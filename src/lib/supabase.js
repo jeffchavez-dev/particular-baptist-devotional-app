@@ -73,6 +73,35 @@ const reviewPrompts = [
   'Journal your thoughts on this week\'s theme',
 ]
 
+// ── Guest progress (localStorage) ────────────────────────────────────
+const LOCAL_KEY = 'devotional_guest_progress'
+
+export function getLocalProgress() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '{}') }
+  catch { return {} }
+}
+
+export function setLocalProgress(dayNumber, fields) {
+  const all = getLocalProgress()
+  all[dayNumber] = { ...(all[dayNumber] || {}), ...fields }
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(all))
+}
+
+export async function migrateLocalToSupabase(userId) {
+  const local = getLocalProgress()
+  const entries = Object.entries(local)
+  if (!entries.length) return
+  const rows = entries.map(([day, d]) => ({
+    user_id: userId,
+    day_number: parseInt(day),
+    completed: !!d.completed,
+    notes: d.notes || '',
+    updated_at: new Date().toISOString(),
+  }))
+  await supabase.from('progress').upsert(rows, { onConflict: 'user_id,day_number' })
+  localStorage.removeItem(LOCAL_KEY)
+}
+
 export function buildSchedule() {
   const pool = []
   let i2=0, iC=0, i1=0, iR=0

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress } from '../lib/supabase'
 import { useAuth } from '../App'
 
 const SCHEDULE = buildSchedule()
@@ -33,33 +33,47 @@ export default function Dashboard() {
   const [page, setPage] = useState(1)
   const [toggling, setToggling] = useState(new Set())
 
-  const userName = session?.user?.user_metadata?.full_name?.split(' ')[0] || 'friend'
+  const userName = session?.user?.user_metadata?.full_name?.split(' ')[0]
+    || session?.user?.email?.split('@')[0]
+    || 'friend'
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from('progress')
-        .select('day_number, completed')
-        .eq('user_id', session.user.id)
+    if (session) {
+      async function load() {
+        const { data } = await supabase
+          .from('progress')
+          .select('day_number, completed')
+          .eq('user_id', session.user.id)
+        const map = {}
+        data?.forEach(r => { map[r.day_number] = r.completed })
+        setProgress(map)
+        setLoading(false)
+      }
+      load()
+    } else {
+      const local = getLocalProgress()
       const map = {}
-      data?.forEach(r => { map[r.day_number] = r.completed })
+      Object.entries(local).forEach(([day, d]) => { map[parseInt(day)] = !!d.completed })
       setProgress(map)
       setLoading(false)
     }
-    load()
   }, [session])
 
   const toggleDay = useCallback(async (day) => {
     const newVal = !progress[day]
     setProgress(p => ({ ...p, [day]: newVal }))
-    setToggling(s => new Set(s).add(day))
-    await supabase.from('progress').upsert({
-      user_id: session.user.id,
-      day_number: day,
-      completed: newVal,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,day_number' })
-    setToggling(s => { const ns=new Set(s); ns.delete(day); return ns })
+    if (session) {
+      setToggling(s => new Set(s).add(day))
+      await supabase.from('progress').upsert({
+        user_id: session.user.id,
+        day_number: day,
+        completed: newVal,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,day_number' })
+      setToggling(s => { const ns=new Set(s); ns.delete(day); return ns })
+    } else {
+      setLocalProgress(day, { completed: newVal })
+    }
   }, [progress, session])
 
   const completedCount = useMemo(() => Object.values(progress).filter(Boolean).length, [progress])
@@ -108,13 +122,24 @@ export default function Dashboard() {
         <div style={s.headerInner}>
           <div>
             <h1 style={s.siteTitle}>365 Devotional</h1>
-            <p style={s.siteGreeting}>Welcome back, {userName}</p>
+            {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
           </div>
-          <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
+          {session ? (
+            <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
+          ) : (
+            <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
+          )}
         </div>
       </header>
 
       <main style={s.main}>
+        {!session && (
+          <div style={s.guestBanner}>
+            <span>Browsing as guest — progress is saved locally.</span>
+            <button onClick={() => navigate('/auth')} style={s.guestBannerLink}>Sign in to sync across devices →</button>
+          </div>
+        )}
+
         {/* Stats */}
         <div style={s.statsGrid}>
           {[
@@ -217,6 +242,16 @@ const s = {
   siteTitle: { fontSize:20, fontFamily:"'Cormorant Garamond', serif", fontWeight:600, color:'var(--ink)' },
   siteGreeting: { fontSize:12, color:'var(--ink-faint)', marginTop:1 },
   main: { maxWidth:860, margin:'0 auto', padding:'2rem 24px' },
+  guestBanner: {
+    display:'flex', alignItems:'center', flexWrap:'wrap', gap:8,
+    background:'var(--gold-faint)', border:'1px solid rgba(154,124,63,0.2)',
+    borderRadius:'var(--radius)', padding:'10px 14px', marginBottom:'1.25rem',
+    fontSize:13, color:'var(--ink-muted)',
+  },
+  guestBannerLink: {
+    background:'none', border:'none', padding:0,
+    color:'var(--gold)', fontWeight:500, fontSize:13, cursor:'pointer',
+  },
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:10, marginBottom:'1.25rem' },
   statCard: { padding:'14px 16px' },
   statLabel: { fontSize:11, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 },

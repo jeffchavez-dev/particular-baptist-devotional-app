@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress } from '../lib/supabase'
 import { useAuth } from '../App'
 
 const SCHEDULE = buildSchedule()
@@ -38,47 +38,65 @@ export default function ReadingPage() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const { data } = await supabase
-        .from('progress')
-        .select('completed, notes')
-        .eq('user_id', session.user.id)
-        .eq('day_number', day)
-        .single()
-      if (data) {
-        setCompleted(!!data.completed)
-        setNotes(data.notes || '')
-        setSavedNotes(data.notes || '')
-      } else {
-        setCompleted(false); setNotes(''); setSavedNotes('')
+    if (!entry) return
+    if (session) {
+      async function load() {
+        setLoading(true)
+        const { data } = await supabase
+          .from('progress')
+          .select('completed, notes')
+          .eq('user_id', session.user.id)
+          .eq('day_number', day)
+          .single()
+        if (data) {
+          setCompleted(!!data.completed)
+          setNotes(data.notes || '')
+          setSavedNotes(data.notes || '')
+        } else {
+          setCompleted(false); setNotes(''); setSavedNotes('')
+        }
+        setLoading(false)
       }
+      load()
+    } else {
+      const local = getLocalProgress()
+      const d = local[day] || {}
+      setCompleted(!!d.completed)
+      setNotes(d.notes || '')
+      setSavedNotes(d.notes || '')
       setLoading(false)
     }
-    if (entry) load()
   }, [day, session])
 
   async function toggleComplete() {
     const newVal = !completed
     setCompleted(newVal)
-    await supabase.from('progress').upsert({
-      user_id: session.user.id,
-      day_number: day,
-      completed: newVal,
-      notes,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,day_number' })
+    if (session) {
+      await supabase.from('progress').upsert({
+        user_id: session.user.id,
+        day_number: day,
+        completed: newVal,
+        notes,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,day_number' })
+    } else {
+      setLocalProgress(day, { completed: newVal, notes })
+    }
   }
 
   async function saveNotes() {
     setSaving(true)
-    await supabase.from('progress').upsert({
-      user_id: session.user.id,
-      day_number: day,
-      completed,
-      notes,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,day_number' })
+    if (session) {
+      await supabase.from('progress').upsert({
+        user_id: session.user.id,
+        day_number: day,
+        completed,
+        notes,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,day_number' })
+    } else {
+      setLocalProgress(day, { completed, notes })
+    }
     setSavedNotes(notes)
     setSaving(false)
     setSaved(true)
@@ -109,7 +127,12 @@ export default function ReadingPage() {
             </svg>
             All days
           </button>
-          <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
+          <div style={{display:'flex', alignItems:'center', gap:12}}>
+            <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
+            {!session && (
+              <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:12, padding:'5px 12px'}}>Sign in</button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -124,8 +147,7 @@ export default function ReadingPage() {
           <p style={s.readingDetail}>{entry.detail}</p>
 
           {entry.link && (
-            <a href={entry.link} target="_blank" rel="noopener noreferrer"
-               style={s.readLink}>
+            <a href={entry.link} target="_blank" rel="noopener noreferrer" style={s.readLink}>
               Read online
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{marginLeft:4}}>
                 <path d="M3 9L9 3M9 3H5M9 3v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
