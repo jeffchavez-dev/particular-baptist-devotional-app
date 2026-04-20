@@ -5,6 +5,7 @@ import { useAuth } from '../App'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
+import { QUOTES } from '../data/quotes'
 
 const SCHEDULE = buildSchedule()
 
@@ -28,9 +29,10 @@ function getContent(entry) {
   if (entry.src === '2LBCF') {
     const m = entry.reading.match(/Ch\.\s*(\d+)\s*§(\d+)/)
     if (!m) return null
-    const item = LBCF2[`${m[1]}.${m[2]}`]
+    const key = `${m[1]}.${m[2]}`
+    const item = LBCF2[key]
     if (!item) return null
-    return { type: '2lbcf', text: item.text, refs: item.refs }
+    return { type: '2lbcf', text: item.text, refs: item.refs, quoteKey: key }
   }
   if (entry.src === 'Catechism') {
     const m = entry.reading.match(/Q&A\s*#(\d+)/)
@@ -61,6 +63,21 @@ function BodyText({ text }) {
   )
 }
 
+function QuoteBlock({ quoteKey }) {
+  const q = QUOTES[quoteKey]
+  if (!q) return null
+  return (
+    <div style={s.quoteCard}>
+      <div style={s.quoteHeading}>{q.heading}</div>
+      <div style={s.quoteMark}>&ldquo;</div>
+      <blockquote style={s.quoteText}>{q.quote}</blockquote>
+      <div style={s.quoteAttrib}>
+        — {q.author}<span style={s.quoteWork}>, {q.work}</span>
+      </div>
+    </div>
+  )
+}
+
 function ContentBlock({ content }) {
   if (!content) return null
   return (
@@ -87,6 +104,10 @@ function ContentBlock({ content }) {
           <div style={s.refsLabel}>Scripture Proofs</div>
           <p style={s.refsText}>{content.refs}</p>
         </div>
+      )}
+
+      {content.type === '2lbcf' && content.quoteKey && (
+        <QuoteBlock quoteKey={content.quoteKey} />
       )}
     </div>
   )
@@ -345,6 +366,29 @@ const s = {
   },
   refsText: {
     fontSize:13, color:'var(--ink-muted)', lineHeight:1.7, margin:0,
+  },
+  quoteCard: {
+    marginTop:20, paddingTop:20,
+    borderTop:'1px solid var(--border)',
+  },
+  quoteHeading: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em',
+    color:'var(--gold)', marginBottom:10,
+  },
+  quoteMark: {
+    fontSize:52, lineHeight:1, color:'var(--gold)', opacity:0.4,
+    fontFamily:"'Cormorant Garamond',serif", marginBottom:-8, display:'block',
+  },
+  quoteText: {
+    fontSize:15, lineHeight:1.85, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", fontStyle:'italic',
+    margin:'0 0 12px 0', paddingLeft:4,
+  },
+  quoteAttrib: {
+    fontSize:12, color:'var(--ink-muted)', fontWeight:500,
+  },
+  quoteWork: {
+    fontStyle:'italic', fontWeight:400,
   },
   completeCard: {
     display:'flex', alignItems:'center', gap:14, padding:'16px 20px', cursor:'pointer',
