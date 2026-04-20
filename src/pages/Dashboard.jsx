@@ -121,7 +121,7 @@ export default function Dashboard() {
       <header style={s.header}>
         <div style={s.headerInner}>
           <div>
-            <h1 style={s.siteTitle}>365 Devotional</h1>
+            <h1 style={s.siteTitle}>Particular Baptist Devotional</h1>
             {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
           </div>
           {session ? (
