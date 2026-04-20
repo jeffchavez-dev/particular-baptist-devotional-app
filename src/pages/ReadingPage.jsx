@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress } from '../lib/supabase'
 import { useAuth } from '../App'
+import { LBCF2 } from '../data/lbcf2'
+import { CATECHISM } from '../data/catechism'
+import { LBCF1 } from '../data/lbcf1'
 
 const SCHEDULE = buildSchedule()
 
@@ -20,6 +23,75 @@ function CheckIcon() {
   )
 }
 
+function getContent(entry) {
+  if (!entry) return null
+  if (entry.src === '2LBCF') {
+    const m = entry.reading.match(/Ch\.\s*(\d+)\s*§(\d+)/)
+    if (!m) return null
+    const item = LBCF2[`${m[1]}.${m[2]}`]
+    if (!item) return null
+    return { type: '2lbcf', text: item.text, refs: item.refs }
+  }
+  if (entry.src === 'Catechism') {
+    const m = entry.reading.match(/Q&A\s*#(\d+)/)
+    if (!m) return null
+    const item = CATECHISM[parseInt(m[1])]
+    if (!item) return null
+    return { type: 'catechism', q: item.q, a: item.a, refs: item.refs }
+  }
+  if (entry.src === '1LBCF') {
+    const m = entry.reading.match(/Article\s*(\d+)/)
+    if (!m) return null
+    const item = LBCF1[parseInt(m[1])]
+    if (!item) return null
+    return { type: '1lbcf', title: item.title, text: item.text, refs: item.refs }
+  }
+  return null
+}
+
+function BodyText({ text }) {
+  const lines = text.split('\\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length <= 1) {
+    return <p style={s.bodyText}>{text}</p>
+  }
+  return (
+    <div style={s.bodyText}>
+      {lines.map((line, i) => <p key={i} style={{ marginBottom: i < lines.length - 1 ? '0.6em' : 0 }}>{line}</p>)}
+    </div>
+  )
+}
+
+function ContentBlock({ content }) {
+  if (!content) return null
+  return (
+    <div className="card" style={s.contentCard}>
+      <div style={s.contentHeader}>
+        <span style={s.contentLabel}>
+          {content.type === 'catechism' ? "Today's Reading" : 'Confession Text'}
+        </span>
+      </div>
+
+      {content.type === 'catechism' && (
+        <div style={s.catWrap}>
+          <p style={s.catQ}><em>Q.</em> {content.q}</p>
+          <p style={s.catA}><em>A.</em> {content.a}</p>
+        </div>
+      )}
+
+      {(content.type === '2lbcf' || content.type === '1lbcf') && (
+        <BodyText text={content.text} />
+      )}
+
+      {content.refs && (
+        <div style={s.refsBlock}>
+          <div style={s.refsLabel}>Scripture Proofs</div>
+          <p style={s.refsText}>{content.refs}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ReadingPage() {
   const { dayNum } = useParams()
   const day = parseInt(dayNum)
@@ -29,6 +101,7 @@ export default function ReadingPage() {
   const entry = SCHEDULE.find(r => r.day === day)
   const prev  = SCHEDULE.find(r => r.day === day - 1)
   const next  = SCHEDULE.find(r => r.day === day + 1)
+  const content = getContent(entry)
 
   const [completed, setCompleted] = useState(false)
   const [notes, setNotes] = useState('')
@@ -156,6 +229,9 @@ export default function ReadingPage() {
           )}
         </div>
 
+        {/* Inline confession / catechism text */}
+        <ContentBlock content={content} />
+
         {/* Complete toggle */}
         <div className="card" style={s.completeCard} onClick={toggleComplete}>
           <div style={{...s.cb, ...(completed ? s.cbDone : {})}}>
@@ -237,7 +313,38 @@ const s = {
     display:'inline-flex', alignItems:'center', marginTop:12,
     fontSize:13, color:'var(--teal)', fontWeight:500,
     border:'1px solid var(--teal)', borderRadius:'var(--radius)',
-    padding:'5px 12px',
+    padding:'5px 12px', textDecoration:'none',
+  },
+  contentCard: { padding:'24px' },
+  contentHeader: { marginBottom:16 },
+  contentLabel: {
+    fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em',
+    color:'var(--ink-faint)',
+  },
+  bodyText: {
+    fontSize:16, lineHeight:1.85, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", fontWeight:400,
+    margin: 0,
+  },
+  catWrap: { display:'flex', flexDirection:'column', gap:14 },
+  catQ: {
+    fontSize:16, lineHeight:1.8, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", margin:0,
+  },
+  catA: {
+    fontSize:16, lineHeight:1.8, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", margin:0,
+  },
+  refsBlock: {
+    marginTop:20, paddingTop:16,
+    borderTop:'1px solid var(--border)',
+  },
+  refsLabel: {
+    fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em',
+    color:'var(--ink-faint)', marginBottom:6,
+  },
+  refsText: {
+    fontSize:13, color:'var(--ink-muted)', lineHeight:1.7, margin:0,
   },
   completeCard: {
     display:'flex', alignItems:'center', gap:14, padding:'16px 20px', cursor:'pointer',
