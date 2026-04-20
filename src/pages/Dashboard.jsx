@@ -140,6 +140,21 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Sources */}
+        <div style={s.sourcesGrid}>
+          {[
+            { label:'2LBCF', name:'Second London Baptist Confession', year:'1689', href:'https://www.the1689confession.com/', color:'var(--purple-ink)', bg:'var(--purple-soft)' },
+            { label:'Catechism', name:"Keach's Baptist Catechism", year:'1693', href:'https://baptistcatechism.org/', color:'var(--teal)', bg:'var(--teal-light)' },
+            { label:'1LBCF', name:'First London Baptist Confession', year:'1644', href:'https://london1644.info/en/fulltext.html', color:'var(--amber-ink)', bg:'var(--amber-soft)' },
+          ].map(src => (
+            <a key={src.label} href={src.href} target="_blank" rel="noopener noreferrer" style={s.sourceCard}>
+              <span style={{...s.sourceBadge, background:src.bg, color:src.color}}>{src.label}</span>
+              <div style={s.sourceName}>{src.name}</div>
+              <div style={s.sourceYear}>{src.year} · Read online ↗</div>
+            </a>
+          ))}
+        </div>
+
         {/* Stats */}
         <div style={s.statsGrid}>
           {[
@@ -252,6 +267,15 @@ const s = {
     background:'none', border:'none', padding:0,
     color:'var(--gold)', fontWeight:500, fontSize:13, cursor:'pointer',
   },
+  sourcesGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:10, marginBottom:'1.25rem' },
+  sourceCard: {
+    display:'flex', flexDirection:'column', gap:6, padding:'14px 16px',
+    background:'white', borderRadius:'var(--radius-lg)', border:'1px solid var(--border)',
+    boxShadow:'var(--shadow-sm)', textDecoration:'none', transition:'box-shadow 0.15s',
+  },
+  sourceBadge: { fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:99, letterSpacing:'0.04em', alignSelf:'flex-start' },
+  sourceName: { fontSize:13, fontWeight:500, color:'var(--ink)', lineHeight:1.3 },
+  sourceYear: { fontSize:11, color:'var(--ink-faint)' },
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:10, marginBottom:'1.25rem' },
   statCard: { padding:'14px 16px' },
   statLabel: { fontSize:11, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 },
