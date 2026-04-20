@@ -114,6 +114,126 @@ function ContentBlock({ content }) {
   )
 }
 
+const ADMIN_EMAIL = 'jeffchavez0828@gmail.com'
+
+function DevNote({ day, session }) {
+  const isAdmin = session?.user?.email === ADMIN_EMAIL
+  const [note, setNote] = useState(null)       // saved content from DB
+  const [draft, setDraft] = useState('')        // edit buffer
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [fetched, setFetched] = useState(false)
+
+  useEffect(() => {
+    async function fetch() {
+      try {
+        const { data } = await supabase
+          .from('dev_notes')
+          .select('content')
+          .eq('day_number', day)
+          .single()
+        setNote(data?.content || null)
+      } catch { /* table may not exist yet */ }
+      setFetched(true)
+    }
+    fetch()
+  }, [day])
+
+  function startEdit() {
+    setDraft(note || '')
+    setEditing(true)
+  }
+
+  function cancelEdit() {
+    setEditing(false)
+    setDraft('')
+  }
+
+  async function saveNote() {
+    if (!draft.trim()) return
+    setSaving(true)
+    await supabase.from('dev_notes').upsert(
+      { day_number: day, content: draft.trim(), updated_at: new Date().toISOString() },
+      { onConflict: 'day_number' }
+    )
+    setNote(draft.trim())
+    setEditing(false)
+    setSaving(false)
+  }
+
+  async function deleteNote() {
+    await supabase.from('dev_notes').delete().eq('day_number', day)
+    setNote(null)
+    setEditing(false)
+  }
+
+  if (!fetched) return null
+  if (!note && !isAdmin) return null
+
+  return (
+    <div className="card" style={dn.card}>
+      <div style={dn.header}>
+        <div style={dn.labelRow}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{flexShrink:0}}>
+            <path d="M9 1.5L11.5 4 4.5 11H2v-2.5L9 1.5z" stroke="var(--amber-ink)" strokeWidth="1.3" strokeLinejoin="round"/>
+          </svg>
+          <span style={dn.label}>Author's Note</span>
+        </div>
+        {isAdmin && !editing && (
+          <button onClick={startEdit} style={dn.editBtn} title="Edit note">
+            {note ? 'Edit' : '+ Add note'}
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div style={{marginTop:10}}>
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="Write a note for all readers on this day…"
+            rows={5}
+            style={{...dn.textarea}}
+            autoFocus
+          />
+          <div style={dn.editActions}>
+            {note && <button onClick={deleteNote} style={dn.deleteBtn}>Delete</button>}
+            <div style={{display:'flex', gap:8}}>
+              <button onClick={cancelEdit} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
+              <button
+                onClick={saveNote}
+                className="btn btn-primary"
+                disabled={saving || !draft.trim()}
+                style={{fontSize:13}}
+              >
+                {saving ? <span className="spinner" style={{width:13,height:13}}/> : 'Publish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : note ? (
+        <p style={dn.noteText}>{note}</p>
+      ) : (
+        <p style={{...dn.noteText, color:'var(--ink-faint)', fontStyle:'italic'}}>
+          No author's note for this day yet.
+        </p>
+      )}
+    </div>
+  )
+}
+
+const dn = {
+  card: { padding:'20px', borderLeft:'3px solid var(--amber-ink)', background:'var(--amber-soft)' },
+  header: { display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2 },
+  labelRow: { display:'flex', alignItems:'center', gap:6 },
+  label: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--amber-ink)' },
+  editBtn: { fontSize:12, color:'var(--amber-ink)', background:'none', border:'none', cursor:'pointer', fontWeight:500, padding:'2px 6px', borderRadius:4 },
+  noteText: { fontSize:15, lineHeight:1.8, color:'var(--ink)', margin:'8px 0 0', fontFamily:"'Cormorant Garamond',serif" },
+  textarea: { resize:'vertical', minHeight:100, lineHeight:1.7, width:'100%', boxSizing:'border-box', background:'white' },
+  editActions: { display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 },
+  deleteBtn: { fontSize:12, color:'var(--ink-faint)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0 },
+}
+
 export default function ReadingPage() {
   const { dayNum } = useParams()
   const day = parseInt(dayNum)
@@ -253,6 +373,9 @@ export default function ReadingPage() {
 
         {/* Inline confession / catechism text */}
         <ContentBlock content={content} />
+
+        {/* Author's note */}
+        <DevNote day={day} session={session} />
 
         {/* Complete toggle */}
         <div className="card" style={s.completeCard} onClick={toggleComplete}>
