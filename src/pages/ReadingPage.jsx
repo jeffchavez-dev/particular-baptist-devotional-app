@@ -44,9 +44,10 @@ function getContent(entry) {
   if (entry.src === '1LBCF') {
     const m = entry.reading.match(/Article\s*(\d+)/)
     if (!m) return null
-    const item = LBCF1[parseInt(m[1])]
+    const num = parseInt(m[1])
+    const item = LBCF1[num]
     if (!item) return null
-    return { type: '1lbcf', title: item.title, text: item.text, refs: item.refs }
+    return { type: '1lbcf', title: item.title, text: item.text, refs: item.refs, quoteKey: `lbcf1.${num}` }
   }
   return null
 }
@@ -106,7 +107,7 @@ function ContentBlock({ content }) {
         </div>
       )}
 
-      {content.type === '2lbcf' && content.quoteKey && (
+      {content.quoteKey && (
         <QuoteBlock quoteKey={content.quoteKey} />
       )}
     </div>
