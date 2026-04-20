@@ -35,7 +35,7 @@ const chapters = [
 ]
 
 const lbcf2 = []
-chapters.forEach(c => { for(let p=1;p<=c.p;p++) lbcf2.push({src:'2LBCF',reading:`Ch. ${c.ch} §${p}`,detail:c.t,link:`https://www.1689.com/chapter${c.ch}.html`}) })
+chapters.forEach(c => { for(let p=1;p<=c.p;p++) lbcf2.push({src:'2LBCF',reading:`Ch. ${c.ch} §${p}`,detail:c.t,link:`https://www.the1689confession.com/1689/chapter-${c.ch}`}) })
 
 const catechism = Array.from({length:114},(_,i)=>({
   src:'Catechism',
@@ -61,7 +61,7 @@ const lbcf1Titles = [
   'Of Church Discipline','Of Communion of Churches','Of Civil Government and Religion',
   'Of the Final State',
 ]
-const lbcf1 = lbcf1Titles.map((t,i)=>({src:'1LBCF',reading:`Article ${i+1}`,detail:t,link:'https://www.arbca.com/1644-confession'}))
+const lbcf1 = lbcf1Titles.map((t,i)=>({src:'1LBCF',reading:`Article ${i+1}`,detail:t,link:`https://london1644.info/en/fulltext.html#artikel${String(i+1).padStart(2,'0')}`}))
 
 const reviewPrompts = [
   'Revisit your favourite reading from this week',
@@ -100,6 +100,12 @@ export async function migrateLocalToSupabase(userId) {
   }))
   await supabase.from('progress').upsert(rows, { onConflict: 'user_id,day_number' })
   localStorage.removeItem(LOCAL_KEY)
+}
+
+export function getTodayDayNum() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), 0, 1)
+  return Math.floor((now - start) / (1000 * 60 * 60 * 24)) + 1
 }
 
 export function buildSchedule() {

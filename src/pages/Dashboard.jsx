@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum } from '../lib/supabase'
 import { useAuth } from '../App'
 
 const SCHEDULE = buildSchedule()
+const TODAY_DAY = Math.min(getTodayDayNum(), 365)
 
 function badgeClass(src) {
   if (src === '2LBCF')    return 'badge badge-2lbcf'
@@ -120,9 +121,12 @@ export default function Dashboard() {
     <div style={s.page}>
       <header style={s.header}>
         <div style={s.headerInner}>
-          <div>
-            <h1 style={s.siteTitle}>Particular Baptist Devotional</h1>
-            {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
+          <div style={{display:'flex', alignItems:'center', gap:12}}>
+            <img src="/pb-icon.svg" alt="P.B." style={{width:36, height:36, flexShrink:0}} />
+            <div>
+              <h1 style={s.siteTitle}>Particular Baptist Devotional</h1>
+              {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
+            </div>
           </div>
           {session ? (
             <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
@@ -139,6 +143,32 @@ export default function Dashboard() {
             <button onClick={() => navigate('/auth')} style={s.guestBannerLink}>Sign in to sync across devices →</button>
           </div>
         )}
+
+        {/* Today's Reading */}
+        {(() => {
+          const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
+          if (!todayEntry) return null
+          return (
+            <div style={s.todayCard} onClick={() => navigate(`/day/${TODAY_DAY}`)}>
+              <div style={s.todayLeft}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
+                  <span style={s.todayLabel}>Today's Reading</span>
+                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>Day {TODAY_DAY} · {todayEntry.date}</span>
+                </div>
+                <div style={s.todayReading}>
+                  <span className={badgeClass(todayEntry.src)}>{todayEntry.src}</span>
+                  <span style={s.todayReadingText}>{todayEntry.reading}</span>
+                </div>
+                <div style={s.todayDetail}>{todayEntry.detail}</div>
+              </div>
+              <div style={s.todayArrow}>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M6 4l5 5-5 5" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Sources */}
         <div style={s.sourcesGrid}>
@@ -246,6 +276,21 @@ export default function Dashboard() {
           <button className="btn btn-outline" onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages}>Next →</button>
         </div>
       </main>
+
+      <footer style={s.footer}>
+        <div style={s.footerInner}>
+          <span style={s.footerText}>Created by Jeff Chavez with Claude Code</span>
+          <span style={s.footerDot}>·</span>
+          <a href="https://theologycheck.blog" target="_blank" rel="noopener noreferrer" style={s.footerLink}>
+            <img
+              src="https://theologycheckblog.wordpress.com/wp-content/uploads/2022/02/tc-logo.png"
+              alt="TheologyCheck"
+              style={{height:20, width:'auto', verticalAlign:'middle', marginRight:5}}
+            />
+            theologycheck.blog
+          </a>
+        </div>
+      </footer>
     </div>
   )
 }
@@ -304,4 +349,37 @@ const s = {
   rowMeta: { display:'flex', alignItems:'center', gap:4, flexShrink:0 },
   rowDate: { fontSize:12, color:'var(--ink-faint)', whiteSpace:'nowrap' },
   pag: { display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginTop:'1.5rem', flexWrap:'wrap' },
+  todayCard: {
+    display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+    background:'white', border:'1.5px solid var(--teal)', borderRadius:'var(--radius-lg)',
+    padding:'16px 20px', cursor:'pointer', marginBottom:4,
+    boxShadow:'0 1px 4px rgba(68,153,136,0.10)',
+    transition:'box-shadow 0.15s',
+  },
+  todayLeft: { flex:1, minWidth:0 },
+  todayLabel: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em',
+    color:'var(--teal)',
+  },
+  todayReading: { display:'flex', alignItems:'center', gap:7, flexWrap:'wrap', marginBottom:3 },
+  todayReadingText: { fontSize:15, fontWeight:500, color:'var(--ink)' },
+  todayDetail: { fontSize:12, color:'var(--ink-faint)' },
+  todayArrow: { flexShrink:0 },
+  footer: {
+    borderTop:'1px solid var(--border)', background:'white',
+    marginTop:'3rem', padding:'20px 24px',
+  },
+  footerInner: {
+    maxWidth:860, margin:'0 auto',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    gap:10, flexWrap:'wrap',
+    fontSize:13, color:'var(--ink-faint)',
+  },
+  footerText: { fontSize:13, color:'var(--ink-faint)' },
+  footerDot: { color:'var(--border-strong)' },
+  footerLink: {
+    display:'inline-flex', alignItems:'center',
+    color:'var(--ink-muted)', textDecoration:'none', fontWeight:500,
+    fontSize:13,
+  },
 }
