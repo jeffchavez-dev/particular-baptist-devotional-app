@@ -257,8 +257,11 @@ function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote })
     : {}
 
   function getContentText() {
-    if (content.type === 'catechism') return `Q. ${content.q}\n\nA. ${content.a}`
-    return content.text || ''
+    let text = content.type === 'catechism'
+      ? `Q. ${content.q}\n\nA. ${content.a}`
+      : (content.text || '')
+    if (content.refs) text += '\n\nScripture proofs: ' + content.refs
+    return text
   }
 
   return (
@@ -592,7 +595,10 @@ export default function ReadingPage() {
             title: entry.reading,
             subtitle: `Day ${day} · ${entry.date}`,
             source: entry.src,
-            text,
+            text: content?.type === 'catechism'
+              ? `Q. ${content.q}\n\nA. ${content.a}`
+              : (content?.text || ''),
+            refs: content?.refs || '',
           })}
           onShareQuote={(q) => setShareCard({
             type: 'quote',

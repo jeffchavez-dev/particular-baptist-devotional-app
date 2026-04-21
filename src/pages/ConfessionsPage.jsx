@@ -331,7 +331,11 @@ export default function ConfessionsPage() {
                               </div>
                             )}
                           </div>
-                          <CopyBtn getText={() => p.text} />
+                          <CopyBtn getText={() => {
+                            let t = p.text
+                            if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
+                            return t
+                          }} />
                         </div>
                       )
                     })}
@@ -364,7 +368,11 @@ export default function ConfessionsPage() {
                         </div>
                       )}
                     </div>
-                    <CopyBtn getText={() => `Q. ${item.q}\n\nA. ${item.a}`} />
+                    <CopyBtn getText={() => {
+                      let t = `Q. ${item.q}\n\nA. ${item.a}`
+                      if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
+                      return t
+                    }} />
                   </div>
                 )
               })}
@@ -391,7 +399,11 @@ export default function ConfessionsPage() {
                         <span style={s.articleNum}>Article {num}</span>
                         <h2 style={s.articleTitle}>{item.title}</h2>
                       </div>
-                      <CopyBtn getText={() => `${item.title}\n\n${item.text}`} />
+                      <CopyBtn getText={() => {
+                        let t = `${item.title}\n\n${item.text}`
+                        if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
+                        return t
+                      }} />
                     </div>
                     <div style={s.articleBody}>
                       {lines.map((line, i) => {

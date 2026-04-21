@@ -160,10 +160,32 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor) {
 
   /* Content body */
   const cSz = Math.round(w * 0.031), cLineH = cSz * 1.75
-  const maxLines = Math.max(3, Math.floor((h * 0.52) / cLineH))
+  const refsPresent = !!(card.refs && card.refs.trim())
+  const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.52)) / cLineH))
   ctx.fillStyle = textColor
   ctx.font = `italic ${cSz}px 'Georgia','Times New Roman',serif`
-  wrapText(ctx, card.text || '', PAD + w * 0.04, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines)
+  const contentBottom = wrapText(ctx, card.text || '', PAD + w * 0.04, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines)
+
+  /* Scripture references — smaller, muted, below content */
+  if (refsPresent) {
+    const refAreaTop = contentBottom + w * 0.03
+    if (refAreaTop < h * 0.88) {
+      const refSz   = Math.round(w * 0.017)
+      const refLineH = refSz * 1.55
+      const refMaxLines = Math.max(1, Math.floor((h * 0.88 - refAreaTop) / refLineH))
+      // Clean footnote markers
+      const refsClean = card.refs.replace(/\b[a-z](?=[A-Z1-9])/g, '').replace(/\s+/g, ' ').trim()
+
+      ctx.fillStyle = accentColor; ctx.globalAlpha = 0.65
+      ctx.font = `bold ${refSz}px 'DM Sans','Helvetica Neue',sans-serif`
+      ctx.fillText('Scripture proofs:', PAD + w * 0.04, refAreaTop)
+
+      ctx.fillStyle = textColor; ctx.globalAlpha = 0.38
+      ctx.font = `${refSz}px 'DM Sans','Helvetica Neue',sans-serif`
+      wrapText(ctx, refsClean, PAD + w * 0.04, refAreaTop + refSz * 1.7, contentW - w * 0.04, refLineH, refMaxLines)
+      ctx.globalAlpha = 1
+    }
+  }
 
   drawBottomChrome(ctx, w, h, PAD, accentColor, textColor)
 }

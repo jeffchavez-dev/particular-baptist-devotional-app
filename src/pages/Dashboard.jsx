@@ -70,7 +70,9 @@ export default function Dashboard() {
   const [loading,      setLoading]      = useState(true)
   const [search,       setSearch]       = useState('')
   const [filterSrc,    setFilterSrc]    = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterStatus, setFilterStatus] = useState(() => {
+    try { return localStorage.getItem('pb-show-completed') === '1' ? '' : 'todo' } catch { return 'todo' }
+  })
   const [page,         setPage]         = useState(1)
   const [toggling,     setToggling]     = useState(new Set())
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
@@ -362,11 +364,29 @@ export default function Dashboard() {
             <option value="1LBCF">1LBCF</option>
             <option value="Review">Review</option>
           </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={s.select}>
-            <option value="">All days</option>
-            <option value="done">Completed</option>
-            <option value="todo">To do</option>
-          </select>
+          <button
+            style={{
+              ...s.select, cursor:'pointer', background:'white',
+              display:'flex', alignItems:'center', gap:6,
+              color: filterStatus === '' ? 'var(--teal)' : 'var(--ink-muted)',
+              borderColor: filterStatus === '' ? 'var(--teal)' : 'var(--border-strong)',
+            }}
+            onClick={() => {
+              const next = filterStatus === 'todo' ? '' : 'todo'
+              setFilterStatus(next)
+              try { localStorage.setItem('pb-show-completed', next === '' ? '1' : '0') } catch {}
+            }}
+            title={filterStatus === 'todo' ? 'Completed days are hidden — click to show' : 'Click to hide completed days'}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              {filterStatus === '' ? (
+                <><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2"/><polyline points="3.5,6.5 5.5,8.5 9.5,4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></>
+              ) : (
+                <><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2"/></>
+              )}
+            </svg>
+            {filterStatus === '' ? `Showing completed (${completedCount})` : `Show completed (${completedCount})`}
+          </button>
         </div>
 
         {/* Search hint */}
