@@ -78,9 +78,9 @@ const QUESTIONS = [
     category: 'Ecclesiology',
     q: 'What are the two ordinances (sacraments) recognised by Particular Baptists?',
     options: [
-      'Baptism and the Lord's Supper',
-      'Baptism, the Lord's Supper, and Confirmation',
-      'The Lord's Supper and Foot-washing',
+      "Baptism and the Lord's Supper",
+      "Baptism, the Lord's Supper, and Confirmation",
+      "The Lord's Supper and Foot-washing",
       'Baptism, Marriage, and Holy Orders',
     ],
     answer: 0,
