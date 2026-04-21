@@ -257,9 +257,9 @@ const QUESTIONS = [
     id: 21,
     level: 'intermediate',
     category: 'Theology Proper',
-    q: 'What does the 2LBCF chapter 2 teach about God\'s simplicity?',
+    q: 'What does the doctrine of divine simplicity, affirmed in 2LBCF chapter 2, mean?',
     options: [
-      'God has no body, parts, or passions and is not composed of distinct elements',
+      'God has no parts and is not composed of distinct elements — He is not a composite being',
       'God is easy to understand',
       'God is one in number but complex in nature',
       'God\'s simplicity means He cannot be angry or sorrowful',
