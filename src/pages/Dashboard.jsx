@@ -49,10 +49,13 @@ function CheckIcon() {
 
 const SOURCES = [
   { label:'2LBCF',     name:'Second London Baptist Confession', year:'1689',
+    internalHref:'/confessions?t=2lbcf',
     href:'https://www.the1689confession.com/', color:'var(--purple-ink)', bg:'var(--purple-soft)' },
   { label:'Catechism', name:"Keach's Baptist Catechism",        year:'1693',
+    internalHref:'/confessions?t=catechism',
     href:'https://baptistcatechism.org/', color:'var(--teal)', bg:'var(--teal-light)' },
   { label:'1LBCF',    name:'First London Baptist Confession',   year:'1644',
+    internalHref:'/confessions?t=1lbcf',
     href:'https://london1644.info/en/fulltext.html', color:'var(--amber-ink)', bg:'var(--amber-soft)' },
 ]
 
@@ -492,19 +495,24 @@ export default function Dashboard() {
               </p>
               <div style={s.sidebarSources}>
                 {SOURCES.map(src => (
-                  <a key={src.label} href={src.href} target="_blank" rel="noopener noreferrer" style={s.sidebarSourceCard}>
+                  <div key={src.label} style={s.sidebarSourceCard}>
                     <div style={s.sidebarSourceTop}>
                       <span style={{...s.sourceBadge, background:src.bg, color:src.color}}>{src.label}</span>
                       <span style={s.sidebarSourceYear}>{src.year}</span>
                     </div>
                     <div style={s.sidebarSourceName}>{src.name}</div>
-                    <div style={s.sidebarSourceLink}>
-                      Read online
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{marginLeft:3}}>
-                        <path d="M2 9L9 2M9 2H4.5M9 2V6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
+                    <div style={{display:'flex', gap:10, marginTop:4}}>
+                      <button
+                        onClick={() => { navigate(src.internalHref); setSidebarOpen(false) }}
+                        style={{...s.sidebarSourceLink, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:"'DM Sans',sans-serif"}}
+                      >
+                        Read in app →
+                      </button>
+                      <a href={src.href} target="_blank" rel="noopener noreferrer" style={{...s.sidebarSourceLink, color:'var(--ink-faint)'}}>
+                        Source ↗
+                      </a>
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
 
