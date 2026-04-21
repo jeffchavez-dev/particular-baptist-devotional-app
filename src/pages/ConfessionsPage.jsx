@@ -81,7 +81,19 @@ export default function ConfessionsPage() {
   const tab = searchParams.get('t') || '2lbcf'
   const [activeChapter, setActiveChapter] = useState(null)
   const [search, setSearch] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const contentRef = useRef(null)
+
+  useEffect(() => {
+    const handler = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (!mobile) setNavOpen(false) // close overlay when resizing to desktop
+    }
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const src = SOURCES[tab] || SOURCES['2lbcf']
 
@@ -89,6 +101,7 @@ export default function ConfessionsPage() {
     setSearchParams({ t })
     setActiveChapter(null)
     setSearch('')
+    setNavOpen(false)
     window.scrollTo({ top: 0 })
   }
 
@@ -100,6 +113,7 @@ export default function ConfessionsPage() {
       window.scrollTo({ top, behavior: 'smooth' })
     }
     setActiveChapter(id)
+    if (isMobile) setNavOpen(false) // close overlay after selection on mobile
   }
 
   /* ─── Chapter list for nav ─── */
@@ -176,27 +190,63 @@ export default function ConfessionsPage() {
           </div>
         </div>
 
-        {/* Confession title + source link */}
+        {/* Confession title + source link + chapter toggle */}
         <div style={s.confessionBar}>
           <div style={s.confessionBarInner}>
             <span style={{...s.confessionBadge, background: src.bg, color: src.color}}>{src.label}</span>
             <span style={s.confessionName}>{src.name}</span>
+
+            {/* Chapter toggle — always visible when there's a nav */}
+            {chapterNav.length > 0 && (
+              <button
+                onClick={() => setNavOpen(o => !o)}
+                className="btn btn-ghost"
+                style={{fontSize:12, gap:5, padding:'5px 10px', marginLeft:4, flexShrink:0}}
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="1" y="2" width="11" height="1.5" rx=".75" fill="currentColor"/>
+                  <rect x="1" y="5.75" width="7"  height="1.5" rx=".75" fill="currentColor"/>
+                  <rect x="1" y="9.5"  width="9"  height="1.5" rx=".75" fill="currentColor"/>
+                </svg>
+                {navOpen ? 'Close' : 'Chapters'}
+              </button>
+            )}
+
             <a href={src.href} target="_blank" rel="noopener noreferrer" style={s.sourceLink}>
-              View original source
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{marginLeft:4}}>
-                <path d="M2 9L9 2M9 2H4.5M9 2V6.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              Source ↗
             </a>
           </div>
         </div>
       </header>
 
+      {/* ── Mobile chapter overlay backdrop ── */}
+      {isMobile && navOpen && chapterNav.length > 0 && (
+        <div
+          style={s.backdrop}
+          onClick={() => setNavOpen(false)}
+        />
+      )}
+
       <div style={s.layout}>
 
-        {/* ── Chapter nav (desktop sidebar) ── */}
+        {/* ── Chapter nav ── */}
         {chapterNav.length > 0 && (
-          <nav style={s.chapNav}>
-            <div style={s.chapNavInner}>
+          <nav style={isMobile
+            ? { ...s.chapNavMobile, transform: navOpen ? 'translateX(0)' : 'translateX(-100%)' }
+            : { ...s.chapNav, display: navOpen ? 'block' : 'none' }
+          }>
+            {/* Mobile header */}
+            {isMobile && (
+              <div style={s.mobileNavHeader}>
+                <span style={{fontSize:13, fontWeight:600, color:'var(--ink)'}}>Chapters</span>
+                <button onClick={() => setNavOpen(false)} style={s.mobileNavClose}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div style={isMobile ? s.chapNavInnerMobile : s.chapNavInner}>
               {chapterNav.map(ch => (
                 <button
                   key={ch.id}

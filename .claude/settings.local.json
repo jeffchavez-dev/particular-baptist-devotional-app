@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(gh --version)",
+      "Bash(git --version)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(python3 -c \"import pdfplumber; pdf = pdfplumber.open\\(r'C:\\\\Users\\\\Jeff Chavez\\\\Downloads\\\\1LCF-EN-CompEd-Text-plus-Scripture-US-Letter.pdf'\\); print\\(pdf.pages[0].extract_text\\(\\)[:2000]\\)\")",
+      "Bash(python3 -c \"import PyPDF2; r = PyPDF2.PdfReader\\(r'C:\\\\Users\\\\Jeff Chavez\\\\Downloads\\\\1LCF-EN-CompEd-Text-plus-Scripture-US-Letter.pdf'\\); print\\(r.pages[0].extract_text\\(\\)[:2000]\\)\")",
+      "Bash(pip install *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 parse_texts.py)",
+      "Bash(python parse_texts.py)",
+      "Bash(python -c ' *)",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__computer",
+      "mcp__Claude_in_Chrome__find",
+      "mcp__Claude_in_Chrome__read_page",
+      "mcp__Claude_in_Chrome__javascript_tool"
+    ]
+  }
+}
