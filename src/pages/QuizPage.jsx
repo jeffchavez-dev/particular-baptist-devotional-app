@@ -500,17 +500,27 @@ function levelColor(level) {
   return { color: 'white', bg: 'var(--ink)' }
 }
 
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 export default function QuizPage() {
   const navigate = useNavigate()
+  const [questions] = useState(() => shuffle(QUESTIONS))
   const [current, setCurrent] = useState(0)
   const [answers, setAnswers] = useState({})   // { questionId: selectedIndex }
   const [submitted, setSubmitted] = useState(false)
   const [selected, setSelected] = useState(null)
   const [showCorrect, setShowCorrect] = useState(false)
 
-  const q = QUESTIONS[current]
+  const q = questions[current]
   const isAnswered = answers[q.id] !== undefined
-  const isLast = current === QUESTIONS.length - 1
+  const isLast = current === questions.length - 1
 
   function choose(idx) {
     if (isAnswered) return
@@ -531,7 +541,7 @@ export default function QuizPage() {
   }
 
   const score = Object.entries(answers).reduce((sum, [id, ans]) => {
-    const question = QUESTIONS.find(q => q.id === parseInt(id))
+    const question = questions.find(q => q.id === parseInt(id))
     return sum + (question && question.answer === ans ? 1 : 0)
   }, 0)
 
@@ -539,10 +549,10 @@ export default function QuizPage() {
   const lc = levelColor(q.level)
 
   if (submitted) {
-    return <ResultsScreen score={score} total={QUESTIONS.length} tier={tier} answers={answers} navigate={navigate} />
+    return <ResultsScreen score={score} total={questions.length} tier={tier} answers={answers} questions={questions} navigate={navigate} />
   }
 
-  const progress = ((current) / QUESTIONS.length) * 100
+  const progress = (current / questions.length) * 100
 
   return (
     <div style={s.page}>
@@ -556,7 +566,7 @@ export default function QuizPage() {
             Back
           </button>
           <span style={s.navTitle}>How Particular Baptist Are You?</span>
-          <span style={s.navCount}>{current + 1} / {QUESTIONS.length}</span>
+          <span style={s.navCount}>{current + 1} / {questions.length}</span>
         </div>
       </nav>
 
@@ -611,10 +621,10 @@ export default function QuizPage() {
 
         {/* Quick nav dots */}
         <div style={s.dots}>
-          {QUESTIONS.map((_, i) => {
-            const ans = answers[QUESTIONS[i].id]
-            const correct = ans !== undefined && QUESTIONS[i].answer === ans
-            const wrong   = ans !== undefined && QUESTIONS[i].answer !== ans
+          {questions.map((_, i) => {
+            const ans = answers[questions[i].id]
+            const correct = ans !== undefined && questions[i].answer === ans
+            const wrong   = ans !== undefined && questions[i].answer !== ans
             return (
               <div
                 key={i}
@@ -633,11 +643,11 @@ export default function QuizPage() {
   )
 }
 
-function ResultsScreen({ score, total, tier, answers, navigate }) {
+function ResultsScreen({ score, total, tier, answers, questions, navigate }) {
   const pct = Math.round((score / total) * 100)
 
   const categoryBreakdown = {}
-  QUESTIONS.forEach(q => {
+  questions.forEach(q => {
     if (!categoryBreakdown[q.category]) categoryBreakdown[q.category] = { correct: 0, total: 0 }
     categoryBreakdown[q.category].total++
     if (answers[q.id] === q.answer) categoryBreakdown[q.category].correct++
@@ -685,7 +695,7 @@ function ResultsScreen({ score, total, tier, answers, navigate }) {
         {/* Review */}
         <div style={s.reviewCard}>
           <div style={s.breakdownTitle}>Answer Review</div>
-          {QUESTIONS.map((q, i) => {
+          {questions.map((q, i) => {
             const userAns = answers[q.id]
             const isCorrect = userAns === q.answer
             const lc = levelColor(q.level)
