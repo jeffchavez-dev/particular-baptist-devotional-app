@@ -64,6 +64,186 @@ export const QUOTES = {
     work: 'An Answer to a Brief Discourse Concerning Singing',
   },
 
+  // ── 2LBCF Chapter 2: Of God and of the Holy Trinity ─────────────────
+  '2.1': {
+    heading: 'The Divine Attributes',
+    quote: 'The Lord our God is... in himself most holy, every way infinite, in greatness, wisdom, power, love; merciful and gracious.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '2.2': {
+    heading: "God's Self-Sufficiency",
+    quote: 'He [God] is the alone fountain of all Being, of whom, through whom, and to whom are all things.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '2.3': {
+    heading: 'The Holy Trinity',
+    quote: 'The same single and infinite Essence is in Father, Son and Holy Ghost; the whole undivided and indivisible Essence of God dwells in the Son in its fullness and infinite perfection.',
+    author: 'Francis Cheynell',
+    work: 'The Divine Trinunity',
+  },
+
+  // ── 2LBCF Chapter 3: Of God's Decree ────────────────────────────────
+  '3.1': {
+    heading: 'The Nature of the Decree',
+    quote: 'The revealed will of God, containeth not his purpose and decree, but our dutie, not what he will doe according to his good pleasure, but what we should doe if we will please him.',
+    author: 'John Owen',
+    work: 'A Display of Arminianism',
+  },
+  '3.2': {
+    heading: "God's Sovereign Sight",
+    quote: 'The heavenly builder (having all Wisdom and Knowledg) sees by one Act (uno intuitu) all things that are necessary and commodious.',
+    author: 'Benjamin Keach',
+    work: 'Troposchemalogia',
+  },
+  '3.3': {
+    heading: 'The Fixed Number of the Elect',
+    quote: 'The salvation of the fullness of Jews and Gentiles is described as \'All Israel,\' signifying that the church is the corporate fulfillment of the promises made to the fathers.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '3.4': {
+    heading: 'Election and Preterition',
+    quote: 'God\'s purpose was Christ coming and offering Himself an acceptable sacrifice to reconcile His \'elect only\'.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics',
+  },
+  '3.5': {
+    heading: 'The Basis of Election',
+    quote: 'God\'s free grace and love is at the root of predestination.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '3.6': {
+    heading: 'The Execution of the Decree',
+    quote: 'The Decree of Election, without the Execution of it, puts nothing into actual Existence... No more are any of the Elect actually Justified... until by the Spirit they are united to him and so Believe.',
+    author: 'Benjamin Keach',
+    work: 'Christ Alone the Way to Heaven',
+  },
+  '3.7': {
+    heading: 'Prudent Handling of the Doctrine',
+    quote: 'To appeal from the judgement of Scripture to the instincts and dictates of the Spirit, is to set the Spirit of God . . . in opposition to it self.',
+    author: 'Hanserd Knollys',
+    work: 'An Answer to a Brief Discourse Concerning Singing',
+  },
+
+  // ── 2LBCF Chapter 4: Of Creation ─────────────────────────────────────
+  '4.1': {
+    heading: 'Creation out of Nothing',
+    quote: 'The Work of Creation is God\'s making all things of Nothing, by the Word of his Power, in the space of six Days, and all very Good.',
+    author: 'Benjamin Keach',
+    work: 'A Confession of Faith',
+  },
+  '4.2': {
+    heading: 'The Creation of Man',
+    quote: 'Uprightness or Rectitude of Nature consisted in the perfect Harmony of his soul, with that law of God which he was made under, and subjected to.',
+    author: 'Nehemiah Coxe',
+    work: 'A Discourse of the Covenants',
+  },
+  '4.3': {
+    heading: 'The Positive Law',
+    quote: 'Besides the Law written in their hearts, they received a command not to eat of the tree of knowledge of good and evil.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+
+  // ── 2LBCF Chapter 5: Of Providence ───────────────────────────────────
+  '5.1': {
+    heading: "God's Universal Government",
+    quote: 'What we see around us is simply the historical expression of the eternal decree of God.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '5.2': {
+    heading: 'Secondary Causes',
+    quote: 'God therefore in his government doth advance his power in the weakness, his wisdom in the follies, his holiness in the sins... yet God is not defiled with the impurities of men.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '5.3': {
+    heading: 'Ordinary Providence',
+    quote: 'Consider [evils] as Gods works, and such as doe proceed from his most holy will, and as they are by his infinite wisdome directed to just and holy ends.',
+    author: 'Nicholas Estwick',
+    work: "Christ's Submission to His Fathers Will",
+  },
+  '5.4': {
+    heading: 'Providence and the Fall',
+    quote: 'God orders the sins of men to the glory of his grace... [and] for the glory of his justice upon others.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '5.5': {
+    heading: 'The Chastisement of Believers',
+    quote: 'Afflictions help God\'s children to remember that they must always look to heaven for sustenance and strength, never relying on their own resources.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '5.6': {
+    heading: 'The Judgment of the Wicked',
+    quote: 'The punishments of the wicked are inflicted upon them in Gods wrath and heavie displeasure; neither doth he take any compassion on them in their miseries.',
+    author: 'John Downame',
+    work: 'Consolations for the Afflicted',
+  },
+  '5.7': {
+    heading: "God's Care for His Church",
+    quote: 'So that whatsoever befalls any of his elect is by his appointment, for his glory, and their good.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+
+  // ── 2LBCF Chapter 6: Of the Fall of Man ──────────────────────────────
+  '6.1': {
+    heading: 'The Transgression of Our First Parents',
+    quote: 'Our first parents... willfully transgress the law of their creation, and break the covenant in eating the forbidden fruit.',
+    author: 'James M. Renihan',
+    work: 'From Shadow to Substance',
+  },
+  '6.2': {
+    heading: 'The Imputation of Guilt',
+    quote: 'Adam therefore being made our Head in that first Covenant, by Divine Ordination, therefore his Transgression is accounted ours.',
+    author: 'Thomas Whinnell',
+    work: 'From Shadow to Substance',
+  },
+  '6.3': {
+    heading: 'Total Corruption',
+    quote: 'This Transgression was a total Apostacy from God, and in it all conceiveable Wickedness was included... yea all the Villanies that to this day have been... are the genuine Fruit thereof.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '6.4': {
+    heading: 'The Propagation of Sin',
+    quote: 'We who descend from him [Adam] by ordinary Generation, sinned in him, and fell with him... our whole Nature is corrupted.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+  '6.5': {
+    heading: 'Indwelling Sin in Believers',
+    quote: 'These phrases acknowledge the fact that while the believer\'s sin is forgiven, it remains in one\'s life and may evidence itself in powerful ways.',
+    author: 'James M. Renihan',
+    work: 'Baptist Symbolics Volume 2',
+  },
+
+  // ── 2LBCF Chapter 7: Of God's Covenant ───────────────────────────────
+  '7.1': {
+    heading: 'The Necessity of Covenant',
+    quote: 'Such a priviledg, and nearness to God, as is included in Covenant-Interest, cannot immediately result from the relation which they have to God as Creatures... for the Lord owes not unto Man the Good promised in any Covenant he makes with them, antecedently.',
+    author: 'Nehemiah Coxe',
+    work: 'A Discourse of the Covenants',
+  },
+  '7.2': {
+    heading: 'The Monopleuristic Nature of Grace',
+    quote: '\'Tis as it appears from hence, an Absolute, and not a Conditional Covenant: not if we do this and that, viz get a new Heart, and perform the Condition of Gospel-Holiness and Obedience, we shall have pardon and be justified; no, but otherwise... all is freely of Grace through Christ\'s Merit.',
+    author: 'Benjamin Keach',
+    work: 'The Everlasting Covenant',
+  },
+  '7.3': {
+    heading: 'The Revealed/Concluded Model',
+    quote: 'If Westminster federalism can be summarized as \'one covenant under two administrations,\' that of the 1689 would be, \'one covenant revealed progressively and concluded formally under the new covenant.\'',
+    author: 'Pascal Denault',
+    work: 'The Distinctiveness of Baptist Covenant Theology',
+  },
+
   // ── 1LBCF: First London Baptist Confession (1644) ────────────────────
   // Unit 1: The Doctrine of God (Articles 1–6)
   'lbcf1.1': {
