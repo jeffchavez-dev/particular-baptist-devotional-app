@@ -2,8 +2,10 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase, migrateLocalToSupabase } from './lib/supabase'
 import AuthPage from './pages/AuthPage'
+import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import ReadingPage from './pages/ReadingPage'
+import QuizPage from './pages/QuizPage'
 
 export const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -35,9 +37,11 @@ export default function App() {
   return (
     <AuthContext.Provider value={{ session }}>
       <Routes>
-        <Route path="/auth" element={session ? <Navigate to="/" /> : <AuthPage />} />
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/auth" element={session ? <Navigate to="/dashboard" /> : <AuthPage />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/day/:dayNum" element={<ReadingPage />} />
+        <Route path="/quiz" element={<QuizPage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </AuthContext.Provider>

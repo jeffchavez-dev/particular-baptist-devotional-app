@@ -34,7 +34,7 @@ export default function AuthPage() {
     setGoogleLoading(true); setError(null)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: { redirectTo: window.location.origin + '/dashboard' }
     })
     if (error) { setError(error.message); setGoogleLoading(false) }
   }
@@ -54,7 +54,7 @@ export default function AuthPage() {
             <span style={styles.pill}>Catechism · 114 Q&As</span>
             <span style={styles.pill}>1LBCF · 52 articles</span>
           </div>
-          <button onClick={() => navigate('/')} style={styles.guestLink}>
+          <button onClick={() => navigate('/dashboard')} style={styles.guestLink}>
             Continue as guest →
           </button>
         </div>
