@@ -521,4 +521,30 @@ const s = {
     fontFamily:"'DM Sans',sans-serif",
   },
   refsLabel: { fontWeight:600, color:'var(--ink-muted)' },
+
+  /* Mobile chapter nav overlay */
+  backdrop: {
+    position:'fixed', inset:0, background:'rgba(30,24,16,0.45)',
+    zIndex:40, backdropFilter:'blur(2px)',
+  },
+  chapNavMobile: {
+    position:'fixed', top:0, left:0, bottom:0, width:280,
+    background:'white', borderRight:'1px solid var(--border)',
+    boxShadow:'4px 0 24px rgba(0,0,0,0.12)',
+    zIndex:50, display:'flex', flexDirection:'column',
+    transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+  },
+  mobileNavHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'14px 16px', borderBottom:'1px solid var(--border)',
+    position:'sticky', top:0, background:'white', flexShrink:0,
+  },
+  mobileNavClose: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', display:'flex', alignItems:'center',
+    justifyContent:'center', padding:6, borderRadius:'var(--radius)',
+  },
+  chapNavInnerMobile: {
+    flex:1, overflowY:'auto', padding:'8px',
+  },
 }
