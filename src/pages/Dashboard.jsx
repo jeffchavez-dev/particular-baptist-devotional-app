@@ -189,10 +189,18 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  async function signOut() { await supabase.auth.signOut() }
+  /* ── notes sorted by day, with schedule info ── */
+  const enrichedNotes = useMemo(() => {
+    return dbNotes
+      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
+      .filter(n => n.entry)
+      .sort((a, b) => a.day_number - b.day_number)
+  }, [dbNotes])
 
   /* ── today entry ── */
   const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
+
+  async function signOut() { await supabase.auth.signOut() }
 
   if (loading) {
     return (
@@ -202,14 +210,6 @@ export default function Dashboard() {
       </div>
     )
   }
-
-  /* ── notes sorted by day, with schedule info ── */
-  const enrichedNotes = useMemo(() => {
-    return dbNotes
-      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
-      .filter(n => n.entry)
-      .sort((a, b) => a.day_number - b.day_number)
-  }, [dbNotes])
 
   return (
     <div style={s.page}>
