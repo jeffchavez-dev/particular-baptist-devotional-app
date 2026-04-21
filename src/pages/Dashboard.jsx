@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum } from '../lib/supabase'
 import { useAuth } from '../App'
 import { QUOTES } from '../data/quotes'
+import ExportModal from '../components/ExportModal'
+import ShareCardModal from '../components/ShareCardModal'
 
 const SCHEDULE  = buildSchedule()
 const TODAY_DAY = Math.min(getTodayDayNum(), 365)
@@ -73,6 +75,8 @@ export default function Dashboard() {
   const [toggling,     setToggling]     = useState(new Set())
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes'
+  const [exportOpen,   setExportOpen]   = useState(false)
+  const [shareCard,    setShareCard]    = useState(null)
 
   /* sidebar: user's own notes + quote search data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
@@ -244,6 +248,18 @@ export default function Dashboard() {
               ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
             }
+            {/* Export button */}
+            <button
+              onClick={() => setExportOpen(true)}
+              className="btn btn-ghost"
+              style={s.sidebarToggle}
+              aria-label="Export data"
+              title="Export &amp; Backup"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 2v9M6 8l3 4 3-4M3 13.5v1A1.5 1.5 0 004.5 16h9A1.5 1.5 0 0015 14.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
             {/* Sidebar toggle */}
             <button
               onClick={() => setSidebarOpen(o => !o)}
@@ -443,6 +459,20 @@ export default function Dashboard() {
         </div>
       </footer>
 
+      {/* ── Modals ── */}
+      <ExportModal
+        isOpen={exportOpen}
+        onClose={() => setExportOpen(false)}
+        userNotes={userNotes}
+        progress={progress}
+        session={session}
+      />
+      <ShareCardModal
+        isOpen={shareCard !== null}
+        onClose={() => setShareCard(null)}
+        card={shareCard}
+      />
+
       {/* ── Sidebar backdrop ── */}
       {sidebarOpen && (
         <div style={s.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden />
@@ -582,21 +612,61 @@ export default function Dashboard() {
                   </p>
                   <div style={s.notesList}>
                     {enrichedNotes.map(n => (
-                      <button
-                        key={n.day_number}
-                        style={s.noteItem}
-                        onClick={() => { navigate(`/day/${n.day_number}`); setSidebarOpen(false) }}
-                      >
-                        <div style={s.noteItemTop}>
-                          <span style={s.noteItemDay}>Day {n.day_number}</span>
-                          <span style={s.noteItemDate}>{n.entry.date}</span>
-                          <span className={badgeClass(n.entry.src)} style={{fontSize:9}}>{n.entry.src}</span>
+                      <div key={n.day_number} style={s.noteItemWrap}>
+                        <button
+                          style={s.noteItem}
+                          onClick={() => { navigate(`/day/${n.day_number}`); setSidebarOpen(false) }}
+                        >
+                          <div style={s.noteItemTop}>
+                            <span style={s.noteItemDay}>Day {n.day_number}</span>
+                            <span style={s.noteItemDate}>{n.entry.date}</span>
+                            <span className={badgeClass(n.entry.src)} style={{fontSize:9}}>{n.entry.src}</span>
+                          </div>
+                          <div style={s.noteItemReading}>{n.entry.reading}</div>
+                          <div style={s.noteItemPreview}>
+                            {n.notes.length > 100 ? n.notes.slice(0, 100) + '…' : n.notes}
+                          </div>
+                        </button>
+                        {/* Share / Copy action row */}
+                        <div style={s.noteActions}>
+                          <button
+                            style={s.noteActionBtn}
+                            title="Copy note"
+                            onClick={async () => {
+                              try { await navigator.clipboard.writeText(n.notes) } catch {}
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                              <rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/>
+                              <path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                            </svg>
+                            Copy
+                          </button>
+                          <button
+                            style={{...s.noteActionBtn, color:'var(--purple-ink)'}}
+                            title="Create share image"
+                            onClick={() => {
+                              setShareCard({
+                                type: 'note',
+                                day: n.day_number,
+                                title: n.entry.reading,
+                                subtitle: `Day ${n.day_number} · ${n.entry.date}`,
+                                source: n.entry.src,
+                                text: n.notes,
+                                label: 'My Reflection',
+                              })
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                              <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                              <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                              <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                              <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                            </svg>
+                            Share
+                          </button>
                         </div>
-                        <div style={s.noteItemReading}>{n.entry.reading}</div>
-                        <div style={s.noteItemPreview}>
-                          {n.notes.length > 100 ? n.notes.slice(0, 100) + '…' : n.notes}
-                        </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </>
@@ -777,10 +847,12 @@ const s = {
   },
   emptyNotes: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'3rem 1rem', textAlign:'center' },
   notesList: { display:'flex', flexDirection:'column', gap:6 },
+  noteItemWrap: { display:'flex', flexDirection:'column' },
   noteItem: {
     display:'block', width:'100%', textAlign:'left',
     padding:'12px 14px', background:'var(--parchment)',
-    border:'1px solid var(--border)', borderRadius:'var(--radius-lg)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius-lg) var(--radius-lg) 0 0',
+    borderBottom:'none',
     cursor:'pointer', transition:'box-shadow 0.15s', fontFamily:"'DM Sans',sans-serif",
   },
   noteItemTop: { display:'flex', alignItems:'center', gap:6, marginBottom:4 },
@@ -788,4 +860,15 @@ const s = {
   noteItemDate: { fontSize:11, color:'var(--ink-faint)' },
   noteItemReading: { fontSize:13, fontWeight:500, color:'var(--ink)', marginBottom:4, lineHeight:1.3 },
   noteItemPreview: { fontSize:12, color:'var(--ink-muted)', lineHeight:1.55, fontStyle:'italic' },
+  noteActions: {
+    display:'flex', gap:6, padding:'6px 14px 8px',
+    background:'var(--parchment-dark)',
+    border:'1px solid var(--border)', borderRadius:'0 0 var(--radius-lg) var(--radius-lg)',
+  },
+  noteActionBtn: {
+    display:'inline-flex', alignItems:'center', gap:4,
+    background:'none', border:'none', cursor:'pointer',
+    fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
+    padding:'2px 6px', borderRadius:4, transition:'color 0.1s',
+  },
 }

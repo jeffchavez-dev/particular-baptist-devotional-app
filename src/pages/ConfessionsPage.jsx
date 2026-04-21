@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -73,6 +73,31 @@ const SOURCES = {
   '2lbcf':     { label: '2LBCF', name: 'Second London Baptist Confession (1677/1689)', color: 'var(--purple-ink)', bg: 'var(--purple-soft)', href: 'https://www.the1689confession.com/' },
   'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)", color: 'var(--teal)', bg: 'var(--teal-light)', href: 'https://baptistcatechism.org/' },
   '1lbcf':     { label: '1LBCF', name: 'First London Baptist Confession (1644)', color: 'var(--amber-ink)', bg: 'var(--amber-soft)', href: 'https://london1644.info/en/fulltext.html' },
+}
+
+/* ── Inline copy button ── */
+function CopyBtn({ getText }) {
+  const [copied, setCopied] = useState(false)
+  async function copy(e) {
+    e.stopPropagation()
+    try { await navigator.clipboard.writeText(getText()); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
+  }
+  return (
+    <button onClick={copy} title="Copy text" style={cp.btn}>
+      {copied
+        ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="1.5,6 4.5,9.5 10.5,2.5" stroke="var(--teal)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        : <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+      }
+    </button>
+  )
+}
+const cp = {
+  btn: {
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
+    padding:4, borderRadius:4, border:'1px solid var(--border)',
+    background:'none', cursor:'pointer', color:'var(--ink-faint)',
+    transition:'border-color 0.1s', flexShrink:0,
+  },
 }
 
 export default function ConfessionsPage() {
@@ -298,6 +323,7 @@ export default function ConfessionsPage() {
                               </div>
                             )}
                           </div>
+                          <CopyBtn getText={() => p.text} />
                         </div>
                       )
                     })}
@@ -330,6 +356,7 @@ export default function ConfessionsPage() {
                         </div>
                       )}
                     </div>
+                    <CopyBtn getText={() => `Q. ${item.q}\n\nA. ${item.a}`} />
                   </div>
                 )
               })}
@@ -351,9 +378,12 @@ export default function ConfessionsPage() {
                 const lines = item.text.split('\n').filter(l => l.trim())
                 return (
                   <section key={num} id={artId} style={s.article}>
-                    <div style={s.articleHeader}>
-                      <span style={s.articleNum}>Article {num}</span>
-                      <h2 style={s.articleTitle}>{item.title}</h2>
+                    <div style={{...s.articleHeader, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
+                      <div>
+                        <span style={s.articleNum}>Article {num}</span>
+                        <h2 style={s.articleTitle}>{item.title}</h2>
+                      </div>
+                      <CopyBtn getText={() => `${item.title}\n\n${item.text}`} />
                     </div>
                     <div style={s.articleBody}>
                       {lines.map((line, i) => {

@@ -6,6 +6,7 @@ import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
 import { QUOTES } from '../data/quotes'
+import ShareCardModal from '../components/ShareCardModal'
 
 const SCHEDULE = buildSchedule()
 
@@ -201,14 +202,66 @@ const qe = {
   errorText: { fontSize:12, color:'#c0392b', margin:'6px 0 0', background:'#fdf0ef', padding:'6px 10px', borderRadius:4 },
 }
 
-function ContentBlock({ content, session }) {
+function CopyBtn({ getText, label = 'Copy' }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(getText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard blocked */ }
+  }
+  return (
+    <button onClick={copy} style={cb.btn} title={label}>
+      {copied
+        ? <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><polyline points="1.5,6.5 5,10 11.5,3" stroke="var(--teal)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        : <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+      }
+      <span style={{fontSize:11, color: copied ? 'var(--teal)' : 'var(--ink-faint)'}}>{copied ? 'Copied!' : label}</span>
+    </button>
+  )
+}
+const cb = {
+  btn: {
+    display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px',
+    background:'none', border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    cursor:'pointer', color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
+    transition:'border-color 0.15s',
+  },
+}
+
+function ContentBlock({ content, session, entry, onShare }) {
   if (!content) return null
+
+  function getContentText() {
+    if (content.type === 'catechism') return `Q. ${content.q}\n\nA. ${content.a}`
+    return content.text || ''
+  }
+
   return (
     <div className="card" style={s.contentCard}>
       <div style={s.contentHeader}>
         <span style={s.contentLabel}>
           {content.type === 'catechism' ? "Today's Reading" : 'Confession Text'}
         </span>
+        <div style={{display:'flex', gap:6, alignItems:'center'}}>
+          <CopyBtn getText={getContentText} label="Copy" />
+          {onShare && (
+            <button
+              onClick={() => onShare({ type:'reading', text: getContentText() })}
+              style={{...cb.btn, color:'var(--purple-ink)', borderColor:'var(--purple-soft)'}}
+              title="Create share image"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              <span style={{fontSize:11}}>Share</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {content.type === 'catechism' && (
@@ -368,6 +421,7 @@ export default function ReadingPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [shareCard, setShareCard] = useState(null)
 
   useEffect(() => {
     if (!entry) return
@@ -495,7 +549,19 @@ export default function ReadingPage() {
         </div>
 
         {/* Inline confession / catechism text */}
-        <ContentBlock content={content} session={session} />
+        <ContentBlock
+          content={content}
+          session={session}
+          entry={entry}
+          onShare={({ text }) => setShareCard({
+            type: 'reading',
+            day: day,
+            title: entry.reading,
+            subtitle: `Day ${day} · ${entry.date}`,
+            source: entry.src,
+            text,
+          })}
+        />
 
         {/* Author's note */}
         <DevNote day={day} session={session} />
@@ -532,16 +598,46 @@ export default function ReadingPage() {
             style={{...s.textarea}}
             rows={6}
           />
-          <div style={{display:'flex',justifyContent:'flex-end',marginTop:10,gap:8,alignItems:'center'}}>
-            {saved && <span style={{fontSize:12,color:'var(--teal)'}}>Saved ✓</span>}
-            <button
-              className="btn btn-primary"
-              onClick={saveNotes}
-              disabled={saving || !hasUnsaved}
-              style={{opacity: (!hasUnsaved && !saving) ? 0.5 : 1}}
-            >
-              {saving ? <span className="spinner" style={{width:14,height:14}} /> : 'Save notes'}
-            </button>
+          <div style={{display:'flex',justifyContent:'space-between',marginTop:10,gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{display:'flex', gap:6}}>
+              {savedNotes && (
+                <CopyBtn getText={() => savedNotes} label="Copy note" />
+              )}
+              {savedNotes && (
+                <button
+                  onClick={() => setShareCard({
+                    type: 'note',
+                    day: day,
+                    title: entry.reading,
+                    subtitle: `Day ${day} · ${entry.date}`,
+                    source: entry.src,
+                    text: savedNotes,
+                    label: 'My Reflection',
+                  })}
+                  style={{...cb.btn, color:'var(--purple-ink)', borderColor:'var(--purple-soft)'}}
+                  title="Create share image of this note"
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{fontSize:11}}>Share</span>
+                </button>
+              )}
+            </div>
+            <div style={{display:'flex', gap:8, alignItems:'center'}}>
+              {saved && <span style={{fontSize:12,color:'var(--teal)'}}>Saved ✓</span>}
+              <button
+                className="btn btn-primary"
+                onClick={saveNotes}
+                disabled={saving || !hasUnsaved}
+                style={{opacity: (!hasUnsaved && !saving) ? 0.5 : 1}}
+              >
+                {saving ? <span className="spinner" style={{width:14,height:14}} /> : 'Save notes'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -565,6 +661,13 @@ export default function ReadingPage() {
           </div>
         </div>
       </main>
+
+      {/* Share Card modal */}
+      <ShareCardModal
+        isOpen={shareCard !== null}
+        onClose={() => setShareCard(null)}
+        card={shareCard}
+      />
     </div>
   )
 }
