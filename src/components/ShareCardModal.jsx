@@ -268,14 +268,52 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
     return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
 
-  /* Download as PNG — universally recognised by photo pickers on all platforms */
-  function download() {
+  const [sharing, setSharing] = useState(false)
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share
+
+  /* Build a PNG blob from the canvas */
+  function getBlob() {
+    return new Promise(resolve => canvasRef.current.toBlob(resolve, 'image/png'))
+  }
+
+  function filename() {
+    const slug = card?.type === 'quote' ? 'quote' : card?.type === 'note' ? 'note' : 'reading'
+    return `pb-${slug}-day${card?.day || ''}-${preset.id}.png`
+  }
+
+  /* On mobile: opens native share sheet → Save Image → goes to Camera Roll */
+  async function shareNative() {
     if (!canvasRef.current) return
-    const link = document.createElement('a')
-    const slug  = card?.type === 'quote' ? 'quote' : card?.type === 'note' ? 'note' : 'reading'
-    link.download = `pb-${slug}-day${card?.day || ''}-${preset.id}.png`
-    link.href = canvasRef.current.toDataURL('image/png')
-    link.click()
+    setSharing(true)
+    try {
+      const blob = await getBlob()
+      const file = new File([blob], filename(), { type: 'image/png' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Particular Baptist Devotional' })
+      } else {
+        // canShare said no (e.g. desktop Chrome) — fall back to download
+        fallbackDownload(blob)
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        // Share failed for a real reason — try download instead
+        const blob = await getBlob()
+        fallbackDownload(blob)
+      }
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  /* On desktop: plain file download */
+  async function fallbackDownload(blob) {
+    const b = blob || await getBlob()
+    const url = URL.createObjectURL(b)
+    const a = document.createElement('a')
+    a.href = url; a.download = filename()
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   if (!isOpen) return null
@@ -367,24 +405,46 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             </div>
           )}
 
-          {/* PNG sharing tip */}
+          {/* Sharing tip — adapts to device */}
           <div style={m.tip}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{flexShrink:0,marginTop:1}}>
               <circle cx="6.5" cy="6.5" r="5.5" stroke="var(--teal)" strokeWidth="1.2"/>
               <path d="M6.5 5.5v4M6.5 4h.01" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
-            <span>Saves as <strong>PNG</strong> — recognised by all photo pickers. After downloading, go to your phone's Photos app and share from there to Facebook or Instagram.</span>
+            {canShare
+              ? <span><strong>On mobile:</strong> tap <em>Share / Save Image</em> below — the iOS/Android share sheet opens so you can save straight to Photos or post directly to Instagram or Facebook.</span>
+              : <span><strong>On desktop:</strong> the PNG downloads to your computer. To share on social media, upload it from your Downloads folder.</span>
+            }
           </div>
         </div>
 
         {/* Footer */}
         <div style={m.footer}>
           <button onClick={onClose} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
-          <button onClick={download} className="btn btn-primary" style={{fontSize:13, gap:6}}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 2v7M4 7l3 3 3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Download PNG
+          {/* Desktop fallback — plain download */}
+          {!canShare && (
+            <button onClick={() => fallbackDownload()} className="btn btn-outline" style={{fontSize:13, gap:6}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 2v7M4 7l3 3 3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Download PNG
+            </button>
+          )}
+          {/* Primary — share sheet on mobile, also triggers download on desktop if canShare is somehow true */}
+          <button
+            onClick={shareNative}
+            className="btn btn-primary"
+            disabled={sharing}
+            style={{fontSize:13, gap:6}}
+          >
+            {sharing
+              ? <span className="spinner" style={{width:14,height:14}} />
+              : <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 2v5M4.5 4.5L7 2l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 7v4.5h8V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            }
+            {canShare ? 'Share / Save Image' : 'Save PNG'}
           </button>
         </div>
       </div>
