@@ -6,6 +6,7 @@ import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
 import ReadingPage from './pages/ReadingPage'
 import QuizPage from './pages/QuizPage'
+import ScripturePage from './pages/ScripturePage'
 
 export const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/day/:dayNum" element={<ReadingPage />} />
         <Route path="/quiz" element={<QuizPage />} />
+        <Route path="/scripture" element={<ScripturePage />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </AuthContext.Provider>

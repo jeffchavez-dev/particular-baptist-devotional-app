@@ -61,7 +61,7 @@ export default function Dashboard() {
   const { session }  = useAuth()
   const navigate     = useNavigate()
 
-  const [progress,     setProgress]     = useState({})
+  const [progress,     setProgress]     = useState({})   // { day_number: completed, _notes_N: text }
   const [loading,      setLoading]      = useState(true)
   const [search,       setSearch]       = useState('')
   const [filterSrc,    setFilterSrc]    = useState('')
@@ -71,8 +71,8 @@ export default function Dashboard() {
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes'
 
-  /* sidebar search data */
-  const [dbNotes,      setDbNotes]      = useState([])         // [{day_number, content}]
+  /* sidebar: user's own notes + quote search data */
+  const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
   const [dbQuotes,     setDbQuotes]     = useState([])         // [{quote_key, quote, author, heading}]
   const [notesLoading, setNotesLoading] = useState(false)
 
@@ -80,44 +80,51 @@ export default function Dashboard() {
     || session?.user?.email?.split('@')[0]
     || 'friend'
 
-  /* ── load progress ── */
+  /* ── load progress (includes user's personal notes) ── */
   useEffect(() => {
     if (session) {
-      supabase.from('progress').select('day_number, completed').eq('user_id', session.user.id)
+      supabase.from('progress').select('day_number, completed, notes').eq('user_id', session.user.id)
         .then(({ data }) => {
           const map = {}
-          data?.forEach(r => { map[r.day_number] = r.completed })
+          const notes = []
+          data?.forEach(r => {
+            map[r.day_number] = r.completed
+            if (r.notes && r.notes.trim()) notes.push({ day_number: r.day_number, notes: r.notes })
+          })
           setProgress(map)
+          setUserNotes(notes)
           setLoading(false)
         })
     } else {
       const local = getLocalProgress()
       const map = {}
-      Object.entries(local).forEach(([day, d]) => { map[parseInt(day)] = !!d.completed })
+      const notes = []
+      Object.entries(local).forEach(([day, d]) => {
+        map[parseInt(day)] = !!d.completed
+        if (d.notes && d.notes.trim()) notes.push({ day_number: parseInt(day), notes: d.notes })
+      })
       setProgress(map)
+      setUserNotes(notes)
       setLoading(false)
     }
   }, [session])
 
-  /* ── load notes + quote overrides for search ── */
+  /* ── load quote overrides for search ── */
   useEffect(() => {
     setNotesLoading(true)
-    Promise.all([
-      supabase.from('dev_notes').select('day_number, content'),
-      supabase.from('quotes').select('quote_key, heading, quote, author, work'),
-    ]).then(([notesRes, quotesRes]) => {
-      if (notesRes.data)  setDbNotes(notesRes.data)
-      if (quotesRes.data) setDbQuotes(quotesRes.data)
-      setNotesLoading(false)
-    }).catch(() => setNotesLoading(false))
+    supabase.from('quotes').select('quote_key, heading, quote, author, work')
+      .then(({ data }) => {
+        if (data) setDbQuotes(data)
+        setNotesLoading(false)
+      }).catch(() => setNotesLoading(false))
   }, [])
 
   /* ── build note + quote search index ── */
   const noteIndex  = useMemo(() => {
     const idx = {}
-    dbNotes.forEach(n => { idx[n.day_number] = n.content.toLowerCase() })
+    userNotes.forEach(n => { idx[n.day_number] = n.notes.toLowerCase() })
     return idx
-  }, [dbNotes])
+  }, [userNotes])
 
   const dbQuoteIndex = useMemo(() => {
     const idx = {}
@@ -189,13 +196,13 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  /* ── notes sorted by day, with schedule info ── */
+  /* ── user's own notes sorted by day, with schedule info ── */
   const enrichedNotes = useMemo(() => {
-    return dbNotes
+    return userNotes
       .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
       .filter(n => n.entry)
       .sort((a, b) => a.day_number - b.day_number)
-  }, [dbNotes])
+  }, [userNotes])
 
   /* ── today entry ── */
   const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
@@ -218,7 +225,12 @@ export default function Dashboard() {
       <header style={s.header}>
         <div style={s.headerInner}>
           <div style={{display:'flex', alignItems:'center', gap:12}}>
-            <img src="/pb-icon.svg" alt="P.B." style={{width:36, height:36, flexShrink:0}} />
+            <img
+              src="/pb-icon.svg" alt="P.B."
+              style={{width:36, height:36, flexShrink:0, cursor:'pointer'}}
+              onClick={() => navigate('/')}
+              title="Home"
+            />
             <div>
               <h1 style={s.siteTitle}>Particular Baptist Devotional</h1>
               {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
@@ -499,15 +511,27 @@ export default function Dashboard() {
               <div style={s.sidebarDivider} />
 
               <div style={s.sidebarSection}>
-                <div style={s.sidebarSectionTitle}>Take the Quiz</div>
-                <p style={s.sidebarDesc}>Test how well you know Particular Baptist theology and history.</p>
-                <button
-                  onClick={() => { navigate('/quiz'); setSidebarOpen(false) }}
-                  className="btn btn-outline"
-                  style={{width:'100%', justifyContent:'center', fontSize:13}}
-                >
-                  How Particular Baptist Are You? →
-                </button>
+                <div style={s.sidebarSectionTitle}>Tools</div>
+                <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                  <button
+                    onClick={() => { navigate('/scripture'); setSidebarOpen(false) }}
+                    className="btn btn-outline"
+                    style={{width:'100%', justifyContent:'center', fontSize:13}}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{marginRight:6}}>
+                      <rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                    </svg>
+                    Scripture Proof Text Index →
+                  </button>
+                  <button
+                    onClick={() => { navigate('/quiz'); setSidebarOpen(false) }}
+                    className="btn btn-outline"
+                    style={{width:'100%', justifyContent:'center', fontSize:13}}
+                  >
+                    How Particular Baptist Are You? →
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -515,9 +539,22 @@ export default function Dashboard() {
           {/* ── Notes tab ── */}
           {sidebarTab === 'notes' && (
             <div>
-              {notesLoading ? (
-                <div style={{display:'flex', justifyContent:'center', padding:'2rem'}}>
-                  <div className="spinner" />
+              {!session ? (
+                <div style={s.emptyNotes}>
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{opacity:.3, marginBottom:10}}>
+                    <path d="M6 4h20v24H6z" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M11 11h10M11 16h7M11 21h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:'0 0 1rem', textAlign:'center'}}>
+                    Sign in to sync and view all your notes here.
+                  </p>
+                  <button
+                    onClick={() => { navigate('/auth'); setSidebarOpen(false) }}
+                    className="btn btn-primary"
+                    style={{fontSize:13}}
+                  >
+                    Sign in →
+                  </button>
                 </div>
               ) : enrichedNotes.length === 0 ? (
                 <div style={s.emptyNotes}>
@@ -525,13 +562,15 @@ export default function Dashboard() {
                     <path d="M6 4h20v24H6z" stroke="currentColor" strokeWidth="1.5"/>
                     <path d="M11 11h10M11 16h7M11 21h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
-                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:0}}>No author's notes yet.</p>
+                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:0, textAlign:'center'}}>
+                    You haven't written any notes yet. Open a day's reading to add reflections.
+                  </p>
                 </div>
               ) : (
                 <>
                   <p style={s.sidebarDesc}>
-                    {enrichedNotes.length} day{enrichedNotes.length !== 1 ? 's' : ''} with author's notes.
-                    Click any to open that reading.
+                    {enrichedNotes.length} day{enrichedNotes.length !== 1 ? 's' : ''} with your notes.
+                    Click any to return to that reading.
                   </p>
                   <div style={s.notesList}>
                     {enrichedNotes.map(n => (
@@ -547,7 +586,7 @@ export default function Dashboard() {
                         </div>
                         <div style={s.noteItemReading}>{n.entry.reading}</div>
                         <div style={s.noteItemPreview}>
-                          {n.content.length > 100 ? n.content.slice(0, 100) + '…' : n.content}
+                          {n.notes.length > 100 ? n.notes.slice(0, 100) + '…' : n.notes}
                         </div>
                       </button>
                     ))}

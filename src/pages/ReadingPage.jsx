@@ -459,6 +459,12 @@ export default function ReadingPage() {
             </svg>
             All days
           </button>
+          <img
+            src="/pb-icon.svg" alt="P.B."
+            style={{width:28, height:28, cursor:'pointer', position:'absolute', left:'50%', transform:'translateX(-50%)'}}
+            onClick={() => navigate('/')}
+            title="Home"
+          />
           <div style={{display:'flex', alignItems:'center', gap:12}}>
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
             {!session && (
@@ -566,7 +572,7 @@ export default function ReadingPage() {
 const s = {
   page: { minHeight:'100vh', background:'var(--parchment)' },
   header: { borderBottom:'1px solid var(--border)', background:'white', position:'sticky', top:0, zIndex:10 },
-  headerInner: { maxWidth:680, margin:'0 auto', padding:'12px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' },
+  headerInner: { maxWidth:680, margin:'0 auto', padding:'12px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative' },
   main: { maxWidth:680, margin:'0 auto', padding:'2.5rem 24px', display:'flex', flexDirection:'column', gap:20 },
   dayHeader: { paddingBottom:4 },
   readingTitle: { fontSize:32, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', marginBottom:6 },
