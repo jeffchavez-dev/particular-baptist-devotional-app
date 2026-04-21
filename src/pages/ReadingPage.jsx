@@ -7,6 +7,7 @@ import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
 import { QUOTES } from '../data/quotes'
 import ShareCardModal from '../components/ShareCardModal'
+import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
 
 const SCHEDULE = buildSchedule()
 
@@ -53,13 +54,14 @@ function getContent(entry) {
   return null
 }
 
-function BodyText({ text }) {
+function BodyText({ text, textStyle = {} }) {
+  const style = { ...s.bodyText, ...textStyle }
   const lines = text.split('\\n').map(l => l.trim()).filter(Boolean)
   if (lines.length <= 1) {
-    return <p style={s.bodyText}>{text}</p>
+    return <p style={style}>{text}</p>
   }
   return (
-    <div style={s.bodyText}>
+    <div style={style}>
       {lines.map((line, i) => <p key={i} style={{ marginBottom: i < lines.length - 1 ? '0.6em' : 0 }}>{line}</p>)}
     </div>
   )
@@ -69,7 +71,7 @@ const ADMIN_EMAIL = 'jeffchavez0828@gmail.com'
 
 const EMPTY_DRAFT = { heading: '', quote: '', author: '', work: '' }
 
-function QuoteBlock({ quoteKey, session }) {
+function QuoteBlock({ quoteKey, session, textStyle = {}, onShareQuote }) {
   const isAdmin = session?.user?.email === ADMIN_EMAIL
   const staticQ  = QUOTES[quoteKey]
 
@@ -173,8 +175,25 @@ function QuoteBlock({ quoteKey, session }) {
         </div>
       ) : q ? (
         <>
-          <div style={s.quoteMark}>&ldquo;</div>
-          <blockquote style={s.quoteText}>{q.quote}</blockquote>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2}}>
+            <div style={s.quoteMark}>&ldquo;</div>
+            {onShareQuote && (
+              <button
+                onClick={() => onShareQuote(q)}
+                style={{...cb.btn, color:'var(--purple-ink)', borderColor:'var(--purple-soft)'}}
+                title="Create share image of this quote"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <span style={{fontSize:11}}>Share</span>
+              </button>
+            )}
+          </div>
+          <blockquote style={{...s.quoteText, ...textStyle, fontSize: textStyle.fontSize ? textStyle.fontSize * 0.94 : undefined}}>{q.quote}</blockquote>
           <div style={s.quoteAttrib}>
             — {q.author}<span style={s.quoteWork}>, {q.work}</span>
           </div>
@@ -230,8 +249,12 @@ const cb = {
   },
 }
 
-function ContentBlock({ content, session, entry, onShare }) {
+function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote }) {
   if (!content) return null
+
+  const textStyle = prefs
+    ? { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
+    : {}
 
   function getContentText() {
     if (content.type === 'catechism') return `Q. ${content.q}\n\nA. ${content.a}`
@@ -266,13 +289,13 @@ function ContentBlock({ content, session, entry, onShare }) {
 
       {content.type === 'catechism' && (
         <div style={s.catWrap}>
-          <p style={s.catQ}><em>Q.</em> {content.q}</p>
-          <p style={s.catA}><em>A.</em> {content.a}</p>
+          <p style={{...s.catQ, ...textStyle}}><em>Q.</em> {content.q}</p>
+          <p style={{...s.catA, ...textStyle}}><em>A.</em> {content.a}</p>
         </div>
       )}
 
       {(content.type === '2lbcf' || content.type === '1lbcf') && (
-        <BodyText text={content.text} />
+        <BodyText text={content.text} textStyle={textStyle} />
       )}
 
       {content.refs && (
@@ -283,7 +306,12 @@ function ContentBlock({ content, session, entry, onShare }) {
       )}
 
       {content.quoteKey && (
-        <QuoteBlock quoteKey={content.quoteKey} session={session} />
+        <QuoteBlock
+          quoteKey={content.quoteKey}
+          session={session}
+          textStyle={textStyle}
+          onShareQuote={onShareQuote}
+        />
       )}
     </div>
   )
@@ -422,6 +450,9 @@ export default function ReadingPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
+  const [prefs, setPrefsState] = useState(() => loadPrefs())
+
+  function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
 
   useEffect(() => {
     if (!entry) return
@@ -519,7 +550,8 @@ export default function ReadingPage() {
             onClick={() => navigate('/')}
             title="Home"
           />
-          <div style={{display:'flex', alignItems:'center', gap:12}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
             {!session && (
               <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:12, padding:'5px 12px'}}>Sign in</button>
@@ -553,6 +585,7 @@ export default function ReadingPage() {
           content={content}
           session={session}
           entry={entry}
+          prefs={prefs}
           onShare={({ text }) => setShareCard({
             type: 'reading',
             day: day,
@@ -560,6 +593,16 @@ export default function ReadingPage() {
             subtitle: `Day ${day} · ${entry.date}`,
             source: entry.src,
             text,
+          })}
+          onShareQuote={(q) => setShareCard({
+            type: 'quote',
+            day: day,
+            source: entry.src,
+            subtitle: `Day ${day} · ${entry.date}`,
+            label: q.heading || '',
+            text: q.quote,
+            title: q.author,
+            subtitle2: q.work,
           })}
         />
 

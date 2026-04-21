@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
@@ -108,7 +109,13 @@ export default function ConfessionsPage() {
   const [search, setSearch] = useState('')
   const [navOpen, setNavOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  const [prefs, setPrefsState] = useState(() => loadPrefs())
   const contentRef = useRef(null)
+
+  function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
+
+  /* Compute text style from prefs */
+  const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
 
   useEffect(() => {
     const handler = () => {
@@ -212,6 +219,7 @@ export default function ConfessionsPage() {
                 <button onClick={() => setSearch('')} style={s.clearBtn}>×</button>
               )}
             </div>
+            <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
           </div>
         </div>
 
@@ -315,7 +323,7 @@ export default function ConfessionsPage() {
                         <div key={p.key} style={s.paragraph} id={`p-${p.key}`}>
                           <div style={s.paraNum}>§{p.para}</div>
                           <div style={s.paraBody}>
-                            <p style={s.paraText}>{p.text}</p>
+                            <p style={{...s.paraText, ...textStyle}}>{p.text}</p>
                             {p.refs && (
                               <div style={s.refs}>
                                 <span style={s.refsLabel}>Proof texts: </span>
@@ -347,8 +355,8 @@ export default function ConfessionsPage() {
                   <div key={num} style={s.qaBlock} id={`qa-${num}`}>
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
-                      <p style={s.qaQuestion}>{item.q}</p>
-                      <p style={s.qaAnswer}><strong style={{fontWeight:600}}>A.</strong> {item.a}</p>
+                      <p style={{...s.qaQuestion, ...textStyle}}>{item.q}</p>
+                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {item.a}</p>
                       {item.refs && (
                         <div style={s.refs}>
                           <span style={s.refsLabel}>Proof texts: </span>
@@ -391,7 +399,7 @@ export default function ConfessionsPage() {
                         const clean = line.replace(/^\d+\s+/, '').trim()
                         if (!clean) return null
                         return (
-                          <p key={i} style={s.articleLine}>{clean}</p>
+                          <p key={i} style={{...s.articleLine, ...textStyle}}>{clean}</p>
                         )
                       })}
                       {item.refs && (
