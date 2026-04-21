@@ -47,8 +47,8 @@ const QUESTIONS = [
     id: 4,
     level: 'easy',
     category: 'History',
-    q: 'In what year was the Second London Baptist Confession published?',
-    options: ['1644', '1658', '1689', '1707'],
+    q: 'The 2LBCF was first circulated in 1677, then formally adopted by Particular Baptist churches in what year?',
+    options: ['1658', '1677', '1689', '1707'],
     answer: 2,
   },
   {
