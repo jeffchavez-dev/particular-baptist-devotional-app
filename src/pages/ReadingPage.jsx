@@ -64,22 +64,128 @@ function BodyText({ text }) {
   )
 }
 
-function QuoteBlock({ quoteKey }) {
-  const q = QUOTES[quoteKey]
-  if (!q) return null
+const ADMIN_EMAIL = 'jeffchavez0828@gmail.com'
+
+const EMPTY_DRAFT = { heading: '', quote: '', author: '', work: '' }
+
+function QuoteBlock({ quoteKey, session }) {
+  const isAdmin = session?.user?.email === ADMIN_EMAIL
+  const staticQ  = QUOTES[quoteKey]
+
+  const [dbQ,     setDbQ]     = useState(null)
+  const [fetched, setFetched] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft,   setDraft]   = useState(EMPTY_DRAFT)
+  const [saving,  setSaving]  = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data } = await supabase.from('quotes').select('*').eq('quote_key', quoteKey).single()
+        setDbQ(data || null)
+      } catch { /* table may not exist yet */ }
+      setFetched(true)
+    }
+    load()
+  }, [quoteKey])
+
+  const q = dbQ || staticQ   // DB overrides static
+
+  function startEdit() {
+    setDraft({ heading: q?.heading || '', quote: q?.quote || '', author: q?.author || '', work: q?.work || '' })
+    setEditing(true)
+  }
+
+  async function save() {
+    if (!draft.quote.trim() || !draft.author.trim()) return
+    setSaving(true)
+    await supabase.from('quotes').upsert(
+      { quote_key: quoteKey, ...draft, updated_at: new Date().toISOString() },
+      { onConflict: 'quote_key' }
+    )
+    setDbQ({ ...draft })
+    setEditing(false)
+    setSaving(false)
+  }
+
+  async function removeOverride() {
+    await supabase.from('quotes').delete().eq('quote_key', quoteKey)
+    setDbQ(null)
+    setEditing(false)
+  }
+
+  if (!fetched && !staticQ) return null          // wait silently if nothing to show yet
+  if (!q && !isAdmin) return null                // no quote, not admin → nothing
+
   return (
     <div style={s.quoteCard}>
-      <div style={s.quoteHeading}>{q.heading}</div>
-      <div style={s.quoteMark}>&ldquo;</div>
-      <blockquote style={s.quoteText}>{q.quote}</blockquote>
-      <div style={s.quoteAttrib}>
-        — {q.author}<span style={s.quoteWork}>, {q.work}</span>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: editing ? 12 : 0 }}>
+        {!editing && q && <div style={s.quoteHeading}>{q.heading}</div>}
+        {!editing && !q && <div style={s.quoteHeading}>Quote</div>}
+        {isAdmin && !editing && (
+          <button onClick={startEdit} style={qe.editBtn}>
+            {dbQ ? 'Edit' : staticQ ? 'Override' : '+ Add quote'}
+          </button>
+        )}
       </div>
+
+      {editing ? (
+        <div style={qe.form}>
+          <label style={qe.label}>Heading</label>
+          <input style={qe.input} value={draft.heading} onChange={e => setDraft(d => ({...d, heading: e.target.value}))} placeholder="e.g. The Necessity of Scripture" />
+          <label style={qe.label}>Quote</label>
+          <textarea style={qe.ta} rows={4} value={draft.quote} onChange={e => setDraft(d => ({...d, quote: e.target.value}))} placeholder="Quote text…" />
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+            <div>
+              <label style={qe.label}>Author</label>
+              <input style={qe.input} value={draft.author} onChange={e => setDraft(d => ({...d, author: e.target.value}))} placeholder="e.g. Benjamin Keach" />
+            </div>
+            <div>
+              <label style={qe.label}>Work</label>
+              <input style={qe.input} value={draft.work} onChange={e => setDraft(d => ({...d, work: e.target.value}))} placeholder="e.g. Gospel Mysteries Unveil'd" />
+            </div>
+          </div>
+          <div style={qe.actions}>
+            {dbQ && <button onClick={removeOverride} style={qe.deleteBtn}>Remove override</button>}
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={() => setEditing(false)} className="btn btn-ghost" style={{ fontSize:13 }}>Cancel</button>
+              <button onClick={save} className="btn btn-primary" disabled={saving || !draft.quote.trim()} style={{ fontSize:13 }}>
+                {saving ? <span className="spinner" style={{width:13,height:13}}/> : 'Publish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : q ? (
+        <>
+          <div style={s.quoteMark}>&ldquo;</div>
+          <blockquote style={s.quoteText}>{q.quote}</blockquote>
+          <div style={s.quoteAttrib}>
+            — {q.author}<span style={s.quoteWork}>, {q.work}</span>
+          </div>
+          {dbQ && isAdmin && (
+            <div style={{ marginTop:6, fontSize:11, color:'var(--teal)', opacity:0.7 }}>● Live (DB override)</div>
+          )}
+        </>
+      ) : (
+        <p style={{ fontSize:13, color:'var(--ink-faint)', fontStyle:'italic', margin:'4px 0 0' }}>
+          No quote for this entry yet.
+        </p>
+      )}
     </div>
   )
 }
 
-function ContentBlock({ content }) {
+const qe = {
+  editBtn: { fontSize:12, color:'var(--gold)', background:'none', border:'none', cursor:'pointer', fontWeight:500, padding:'2px 6px', borderRadius:4 },
+  form: { display:'flex', flexDirection:'column', gap:10 },
+  label: { fontSize:11, fontWeight:600, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.05em', display:'block', marginBottom:3 },
+  input: { width:'100%', boxSizing:'border-box', fontSize:14 },
+  ta: { width:'100%', boxSizing:'border-box', fontSize:14, resize:'vertical', lineHeight:1.6 },
+  actions: { display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:4 },
+  deleteBtn: { fontSize:12, color:'var(--ink-faint)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0 },
+}
+
+function ContentBlock({ content, session }) {
   if (!content) return null
   return (
     <div className="card" style={s.contentCard}>
@@ -108,13 +214,11 @@ function ContentBlock({ content }) {
       )}
 
       {content.quoteKey && (
-        <QuoteBlock quoteKey={content.quoteKey} />
+        <QuoteBlock quoteKey={content.quoteKey} session={session} />
       )}
     </div>
   )
 }
-
-const ADMIN_EMAIL = 'jeffchavez0828@gmail.com'
 
 function DevNote({ day, session }) {
   const isAdmin = session?.user?.email === ADMIN_EMAIL
@@ -372,7 +476,7 @@ export default function ReadingPage() {
         </div>
 
         {/* Inline confession / catechism text */}
-        <ContentBlock content={content} />
+        <ContentBlock content={content} session={session} />
 
         {/* Author's note */}
         <DevNote day={day} session={session} />
