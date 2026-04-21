@@ -77,41 +77,55 @@ function QuoteBlock({ quoteKey, session }) {
   const [editing, setEditing] = useState(false)
   const [draft,   setDraft]   = useState(EMPTY_DRAFT)
   const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState(null)
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
-      try {
-        const { data } = await supabase.from('quotes').select('*').eq('quote_key', quoteKey).single()
-        setDbQ(data || null)
-      } catch { /* table may not exist yet */ }
-      setFetched(true)
+      const { data, error: err } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('quote_key', quoteKey)
+        .maybeSingle()
+      if (!cancelled) {
+        if (!err) setDbQ(data || null)
+        setFetched(true)
+      }
     }
     load()
+    return () => { cancelled = true }
   }, [quoteKey])
 
   const q = dbQ || staticQ   // DB overrides static
 
   function startEdit() {
     setDraft({ heading: q?.heading || '', quote: q?.quote || '', author: q?.author || '', work: q?.work || '' })
+    setError(null)
     setEditing(true)
   }
 
   async function save() {
     if (!draft.quote.trim() || !draft.author.trim()) return
     setSaving(true)
-    await supabase.from('quotes').upsert(
+    setError(null)
+    const { error: err } = await supabase.from('quotes').upsert(
       { quote_key: quoteKey, ...draft, updated_at: new Date().toISOString() },
       { onConflict: 'quote_key' }
     )
+    if (err) {
+      setError('Save failed: ' + err.message)
+      setSaving(false)
+      return
+    }
     setDbQ({ ...draft })
     setEditing(false)
     setSaving(false)
   }
 
   async function removeOverride() {
-    await supabase.from('quotes').delete().eq('quote_key', quoteKey)
-    setDbQ(null)
-    setEditing(false)
+    const { error: err } = await supabase.from('quotes').delete().eq('quote_key', quoteKey)
+    if (!err) { setDbQ(null); setEditing(false) }
+    else setError('Delete failed: ' + err.message)
   }
 
   if (!fetched && !staticQ) return null          // wait silently if nothing to show yet
@@ -145,10 +159,11 @@ function QuoteBlock({ quoteKey, session }) {
               <input style={qe.input} value={draft.work} onChange={e => setDraft(d => ({...d, work: e.target.value}))} placeholder="e.g. Gospel Mysteries Unveil'd" />
             </div>
           </div>
+          {error && <p style={dn.errorText}>{error}</p>}
           <div style={qe.actions}>
             {dbQ && <button onClick={removeOverride} style={qe.deleteBtn}>Remove override</button>}
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => setEditing(false)} className="btn btn-ghost" style={{ fontSize:13 }}>Cancel</button>
+              <button onClick={() => { setEditing(false); setError(null) }} className="btn btn-ghost" style={{ fontSize:13 }}>Cancel</button>
               <button onClick={save} className="btn btn-primary" disabled={saving || !draft.quote.trim()} style={{ fontSize:13 }}>
                 {saving ? <span className="spinner" style={{width:13,height:13}}/> : 'Publish'}
               </button>
@@ -183,6 +198,7 @@ const qe = {
   ta: { width:'100%', boxSizing:'border-box', fontSize:14, resize:'vertical', lineHeight:1.6 },
   actions: { display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:4 },
   deleteBtn: { fontSize:12, color:'var(--ink-faint)', background:'none', border:'none', cursor:'pointer', textDecoration:'underline', padding:0 },
+  errorText: { fontSize:12, color:'#c0392b', margin:'6px 0 0', background:'#fdf0ef', padding:'6px 10px', borderRadius:4 },
 }
 
 function ContentBlock({ content, session }) {
@@ -222,53 +238,58 @@ function ContentBlock({ content, session }) {
 
 function DevNote({ day, session }) {
   const isAdmin = session?.user?.email === ADMIN_EMAIL
-  const [note, setNote] = useState(null)       // saved content from DB
-  const [draft, setDraft] = useState('')        // edit buffer
+  const [note,    setNote]    = useState(null)
+  const [draft,   setDraft]   = useState('')
   const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState(null)
   const [fetched, setFetched] = useState(false)
 
   useEffect(() => {
-    async function fetch() {
-      try {
-        const { data } = await supabase
-          .from('dev_notes')
-          .select('content')
-          .eq('day_number', day)
-          .single()
-        setNote(data?.content || null)
-      } catch { /* table may not exist yet */ }
-      setFetched(true)
+    let cancelled = false
+    async function load() {
+      const { data, error: err } = await supabase
+        .from('dev_notes')
+        .select('content')
+        .eq('day_number', day)
+        .maybeSingle()           // returns null (not error) when no row found
+      if (!cancelled) {
+        if (!err) setNote(data?.content ?? null)
+        setFetched(true)
+      }
     }
-    fetch()
+    load()
+    return () => { cancelled = true }
   }, [day])
 
   function startEdit() {
     setDraft(note || '')
+    setError(null)
     setEditing(true)
-  }
-
-  function cancelEdit() {
-    setEditing(false)
-    setDraft('')
   }
 
   async function saveNote() {
     if (!draft.trim()) return
     setSaving(true)
-    await supabase.from('dev_notes').upsert(
+    setError(null)
+    const { error: err } = await supabase.from('dev_notes').upsert(
       { day_number: day, content: draft.trim(), updated_at: new Date().toISOString() },
       { onConflict: 'day_number' }
     )
+    if (err) {
+      setError('Save failed: ' + err.message)
+      setSaving(false)
+      return
+    }
     setNote(draft.trim())
     setEditing(false)
     setSaving(false)
   }
 
   async function deleteNote() {
-    await supabase.from('dev_notes').delete().eq('day_number', day)
-    setNote(null)
-    setEditing(false)
+    const { error: err } = await supabase.from('dev_notes').delete().eq('day_number', day)
+    if (!err) { setNote(null); setEditing(false) }
+    else setError('Delete failed: ' + err.message)
   }
 
   if (!fetched) return null
@@ -284,9 +305,7 @@ function DevNote({ day, session }) {
           <span style={dn.label}>Author's Note</span>
         </div>
         {isAdmin && !editing && (
-          <button onClick={startEdit} style={dn.editBtn} title="Edit note">
-            {note ? 'Edit' : '+ Add note'}
-          </button>
+          <button onClick={startEdit} style={dn.editBtn}>{note ? 'Edit' : '+ Add note'}</button>
         )}
       </div>
 
@@ -297,19 +316,15 @@ function DevNote({ day, session }) {
             onChange={e => setDraft(e.target.value)}
             placeholder="Write a note for all readers on this day…"
             rows={5}
-            style={{...dn.textarea}}
+            style={dn.textarea}
             autoFocus
           />
+          {error && <p style={dn.errorText}>{error}</p>}
           <div style={dn.editActions}>
             {note && <button onClick={deleteNote} style={dn.deleteBtn}>Delete</button>}
             <div style={{display:'flex', gap:8}}>
-              <button onClick={cancelEdit} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
-              <button
-                onClick={saveNote}
-                className="btn btn-primary"
-                disabled={saving || !draft.trim()}
-                style={{fontSize:13}}
-              >
+              <button onClick={() => { setEditing(false); setError(null) }} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
+              <button onClick={saveNote} className="btn btn-primary" disabled={saving || !draft.trim()} style={{fontSize:13}}>
                 {saving ? <span className="spinner" style={{width:13,height:13}}/> : 'Publish'}
               </button>
             </div>
@@ -318,9 +333,7 @@ function DevNote({ day, session }) {
       ) : note ? (
         <p style={dn.noteText}>{note}</p>
       ) : (
-        <p style={{...dn.noteText, color:'var(--ink-faint)', fontStyle:'italic'}}>
-          No author's note for this day yet.
-        </p>
+        <p style={{...dn.noteText, color:'var(--ink-faint)', fontStyle:'italic'}}>No author's note for this day yet.</p>
       )}
     </div>
   )
