@@ -73,6 +73,7 @@ const sources = [
     bg: 'var(--purple-soft)',
     chapters: '32 chapters',
     desc: 'The doctrinal standard of Particular Baptists — a thorough statement of Reformed theology grounded in Scripture, closely following the Westminster Confession with key Baptist modifications.',
+    route: '2lbcf',
   },
   {
     label: 'Catechism',
@@ -82,6 +83,7 @@ const sources = [
     bg: 'var(--teal-light)',
     chapters: '114 questions',
     desc: 'One hundred and fourteen questions and answers teaching the essentials of Christian doctrine — designed by Benjamin Keach for instruction in faith and practice for all ages.',
+    route: 'catechism',
   },
   {
     label: '1LBCF',
@@ -91,6 +93,7 @@ const sources = [
     bg: 'var(--amber-soft)',
     chapters: '52 articles',
     desc: 'The founding document of the Particular Baptist movement — fifty-two articles affirming biblical faith, distinguishing these congregations from General Baptists and Anabaptists.',
+    route: '1lbcf',
   },
 ]
 
@@ -190,7 +193,7 @@ export default function LandingPage() {
           <h2 style={s.sectionTitle}>The Standards of Particular Baptist Theology</h2>
           <div style={s.sourcesGrid}>
             {sources.map(src => (
-              <div key={src.label} style={s.sourceCard}>
+              <div key={src.label} style={{...s.sourceCard, cursor: 'pointer'}} onClick={() => navigate(`/confessions?t=${src.route}`)}>
                 <div style={s.sourceCardTop}>
                   <span style={{ ...s.sourceBadge, background: src.bg, color: src.color }}>{src.label}</span>
                   <span style={s.sourceCardYear}>{src.year}</span>
