@@ -11,6 +11,15 @@ const PRESETS = [
   { id:'custom',    label:'Custom',      type:'solid',    bg:'#ffffff',              textColor:'#1a1410', accentColor:'#8a6d2e' },
 ]
 
+/* Card text-size scales */
+const CARD_SCALES = [
+  { id:'xs', label:'XS', scale:0.58, hint:'Very small — fits the most text' },
+  { id:'s',  label:'S',  scale:0.74 },
+  { id:'m',  label:'M',  scale:1.0,  hint:'Default' },
+  { id:'l',  label:'L',  scale:1.2  },
+  { id:'xl', label:'XL', scale:1.4,  hint:'Large — best for short quotes' },
+]
+
 /* Formats — standard social media dimensions */
 const FORMATS = [
   { id:'square', label:'Square (1:1)',    w:1080, h:1080, hint:'Instagram post, Facebook post' },
@@ -83,10 +92,10 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
   ctx.beginPath(); ctx.moveTo(PAD, h * 0.1); ctx.lineTo(w - PAD, h * 0.1); ctx.stroke()
   ctx.globalAlpha = 1
 
-  /* P.B. monogram */
-  ctx.fillStyle = accentColor; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
-  ctx.font = `bold ${Math.round(w * 0.026)}px 'DM Sans','Helvetica Neue',sans-serif`
-  ctx.fillText('P.B.', PAD, h * 0.088)
+  /* P.B. monogram - removed */
+  // ctx.fillStyle = accentColor; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+  // ctx.font = `bold ${Math.round(w * 0.026)}px 'DM Sans','Helvetica Neue',sans-serif`
+  // ctx.fillText('P.B.', PAD, h * 0.088)
 
   /* Source badge */
   const srcColors = SRC_COLORS[source] || { bg:'#333', text:'#eee' }
@@ -119,20 +128,20 @@ function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
 }
 
 /* ── Reading / Note card ── */
-function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor) {
+function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
 
-  /* Subtitle */
-  const subSz = Math.round(w * 0.022)
-  ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
-  ctx.fillStyle = textColor; ctx.globalAlpha = 0.55
-  ctx.fillText(card.subtitle || '', PAD, sourceY + subSz * 2)
-  ctx.globalAlpha = 1
+  /* Subtitle - removed */
+  // const subSz = Math.round(w * 0.022)
+  // ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
+  // ctx.fillStyle = textColor; ctx.globalAlpha = 0.55
+  // ctx.fillText(card.subtitle || '', PAD, sourceY + subSz * 2)
+  // ctx.globalAlpha = 1
 
   /* Title */
   const titleSz = Math.round(w * 0.048)
-  const titleY  = sourceY + subSz * 2 + titleSz * 1.4
+  const titleY  = sourceY + titleSz * 1.4 // adjusted since subtitle removed
   ctx.fillStyle = textColor
   ctx.font = `600 ${titleSz}px 'Georgia','Times New Roman',serif`
   const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.25, 3)
@@ -158,8 +167,8 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor) {
   ctx.fillText('\u201C', PAD - w * 0.008, contentY + w * 0.045)
   ctx.globalAlpha = 1
 
-  /* Content body */
-  const cSz = Math.round(w * 0.031), cLineH = cSz * 1.75
+  /* Content body — font scaled by user preference */
+  const cSz = Math.round(w * 0.031 * scale), cLineH = cSz * 1.75
   const refsPresent = !!(card.refs && card.refs.trim())
   const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.52)) / cLineH))
   ctx.fillStyle = textColor
@@ -191,19 +200,19 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor) {
 }
 
 /* ── Quote card — quote text is the hero ── */
-function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor) {
+function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
 
-  /* Day subtitle */
-  const subSz = Math.round(w * 0.02)
-  ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
-  ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
-  ctx.fillText(card.subtitle || '', PAD, sourceY + subSz * 2)
-  ctx.globalAlpha = 1
+  /* Day subtitle - removed */
+  // const subSz = Math.round(w * 0.02)
+  // ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
+  // ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
+  // ctx.fillText(card.subtitle || '', PAD, sourceY + subSz * 2)
+  // ctx.globalAlpha = 1
 
   /* Section heading (label) */
-  let headY = sourceY + subSz * 4.5
+  let headY = sourceY + w * 0.046 // adjusted since subtitle removed
   if (card.label) {
     ctx.fillStyle = accentColor
     ctx.font = `bold ${Math.round(w * 0.02)}px 'DM Sans','Helvetica Neue',sans-serif`
@@ -218,8 +227,8 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor) {
   ctx.fillText('\u201C', PAD - w * 0.01, headY + qMarkSz * 0.52)
   ctx.globalAlpha = 1
 
-  /* Quote text — most prominent */
-  const qSz = Math.round(w * 0.038), qLineH = qSz * 1.85
+  /* Quote text — most prominent, font scaled by user preference */
+  const qSz = Math.round(w * 0.038 * scale), qLineH = qSz * 1.85
   const maxLines = Math.max(4, Math.floor((h * 0.54) / qLineH))
   ctx.fillStyle = textColor
   ctx.font = `italic ${qSz}px 'Georgia','Times New Roman',serif`
@@ -248,7 +257,7 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor) {
 }
 
 /* ── Master draw dispatcher ── */
-function drawCard(canvas, card, preset, format, customBg, customText) {
+function drawCard(canvas, card, preset, format, customBg, customText, scale = 1.0) {
   const { w, h } = format
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
@@ -260,9 +269,9 @@ function drawCard(canvas, card, preset, format, customBg, customText) {
   ctx.textBaseline = 'alphabetic'
 
   if (card.type === 'quote') {
-    drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor)
+    drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale)
   } else {
-    drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor)
+    drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale)
   }
 }
 
@@ -273,14 +282,15 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   const [format,    setFormat]  = useState(FORMATS[0])
   const [customBg,  setCustomBg]  = useState('#f5f0e8')
   const [customText,setCustomText]= useState('#1a1410')
+  const [cardScale, setCardScale] = useState(CARD_SCALES[2]) // default 'M' (1.0)
 
   /* Redraw whenever inputs change */
   useEffect(() => {
     if (!isOpen || !canvasRef.current || !card) return
     document.fonts.ready.then(() => {
-      drawCard(canvasRef.current, card, preset, format, customBg, customText)
+      drawCard(canvasRef.current, card, preset, format, customBg, customText, cardScale.scale)
     })
-  }, [isOpen, card, preset, format, customBg, customText])
+  }, [isOpen, card, preset, format, customBg, customText, cardScale])
 
   /* ESC to close */
   useEffect(() => {
