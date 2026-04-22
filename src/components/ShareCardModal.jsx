@@ -122,8 +122,9 @@ function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
   ctx.font = `${fSz}px 'DM Sans','Helvetica Neue',sans-serif`
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.45; ctx.textAlign = 'left'
   ctx.fillText('Particular Baptist Devotional', PAD, h * 0.94)
-  ctx.fillStyle = accentColor; ctx.globalAlpha = 0.65; ctx.textAlign = 'right'
-  ctx.fillText('pb-devotional.vercel.app', w - PAD, h * 0.94)
+  /* Removed URL */
+  // ctx.fillStyle = accentColor; ctx.globalAlpha = 0.65; ctx.textAlign = 'right'
+  // ctx.fillText('pb-devotional.vercel.app', w - PAD, h * 0.94)
   ctx.globalAlpha = 1; ctx.textAlign = 'left'
 }
 

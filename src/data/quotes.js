@@ -66,22 +66,16 @@ export const QUOTES = {
 
   // ── 2LBCF Chapter 2: Of God and of the Holy Trinity ─────────────────
   '2.1': {
-    heading: 'The Divine Attributes',
-    quote: 'The Lord our God is... in himself most holy, every way infinite, in greatness, wisdom, power, love; merciful and gracious.',
-    author: 'James M. Renihan',
-    work: 'Baptist Symbolics Volume 2',
+    heading: 'The One True God', quote: 'We are plentifully instructed from the Scripture, that there is but one only living and true God, who is a most pure spirit, eternal and immutable, incomprehensible, and infinitely perfect in his being, and all the properties thereof.', author: 'Nehemiah Coxe', work: 'Vindiciae Veritatis'
   },
   '2.2': {
-    heading: "God's Self-Sufficiency",
-    quote: 'He [God] is the alone fountain of all Being, of whom, through whom, and to whom are all things.',
-    author: 'James M. Renihan',
-    work: 'Baptist Symbolics Volume 2',
+    heading: 'Creator-creature Distinction', quote: 'What is an angel more than a worm? A worm is a creature, and an angel is no more; he hath made the one to creep in the earth—made also the other to dwell in heaven. There is still a proportion between these, they agree in something; but what are all the nothings of the world to the God infinitely blessed for evermore?', author: 'John Owen', work: ' The Works of John Owen (Banner of Truth Trust, 1965), 2:60.',
   },
   '2.3': {
     heading: 'The Holy Trinity',
-    quote: 'The same single and infinite Essence is in Father, Son and Holy Ghost; the whole undivided and indivisible Essence of God dwells in the Son in its fullness and infinite perfection.',
-    author: 'Francis Cheynell',
-    work: 'The Divine Trinunity',
+    quote: 'No sooner do I conceive of the One than I am illumined by the splendor of the Three; no sooner do I distinguish them than I am carried back to the One. When I think of any One of the Three I think of Him as the Whole, and my eyes are filled, and the greater part of what I am thinking escapes me. I cannot grasp the greatness of that One so as to attribute a greater greatness to the Rest.',
+    author: 'Gregory Nazianzen',
+    work: 'Orations 40.41',
   },
 
   // ── 2LBCF Chapter 3: Of God's Decree ────────────────────────────────
@@ -92,28 +86,16 @@ export const QUOTES = {
     work: 'A Display of Arminianism',
   },
   '3.2': {
-    heading: "God's Sovereign Sight",
-    quote: 'The heavenly builder (having all Wisdom and Knowledg) sees by one Act (uno intuitu) all things that are necessary and commodious.',
-    author: 'Benjamin Keach',
-    work: 'Troposchemalogia',
+    heading: 'Sovereignty and the Divine Will', quote: 'I marvel any thinking Christians should doubt of Election, as it results from the absolute Soveraignty of God’s Grace, or good Pleasure of his Will, since God by Election took hold of some of the Angels, as well as some of the lost Sons and Daughters of Adam.', author: 'Benjamin Keach', work: 'A Golden Mine Opened'
   },
   '3.3': {
-    heading: 'The Fixed Number of the Elect',
-    quote: 'The salvation of the fullness of Jews and Gentiles is described as \'All Israel,\' signifying that the church is the corporate fulfillment of the promises made to the fathers.',
-    author: 'James M. Renihan',
-    work: 'Baptist Symbolics Volume 2',
+    heading: 'The Predestination of Men and Angels', quote: 'as he had foreseen their fall from all eternity, so he purposed before the foundation of the world to save some of them, and to leave others in their fallen condition . . . some angels are called "elect," not so much on account of their excellent nature, as because they are chosen by God from among the rest.', author: 'Benedict Pictet', work: 'Christian Theology',
   },
   '3.4': {
-    heading: 'Election and Preterition',
-    quote: 'God\'s purpose was Christ coming and offering Himself an acceptable sacrifice to reconcile His \'elect only\'.',
-    author: 'James M. Renihan',
-    work: 'Baptist Symbolics',
+    heading: 'The Certainty of the Elect Number', quote: 'Thirdly, I believe God out of the counsel of his own will, did before he made the world, elect and choose some certain number of his foreseen fallen creatures, and appointed them to eternal life in his Son, for the glory of his grace: which number so elected, shall unavoidably be saved...', author: 'John Spilsbury', work: 'John Spilsbery\'s Confession of Faith',
   },
   '3.5': {
-    heading: 'The Basis of Election',
-    quote: 'God\'s free grace and love is at the root of predestination.',
-    author: 'James M. Renihan',
-    work: 'Baptist Symbolics Volume 2',
+    heading: 'The Sovereign Will as the Sole Cause', quote: 'The decree and eternal counsel of God concerning them both, has no cause besides His will and pleasure.', author: 'William Perkins', work: 'A Golden Chain',
   },
   '3.6': {
     heading: 'The Execution of the Decree',
@@ -122,10 +104,7 @@ export const QUOTES = {
     work: 'Christ Alone the Way to Heaven',
   },
   '3.7': {
-    heading: 'Prudent Handling of the Doctrine',
-    quote: 'To appeal from the judgement of Scripture to the instincts and dictates of the Spirit, is to set the Spirit of God . . . in opposition to it self.',
-    author: 'Hanserd Knollys',
-    work: 'An Answer to a Brief Discourse Concerning Singing',
+    heading: 'Adoration of the Mystery', quote: 'This is such a glorious mystery as by his word only is revealed to us; we cannot by reason comprehend it, but ought to adore it; and by faith rest in his testimony concerning it.', author: 'Nehemiah Coxe', work: 'Vindiciae Veritatis',
   },
 
   // ── 2LBCF Chapter 4: Of Creation ─────────────────────────────────────
