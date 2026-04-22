@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
+import { buildSchedule } from '../lib/supabase'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
@@ -76,19 +77,20 @@ const SOURCES = {
   '1lbcf':     { label: '1LBCF', name: 'First London Baptist Confession (1644)', color: 'var(--amber-ink)', bg: 'var(--amber-soft)', href: 'https://london1644.info/en/fulltext.html' },
 }
 
-/* ── Inline copy button ── */
-function CopyBtn({ getText }) {
-  const [copied, setCopied] = useState(false)
-  async function copy(e) {
-    e.stopPropagation()
-    try { await navigator.clipboard.writeText(getText()); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
-  }
+/* ── Devotional link button ── */
+function DevotionalLink({ day }) {
+  const navigate = useNavigate()
   return (
-    <button onClick={copy} title="Copy text" style={cp.btn}>
-      {copied
-        ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polyline points="1.5,6 4.5,9.5 10.5,2.5" stroke="var(--teal)" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        : <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-      }
+    <button
+      onClick={() => navigate(`/day/${day}`)}
+      title={`View in devotional (Day ${day})`}
+      style={cp.btn}
+    >
+      <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+        <path d="M1.5 4.5h10v6a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 012 10.5v-6z" stroke="currentColor" strokeWidth="1.2"/>
+        <path d="M4.5 1.5h4v3h-4v-3z" stroke="currentColor" strokeWidth="1.2"/>
+        <circle cx="6.5" cy="7" r="1" fill="currentColor"/>
+      </svg>
     </button>
   )
 }
@@ -116,6 +118,16 @@ export default function ConfessionsPage() {
 
   /* Compute text style from prefs */
   const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
+
+  /* Build reading to day map */
+  const readingToDay = useMemo(() => {
+    const SCHEDULE = buildSchedule()
+    const map = {}
+    SCHEDULE.forEach((entry, index) => {
+      map[entry.src + '|' + entry.reading] = index + 1
+    })
+    return map
+  }, [])
 
   useEffect(() => {
     const handler = () => {
@@ -331,11 +343,18 @@ export default function ConfessionsPage() {
                               </div>
                             )}
                           </div>
-                          <CopyBtn getText={() => {
-                            let t = p.text
-                            if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
-                            return t
-                          }} />
+                          <div style={s.paraActions}>
+                            <CopyBtn getText={() => {
+                              let t = p.text
+                              if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
+                              return t
+                            }} />
+                            {(() => {
+                              const reading = `Ch. ${chNum} §${p.para}`
+                              const day = readingToDay['2LBCF|' + reading]
+                              return day ? <DevotionalLink day={day} /> : null
+                            })()}
+                          </div>
                         </div>
                       )
                     })}
@@ -368,11 +387,18 @@ export default function ConfessionsPage() {
                         </div>
                       )}
                     </div>
-                    <CopyBtn getText={() => {
-                      let t = `Q. ${item.q}\n\nA. ${item.a}`
-                      if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
-                      return t
-                    }} />
+                    <div style={s.qaActions}>
+                      <CopyBtn getText={() => {
+                        let t = `Q. ${item.q}\n\nA. ${item.a}`
+                        if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
+                        return t
+                      }} />
+                      {(() => {
+                        const reading = `Q&A #${num}`
+                        const day = readingToDay['Catechism|' + reading]
+                        return day ? <DevotionalLink day={day} /> : null
+                      })()}
+                    </div>
                   </div>
                 )
               })}
@@ -399,11 +425,18 @@ export default function ConfessionsPage() {
                         <span style={s.articleNum}>Article {num}</span>
                         <h2 style={s.articleTitle}>{item.title}</h2>
                       </div>
-                      <CopyBtn getText={() => {
-                        let t = `${item.title}\n\n${item.text}`
-                        if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
-                        return t
-                      }} />
+                      <div style={s.articleActions}>
+                        <CopyBtn getText={() => {
+                          let t = `${item.title}\n\n${item.text}`
+                          if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
+                          return t
+                        }} />
+                        {(() => {
+                          const reading = `Article ${num}`
+                          const day = readingToDay['1LBCF|' + reading]
+                          return day ? <DevotionalLink day={day} /> : null
+                        })()}
+                      </div>
                     </div>
                     <div style={s.articleBody}>
                       {lines.map((line, i) => {
@@ -531,6 +564,7 @@ const s = {
     minWidth:28, paddingTop:3, fontVariantNumeric:'tabular-nums',
   },
   paraBody: { flex:1 },
+  paraActions: { display:'flex', gap:8, flexShrink:0, alignItems:'flex-start' },
   paraText: {
     fontSize:16, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.9,
     color:'var(--ink)', margin:'0 0 8px',
@@ -544,6 +578,7 @@ const s = {
     minWidth:32, paddingTop:2, fontVariantNumeric:'tabular-nums',
   },
   qaBody: { flex:1 },
+  qaActions: { display:'flex', gap:8, flexShrink:0, alignItems:'flex-start' },
   qaQuestion: {
     fontSize:17, fontFamily:"'Cormorant Garamond',serif", fontWeight:600,
     color:'var(--ink)', lineHeight:1.55, margin:'0 0 8px',
@@ -556,6 +591,7 @@ const s = {
   /* 1LBCF */
   article: { marginBottom:'2.5rem', paddingBottom:'2rem', borderBottom:'1px solid var(--border)' },
   articleHeader: { marginBottom:'1rem' },
+  articleActions: { display:'flex', gap:8, flexShrink:0, alignItems:'flex-start' },
   articleNum: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'var(--amber-ink)', display:'block', marginBottom:4 },
   articleTitle: { fontSize:24, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', lineHeight:1.25 },
   articleBody: { paddingLeft:4 },
