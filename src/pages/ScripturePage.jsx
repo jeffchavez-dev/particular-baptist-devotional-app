@@ -82,7 +82,7 @@ export default function ScripturePage() {
             </button>
           </div>
           <div style={s.navCenter}>
-            <span style={s.navTitle}>Scripture Proof Text Index</span>
+           
           </div>
           <span style={{fontSize:12, color:'var(--ink-faint)', whiteSpace:'nowrap'}}>
             {totalRefs.toLocaleString()} passages · {totalCitations.toLocaleString()} citations

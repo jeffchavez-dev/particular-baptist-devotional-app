@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
+import CopyBtn from '../components/CopyBtn'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
@@ -293,7 +294,7 @@ export default function ConfessionsPage() {
                       <h2 style={s.chapterTitle}>{chTitle}</h2>
                     </div>
                     {paras.map(p => {
-                      if (q && !p.text.toLowerCase().includes(q) && !(p.refs||'').toLowerCase().includes(q)) return null
+                      if (q && !p.text.toLowerCase().includes(q) && !(p.refs||'').toLowerCase().includes(q) && !CHAPTER_TITLES[parseInt(chNum)].toLowerCase().includes(q)) return null
                       return (
                         <div key={p.key} style={s.paragraph} id={`p-${p.key}`}>
                           <div style={s.paraNum}>§{p.para}</div>

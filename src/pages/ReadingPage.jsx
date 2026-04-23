@@ -8,6 +8,7 @@ import { LBCF1 } from '../data/lbcf1'
 import { QUOTES } from '../data/quotes'
 import ShareCardModal from '../components/ShareCardModal'
 import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
+import CopyBtn from '../components/CopyBtn'
 
 const SCHEDULE = buildSchedule()
 

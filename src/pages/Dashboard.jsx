@@ -81,6 +81,7 @@ export default function Dashboard() {
   const [exportOpen,   setExportOpen]   = useState(false)
   const [shareCard,    setShareCard]    = useState(null)
   const [aboutOpen,    setAboutOpen]    = useState(false)
+  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
 
   /* sidebar: user's own notes + quote search data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
@@ -90,6 +91,13 @@ export default function Dashboard() {
   const userName = session?.user?.user_metadata?.full_name?.split(' ')[0]
     || session?.user?.email?.split('@')[0]
     || 'friend'
+
+  /* ── track mobile resize ── */
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   /* ── load progress (includes user's personal notes) ── */
   useEffect(() => {
@@ -243,7 +251,7 @@ export default function Dashboard() {
               title="Home"
             />
             <div>
-              <h1 style={s.siteTitle}>Particular Baptist Devotional</h1>
+              <h1 style={{...s.siteTitle, display: isMobile ? 'none' : 'block'}}>Particular Baptist Devotional</h1>
               {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
             </div>
           </div>
