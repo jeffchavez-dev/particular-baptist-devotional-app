@@ -17,21 +17,21 @@ function dateStr(n) {
 
 const chapters = [
   {ch:1,t:'Of the Holy Scriptures',p:10},{ch:2,t:'Of God and of the Holy Trinity',p:3},
-  {ch:3,t:"Of God's Decree",p:7},{ch:4,t:'Of Creation',p:4},
-  {ch:5,t:'Of Divine Providence',p:7},{ch:6,t:'Of the Fall of Man',p:6},
+  {ch:3,t:"Of God's Decree",p:7},{ch:4,t:'Of Creation',p:3},
+  {ch:5,t:'Of Divine Providence',p:7},{ch:6,t:'Of the Fall of Man',p:5},
   {ch:7,t:"Of God's Covenant",p:3},{ch:8,t:'Of Christ the Mediator',p:10},
   {ch:9,t:'Of Free Will',p:5},{ch:10,t:'Of Effectual Calling',p:4},
-  {ch:11,t:'Of Justification',p:5},{ch:12,t:'Of Adoption',p:1},
+  {ch:11,t:'Of Justification',p:6},{ch:12,t:'Of Adoption',p:1},
   {ch:13,t:'Of Sanctification',p:3},{ch:14,t:'Of Saving Faith',p:3},
-  {ch:15,t:'Of Repentance unto Life',p:6},{ch:16,t:'Of Good Works',p:7},
+  {ch:15,t:'Of Repentance unto Life',p:5},{ch:16,t:'Of Good Works',p:7},
   {ch:17,t:'Of Perseverance of the Saints',p:3},{ch:18,t:'Of Assurance of Grace',p:4},
   {ch:19,t:'Of the Law of God',p:7},{ch:20,t:'Of the Gospel',p:4},
   {ch:21,t:'Of Christian Liberty',p:3},{ch:22,t:'Of Religious Worship & Sabbath',p:8},
-  {ch:23,t:'Of Lawful Oaths and Vows',p:5},{ch:24,t:'Of the Civil Magistrate',p:4},
-  {ch:25,t:'Of Marriage',p:3},{ch:26,t:'Of the Church',p:15},
-  {ch:27,t:'Of Communion of Saints',p:2},{ch:28,t:'Of Baptism and the Lord\'s Supper',p:4},
+  {ch:23,t:'Of Lawful Oaths and Vows',p:5},{ch:24,t:'Of the Civil Magistrate',p:3},
+  {ch:25,t:'Of Marriage',p:4},{ch:26,t:'Of the Church',p:15},
+  {ch:27,t:'Of Communion of Saints',p:2},{ch:28,t:'Of Baptism and the Lord\'s Supper',p:2},
   {ch:29,t:'Of Baptism',p:4},{ch:30,t:"Of the Lord's Supper",p:8},
-  {ch:31,t:'Of the State after Death',p:3},{ch:32,t:'Of the Last Judgment',p:2},
+  {ch:31,t:'Of the State after Death',p:3},{ch:32,t:'Of the Last Judgment',p:3},
 ]
 
 const lbcf2 = []
