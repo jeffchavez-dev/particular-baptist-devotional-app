@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
-import { buildSchedule } from '../lib/supabase'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
@@ -77,32 +76,6 @@ const SOURCES = {
   '1lbcf':     { label: '1LBCF', name: 'First London Baptist Confession (1644)', color: 'var(--amber-ink)', bg: 'var(--amber-soft)', href: 'https://london1644.info/en/fulltext.html' },
 }
 
-/* ── Devotional link button ── */
-function DevotionalLink({ day }) {
-  const navigate = useNavigate()
-  return (
-    <button
-      onClick={() => navigate(`/day/${day}`)}
-      title={`View in devotional (Day ${day})`}
-      style={cp.btn}
-    >
-      <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-        <path d="M1.5 4.5h10v6a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 012 10.5v-6z" stroke="currentColor" strokeWidth="1.2"/>
-        <path d="M4.5 1.5h4v3h-4v-3z" stroke="currentColor" strokeWidth="1.2"/>
-        <circle cx="6.5" cy="7" r="1" fill="currentColor"/>
-      </svg>
-    </button>
-  )
-}
-const cp = {
-  btn: {
-    display:'inline-flex', alignItems:'center', justifyContent:'center',
-    padding:4, borderRadius:4, border:'1px solid var(--border)',
-    background:'none', cursor:'pointer', color:'var(--ink-faint)',
-    transition:'border-color 0.1s', flexShrink:0,
-  },
-}
-
 export default function ConfessionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -118,16 +91,6 @@ export default function ConfessionsPage() {
 
   /* Compute text style from prefs */
   const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
-
-  /* Build reading to day map */
-  const readingToDay = useMemo(() => {
-    const SCHEDULE = buildSchedule()
-    const map = {}
-    SCHEDULE.forEach((entry, index) => {
-      map[entry.src + '|' + entry.reading] = index + 1
-    })
-    return map
-  }, [])
 
   useEffect(() => {
     const handler = () => {
@@ -349,11 +312,6 @@ export default function ConfessionsPage() {
                               if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
                               return t
                             }} />
-                            {(() => {
-                              const reading = `Ch. ${chNum} §${p.para}`
-                              const day = readingToDay['2LBCF|' + reading]
-                              return day ? <DevotionalLink day={day} /> : null
-                            })()}
                           </div>
                         </div>
                       )
@@ -393,11 +351,6 @@ export default function ConfessionsPage() {
                         if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
                         return t
                       }} />
-                      {(() => {
-                        const reading = `Q&A #${num}`
-                        const day = readingToDay['Catechism|' + reading]
-                        return day ? <DevotionalLink day={day} /> : null
-                      })()}
                     </div>
                   </div>
                 )
@@ -431,11 +384,6 @@ export default function ConfessionsPage() {
                           if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
                           return t
                         }} />
-                        {(() => {
-                          const reading = `Article ${num}`
-                          const day = readingToDay['1LBCF|' + reading]
-                          return day ? <DevotionalLink day={day} /> : null
-                        })()}
                       </div>
                     </div>
                     <div style={s.articleBody}>
