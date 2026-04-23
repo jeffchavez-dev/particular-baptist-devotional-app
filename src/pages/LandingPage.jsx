@@ -116,7 +116,7 @@ export default function LandingPage() {
               Take the Quiz
             </button>
             {session
-              ? <button onClick={() => navigate('/dashboard')} className="btn btn-outline" style={{ fontSize: 13 }}>My Dashboard</button>
+              ? <button onClick={() => navigate('/')} className="btn btn-outline" style={{ fontSize: 13 }}>My Dashboard</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{ fontSize: 13 }}>Sign in</button>
             }
           </div>
@@ -146,7 +146,7 @@ export default function LandingPage() {
           </p>
 
           <div style={s.heroCtas}>
-            <button onClick={() => navigate('/dashboard')} className="btn btn-primary" style={s.ctaPrimary}>
+            <button onClick={() => navigate('/')} className="btn btn-primary" style={s.ctaPrimary}>
               Begin the Devotional
             </button>
             <button onClick={() => navigate('/quiz')} className="btn btn-outline" style={s.ctaSecondary}>
@@ -254,7 +254,7 @@ export default function LandingPage() {
           <p style={s.ctaBody}>
             No commitment required. Start today and mark your progress as you go.
           </p>
-          <button onClick={() => navigate('/dashboard')} className="btn" style={s.ctaFinal}>
+          <button onClick={() => navigate('/')} className="btn" style={s.ctaFinal}>
             Open the Devotional
           </button>
         </div>

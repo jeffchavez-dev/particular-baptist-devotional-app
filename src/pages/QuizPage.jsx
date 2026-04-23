@@ -723,7 +723,7 @@ function ResultsScreen({ score, total, tier, answers, questions, navigate }) {
           <button onClick={() => window.location.reload()} className="btn btn-outline" style={{fontSize:14}}>
             Retake the Quiz
           </button>
-          <button onClick={() => navigate('/dashboard')} className="btn btn-primary" style={{fontSize:14}}>
+          <button onClick={() => navigate('/')} className="btn btn-primary" style={{fontSize:14}}>
             Begin the Devotional →
           </button>
         </div>

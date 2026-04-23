@@ -5,6 +5,7 @@ import { useAuth } from '../App'
 import { QUOTES } from '../data/quotes'
 import ExportModal from '../components/ExportModal'
 import ShareCardModal from '../components/ShareCardModal'
+import AboutModal from '../components/AboutModal'
 
 const SCHEDULE  = buildSchedule()
 const TODAY_DAY = Math.min(getTodayDayNum(), 365)
@@ -79,6 +80,7 @@ export default function Dashboard() {
   const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes'
   const [exportOpen,   setExportOpen]   = useState(false)
   const [shareCard,    setShareCard]    = useState(null)
+  const [aboutOpen,    setAboutOpen]    = useState(false)
 
   /* sidebar: user's own notes + quote search data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
@@ -274,6 +276,20 @@ export default function Dashboard() {
                 <rect x="2" y="3" width="14" height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="8" width="9"  height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="13" width="11" height="2" rx="1" fill="currentColor"/>
+              </svg>
+            </button>
+            {/* About button */}
+            <button
+              onClick={() => setAboutOpen(true)}
+              className="btn btn-ghost"
+              style={s.sidebarToggle}
+              aria-label="About"
+              title="About"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M9 6v1M9 9v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="9" cy="5" r="0.5" fill="currentColor"/>
               </svg>
             </button>
           </div>
@@ -491,6 +507,10 @@ export default function Dashboard() {
         isOpen={shareCard !== null}
         onClose={() => setShareCard(null)}
         card={shareCard}
+      />
+      <AboutModal
+        open={aboutOpen}
+        onClose={() => setAboutOpen(false)}
       />
 
       {/* ── Sidebar backdrop ── */}

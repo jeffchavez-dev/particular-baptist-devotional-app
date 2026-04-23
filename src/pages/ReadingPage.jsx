@@ -524,7 +524,7 @@ export default function ReadingPage() {
   }
 
   if (!entry) {
-    return <div style={{padding:'3rem',textAlign:'center'}}>Day not found. <button onClick={()=>navigate('/dashboard')} className="btn btn-ghost">Go home</button></div>
+    return <div style={{padding:'3rem',textAlign:'center'}}>Day not found. <button onClick={()=>navigate('/')} className="btn btn-ghost">Go home</button></div>
   }
 
   if (loading) {
@@ -541,7 +541,7 @@ export default function ReadingPage() {
     <div style={s.page}>
       <header style={s.header}>
         <div style={s.headerInner}>
-          <button onClick={()=>navigate('/dashboard')} className="btn btn-ghost" style={{gap:4}}>
+          <button onClick={()=>navigate('/')} className="btn btn-ghost" style={{gap:4}}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>

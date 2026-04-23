@@ -74,7 +74,7 @@ export default function ScripturePage() {
               style={{width:28, height:28, cursor:'pointer'}}
               onClick={() => navigate('/')}
             />
-            <button onClick={() => navigate('/dashboard')} className="btn btn-ghost" style={{gap:5, fontSize:13}}>
+            <button onClick={() => navigate('/')} className="btn btn-ghost" style={{gap:5, fontSize:13}}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
