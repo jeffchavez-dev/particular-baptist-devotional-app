@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter } from '../lib/supabase'
 import { useAuth } from '../App'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -436,6 +436,10 @@ export default function ReadingPage() {
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
   const [prefs, setPrefsState] = useState(() => loadPrefs())
+  const bibleChapter = entry?.bibleChapter || null
+  const [bibleChapterDone, setBibleChapterDone] = useState(() =>
+    bibleChapter ? !!getBibleProgress()[bibleChapter] : false
+  )
 
   function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
 
@@ -473,6 +477,11 @@ export default function ReadingPage() {
   async function toggleComplete() {
     const newVal = !completed
     setCompleted(newVal)
+    // Auto-mark the linked bible chapter when day is completed
+    if (newVal && bibleChapter && !bibleChapterDone) {
+      setBibleChapter(bibleChapter, true)
+      setBibleChapterDone(true)
+    }
     if (session) {
       await supabase.from('progress').upsert({
         user_id: session.user.id,
@@ -484,6 +493,12 @@ export default function ReadingPage() {
     } else {
       setLocalProgress(day, { completed: newVal, notes })
     }
+  }
+
+  function toggleBibleChapter() {
+    const newVal = !bibleChapterDone
+    setBibleChapterDone(newVal)
+    if (bibleChapter) setBibleChapter(bibleChapter, newVal)
   }
 
   async function saveNotes() {
@@ -611,6 +626,38 @@ export default function ReadingPage() {
             </div>
           </div>
         </div>
+
+        {/* Scripture Reading */}
+        {bibleChapter && (
+          <div className="card" style={s.bibleCard}>
+            <div style={s.bibleCardInner}>
+              <div style={s.bibleLeft}>
+                <span style={s.bibleLabel}>Scripture Reading</span>
+                <span style={s.bibleChapter}>{bibleChapter}</span>
+                <span style={s.bibleHint}>Read the full chapter alongside today's study</span>
+              </div>
+              <button
+                onClick={toggleBibleChapter}
+                style={{
+                  ...s.bibleCheck,
+                  background: bibleChapterDone ? 'var(--teal)' : 'white',
+                  borderColor: bibleChapterDone ? 'var(--teal)' : 'var(--border-strong)',
+                }}
+                title={bibleChapterDone ? 'Mark unread' : 'Mark as read'}
+                aria-label={bibleChapterDone ? 'Mark unread' : 'Mark chapter as read'}
+              >
+                {bibleChapterDone && (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+            {bibleChapterDone && (
+              <div style={s.bibleReadBadge}>✓ Chapter read</div>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         <div className="card" style={s.notesCard}>
@@ -781,6 +828,21 @@ const s = {
     flexShrink:0, transition:'all 0.2s', background:'white',
   },
   cbDone: { background:'var(--teal)', borderColor:'var(--teal)' },
+  bibleCard: { padding:'16px 20px' },
+  bibleCardInner: { display:'flex', alignItems:'center', gap:12 },
+  bibleLeft: { flex:1, display:'flex', flexDirection:'column', gap:2 },
+  bibleLabel: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--teal)' },
+  bibleChapter: { fontSize:18, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)' },
+  bibleHint: { fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" },
+  bibleCheck: {
+    width:36, height:36, borderRadius:'50%', border:'2px solid',
+    cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+    flexShrink:0, transition:'all 0.2s',
+  },
+  bibleReadBadge: {
+    marginTop:8, fontSize:11, color:'var(--teal)', fontWeight:600,
+    fontFamily:"'DM Sans',sans-serif",
+  },
   notesCard: { padding:'20px' },
   textarea: { resize:'vertical', minHeight:120, lineHeight:1.7 },
   nav: { display:'flex', justifyContent:'space-between', gap:12, marginTop:8 },

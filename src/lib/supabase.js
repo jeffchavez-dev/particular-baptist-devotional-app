@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { DAY_BIBLE } from '../data/readingPlan'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -113,12 +114,12 @@ export function buildSchedule() {
   let i2=0, iC=0, i1=0, iR=0
   for (let day=1; day<=365; day++) {
     if (day % 7 === 0) {
-      pool.push({day, date:dateStr(day), src:'Review', reading:'Weekly review & reflection', detail:reviewPrompts[iR%reviewPrompts.length], link:null})
+      pool.push({day, date:dateStr(day), src:'Review', reading:'Weekly review & reflection', detail:reviewPrompts[iR%reviewPrompts.length], link:null, bibleChapter: DAY_BIBLE[day] || null})
       iR++
     } else {
       const turn = (day - Math.floor(day/7)) % 3
       let pushed = false
-      const tryPush = (arr, idx) => { if(idx < arr.length){pool.push({day,date:dateStr(day),...arr[idx]});return true;}return false; }
+      const tryPush = (arr, idx) => { if(idx < arr.length){pool.push({day,date:dateStr(day),...arr[idx], bibleChapter: DAY_BIBLE[day] || null});return true;}return false; }
       if      (turn===0 && tryPush(lbcf2,i2))    { i2++;  pushed=true }
       else if (turn===1 && tryPush(catechism,iC)) { iC++;  pushed=true }
       else if (turn===2 && tryPush(lbcf1,i1))     { i1++;  pushed=true }
@@ -130,4 +131,23 @@ export function buildSchedule() {
     }
   }
   return pool
+}
+
+// ── Bible chapter progress (localStorage) ────────────────────────────────
+const BIBLE_KEY = 'pb-bible-progress'
+
+export function getBibleProgress() {
+  try { return JSON.parse(localStorage.getItem(BIBLE_KEY) || '{}') }
+  catch { return {} }
+}
+
+export function setBibleChapter(chapter, done) {
+  const all = getBibleProgress()
+  if (done) all[chapter] = true
+  else delete all[chapter]
+  try { localStorage.setItem(BIBLE_KEY, JSON.stringify(all)) } catch {}
+}
+
+export function isBibleChapterDone(chapter) {
+  return !!getBibleProgress()[chapter]
 }
