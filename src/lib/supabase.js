@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { DAY_BIBLE } from '../data/readingPlan'
+import { LBCF1 } from '../data/lbcf1'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -45,24 +46,13 @@ const catechism = Array.from({length:114},(_,i)=>({
   link:`https://baptistcatechism.org/${i+1}/`
 }))
 
-const lbcf1Titles = [
-  'The Holy Scriptures','Of God','Of the Decrees of God','Of Creation','Of Providence',
-  'Of the Fall and Original Sin',"Of the Covenant of God",'Of Christ the Mediator',
-  'Of Free Will','Of Effectual Calling','Of Justification','Of Adoption','Of Sanctification',
-  'Of Saving Faith','Of Repentance and Salvation','Of Good Works','Of Perseverance of Saints',
-  'Of the Assurance of Salvation','Of the Law of God','Of the Gospel','Of Christian Liberty',
-  'Of Worship and the Sabbath','Of Oaths and Vows','Of the Civil Magistrate','Of Marriage',
-  'Of the Church','Of Communion of Saints','Of Baptism and the Lord\'s Supper','Of Baptism',
-  "Of the Lord's Supper",'Of the State after Death','Of the Last Judgment',
-  "Of Scripture's Perfection",'Of the Rule of Faith','Of Judgment of Controversies',
-  'Of Private Judgment','Of Creeds and Confessions',"Of the Church's Authority",
-  'Of Church Councils','Of the Visible Church','Of Officers of the Church',
-  'Of Church Censures','Of the Power of the Keys','Of Calling to Office','Of the Sacraments',
-  'Of the Word and Sacraments','Of Infant Membership','Of Covenant Children',
-  'Of Church Discipline','Of Communion of Churches','Of Civil Government and Religion',
-  'Of the Final State',
-]
-const lbcf1 = lbcf1Titles.map((t,i)=>({src:'1LBCF',reading:`Article ${i+1}`,detail:t,link:`https://london1644.info/en/fulltext.html#artikel${String(i+1).padStart(2,'0')}`}))
+// Derive 1LBCF article list directly from the data file so titles are always accurate
+const lbcf1 = Object.entries(LBCF1).map(([num, item]) => ({
+  src: '1LBCF',
+  reading: `Article ${num}`,
+  detail: item.title,
+  link: `https://london1644.info/en/fulltext.html#artikel${String(parseInt(num)).padStart(2,'0')}`,
+}))
 
 const reviewPrompts = [
   'Revisit your favourite reading from this week',
