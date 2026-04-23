@@ -120,3 +120,9 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
   width:20px; height:20px; border:2px solid var(--border);
   border-top-color:var(--gold); border-radius:50%; animation: spin 0.7s linear infinite;
 }
+
+/* ── Mobile bottom navigation ── */
+/* Hide on desktop — only show on narrow viewports */
+@media (min-width: 769px) {
+  [data-bottom-nav] { display: none !important; }
+}

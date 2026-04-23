@@ -64,11 +64,57 @@ function cleanRefs(refs) {
   return refs.replace(/\b[a-z](?=[A-Z1-9])/g, '').replace(/\s+/g, ' ').trim()
 }
 
-/* ── Strip inline footnote markers from body text ── */
-function cleanText(text) {
-  // Remove single lowercase letters used as superscript footnote markers
-  // Pattern: a lowercase letter directly before an uppercase letter or digit mid-word
-  return text.replace(/(?<=[a-z,;. ])([a-z])(?=[A-Z])/g, '').trim()
+/* ── Normalize text for comprehensive search ──
+   Handles two OCR/transcription artifacts:
+   1. Broken hyphenation: "after- ward" → "afterward"
+   2. Inline footnote markers concatenated to words:
+      "gmaketh" → "maketh", "mplain" → "plain", "arule" → "rule"
+      (single lowercase letter appearing before a 2+ char word with no space)
+── */
+function makeSearchable(text) {
+  if (!text) return ''
+  return text
+    // Join OCR-broken hyphenated words ("after- ward" → "afterward")
+    .replace(/(\w)-\s+/g, '$1')
+    // Strip single-char markers before uppercase letters (refs: "aRom" → "Rom")
+    .replace(/\b[a-z](?=[A-Z])/g, '')
+    // Strip single-char markers before lowercase words of 3+ chars
+    // e.g. "gmaketh" → "maketh", "mplain" → "plain"
+    // We check that removing the first char leaves a 3+ char sequence to avoid
+    // stripping real single-letter words like "a", "i", "o"
+    .replace(/\b([a-z])([a-z]{3,})\b/g, (_, _marker, word) => word)
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/* ── Pre-built search index (built once at module load) ── */
+function buildSearchIndex() {
+  const idx = { lbcf2: {}, catechism: {}, lbcf1: {} }
+
+  Object.entries(LBCF2).forEach(([key, item]) => {
+    idx.lbcf2[key] = makeSearchable((item.text || '') + ' ' + (item.refs || ''))
+  })
+  Object.entries(CATECHISM).forEach(([num, item]) => {
+    idx.catechism[num] = makeSearchable(
+      (item.q || '') + ' ' + (item.a || '') + ' ' + (item.refs || '')
+    )
+  })
+  Object.entries(LBCF1).forEach(([num, item]) => {
+    idx.lbcf1[num] = makeSearchable(
+      (item.title || '') + ' ' + (item.text || '') + ' ' + (item.refs || '')
+    )
+  })
+  return idx
+}
+
+const SEARCH_IDX = buildSearchIndex()
+
+/* Unified match check: tries raw text first, then normalized index */
+function textMatches(rawText, rawRefs, normIndexed, q) {
+  if (!q) return true
+  const raw = ((rawText || '') + ' ' + (rawRefs || '')).toLowerCase()
+  return raw.includes(q) || normIndexed.includes(q)
 }
 
 const SOURCES = {
@@ -145,6 +191,26 @@ export default function ConfessionsPage() {
 
   /* ─── Filtered content ─── */
   const q = search.toLowerCase().trim()
+
+  /* Result counts for search feedback */
+  const resultCounts = useMemo(() => {
+    if (!q) return null
+    let lbcf2Count = 0, catCount = 0, lbcf1Count = 0
+    Object.entries(LBCF2_CHAPTERS).forEach(([chNum, paras]) => {
+      const chTitle = (CHAPTER_TITLES[parseInt(chNum)] || '').toLowerCase()
+      const chMatch = chTitle.includes(q)
+      paras.forEach(p => {
+        if (chMatch || textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)) lbcf2Count++
+      })
+    })
+    Object.entries(CATECHISM).forEach(([num, item]) => {
+      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.catechism[num] || '', q)) catCount++
+    })
+    Object.entries(LBCF1).forEach(([num, item]) => {
+      if (textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) lbcf1Count++
+    })
+    return { lbcf2: lbcf2Count, catechism: catCount, lbcf1: lbcf1Count }
+  }, [q])
 
   return (
     <div style={s.page}>
@@ -278,13 +344,14 @@ export default function ConfessionsPage() {
           {tab === '2lbcf' && (
             <div>
               {Object.entries(LBCF2_CHAPTERS).map(([chNum, paras]) => {
-                const chTitle = CHAPTER_TITLES[parseInt(chNum)]
+                const chTitle = CHAPTER_TITLES[parseInt(chNum)] || ''
                 const chId = `ch-${chNum}`
-                // Filter
+                const chTitleMatches = q && chTitle.toLowerCase().includes(q)
+
                 if (q) {
-                  const hasMatch = paras.some(p =>
-                    p.text.toLowerCase().includes(q) || (p.refs || '').toLowerCase().includes(q)
-                  ) || chTitle.toLowerCase().includes(q)
+                  const hasMatch = chTitleMatches || paras.some(p =>
+                    textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)
+                  )
                   if (!hasMatch) return null
                 }
                 return (
@@ -294,7 +361,9 @@ export default function ConfessionsPage() {
                       <h2 style={s.chapterTitle}>{chTitle}</h2>
                     </div>
                     {paras.map(p => {
-                      if (q && !p.text.toLowerCase().includes(q) && !(p.refs||'').toLowerCase().includes(q) && !CHAPTER_TITLES[parseInt(chNum)].toLowerCase().includes(q)) return null
+                      const paraMatches = !q || chTitleMatches ||
+                        textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)
+                      if (!paraMatches) return null
                       return (
                         <div key={p.key} style={s.paragraph} id={`p-${p.key}`}>
                           <div style={s.paraNum}>§{p.para}</div>
@@ -327,12 +396,7 @@ export default function ConfessionsPage() {
           {tab === 'catechism' && (
             <div style={s.catechismList}>
               {Object.entries(CATECHISM).map(([num, item]) => {
-                if (q) {
-                  const matches = item.q.toLowerCase().includes(q) ||
-                    item.a.toLowerCase().includes(q) ||
-                    (item.refs||'').toLowerCase().includes(q)
-                  if (!matches) return null
-                }
+                if (q && !textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.catechism[num] || '', q)) return null
                 return (
                   <div key={num} style={s.qaBlock} id={`qa-${num}`}>
                     <div style={s.qaNum}>Q.{num}</div>
@@ -364,12 +428,7 @@ export default function ConfessionsPage() {
             <div>
               {Object.entries(LBCF1).map(([num, item]) => {
                 const artId = `art-${num}`
-                if (q) {
-                  const matches = item.title.toLowerCase().includes(q) ||
-                    item.text.toLowerCase().includes(q) ||
-                    (item.refs||'').toLowerCase().includes(q)
-                  if (!matches) return null
-                }
+                if (q && !textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) return null
                 // Split text on \n and numbered lines
                 const lines = item.text.split('\n').filter(l => l.trim())
                 return (
@@ -409,12 +468,16 @@ export default function ConfessionsPage() {
             </div>
           )}
 
-          {/* Empty search state */}
-          {q && tab === '2lbcf' && Object.values(LBCF2_CHAPTERS).every(paras =>
-            !paras.some(p => p.text.toLowerCase().includes(q) || (p.refs||'').toLowerCase().includes(q))
-          ) && (
-            <div style={s.empty}>No results for "{search}"</div>
-          )}
+          {/* Search result feedback */}
+          {q && resultCounts && (() => {
+            const count = resultCounts[tab === '2lbcf' ? 'lbcf2' : tab === 'catechism' ? 'catechism' : 'lbcf1']
+            if (count === 0) return <div style={s.empty}>No results for "{search}"</div>
+            return (
+              <div style={s.resultBanner}>
+                {count} {tab === 'catechism' ? 'Q&A' : 'section'}{count !== 1 ? 's' : ''} matched "{search}"
+              </div>
+            )
+          })()}
 
         </main>
       </div>
@@ -424,7 +487,7 @@ export default function ConfessionsPage() {
 
 /* ─── Styles ─── */
 const s = {
-  page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif" },
+  page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", paddingBottom:'env(safe-area-inset-bottom)' },
 
   /* header */
   header: {
@@ -500,6 +563,12 @@ const s = {
   /* main reading area */
   main: { flex:1, padding:'2rem 0 4rem 2rem', maxWidth:760 },
   empty: { textAlign:'center', padding:'4rem', color:'var(--ink-faint)', fontSize:14 },
+  resultBanner: {
+    fontSize:12, color:'var(--teal)', background:'var(--teal-light)',
+    border:'1px solid rgba(29,107,90,0.2)', borderRadius:'var(--radius)',
+    padding:'8px 14px', marginBottom:'1.5rem', fontWeight:500,
+    fontFamily:"'DM Sans',sans-serif",
+  },
 
   /* 2LBCF chapters */
   chapter: { marginBottom:'3rem', paddingBottom:'2rem', borderBottom:'1px solid var(--border)' },
