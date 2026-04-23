@@ -222,25 +222,6 @@ const qe = {
   errorText: { fontSize:12, color:'#c0392b', margin:'6px 0 0', background:'#fdf0ef', padding:'6px 10px', borderRadius:4 },
 }
 
-function CopyBtn({ getText, label = 'Copy' }) {
-  const [copied, setCopied] = useState(false)
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(getText())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { /* clipboard blocked */ }
-  }
-  return (
-    <button onClick={copy} style={cb.btn} title={label}>
-      {copied
-        ? <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><polyline points="1.5,6.5 5,10 11.5,3" stroke="var(--teal)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        : <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-      }
-      <span style={{fontSize:11, color: copied ? 'var(--teal)' : 'var(--ink-faint)'}}>{copied ? 'Copied!' : label}</span>
-    </button>
-  )
-}
 const cb = {
   btn: {
     display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px',

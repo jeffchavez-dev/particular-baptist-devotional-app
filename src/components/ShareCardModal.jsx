@@ -399,6 +399,32 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             <div style={m.hint}>{format.hint}</div>
           </div>
 
+          {/* Text size */}
+          <div style={m.section}>
+            <div style={m.label}>Text Size <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— smaller fits more text</span></div>
+            <div style={m.row}>
+              {CARD_SCALES.map(s => {
+                const active = cardScale.id === s.id
+                return (
+                  <button
+                    key={s.id}
+                    title={s.hint || s.label}
+                    onClick={() => setCardScale(s)}
+                    style={{
+                      ...m.scaleBtn,
+                      fontSize: 11 + CARD_SCALES.indexOf(s) * 2,
+                      borderColor: active ? 'var(--teal)' : 'var(--border)',
+                      background:  active ? 'var(--teal-light)' : 'var(--parchment)',
+                      color:       active ? 'var(--teal)' : 'var(--ink)',
+                      fontWeight:  active ? 700 : 400,
+                    }}
+                  >A</button>
+                )
+              })}
+            </div>
+            {cardScale.hint && <div style={m.hint}>{cardScale.hint}</div>}
+          </div>
+
           {/* Background */}
           <div style={m.section}>
             <div style={m.label}>Background</div>
@@ -519,6 +545,11 @@ const m = {
     padding:'6px 14px', borderRadius:99, border:'1.5px solid var(--border)',
     background:'var(--parchment)', fontSize:12, cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", color:'var(--ink)', transition:'all 0.15s',
+  },
+  scaleBtn: {
+    width:40, height:40, borderRadius:'var(--radius)', border:'1.5px solid',
+    cursor:'pointer', fontFamily:"'Georgia',serif", transition:'all 0.12s',
+    display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1,
   },
   chipActive: { borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)' },
   swatch: {
