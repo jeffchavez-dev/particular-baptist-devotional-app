@@ -103,25 +103,23 @@ const n = {
   spacer: { height: 'calc(64px + env(safe-area-inset-bottom))', display: 'block' },
   nav: {
     position: 'fixed', bottom: 0, left: 0, right: 0,
-    /* height expands with safe area so tabs stay above home indicator */
     paddingBottom: 'env(safe-area-inset-bottom)',
     background: 'var(--surface)', borderTop: '1px solid var(--border)',
     display: 'flex', alignItems: 'flex-start', zIndex: 100,
-    boxShadow: '0 -2px 12px rgba(0,0,0,0.07)',
-    /* Extend into landscape side notch */
+    boxShadow: '0 -2px 16px rgba(0,0,0,0.08)',
     paddingLeft:  'env(safe-area-inset-left)',
     paddingRight: 'env(safe-area-inset-right)',
   },
   tabWrap: { height: 64 },
   tab: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', gap: 2, background: 'none', border: 'none',
-    cursor: 'pointer', padding: '8px 2px 4px', position: 'relative',
+    justifyContent: 'center', gap: 3, background: 'none', border: 'none',
+    cursor: 'pointer', padding: '8px 4px 4px', position: 'relative',
     transition: 'color 0.15s', fontFamily: "'DM Sans', sans-serif",
     WebkitTapHighlightColor: 'transparent',
   },
   icon: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 9, letterSpacing: '0.02em', lineHeight: 1 },
+  label: { fontSize: 10, letterSpacing: '0.02em', lineHeight: 1, fontWeight: 500 },
   indicator: {
     position: 'absolute', top: 0, left: '20%', right: '20%',
     height: 2, borderRadius: '0 0 2px 2px', background: 'var(--teal)',
