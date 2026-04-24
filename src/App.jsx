@@ -24,6 +24,19 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const prevUser = useRef(null)
 
+  /* ── Online/offline detection ── */
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  useEffect(() => {
+    const goOnline  = () => setIsOnline(true)
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online',  goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online',  goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
   /* ── Theme (dark mode) ── */
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('pb-dark') === '1' } catch { return false }
@@ -61,6 +74,19 @@ export default function App() {
     <ThemeContext.Provider value={{ dark, toggleDark }}>
       <PrefsContext.Provider value={{ prefs, updatePrefs }}>
         <AuthContext.Provider value={{ session }}>
+          {/* Offline banner */}
+          {!isOnline && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+              background: '#7a5c1e', color: 'white',
+              fontSize: 12, fontWeight: 500, textAlign: 'center',
+              padding: '6px 16px', fontFamily: "'DM Sans', sans-serif",
+              letterSpacing: '0.02em',
+            }}>
+              ✈ Offline — all readings available, sync paused
+            </div>
+          )}
+          <div style={!isOnline ? { paddingTop: 29 } : {}}>
           <Routes>
             <Route path="/auth"    element={session ? <Navigate to="/" /> : <AuthPage />} />
             <Route path="/"        element={<Dashboard />} />
@@ -72,6 +98,7 @@ export default function App() {
             <Route path="*"        element={<Navigate to="/" />} />
           </Routes>
           <BottomNav />
+          </div>
         </AuthContext.Provider>
       </PrefsContext.Provider>
     </ThemeContext.Provider>
