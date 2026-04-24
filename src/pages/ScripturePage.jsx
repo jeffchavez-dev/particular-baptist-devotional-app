@@ -122,27 +122,167 @@ function ProgressBar({ done, total, label }) {
   )
 }
 
-/* ── Collapsible testament accordion ── */
-function TestamentAccordion({ testament, isOpen, onToggle, doneCount, totalCount, children }) {
-  const isOT  = testament === 'OT'
-  const label = isOT ? 'Old Testament' : 'New Testament'
+/* ── Bible category groupings ── */
+const OT_CATEGORIES = [
+  { id:'law',     label:'The Law',        color:'#7c5230', bg:'#fdf3e3', books:['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'] },
+  { id:'history', label:'History',        color:'#5a3e8c', bg:'#f0ecfa', books:['Joshua','Judges','Ruth','1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra','Nehemiah','Esther'] },
+  { id:'wisdom',  label:'Psalms & Wisdom',color:'#1d6b5a', bg:'#e4f0ec', books:['Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon'] },
+  { id:'major',   label:'Major Prophets', color:'#8c3e3e', bg:'#faeaea', books:['Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel'] },
+  { id:'minor',   label:'Minor Prophets', color:'#3e5a8c', bg:'#e8eefa', books:['Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'] },
+]
+const NT_CATEGORIES = [
+  { id:'gospels', label:'Gospels',         color:'#1d6b5a', bg:'#e4f0ec', books:['Matthew','Mark','Luke','John'] },
+  { id:'acts',    label:'History',         color:'#5a3e8c', bg:'#f0ecfa', books:['Acts'] },
+  { id:'pauline', label:'Pauline Letters', color:'#7c5230', bg:'#fdf3e3', books:['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon'] },
+  { id:'general', label:'General Epistles',color:'#3e5a8c', bg:'#e8eefa', books:['Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
+]
+
+/* ── Category box component (used in both plan + bible modes) ──
+   In plan mode: pass planByBook, navigate.
+   In bible mode: pass bibBooks, onToggle. ── */
+function CategoryBox({ cat, planByBook, bibBooks, progress, mode, onToggle, onNavigate, isOpen, onOpenToggle }) {
+  // Filter to books in this category that actually have data
+  const bookNames = mode === 'plan'
+    ? cat.books.filter(b => planByBook[b])
+    : cat.books.filter(b => bibBooks.find(bk => bk.name === b))
+
+  const { total, done } = bookNames.reduce((acc, name) => {
+    if (mode === 'plan') {
+      const chs = planByBook[name] || []
+      acc.total += chs.length
+      acc.done  += chs.filter(ch => progress[`${name} ${ch}`]).length
+    } else {
+      const bk = bibBooks.find(b => b.name === name)
+      if (bk) {
+        acc.total += bk.chapters
+        acc.done  += Array.from({length: bk.chapters}, (_, i) => i+1).filter(ch => progress[`${name} ${ch}`]).length
+      }
+    }
+    return acc
+  }, { total: 0, done: 0 })
+
+  if (total === 0) return null
+
+  return (
+    <div style={{...s.catBox, borderColor: isOpen ? cat.color : 'var(--border)'}}>
+      <button
+        style={{...s.catHeader, background: isOpen ? cat.bg : 'white'}}
+        onClick={onOpenToggle}
+      >
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{...s.catLabel, color: cat.color}}>{cat.label}</div>
+          <div style={{fontSize:10, color:'var(--ink-faint)', marginTop:2}}>{bookNames.length} book{bookNames.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
+          <MiniBar done={done} total={total} />
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{flexShrink:0, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)', color:'var(--ink-faint)'}}>
+            <path d="M4 2.5l4.5 4.5L4 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div style={s.catBody}>
+          {bookNames.map(name => {
+            const planChs = planByBook[name] || []
+            const bk = bibBooks?.find(b => b.name === name)
+            const chList = mode === 'plan'
+              ? planChs.map(ch => ({ ch, chId:`${name} ${ch}`, isDone: !!progress[`${name} ${ch}`] }))
+              : Array.from({length: bk?.chapters || 0}, (_, i) => i+1).map(ch => ({
+                  ch, chId:`${name} ${ch}`,
+                  isDone: !!progress[`${name} ${ch}`],
+                  inPlan: planChs.includes(ch),
+                }))
+            const doneCnt = chList.filter(c => c.isDone).length
+            return (
+              <div key={name} style={s.catBookRow}>
+                <div style={s.catBookHead}>
+                  <span style={s.catBookName}>{name}</span>
+                  <span style={s.catBookProgress}>{doneCnt}/{chList.length}</span>
+                </div>
+                {mode === 'plan' ? (
+                  <div style={s.dayLinks}>
+                    {chList.map(({ ch, chId, isDone }) =>
+                      (CHAPTER_TO_DAYS[chId] || []).map(d => (
+                        <button
+                          key={`${ch}-${d}`}
+                          onClick={() => onNavigate(d)}
+                          style={{...s.dayLink, ...(isDone ? {background:'var(--teal)',color:'white',borderColor:'var(--teal)'} : {})}}
+                          title={`Go to Day ${d}`}
+                        >
+                          {isDone && <span style={{marginRight:2}}>✓</span>}Ch.{ch} · Day {d}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div style={s.chGrid}>
+                    {chList.map(({ ch, chId, isDone, inPlan }) => (
+                      <ChapterBlock
+                        key={ch}
+                        chId={chId}
+                        done={isDone}
+                        inPlan={inPlan}
+                        onToggle={onToggle}
+                        label={ch}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Testament section with category grid ── */
+function TestamentSection({ testament, categories, planByBook, bibBooks, progress, mode, onToggle, onNavigate, openCats, setOpenCat }) {
+  const isOT = testament === 'OT'
   const badgeBg    = isOT ? 'var(--amber-soft)'  : 'var(--purple-soft)'
   const badgeColor = isOT ? 'var(--amber-ink)'   : 'var(--purple-ink)'
-  const pct  = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+
+  const { total, done } = mode === 'plan'
+    ? Object.keys(planByBook)
+        .filter(b => { const meta = bibBooks.find(bk => bk.name === b); return meta?.testament === testament })
+        .reduce((acc, b) => {
+          const chs = planByBook[b]
+          acc.total += chs.length
+          acc.done  += chs.filter(ch => progress[`${b} ${ch}`]).length
+          return acc
+        }, { total: 0, done: 0 })
+    : bibBooks.filter(b => b.testament === testament)
+        .reduce((acc, bk) => {
+          acc.total += bk.chapters
+          acc.done  += Array.from({length:bk.chapters},(_, i)=>i+1).filter(ch => progress[`${bk.name} ${ch}`]).length
+          return acc
+        }, { total: 0, done: 0 })
+
   return (
-    <div style={s.accordWrap}>
-      <button style={s.accordHeader} onClick={onToggle}>
+    <div style={s.testamentSection}>
+      <div style={s.testamentHeader}>
         <span style={{...s.testBadge, background: badgeBg, color: badgeColor}}>{testament}</span>
-        <span style={s.accordLabel}>{label}</span>
-        <MiniBar done={doneCount} total={totalCount} />
-        <svg
-          width="16" height="16" viewBox="0 0 16 16" fill="none"
-          style={{ marginLeft:'auto', flexShrink:0, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)' }}
-        >
-          <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-        </svg>
-      </button>
-      {isOpen && <div style={s.accordBody}>{children}</div>}
+        <span style={s.testamentLabel}>{isOT ? 'Old Testament' : 'New Testament'}</span>
+        <MiniBar done={done} total={total} />
+      </div>
+      <div style={s.catGrid}>
+        {categories.map(cat => (
+          <CategoryBox
+            key={cat.id}
+            cat={cat}
+            planByBook={planByBook}
+            bibBooks={bibBooks}
+            progress={progress}
+            mode={mode}
+            onToggle={onToggle}
+            onNavigate={onNavigate}
+            isOpen={openCats.has(cat.id)}
+            onOpenToggle={() => setOpenCat(cat.id)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -152,13 +292,11 @@ export default function ScripturePage() {
   const navigate = useNavigate()
 
   /* Restore saved state */
-  const _saved = loadState('scripture', { mode: 'plan', planOT: false, planNT: false, bibleOT: false, bibleNT: false })
+  const _saved = loadState('scripture', { mode: 'plan' })
   const [mode,    setMode]    = useState(_saved.mode)
-  const [planOT,  setPlanOT]  = useState(_saved.planOT)
-  const [planNT,  setPlanNT]  = useState(_saved.planNT)
-  const [bibleOT, setBibleOT] = useState(_saved.bibleOT)
-  const [bibleNT, setBibleNT] = useState(_saved.bibleNT)
   const [progress, setProgress] = useState(() => getBibleProgress())
+  /* Open/closed category boxes */
+  const [openCats, setOpenCats] = useState(new Set())
 
   /* Proof-text state */
   const [search,    setSearch]    = useState('')
@@ -167,8 +305,16 @@ export default function ScripturePage() {
   const [expanded,  setExpanded]  = useState(null)
 
   /* Persist state on change */
-  useEffect(() => { saveState('scripture', { mode, planOT, planNT, bibleOT, bibleNT }) },
-    [mode, planOT, planNT, bibleOT, bibleNT])
+  useEffect(() => { saveState('scripture', { mode }) }, [mode])
+
+  /* Toggle a category box open/closed */
+  function setOpenCat(id) {
+    setOpenCats(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
 
   /* Save scroll on unmount, restore on mount */
   useEffect(() => {
@@ -214,20 +360,10 @@ export default function ScripturePage() {
     })
   }, [])
 
-  /* Counts */
-  const planDone    = useMemo(() => PLAN_BOOKS_ORDERED.reduce((s, b) =>
+  /* Counts for tab badges */
+  const planDone  = useMemo(() => PLAN_BOOKS_ORDERED.reduce((s, b) =>
     s + PLAN_BY_BOOK[b].filter(ch => progress[`${b} ${ch}`]).length, 0), [progress])
-  const planOTDone  = useMemo(() => PLAN_OT_BOOKS.reduce((s, b) =>
-    s + PLAN_BY_BOOK[b].filter(ch => progress[`${b} ${ch}`]).length, 0), [progress])
-  const planNTDone  = useMemo(() => PLAN_NT_BOOKS.reduce((s, b) =>
-    s + PLAN_BY_BOOK[b].filter(ch => progress[`${b} ${ch}`]).length, 0), [progress])
-  const bibleDone   = Object.keys(progress).length
-  const bibleOTDone = useMemo(() => BIBLE_BOOKS.filter(b => b.testament === 'OT')
-    .reduce((s, b) => s + Array.from({length: b.chapters}, (_, i) => i + 1)
-      .filter(ch => progress[`${b.name} ${ch}`]).length, 0), [progress])
-  const bibleNTDone = useMemo(() => BIBLE_BOOKS.filter(b => b.testament === 'NT')
-    .reduce((s, b) => s + Array.from({length: b.chapters}, (_, i) => i + 1)
-      .filter(ch => progress[`${b.name} ${ch}`]).length, 0), [progress])
+  const bibleDone = Object.keys(progress).length
 
   /* Mode tabs */
   const tabs = [
@@ -267,106 +403,32 @@ export default function ScripturePage() {
       {/* ══ READING PLAN MODE ══ */}
       {mode === 'plan' && (
         <div style={s.body}>
-          {/* Overall progress */}
           <div style={s.progressCard}>
             <ProgressBar done={planDone} total={PLAN_TOTAL} label="Reading plan progress" />
             <p style={s.progressNote}>
               One chapter per devotional day (360 total). Click a day chip to jump to that devotional.
             </p>
           </div>
-
-          {/* OT accordion */}
-          <TestamentAccordion
-            testament="OT"
-            isOpen={planOT}
-            onToggle={() => setPlanOT(o => !o)}
-            doneCount={planOTDone}
-            totalCount={PLAN_OT_TOTAL}
-          >
-            {PLAN_OT_BOOKS.map(bookName => {
-              const chapters = PLAN_BY_BOOK[bookName]
-              const doneChs  = chapters.filter(ch => progress[`${bookName} ${ch}`]).length
-              return (
-                <div key={bookName} style={s.bookBlock}>
-                  <div style={s.bookHead}>
-                    <span style={s.bookName}>{bookName}</span>
-                    <span style={s.bookProgress}>{doneChs}/{chapters.length}</span>
-                  </div>
-                  <div style={s.dayLinks}>
-                    {chapters.map(ch => {
-                      const chId = `${bookName} ${ch}`
-                      const days = CHAPTER_TO_DAYS[chId] || []
-                      const isDone = !!progress[chId]
-                      return days.map(d => (
-                        <button
-                          key={`${ch}-${d}`}
-                          onClick={() => navigate(`/day/${d}`)}
-                          style={{
-                            ...s.dayLink,
-                            ...(isDone ? { background:'var(--teal)', color:'white', borderColor:'var(--teal)' } : {}),
-                          }}
-                          title={`Go to Day ${d}`}
-                        >
-                          {isDone && <span style={{marginRight:3}}>✓</span>}
-                          Ch.{ch} · Day {d}
-                        </button>
-                      ))
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </TestamentAccordion>
-
-          {/* NT accordion */}
-          <TestamentAccordion
-            testament="NT"
-            isOpen={planNT}
-            onToggle={() => setPlanNT(o => !o)}
-            doneCount={planNTDone}
-            totalCount={PLAN_NT_TOTAL}
-          >
-            {PLAN_NT_BOOKS.map(bookName => {
-              const chapters = PLAN_BY_BOOK[bookName]
-              const doneChs  = chapters.filter(ch => progress[`${bookName} ${ch}`]).length
-              return (
-                <div key={bookName} style={s.bookBlock}>
-                  <div style={s.bookHead}>
-                    <span style={s.bookName}>{bookName}</span>
-                    <span style={s.bookProgress}>{doneChs}/{chapters.length}</span>
-                  </div>
-                  <div style={s.dayLinks}>
-                    {chapters.map(ch => {
-                      const chId = `${bookName} ${ch}`
-                      const days = CHAPTER_TO_DAYS[chId] || []
-                      const isDone = !!progress[chId]
-                      return days.map(d => (
-                        <button
-                          key={`${ch}-${d}`}
-                          onClick={() => navigate(`/day/${d}`)}
-                          style={{
-                            ...s.dayLink,
-                            ...(isDone ? { background:'var(--teal)', color:'white', borderColor:'var(--teal)' } : {}),
-                          }}
-                          title={`Go to Day ${d}`}
-                        >
-                          {isDone && <span style={{marginRight:3}}>✓</span>}
-                          Ch.{ch} · Day {d}
-                        </button>
-                      ))
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </TestamentAccordion>
+          <TestamentSection
+            testament="OT" categories={OT_CATEGORIES}
+            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+            progress={progress} mode="plan"
+            onNavigate={d => navigate(`/day/${d}`)}
+            openCats={openCats} setOpenCat={setOpenCat}
+          />
+          <TestamentSection
+            testament="NT" categories={NT_CATEGORIES}
+            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+            progress={progress} mode="plan"
+            onNavigate={d => navigate(`/day/${d}`)}
+            openCats={openCats} setOpenCat={setOpenCat}
+          />
         </div>
       )}
 
       {/* ══ FULL BIBLE TRACKER ══ */}
       {mode === 'bible' && (
         <div style={s.body}>
-          {/* Progress */}
           <div style={s.progressCard}>
             <ProgressBar done={bibleDone} total={TOTAL_CHAPTERS} label="Bible chapters read" />
             <p style={s.progressNote}>
@@ -378,88 +440,20 @@ export default function ScripturePage() {
               </span>
             </p>
           </div>
-
-          {/* OT accordion */}
-          <TestamentAccordion
-            testament="OT"
-            isOpen={bibleOT}
-            onToggle={() => setBibleOT(o => !o)}
-            doneCount={bibleOTDone}
-            totalCount={BIBLE_OT_TOTAL}
-          >
-            {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(book => {
-              const doneChs = Array.from({length: book.chapters}, (_, i) => i + 1)
-                .filter(ch => progress[`${book.name} ${ch}`]).length
-              const planChs = PLAN_BY_BOOK[book.name] || []
-              return (
-                <div key={book.name} style={s.bookBlock}>
-                  <div style={s.bookHead}>
-                    <span style={s.bookName}>{book.name}</span>
-                    <span style={s.bookProgress}>{doneChs}/{book.chapters}</span>
-                    {planChs.length > 0 && (
-                      <span style={s.planIndicator}>{planChs.length} in plan</span>
-                    )}
-                  </div>
-                  <div style={s.chGrid}>
-                    {Array.from({length: book.chapters}, (_, i) => i + 1).map(ch => {
-                      const chId = `${book.name} ${ch}`
-                      return (
-                        <ChapterBlock
-                          key={ch}
-                          chId={chId}
-                          done={!!progress[chId]}
-                          inPlan={planChs.includes(ch)}
-                          onToggle={toggleChapter}
-                          label={ch}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </TestamentAccordion>
-
-          {/* NT accordion */}
-          <TestamentAccordion
-            testament="NT"
-            isOpen={bibleNT}
-            onToggle={() => setBibleNT(o => !o)}
-            doneCount={bibleNTDone}
-            totalCount={BIBLE_NT_TOTAL}
-          >
-            {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(book => {
-              const doneChs = Array.from({length: book.chapters}, (_, i) => i + 1)
-                .filter(ch => progress[`${book.name} ${ch}`]).length
-              const planChs = PLAN_BY_BOOK[book.name] || []
-              return (
-                <div key={book.name} style={s.bookBlock}>
-                  <div style={s.bookHead}>
-                    <span style={s.bookName}>{book.name}</span>
-                    <span style={s.bookProgress}>{doneChs}/{book.chapters}</span>
-                    {planChs.length > 0 && (
-                      <span style={s.planIndicator}>{planChs.length} in plan</span>
-                    )}
-                  </div>
-                  <div style={s.chGrid}>
-                    {Array.from({length: book.chapters}, (_, i) => i + 1).map(ch => {
-                      const chId = `${book.name} ${ch}`
-                      return (
-                        <ChapterBlock
-                          key={ch}
-                          chId={chId}
-                          done={!!progress[chId]}
-                          inPlan={planChs.includes(ch)}
-                          onToggle={toggleChapter}
-                          label={ch}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })}
-          </TestamentAccordion>
+          <TestamentSection
+            testament="OT" categories={OT_CATEGORIES}
+            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+            progress={progress} mode="bible"
+            onToggle={toggleChapter}
+            openCats={openCats} setOpenCat={setOpenCat}
+          />
+          <TestamentSection
+            testament="NT" categories={NT_CATEGORIES}
+            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+            progress={progress} mode="bible"
+            onToggle={toggleChapter}
+            openCats={openCats} setOpenCat={setOpenCat}
+          />
         </div>
       )}
 
@@ -669,4 +663,49 @@ const s = {
     padding:'2px 8px', borderRadius:99, border:'none', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", transition:'opacity 0.1s', whiteSpace:'nowrap',
   },
+
+  /* ── Category-box layout ── */
+  testamentSection: { marginBottom:'1.5rem' },
+  testamentHeader: {
+    display:'flex', alignItems:'center', gap:10,
+    padding:'10px 0 8px', marginBottom:10,
+    borderBottom:'2px solid var(--border)',
+  },
+  testamentLabel: {
+    fontSize:15, fontWeight:600, fontFamily:"'Cormorant Garamond',serif",
+    color:'var(--ink)', flex:1,
+  },
+  catGrid: {
+    display:'grid',
+    gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))',
+    gap:10,
+  },
+  catBox: {
+    background:'white', border:'1.5px solid var(--border)',
+    borderRadius:'var(--radius-lg)', overflow:'hidden',
+    transition:'border-color 0.15s',
+  },
+  catHeader: {
+    display:'flex', alignItems:'center', gap:10,
+    padding:'12px 14px', width:'100%', textAlign:'left',
+    border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.15s',
+  },
+  catLabel: {
+    fontSize:13, fontWeight:700, fontFamily:"'DM Sans',sans-serif",
+    letterSpacing:'0.01em',
+  },
+  catBody: {
+    borderTop:'1px solid var(--border)',
+    padding:'10px 12px', display:'flex', flexDirection:'column', gap:10,
+  },
+  catBookRow: {},
+  catBookHead: {
+    display:'flex', alignItems:'center', gap:8, marginBottom:6,
+  },
+  catBookName: {
+    fontSize:13, fontFamily:"'Cormorant Garamond',serif", fontWeight:600,
+    color:'var(--ink)', flex:1,
+  },
+  catBookProgress: { fontSize:11, color:'var(--ink-faint)', fontVariantNumeric:'tabular-nums' },
 }

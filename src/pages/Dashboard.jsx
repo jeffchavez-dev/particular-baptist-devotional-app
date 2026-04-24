@@ -36,6 +36,20 @@ SCHEDULE.forEach(r => {
   }
 })
 
+function highlight(text, q) {
+  if (!q || !text) return text
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  try {
+    const parts = String(text).split(new RegExp(`(${escaped})`, 'gi'))
+    if (parts.length === 1) return text
+    return parts.map((p, i) =>
+      p.toLowerCase() === q.toLowerCase()
+        ? <mark key={i} style={{background:'#fef08a',color:'inherit',borderRadius:2,padding:'0 1px'}}>{p}</mark>
+        : p
+    )
+  } catch { return text }
+}
+
 function badgeClass(src) {
   if (src === '2LBCF')     return 'badge badge-2lbcf'
   if (src === 'Catechism')  return 'badge badge-cat'
@@ -512,10 +526,10 @@ export default function Dashboard() {
                 <div style={s.rowMain}>
                   <div style={s.rowReading}>
                     <span className={badgeClass(r.src)}>{r.src}</span>
-                    <span style={done ? {textDecoration:'line-through', opacity:.45} : {}}>{r.reading}</span>
+                    <span style={done ? {textDecoration:'line-through', opacity:.45} : {}}>{highlight(r.reading, search)}</span>
                   </div>
                   <div style={s.rowDetail}>
-                    {r.detail}
+                    {highlight(r.detail, search)}
                     {hasNote && (
                       <span style={s.rowPip} title="Has author's note">
                         <svg width="9" height="9" viewBox="0 0 9 9" fill="none">

@@ -96,6 +96,20 @@ function textMatches(rawText, rawRefs, normIndexed, q) {
   return raw.includes(q) || normIndexed.includes(q)
 }
 
+function highlight(text, q) {
+  if (!q || !text) return text
+  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  try {
+    const parts = String(text).split(new RegExp(`(${escaped})`, 'gi'))
+    if (parts.length === 1) return text
+    return parts.map((p, i) =>
+      p.toLowerCase() === q.toLowerCase()
+        ? <mark key={i} style={{background:'#fef08a',color:'inherit',borderRadius:2,padding:'0 1px'}}>{p}</mark>
+        : p
+    )
+  } catch { return text }
+}
+
 const SOURCES = {
   '2lbcf':     { label: '2LBCF',     name: 'Second London Baptist Confession (1677/1689)', color: 'var(--purple-ink)', bg: 'var(--purple-soft)', href: 'https://www.the1689confession.com/' },
   'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",            color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
@@ -419,7 +433,7 @@ export default function ConfessionsPage() {
                         <div key={p.key} style={s.paragraph} id={`p-${p.key}`}>
                           <div style={s.paraNum}>§{p.para}</div>
                           <div style={s.paraBody}>
-                            <p style={{...s.paraText, ...textStyle}}>{p.text}</p>
+                            <p style={{...s.paraText, ...textStyle}}>{highlight(p.text, q)}</p>
                             {p.refs && (
                               <div style={s.refs}>
                                 <span style={s.refsLabel}>Proof texts: </span>
@@ -452,8 +466,8 @@ export default function ConfessionsPage() {
                   <div key={num} style={s.qaBlock} id={`qa-${num}`}>
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
-                      <p style={{...s.qaQuestion, ...textStyle}}>{item.q}</p>
-                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {item.a}</p>
+                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
+                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(item.a, q)}</p>
                       {item.refs && (
                         <div style={s.refs}>
                           <span style={s.refsLabel}>Proof texts: </span>
@@ -500,7 +514,7 @@ export default function ConfessionsPage() {
                       {lines.map((line, i) => {
                         const clean = line.replace(/^\d+\s+/, '').trim()
                         if (!clean) return null
-                        return <p key={i} style={{...s.articleLine, ...textStyle}}>{clean}</p>
+                        return <p key={i} style={{...s.articleLine, ...textStyle}}>{highlight(clean, q)}</p>
                       })}
                       {item.refs && (
                         <div style={s.refs}>
