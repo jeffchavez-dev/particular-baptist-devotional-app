@@ -7,7 +7,8 @@ import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
 import { QUOTES } from '../data/quotes'
 import ShareCardModal from '../components/ShareCardModal'
-import FontPrefsPanel, { loadPrefs, savePrefs, getFontCss } from '../components/FontPrefsPanel'
+import { getFontCss } from '../components/FontPrefsPanel'
+import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 
 const SCHEDULE = buildSchedule()
@@ -435,13 +436,11 @@ export default function ReadingPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
-  const [prefs, setPrefsState] = useState(() => loadPrefs())
+  const { prefs } = usePrefs()
   const bibleChapter = entry?.bibleChapter || null
   const [bibleChapterDone, setBibleChapterDone] = useState(() =>
     bibleChapter ? !!getBibleProgress()[bibleChapter] : false
   )
-
-  function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
 
   useEffect(() => {
     if (!entry) return
@@ -545,7 +544,6 @@ export default function ReadingPage() {
             All days
           </button>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
             {!session && (
               <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:12, padding:'5px 12px'}}>Sign in</button>
@@ -746,7 +744,7 @@ export default function ReadingPage() {
 
 const s = {
   page: { minHeight:'100vh', background:'var(--parchment)' },
-  header: { borderBottom:'1px solid var(--border)', background:'white', position:'sticky', top:0, zIndex:10 },
+  header: { borderBottom:'1px solid var(--border)', background:'var(--surface)', position:'sticky', top:0, zIndex:10 },
   headerInner: { maxWidth:680, margin:'0 auto', padding:'12px 24px', display:'flex', alignItems:'center', justifyContent:'space-between', position:'relative' },
   main: { maxWidth:680, margin:'0 auto', padding:'2.5rem 24px', display:'flex', flexDirection:'column', gap:20 },
   dayHeader: { paddingBottom:4 },

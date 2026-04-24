@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum } from '../lib/supabase'
 import { useAuth } from '../App'
 import { QUOTES } from '../data/quotes'
-import ExportModal from '../components/ExportModal'
+import { LBCF2 } from '../data/lbcf2'
+import { CATECHISM } from '../data/catechism'
+import { LBCF1 } from '../data/lbcf1'
 import ShareCardModal from '../components/ShareCardModal'
-import AboutModal from '../components/AboutModal'
 
 const SCHEDULE  = buildSchedule()
 const TODAY_DAY = Math.min(getTodayDayNum(), 365)
@@ -78,10 +79,9 @@ export default function Dashboard() {
   const [toggling,     setToggling]     = useState(new Set())
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes'
-  const [exportOpen,   setExportOpen]   = useState(false)
   const [shareCard,    setShareCard]    = useState(null)
-  const [aboutOpen,    setAboutOpen]    = useState(false)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
+  const [todaySeeMore, setTodaySeeMore] = useState(false)
 
   /* sidebar: user's own notes + quote search data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
@@ -226,6 +226,30 @@ export default function Dashboard() {
   /* ── today entry ── */
   const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
 
+  /* ── today confession snippet ── */
+  const todayConfession = useMemo(() => {
+    if (!todayEntry) return null
+    if (todayEntry.src === '2LBCF') {
+      const m = todayEntry.reading.match(/Ch\.\s*(\d+)\s*§(\d+)/)
+      if (!m) return null
+      const item = LBCF2[`${m[1]}.${m[2]}`]
+      return item ? item.text : null
+    }
+    if (todayEntry.src === 'Catechism') {
+      const m = todayEntry.reading.match(/Q&A\s*#(\d+)/)
+      if (!m) return null
+      const item = CATECHISM[parseInt(m[1])]
+      return item ? `Q. ${item.q}\n\nA. ${item.a}` : null
+    }
+    if (todayEntry.src === '1LBCF') {
+      const m = todayEntry.reading.match(/Article\s*(\d+)/)
+      if (!m) return null
+      const item = LBCF1[parseInt(m[1])]
+      return item ? item.text : null
+    }
+    return null
+  }, [todayEntry])
+
   async function signOut() { await supabase.auth.signOut() }
 
   if (loading) {
@@ -260,19 +284,7 @@ export default function Dashboard() {
               ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
             }
-            {/* Export button */}
-            <button
-              onClick={() => setExportOpen(true)}
-              className="btn btn-ghost"
-              style={s.sidebarToggle}
-              aria-label="Export data"
-              title="Export &amp; Backup"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2v9M6 8l3 4 3-4M3 13.5v1A1.5 1.5 0 004.5 16h9A1.5 1.5 0 0015 14.5v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            {/* Sidebar toggle */}
+            {/* Notes / Resources sidebar toggle */}
             <button
               onClick={() => setSidebarOpen(o => !o)}
               className="btn btn-ghost"
@@ -284,20 +296,6 @@ export default function Dashboard() {
                 <rect x="2" y="3" width="14" height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="8" width="9"  height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="13" width="11" height="2" rx="1" fill="currentColor"/>
-              </svg>
-            </button>
-            {/* About button */}
-            <button
-              onClick={() => setAboutOpen(true)}
-              className="btn btn-ghost"
-              style={s.sidebarToggle}
-              aria-label="About"
-              title="About"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M9 6v1M9 9v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="9" cy="5" r="0.5" fill="currentColor"/>
               </svg>
             </button>
           </div>
@@ -317,23 +315,53 @@ export default function Dashboard() {
 
         {/* Today's Reading */}
         {todayEntry && (
-          <div style={s.todayCard} onClick={() => navigate(`/day/${TODAY_DAY}`)}>
-            <div style={s.todayLeft}>
-              <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
-                <span style={s.todayLabel}>Today's Reading</span>
-                <span style={{fontSize:12, color:'var(--ink-faint)'}}>Day {TODAY_DAY} · {todayEntry.date}</span>
+          <div style={s.todayWrap}>
+            {/* Header row — always clickable to navigate */}
+            <div style={s.todayCard} onClick={() => navigate(`/day/${TODAY_DAY}`)}>
+              <div style={s.todayLeft}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
+                  <span style={s.todayLabel}>Today's Reading</span>
+                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>Day {TODAY_DAY} · {todayEntry.date}</span>
+                </div>
+                <div style={s.todayReading}>
+                  <span className={badgeClass(todayEntry.src)}>{todayEntry.src}</span>
+                  <span style={s.todayReadingText}>{todayEntry.reading}</span>
+                </div>
+                <div style={s.todayDetail}>{todayEntry.detail}</div>
               </div>
-              <div style={s.todayReading}>
-                <span className={badgeClass(todayEntry.src)}>{todayEntry.src}</span>
-                <span style={s.todayReadingText}>{todayEntry.reading}</span>
+              <div style={s.todayArrow}>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M6 4l5 5-5 5" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
               </div>
-              <div style={s.todayDetail}>{todayEntry.detail}</div>
             </div>
-            <div style={s.todayArrow}>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M6 4l5 5-5 5" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </div>
+
+            {/* Inline confession preview — only for confession entries */}
+            {todayConfession && (
+              <div style={s.confessionPreview}>
+                <p style={{
+                  ...s.confessionText,
+                  WebkitLineClamp: todaySeeMore ? 'unset' : 4,
+                  display: '-webkit-box',
+                  WebkitBoxOrient: 'vertical',
+                  overflow: todaySeeMore ? 'visible' : 'hidden',
+                }}>
+                  {todayConfession}
+                </p>
+                <button
+                  onClick={e => { e.stopPropagation(); setTodaySeeMore(m => !m) }}
+                  style={s.seeMoreBtn}
+                >
+                  {todaySeeMore ? 'See less ↑' : 'See more ↓'}
+                </button>
+                <button
+                  onClick={() => navigate(`/day/${TODAY_DAY}`)}
+                  style={s.readFullBtn}
+                >
+                  Open full reading →
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -504,21 +532,10 @@ export default function Dashboard() {
       </footer>
 
       {/* ── Modals ── */}
-      <ExportModal
-        isOpen={exportOpen}
-        onClose={() => setExportOpen(false)}
-        userNotes={userNotes}
-        progress={progress}
-        session={session}
-      />
       <ShareCardModal
         isOpen={shareCard !== null}
         onClose={() => setShareCard(null)}
         card={shareCard}
-      />
-      <AboutModal
-        open={aboutOpen}
-        onClose={() => setAboutOpen(false)}
       />
 
       {/* ── Sidebar backdrop ── */}
@@ -732,7 +749,7 @@ const s = {
   page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif" },
 
   /* header */
-  header: { borderBottom:'1px solid var(--border)', background:'white', position:'sticky', top:0, zIndex:30 },
+  header: { borderBottom:'1px solid var(--border)', background:'var(--surface)', position:'sticky', top:0, zIndex:30 },
   headerInner: { maxWidth:900, margin:'0 auto', padding:'14px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' },
   siteTitle: { fontSize:20, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)' },
   siteGreeting: { fontSize:12, color:'var(--ink-faint)', marginTop:1 },
@@ -750,11 +767,11 @@ const s = {
   guestBannerLink: { background:'none', border:'none', padding:0, color:'var(--gold)', fontWeight:500, fontSize:13, cursor:'pointer' },
 
   /* today */
+  todayWrap: { marginBottom:'1.25rem', border:'1.5px solid var(--teal)', borderRadius:'var(--radius-lg)', overflow:'hidden', boxShadow:'0 1px 4px rgba(68,153,136,0.10)' },
   todayCard: {
     display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-    background:'white', border:'1.5px solid var(--teal)', borderRadius:'var(--radius-lg)',
-    padding:'16px 20px', cursor:'pointer', marginBottom:'1.25rem',
-    boxShadow:'0 1px 4px rgba(68,153,136,0.10)', transition:'box-shadow 0.15s',
+    background:'var(--surface)', padding:'16px 20px', cursor:'pointer',
+    transition:'background 0.15s',
   },
   todayLeft: { flex:1, minWidth:0 },
   todayLabel: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--teal)' },
@@ -762,6 +779,23 @@ const s = {
   todayReadingText: { fontSize:15, fontWeight:500, color:'var(--ink)' },
   todayDetail: { fontSize:12, color:'var(--ink-faint)' },
   todayArrow: { flexShrink:0 },
+  confessionPreview: {
+    borderTop:'1px solid var(--border)', background:'var(--parchment)',
+    padding:'14px 20px 12px',
+  },
+  confessionText: {
+    fontSize:15, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.85,
+    color:'var(--ink)', margin:'0 0 10px',
+  },
+  seeMoreBtn: {
+    background:'none', border:'none', cursor:'pointer', fontSize:12,
+    color:'var(--teal)', fontWeight:600, padding:0, marginRight:16,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  readFullBtn: {
+    background:'none', border:'none', cursor:'pointer', fontSize:12,
+    color:'var(--ink-faint)', padding:0, fontFamily:"'DM Sans',sans-serif",
+  },
 
   /* stats */
   statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:10, marginBottom:'1.25rem' },
@@ -800,7 +834,7 @@ const s = {
   searchHint: { fontSize:12, color:'var(--ink-faint)', marginBottom:'0.75rem' },
 
   /* list */
-  listWrap: { display:'flex', flexDirection:'column', gap:0, borderRadius:'var(--radius-lg)', overflow:'hidden', border:'1px solid var(--border)', background:'white' },
+  listWrap: { display:'flex', flexDirection:'column', gap:0, borderRadius:'var(--radius-lg)', overflow:'hidden', border:'1px solid var(--border)', background:'var(--surface)' },
   row: {
     display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
     borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background 0.1s',
@@ -824,7 +858,7 @@ const s = {
   pag: { display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginTop:'1.5rem', flexWrap:'wrap' },
 
   /* footer */
-  footer: { borderTop:'1px solid var(--border)', background:'white', marginTop:'3rem', padding:'20px 24px' },
+  footer: { borderTop:'1px solid var(--border)', background:'var(--surface)', marginTop:'3rem', padding:'20px 24px' },
   footerInner: { maxWidth:900, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'center', gap:10, flexWrap:'wrap' },
   footerText: { fontSize:13, color:'var(--ink-faint)' },
   footerDot:  { color:'var(--border-strong)' },
@@ -837,7 +871,7 @@ const s = {
   },
   sidebar: {
     position:'fixed', top:0, right:0, bottom:0, width:'clamp(300px,90vw,360px)',
-    background:'white', borderLeft:'1px solid var(--border)',
+    background:'var(--surface)', borderLeft:'1px solid var(--border)',
     boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
     zIndex:50, display:'flex', flexDirection:'column',
     transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
@@ -846,7 +880,7 @@ const s = {
   sidebarHead: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
     padding:'16px 20px', borderBottom:'1px solid var(--border)',
-    position:'sticky', top:0, background:'white', zIndex:5,
+    position:'sticky', top:0, background:'var(--surface)', zIndex:5,
     gap:8,
   },
   sidebarTabs: { display:'flex', gap:4 },
