@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 const TABS = [
@@ -62,6 +62,13 @@ const TABS = [
 export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 769)
+
+  useEffect(() => {
+    const handler = () => setIsDesktop(window.innerWidth >= 769)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   function getActive() {
     if (pathname === '/' || pathname.startsWith('/day/')) return '/'
@@ -73,10 +80,20 @@ export default function BottomNav() {
   const active = getActive()
   if (active === null) return null
 
+  const desktopNav = isDesktop ? {
+    left: '50%',
+    right: 'auto',
+    transform: 'translateX(-50%)',
+    maxWidth: 640,
+    borderLeft: '1px solid var(--border)',
+    borderRight: '1px solid var(--border)',
+    borderRadius: '14px 14px 0 0',
+  } : {}
+
   return (
     <>
       <div data-bottom-nav style={n.spacer} />
-      <nav data-bottom-nav style={n.nav} aria-label="Main navigation">
+      <nav data-bottom-nav style={{ ...n.nav, ...desktopNav }} aria-label="Main navigation">
         {TABS.map(tab => {
           const isActive = active === tab.path
           return (

@@ -246,30 +246,29 @@ export default function KjvReader({ todayChapter }) {
 
         {/* ── Reader toolbar ── */}
         <div style={r.toolbar}>
-          <div style={{display:'flex', alignItems:'center', gap:8, flex:1, minWidth:0}}>
-            {/* Mobile: book picker button */}
+          {/* Book + chapter pill — tappable on mobile to open sidebar */}
+          <button
+            style={r.bookPill}
+            onClick={() => isMobile && setSideOpen(true)}
+            title={isMobile ? 'Select book' : undefined}
+            disabled={!isMobile}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{flexShrink:0,opacity:0.5}}>
+              <rect x="1" y="1" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M4 4h5M4 6.5h5M4 9h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+            <span style={r.bookPillName}>{book}</span>
+            <span style={r.bookPillCh}>Ch. {chapter}</span>
+            {isTodayChapter && <span style={r.todayBadge}>Today</span>}
             {isMobile && (
-              <button style={r.toolBtn} onClick={() => setSideOpen(true)}>
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                  <rect x="1" y="2" width="13" height="1.5" rx=".75" fill="currentColor"/>
-                  <rect x="1" y="6.75" width="8" height="1.5" rx=".75" fill="currentColor"/>
-                  <rect x="1" y="11.5" width="10" height="1.5" rx=".75" fill="currentColor"/>
-                </svg>
-              </button>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{marginLeft:'auto',flexShrink:0,opacity:0.4}}>
+                <path d="M2 4l3.5 3.5L9 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
             )}
-            {/* Book + chapter display */}
-            <div style={r.bookTitle}>
-              <span style={r.bookName}>{book}</span>
-              <span style={{color:'var(--ink-faint)', margin:'0 4px'}}>·</span>
-              <span style={r.chapterDisplay}>Ch. {chapter}</span>
-            </div>
-            {isTodayChapter && (
-              <span style={r.todayBadge}>Today</span>
-            )}
-          </div>
+          </button>
 
           {/* Font size controls */}
-          <div style={{display:'flex', alignItems:'center', gap:4, flexShrink:0}}>
+          <div style={{display:'flex', alignItems:'center', gap:4, flexShrink:0, marginLeft:'auto'}}>
             <button style={r.toolBtn} onClick={() => changeFontSize(-1)} title="Smaller text">A−</button>
             <button style={r.toolBtn} onClick={() => changeFontSize(+1)} title="Larger text">A+</button>
           </div>
@@ -395,7 +394,11 @@ const sb = {
 /* ── Reader styles ── */
 const r = {
   wrap: {
-    display:'flex', height:'calc(100vh - 120px)', // leave room for header + bottom nav
+    display:'flex',
+    /* Fill all space between the ScripturePage sticky header and the bottom nav.
+       ScripturePage header ≈ 50px, bottom nav spacer ≈ 64px + safe-area.
+       Using a tall min-height + overflow lets each panel scroll independently. */
+    height:'calc(100vh - 130px)',
     overflow:'hidden', position:'relative',
   },
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:199 },
@@ -423,9 +426,24 @@ const r = {
     position:'sticky', top:0, zIndex:10,
     fontFamily:"'DM Sans',sans-serif",
   },
-  bookTitle: { display:'flex', alignItems:'center', flexWrap:'wrap', gap:4, minWidth:0 },
-  bookName: { fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)', whiteSpace:'nowrap' },
-  chapterDisplay: { fontSize:13, fontWeight:600, color:'var(--teal)' },
+  /* Book pill — the main clickable element in the toolbar */
+  bookPill: {
+    display:'flex', alignItems:'center', gap:8, flex:1,
+    padding:'7px 12px', borderRadius:'var(--radius-lg)',
+    border:'1.5px solid var(--border)', background:'var(--parchment)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    textAlign:'left', minWidth:0, transition:'border-color 0.15s',
+  },
+  bookPillName: {
+    fontSize:15, fontWeight:700,
+    fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)',
+    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+  },
+  bookPillCh: {
+    fontSize:12, fontWeight:600, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:99,
+    padding:'1px 8px', flexShrink:0,
+  },
   todayBadge: {
     fontSize:9, fontWeight:700, background:'var(--teal)', color:'white',
     borderRadius:99, padding:'2px 6px', letterSpacing:'0.04em',
