@@ -81,7 +81,26 @@
 }
 [data-theme="dark"] .btn-ghost { color: var(--ink-muted) !important; }
 
-body { min-height: 100vh; }
+body {
+  min-height: 100vh;
+  /* Landscape safe area (rounded corners / notch on iPhone in landscape) */
+  padding-left:  env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* ── Full-screen PWA: extend sticky headers under the iOS status bar ──
+   With apple-mobile-web-app-status-bar-style: black-translucent,
+   content starts at y=0 (under the status bar).
+   Adding padding-top: env(safe-area-inset-top) pushes header content
+   below the status bar while the header background fills it. ── */
+header {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Offline banner sits above everything, must also account for notch */
+#pwa-offline-banner {
+  padding-top: env(safe-area-inset-top);
+}
 
 h1,h2,h3,h4 { font-family: 'Cormorant Garamond', serif; font-weight: 500; line-height: 1.25; }
 

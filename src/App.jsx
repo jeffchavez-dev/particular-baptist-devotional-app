@@ -76,17 +76,17 @@ export default function App() {
         <AuthContext.Provider value={{ session }}>
           {/* Offline banner */}
           {!isOnline && (
-            <div style={{
+            <div id="pwa-offline-banner" style={{
               position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
               background: '#7a5c1e', color: 'white',
               fontSize: 12, fontWeight: 500, textAlign: 'center',
-              padding: '6px 16px', fontFamily: "'DM Sans', sans-serif",
+              padding: '6px 16px 6px', fontFamily: "'DM Sans', sans-serif",
               letterSpacing: '0.02em',
             }}>
               ✈ Offline — all readings available, sync paused
             </div>
           )}
-          <div style={!isOnline ? { paddingTop: 29 } : {}}>
+          <div style={!isOnline ? { paddingTop: 34 } : {}}>
           <Routes>
             <Route path="/auth"    element={session ? <Navigate to="/" /> : <AuthPage />} />
             <Route path="/"        element={<Dashboard />} />

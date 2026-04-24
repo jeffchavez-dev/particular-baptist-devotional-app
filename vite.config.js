@@ -14,8 +14,9 @@ export default defineConfig({
         short_name: 'PB Devotional',
         description: 'A 365-day devotional reading plan through the 2nd London Baptist Confession, Keach\'s Catechism, and the 1st London Baptist Confession.',
         theme_color: '#1d6b5a',
-        background_color: '#faf7f2',
-        display: 'standalone',
+        background_color: '#1d6b5a',   // splash screen bg matches header
+        display: 'standalone',          // hides browser chrome, keeps status bar
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
