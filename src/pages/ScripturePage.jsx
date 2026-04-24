@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { buildSchedule, getBibleProgress, setBibleChapter } from '../lib/supabase'
+import KjvReader from '../components/KjvReader'
+import { buildSchedule, getBibleProgress, setBibleChapter, getTodayDayNum } from '../lib/supabase'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
@@ -292,7 +293,7 @@ export default function ScripturePage() {
   const navigate = useNavigate()
 
   /* Restore saved state */
-  const _saved = loadState('scripture', { mode: 'plan' })
+  const _saved = loadState('scripture', { mode: 'read' })
   const [mode,    setMode]    = useState(_saved.mode)
   const [progress, setProgress] = useState(() => getBibleProgress())
   /* Open/closed category boxes */
@@ -365,11 +366,18 @@ export default function ScripturePage() {
     s + PLAN_BY_BOOK[b].filter(ch => progress[`${b} ${ch}`]).length, 0), [progress])
   const bibleDone = Object.keys(progress).length
 
+  /* Today's Bible chapter (for KJV reader "Today" badge) */
+  const todayBibleChapter = useMemo(() => {
+    const today = Math.min(getTodayDayNum(), 365)
+    return DAY_BIBLE[today] || null
+  }, [])
+
   /* Mode tabs */
   const tabs = [
-    { id: 'plan',       label: 'Reading Plan',  hint: `${planDone}/${PLAN_TOTAL}` },
-    { id: 'bible',      label: 'Full Bible',    hint: `${bibleDone}/${TOTAL_CHAPTERS}` },
-    { id: 'prooftexts', label: 'Proof Texts',   hint: null },
+    { id: 'read',       label: '📖 Read KJV',    hint: null },
+    { id: 'plan',       label: 'Reading Plan',   hint: `${planDone}/${PLAN_TOTAL}` },
+    { id: 'bible',      label: 'Full Bible',     hint: `${bibleDone}/${TOTAL_CHAPTERS}` },
+    { id: 'prooftexts', label: 'Proof Texts',    hint: null },
   ]
 
   return (
@@ -399,6 +407,11 @@ export default function ScripturePage() {
           </div>
         </div>
       </header>
+
+      {/* ══ KJV READER ══ */}
+      {mode === 'read' && (
+        <KjvReader todayChapter={todayBibleChapter} />
+      )}
 
       {/* ══ READING PLAN MODE ══ */}
       {mode === 'plan' && (
