@@ -32,6 +32,7 @@ const SRC_COLORS = {
   'Catechism':{ bg:'#1a3a38', text:'#7ecfc8' },
   '1LBCF':    { bg:'#4a2e0a', text:'#d4a84c' },
   'Review':   { bg:'#2a2a2a', text:'#aaaaaa' },
+  'KJV':      { bg:'#1e3a5f', text:'#a8c5e8' },
 }
 
 /* ── Canvas helpers ── */

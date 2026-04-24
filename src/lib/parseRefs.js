@@ -107,11 +107,35 @@ const ABBREV = {
 }
 
 /**
+ * Full canonical book names → canonical form.
+ * Handles LBCF1 which writes "John", "James", "Matthew", "1John" etc.
+ */
+const FULL_NAMES = Object.fromEntries([
+  'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth',
+  '1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles',
+  'Ezra','Nehemiah','Esther','Job','Psalms','Psalm','Proverbs','Ecclesiastes',
+  'Song of Solomon','Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel',
+  'Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk',
+  'Zephaniah','Haggai','Zechariah','Malachi',
+  'Matthew','Mark','Luke','John','Acts','Romans',
+  '1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians',
+  'Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy',
+  'Titus','Philemon','Hebrews','James','1 Peter','2 Peter',
+  '1 John','2 John','3 John','Jude','Revelation',
+].map(n => [n.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,''), n]))
+
+/**
  * Strips footnote marker letters (a, b, c…) that appear at the start of
  * each individual reference in LBCF data, e.g. "aGen 1:1" → "Gen 1:1".
+ * Also strips trailing periods used by LBCF1 abbreviations: "Isa. 46" → "Isa 46".
  */
 function cleanRefs(refs) {
-  return refs.replace(/\b[a-z](?=[A-Z1-9])/g, '').replace(/\s+/g, ' ').trim()
+  return refs
+    .replace(/\b[a-z](?=[A-Z1-9])/g, '')      // strip footnote markers
+    .replace(/([A-Za-z])\.(\s|;|,|$)/g, '$1$2') // "Isa. " → "Isa "
+    .replace(/([A-Za-z])\.$/, '$1')             // trailing period at end
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /**
@@ -120,7 +144,15 @@ function cleanRefs(refs) {
  */
 function resolveBook(numStr, abbr) {
   const key = numStr ? `${numStr}${abbr}` : abbr
-  return ABBREV[key.toLowerCase()] ?? ABBREV[abbr.toLowerCase()] ?? null
+  const lower = key.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')
+  const abbrLower = abbr.toLowerCase()
+  return (
+    ABBREV[lower] ??
+    FULL_NAMES[lower] ??
+    ABBREV[abbrLower] ??
+    FULL_NAMES[abbrLower] ??
+    null
+  )
 }
 
 /**
