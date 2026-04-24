@@ -284,8 +284,8 @@ export default function Dashboard() {
               ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
             }
-            {/* Notes / Resources sidebar toggle */}
-            <button
+            {/* Notes / Resources sidebar toggle — desktop only */}
+            {!isMobile && <button
               onClick={() => setSidebarOpen(o => !o)}
               className="btn btn-ghost"
               style={s.sidebarToggle}
@@ -297,7 +297,7 @@ export default function Dashboard() {
                 <rect x="2" y="8" width="9"  height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="13" width="11" height="2" rx="1" fill="currentColor"/>
               </svg>
-            </button>
+            </button>}
           </div>
         </div>
       </header>
