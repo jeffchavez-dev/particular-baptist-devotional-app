@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum, getBookmarks, toggleBookmark } from '../lib/supabase'
 import { useAuth } from '../App'
 import { QUOTES } from '../data/quotes'
 import { LBCF2 } from '../data/lbcf2'
@@ -78,7 +78,8 @@ export default function Dashboard() {
   const [page,         setPage]         = useState(1)
   const [toggling,     setToggling]     = useState(new Set())
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
-  const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes'
+  const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes' | 'bookmarks'
+  const [bookmarks,    setBookmarks]    = useState(() => getBookmarks())
   const [shareCard,    setShareCard]    = useState(null)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const [todaySeeMore, setTodaySeeMore] = useState(false)
@@ -215,6 +216,11 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
+  /* ── refresh bookmarks when sidebar opens (picks up changes from ReadingPage) ── */
+  useEffect(() => {
+    if (sidebarOpen) setBookmarks(getBookmarks())
+  }, [sidebarOpen])
+
   /* ── user's own notes sorted by day, with schedule info ── */
   const enrichedNotes = useMemo(() => {
     return userNotes
@@ -222,6 +228,20 @@ export default function Dashboard() {
       .filter(n => n.entry)
       .sort((a, b) => a.day_number - b.day_number)
   }, [userNotes])
+
+  /* ── bookmarked entries sorted by day ── */
+  const bookmarkedEntries = useMemo(() => {
+    return Object.keys(bookmarks)
+      .map(d => SCHEDULE.find(r => r.day === parseInt(d)))
+      .filter(Boolean)
+      .sort((a, b) => a.day - b.day)
+  }, [bookmarks])
+
+  function handleRemoveBookmark(day, e) {
+    e.stopPropagation()
+    toggleBookmark(day)
+    setBookmarks(prev => { const next = {...prev}; delete next[day]; return next })
+  }
 
   /* ── today entry ── */
   const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
@@ -457,6 +477,7 @@ export default function Dashboard() {
             const busy = toggling.has(r.day)
             const hasNote  = !!noteIndex[r.day]
             const hasQuote = !!(STATIC_QUOTE_SEARCH[r.day] || dbQuoteIndex[r.day])
+            const isMarked = !!bookmarks[r.day]
             return (
               <div
                 key={r.day}
@@ -496,6 +517,13 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div style={s.rowMeta}>
+                  {isMarked && (
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" title="Bookmarked" style={{color:'var(--teal)', flexShrink:0}}>
+                      <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
+                        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"
+                        fill="currentColor" fillOpacity="0.2"/>
+                    </svg>
+                  )}
                   <span style={s.rowDate}>{r.date}</span>
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{opacity:.3}}>
                     <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -570,6 +598,22 @@ export default function Dashboard() {
               Notes
               {enrichedNotes.length > 0 && (
                 <span style={s.notesBadge}>{enrichedNotes.length}</span>
+              )}
+            </button>
+            <button
+              style={{...s.sidebarTabBtn, ...(sidebarTab==='bookmarks' ? s.sidebarTabActive : {})}}
+              onClick={() => setSidebarTab('bookmarks')}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
+                  stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
+                  fill={sidebarTab==='bookmarks' ? 'currentColor' : 'none'}
+                  fillOpacity={sidebarTab==='bookmarks' ? 0.15 : 0}
+                />
+              </svg>
+              Saved
+              {bookmarkedEntries.length > 0 && (
+                <span style={{...s.notesBadge, background:'var(--teal)'}}>{bookmarkedEntries.length}</span>
               )}
             </button>
           </div>
@@ -738,6 +782,59 @@ export default function Dashboard() {
               )}
             </div>
           )}
+          {/* ── Bookmarks tab ── */}
+          {sidebarTab === 'bookmarks' && (
+            <div>
+              {bookmarkedEntries.length === 0 ? (
+                <div style={s.emptyNotes}>
+                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{opacity:.3, marginBottom:10}}>
+                    <path d="M6 4A2 2 0 018 2h16a2 2 0 012 2v26L16 23 6 30V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  </svg>
+                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:0, textAlign:'center'}}>
+                    No bookmarks yet. Open any devotional and tap the
+                    bookmark icon beside "My notes &amp; reflections".
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p style={s.sidebarDesc}>
+                    {bookmarkedEntries.length} saved day{bookmarkedEntries.length !== 1 ? 's' : ''}.
+                    Click any to return to that reading.
+                  </p>
+                  <div style={s.notesList}>
+                    {bookmarkedEntries.map(r => (
+                      <div key={r.day} style={s.noteItemWrap}>
+                        <button
+                          style={{...s.noteItem, borderRadius:'var(--radius-lg)'}}
+                          onClick={() => { navigate(`/day/${r.day}`); setSidebarOpen(false) }}
+                        >
+                          <div style={s.noteItemTop}>
+                            <span style={s.noteItemDay}>Day {r.day}</span>
+                            <span style={s.noteItemDate}>{r.date}</span>
+                            <span className={badgeClass(r.src)} style={{fontSize:9}}>{r.src}</span>
+                          </div>
+                          <div style={s.noteItemReading}>{r.reading}</div>
+                          <div style={{...s.noteItemPreview, fontStyle:'normal'}}>{r.detail}</div>
+                        </button>
+                        <button
+                          style={{...s.noteActionBtn, display:'flex', alignItems:'center', gap:4, marginTop:2, color:'var(--ink-faint)', fontSize:11, padding:'2px 4px'}}
+                          title="Remove bookmark"
+                          onClick={e => handleRemoveBookmark(r.day, e)}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                            <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
+                              stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                          </svg>
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
         </div>
       </aside>
     </div>

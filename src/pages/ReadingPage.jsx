@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked } from '../lib/supabase'
 import { useAuth } from '../App'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -441,6 +441,7 @@ export default function ReadingPage() {
   const [bibleChapterDone, setBibleChapterDone] = useState(() =>
     bibleChapter ? !!getBibleProgress()[bibleChapter] : false
   )
+  const [bookmarked, setBookmarked] = useState(() => isBookmarked(day))
 
   useEffect(() => {
     if (!entry) return
@@ -498,6 +499,12 @@ export default function ReadingPage() {
     const newVal = !bibleChapterDone
     setBibleChapterDone(newVal)
     if (bibleChapter) setBibleChapter(bibleChapter, newVal)
+  }
+
+  function handleBookmark(e) {
+    e.stopPropagation()
+    const next = toggleBookmark(day)
+    setBookmarked(next)
   }
 
   async function saveNotes() {
@@ -654,9 +661,32 @@ export default function ReadingPage() {
         {/* Notes */}
         <div className="card" style={s.notesCard}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-            <h3 style={{fontSize:15,fontFamily:"'Cormorant Garamond',serif",fontWeight:600}}>
-              My notes &amp; reflections
-            </h3>
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              <h3 style={{fontSize:15,fontFamily:"'Cormorant Garamond',serif",fontWeight:600}}>
+                My notes &amp; reflections
+              </h3>
+              <button
+                onClick={handleBookmark}
+                title={bookmarked ? 'Remove bookmark' : 'Bookmark this day'}
+                aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this day'}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '2px 4px', display: 'flex', alignItems: 'center',
+                  color: bookmarked ? 'var(--teal)' : 'var(--border-strong)',
+                  transition: 'color 0.15s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M3 2.5A1.5 1.5 0 014.5 1h7A1.5 1.5 0 0113 2.5v12l-5-3-5 3V2.5z"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"
+                    fill={bookmarked ? 'currentColor' : 'none'}
+                    fillOpacity={bookmarked ? 0.18 : 0}
+                  />
+                </svg>
+              </button>
+            </div>
             {hasUnsaved && (
               <span style={{fontSize:11,color:'var(--ink-faint)'}}>Unsaved changes</span>
             )}

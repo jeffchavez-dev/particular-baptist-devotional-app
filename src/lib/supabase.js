@@ -64,3 +64,23 @@ export function setBibleChapter(chapter, done) {
 export function isBibleChapterDone(chapter) {
   return !!getBibleProgress()[chapter]
 }
+
+// ── Bookmarks (localStorage) ─────────────────────────────────────────────
+const BOOKMARK_KEY = 'pb-bookmarks'
+
+export function getBookmarks() {
+  try { return JSON.parse(localStorage.getItem(BOOKMARK_KEY) || '{}') }
+  catch { return {} }
+}
+
+export function toggleBookmark(day) {
+  const all = getBookmarks()
+  if (all[day]) delete all[day]
+  else all[day] = true
+  try { localStorage.setItem(BOOKMARK_KEY, JSON.stringify(all)) } catch {}
+  return !!all[day]
+}
+
+export function isBookmarked(day) {
+  return !!getBookmarks()[day]
+}
