@@ -50,7 +50,10 @@
       "Bash(curl -s \"https://api.github.com/repos/wldeh/bible-api/contents/bibles/en-kjv/books?per_page=100\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/wldeh/bible-api/main/bibles/en-kjv/books/matthew/chapters/1.json\")",
       "Bash(node scripts/fetch-kjv.mjs)",
-      "Bash(powershell -command \"\\(Get-Item public/kjv.json\\).length / 1MB\")"
+      "Bash(powershell -command \"\\(Get-Item public/kjv.json\\).length / 1MB\")",
+      "Bash(node -e \"const wp = require\\('web-push'\\); const keys = wp.generateVAPIDKeys\\(\\); console.log\\('PUBLIC:', keys.publicKey\\); console.log\\('PRIVATE:', keys.privateKey\\);\")",
+      "Bash(cat .env.local)",
+      "Bash(cat .env)"
     ]
   }
 }

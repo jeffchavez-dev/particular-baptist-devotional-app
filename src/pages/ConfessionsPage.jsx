@@ -7,6 +7,8 @@ import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
+import { parseRefs } from '../lib/parseRefs'
+import KjvModal from '../components/KjvModal'
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
@@ -116,6 +118,33 @@ const SOURCES = {
   '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',       color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
 }
 
+/* ── Clickable scripture-proof chips ── */
+function RefChips({ refs, onOpen }) {
+  const parsed = parseRefs(refs)
+  if (!parsed.length) return <span style={{ fontSize:13, color:'var(--ink-muted)' }}>{refs}</span>
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:2 }}>
+      {parsed.map(({ book, chapter, display }) => (
+        <button
+          key={`${book}|${chapter}`}
+          style={rc.chip}
+          onClick={() => onOpen({ book, chapter, refDisplay: display })}
+        >
+          {display}
+        </button>
+      ))}
+    </div>
+  )
+}
+const rc = {
+  chip: {
+    fontSize:11, fontWeight:500, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid transparent',
+    borderRadius:99, padding:'3px 9px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.4,
+  },
+}
+
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { prefs, updatePrefs } = usePrefs()
@@ -127,6 +156,7 @@ export default function ConfessionsPage() {
   const [activeChapter, setActiveChapter] = useState(null)
   const [search,        setSearch]        = useState(_saved.search)
   const [navOpen,       setNavOpen]       = useState(false)
+  const [kjvModal,      setKjvModal]      = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
   /* sidebarConf tracks which confession's chapters are shown in the sidebar,
      independently of the currently displayed confession (tab).
@@ -435,7 +465,7 @@ export default function ConfessionsPage() {
                             {p.refs && (
                               <div style={s.refs}>
                                 <span style={s.refsLabel}>Proof texts: </span>
-                                {cleanRefs(p.refs)}
+                                <RefChips refs={p.refs} onOpen={setKjvModal} />
                               </div>
                             )}
                             <div style={s.paraActions}>
@@ -469,7 +499,7 @@ export default function ConfessionsPage() {
                       {item.refs && (
                         <div style={s.refs}>
                           <span style={s.refsLabel}>Proof texts: </span>
-                          {cleanRefs(item.refs)}
+                          <RefChips refs={item.refs} onOpen={setKjvModal} />
                         </div>
                       )}
                       <div style={s.paraActions}>
@@ -517,7 +547,7 @@ export default function ConfessionsPage() {
                       {item.refs && (
                         <div style={s.refs}>
                           <span style={s.refsLabel}>Proof texts: </span>
-                          {cleanRefs(item.refs)}
+                          <RefChips refs={item.refs} onOpen={setKjvModal} />
                         </div>
                       )}
                     </div>
@@ -529,6 +559,16 @@ export default function ConfessionsPage() {
 
         </main>
       </div>
+
+      {/* KJV scripture modal */}
+      {kjvModal && (
+        <KjvModal
+          book={kjvModal.book}
+          chapter={kjvModal.chapter}
+          refDisplay={kjvModal.refDisplay}
+          onClose={() => setKjvModal(null)}
+        />
+      )}
     </div>
   )
 }

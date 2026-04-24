@@ -172,7 +172,8 @@ export function parseRefs(refsStr) {
     // Match patterns like:
     //   "Gen 1:1"   "1Cor 15:45"  "Ps23:1"  "1 Sam 17:4"  "Matt 5:3-12"
     // Capture: optional leading digit (for 1/2/3 books), book letters, chapter number
-    const m = part.match(/^(\d\s*)?([A-Za-z]+)\s*(\d+)[:.]\d/)
+    // Accept "Gen 1:31" (with verse) OR "Gen 1" (chapter-only reference)
+    const m = part.match(/^(\d\s*)?([A-Za-z]+)\.?\s*(\d+)/)
     if (!m) continue
 
     const numPart = m[1] ? m[1].replace(/\s+/g, '') : ''
