@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { FONT_OPTIONS, FONT_SIZES } from '../components/FontPrefsPanel'
-import { supabase, getLocalProgress } from '../lib/supabase'
+import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
+
+const SCHEDULE = buildSchedule()
 
 const SOURCES = [
   {
@@ -53,6 +55,59 @@ export default function AboutPage() {
   const [resetDone,    setResetDone]    = useState(false)
   const [resetting,    setResetting]    = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+
+  /* ── Notes & Bookmarks ── */
+  const [userNotes,  setUserNotes]  = useState([])
+  const [bookmarks,  setBookmarks]  = useState(() => getBookmarks())
+  const [notesTabOpen, setNotesTabOpen] = useState(true)
+  const [bmTabOpen,    setBmTabOpen]    = useState(true)
+
+  /* Load notes */
+  useEffect(() => {
+    if (session) {
+      supabase.from('progress').select('day_number, notes')
+        .eq('user_id', session.user.id)
+        .then(({ data }) => {
+          const notes = (data || []).filter(r => r.notes && r.notes.trim())
+          setUserNotes(notes)
+        })
+    } else {
+      const local = getLocalProgress()
+      const notes = Object.entries(local)
+        .filter(([, d]) => d.notes && d.notes.trim())
+        .map(([day, d]) => ({ day_number: parseInt(day), notes: d.notes }))
+      setUserNotes(notes)
+    }
+  }, [session])
+
+  /* Refresh bookmarks whenever the page is focused */
+  useEffect(() => {
+    const handler = () => setBookmarks(getBookmarks())
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [])
+
+  const enrichedNotes = useMemo(() =>
+    userNotes
+      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
+      .filter(n => n.entry)
+      .sort((a, b) => a.day_number - b.day_number),
+    [userNotes]
+  )
+
+  const bookmarkedEntries = useMemo(() =>
+    Object.keys(bookmarks)
+      .map(d => SCHEDULE.find(r => r.day === parseInt(d)))
+      .filter(Boolean)
+      .sort((a, b) => a.day - b.day),
+    [bookmarks]
+  )
+
+  function handleRemoveBookmark(day, e) {
+    e.stopPropagation()
+    toggleBookmark(day)
+    setBookmarks(prev => { const next = { ...prev }; delete next[day]; return next })
+  }
 
   /* ── Reset all progress (preserve notes) ── */
   const handleReset = useCallback(async () => {
@@ -242,6 +297,140 @@ export default function AboutPage() {
           </div>
         </section>
 
+        {/* ════════════════════════════════ MY NOTES ════════════════════════════════ */}
+        <section style={s.section}>
+          <button
+            onClick={() => setNotesTabOpen(o => !o)}
+            style={s.collapsibleHeader}
+            aria-expanded={notesTabOpen}
+          >
+            <div style={{display:'flex', alignItems:'center', gap:10}}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 2.5h12M2 5.5h8M2 8.5h10M2 11.5h6" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+              <h2 style={{...s.sectionTitle, margin:0}}>My Notes</h2>
+              {enrichedNotes.length > 0 && (
+                <span style={s.countBadge}>{enrichedNotes.length}</span>
+              )}
+            </div>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+              style={{transition:'transform 0.2s', transform: notesTabOpen ? 'rotate(180deg)' : 'none', flexShrink:0}}>
+              <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+
+          {notesTabOpen && (
+            <div style={{marginTop:12}}>
+              {!session ? (
+                <div style={s.emptyState}>
+                  <p style={s.emptyText}>Sign in to sync and view all your notes here.</p>
+                  <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{fontSize:13}}>
+                    Sign in →
+                  </button>
+                </div>
+              ) : enrichedNotes.length === 0 ? (
+                <div style={s.emptyState}>
+                  <p style={s.emptyText}>No notes yet. Open any reading day to add your reflections.</p>
+                </div>
+              ) : (
+                <div style={s.notesList}>
+                  {enrichedNotes.map(n => (
+                    <div
+                      key={n.day_number}
+                      style={s.noteCard}
+                      onClick={() => navigate(`/day/${n.day_number}`)}
+                    >
+                      <div style={s.noteCardHeader}>
+                        <span style={s.noteDay}>Day {n.day_number}</span>
+                        <span style={s.noteDate}>{n.entry.date}</span>
+                        <span style={{...s.noteSrc, background:
+                          n.entry.src==='2LBCF' ? 'var(--purple-soft)' :
+                          n.entry.src==='Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
+                          color:
+                          n.entry.src==='2LBCF' ? 'var(--purple-ink)' :
+                          n.entry.src==='Catechism' ? 'var(--teal)' : 'var(--amber-ink)',
+                        }}>{n.entry.src}</span>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{marginLeft:'auto', opacity:.35}}>
+                          <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <p style={s.noteReading}>{n.entry.reading}</p>
+                      <p style={s.notePreview}>{n.notes.slice(0, 120)}{n.notes.length > 120 ? '…' : ''}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ════════════════════════════════ BOOKMARKS ════════════════════════════════ */}
+        <section style={s.section}>
+          <button
+            onClick={() => setBmTabOpen(o => !o)}
+            style={s.collapsibleHeader}
+            aria-expanded={bmTabOpen}
+          >
+            <div style={{display:'flex', alignItems:'center', gap:10}}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 2A1.5 1.5 0 014.5 .5h7A1.5 1.5 0 0113 2v13l-5-3-5 3V2z"
+                  stroke="var(--teal)" strokeWidth="1.4" strokeLinejoin="round" fill="var(--teal)" fillOpacity="0.15"/>
+              </svg>
+              <h2 style={{...s.sectionTitle, margin:0}}>Saved Days</h2>
+              {bookmarkedEntries.length > 0 && (
+                <span style={s.countBadge}>{bookmarkedEntries.length}</span>
+              )}
+            </div>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+              style={{transition:'transform 0.2s', transform: bmTabOpen ? 'rotate(180deg)' : 'none', flexShrink:0}}>
+              <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+
+          {bmTabOpen && (
+            <div style={{marginTop:12}}>
+              {bookmarkedEntries.length === 0 ? (
+                <div style={s.emptyState}>
+                  <p style={s.emptyText}>No saved days yet. Tap the bookmark icon on any reading day to save it here.</p>
+                </div>
+              ) : (
+                <div style={s.notesList}>
+                  {bookmarkedEntries.map(entry => (
+                    <div
+                      key={entry.day}
+                      style={s.noteCard}
+                      onClick={() => navigate(`/day/${entry.day}`)}
+                    >
+                      <div style={s.noteCardHeader}>
+                        <span style={s.noteDay}>Day {entry.day}</span>
+                        <span style={s.noteDate}>{entry.date}</span>
+                        <span style={{...s.noteSrc,
+                          background: entry.src==='2LBCF' ? 'var(--purple-soft)' :
+                            entry.src==='Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
+                          color: entry.src==='2LBCF' ? 'var(--purple-ink)' :
+                            entry.src==='Catechism' ? 'var(--teal)' : 'var(--amber-ink)',
+                        }}>{entry.src}</span>
+                        <button
+                          onClick={(e) => handleRemoveBookmark(entry.day, e)}
+                          style={s.removeBtn}
+                          title="Remove bookmark"
+                        >
+                          ×
+                        </button>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{opacity:.35}}>
+                          <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <p style={s.noteReading}>{entry.reading}</p>
+                      <p style={{...s.notePreview, color:'var(--ink-faint)', fontStyle:'italic'}}>{entry.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
         {/* ════════════════════════════════ SOURCES ════════════════════════════════ */}
         <section style={s.section}>
           <h2 style={s.sectionTitle}>The Confessions</h2>
@@ -421,4 +610,35 @@ const s = {
   footerText: { fontSize:12, color:'var(--ink-faint)' },
   footerDot:  { color:'var(--border-strong)' },
   footerLink: { display:'inline-flex', alignItems:'center', color:'var(--ink-muted)', textDecoration:'none', fontWeight:500, fontSize:12 },
+
+  /* Notes & Bookmarks */
+  collapsibleHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    width:'100%', background:'none', border:'none', cursor:'pointer',
+    padding:'4px 0', textAlign:'left', color:'var(--ink)',
+  },
+  countBadge: {
+    fontSize:10, fontWeight:700, background:'var(--teal-light)', color:'var(--teal)',
+    borderRadius:99, padding:'1px 7px', letterSpacing:'0.03em',
+  },
+  emptyState: {
+    padding:'20px 0', display:'flex', flexDirection:'column', alignItems:'center', gap:10,
+  },
+  emptyText: { fontSize:13, color:'var(--ink-faint)', textAlign:'center', margin:0 },
+  notesList: { display:'flex', flexDirection:'column', gap:8 },
+  noteCard: {
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', padding:'12px 14px',
+    cursor:'pointer', transition:'border-color 0.15s',
+  },
+  noteCardHeader: { display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' },
+  noteDay:  { fontSize:11, fontWeight:700, color:'var(--teal)' },
+  noteDate: { fontSize:11, color:'var(--ink-faint)' },
+  noteSrc:  { fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:99, letterSpacing:'0.04em' },
+  noteReading: { fontSize:13, fontWeight:600, color:'var(--ink)', margin:'0 0 4px', fontFamily:"'Cormorant Garamond',serif" },
+  notePreview: { fontSize:12, color:'var(--ink-muted)', margin:0, lineHeight:1.55 },
+  removeBtn: {
+    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
+    fontSize:16, lineHeight:1, padding:'0 2px', marginLeft:'auto',
+  },
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum, getBookmarks, toggleBookmark } from '../lib/supabase'
-import { useAuth } from '../App'
+import { useAuth, usePrefs } from '../App'
+import { getFontCss } from '../components/FontPrefsPanel'
 import { QUOTES } from '../data/quotes'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -66,6 +67,7 @@ const SOURCES = [
 /* ─────────────────────────────────────────────────────────── */
 export default function Dashboard() {
   const { session }  = useAuth()
+  const { prefs }    = usePrefs()
   const navigate     = useNavigate()
 
   const [progress,     setProgress]     = useState({})   // { day_number: completed, _notes_N: text }
@@ -75,7 +77,7 @@ export default function Dashboard() {
   const [filterStatus, setFilterStatus] = useState(() => {
     try { return localStorage.getItem('pb-show-completed') === '1' ? '' : 'todo' } catch { return 'todo' }
   })
-  const [page,         setPage]         = useState(1)
+  const [page,         setPage]         = useState(() => Math.ceil(TODAY_DAY / PAGE))
   const [toggling,     setToggling]     = useState(new Set())
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
   const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes' | 'bookmarks'
@@ -207,7 +209,11 @@ export default function Dashboard() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE))
   const pageItems  = filtered.slice((page - 1) * PAGE, page * PAGE)
 
-  useEffect(() => { setPage(1) }, [search, filterSrc, filterStatus])
+  useEffect(() => { setPage(1) }, [search, filterSrc])
+  /* When status filter changes, if showing all days jump to today's page */
+  useEffect(() => {
+    setPage(filterStatus === 'todo' ? 1 : Math.ceil(TODAY_DAY / PAGE))
+  }, [filterStatus])
 
   /* ── close sidebar on ESC ── */
   useEffect(() => {
@@ -304,8 +310,8 @@ export default function Dashboard() {
               ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
             }
-            {/* Notes / Resources sidebar toggle — desktop only */}
-            {!isMobile && <button
+            {/* Notes / Resources sidebar toggle */}
+            <button
               onClick={() => setSidebarOpen(o => !o)}
               className="btn btn-ghost"
               style={s.sidebarToggle}
@@ -317,7 +323,7 @@ export default function Dashboard() {
                 <rect x="2" y="8" width="9"  height="2" rx="1" fill="currentColor"/>
                 <rect x="2" y="13" width="11" height="2" rx="1" fill="currentColor"/>
               </svg>
-            </button>}
+            </button>
           </div>
         </div>
       </header>
@@ -361,6 +367,8 @@ export default function Dashboard() {
               <div style={s.confessionPreview}>
                 <p style={{
                   ...s.confessionText,
+                  fontSize: prefs.sizePx,
+                  fontFamily: getFontCss(prefs.fontId),
                   WebkitLineClamp: todaySeeMore ? 'unset' : 4,
                   display: '-webkit-box',
                   WebkitBoxOrient: 'vertical',
@@ -478,10 +486,15 @@ export default function Dashboard() {
             const hasNote  = !!noteIndex[r.day]
             const hasQuote = !!(STATIC_QUOTE_SEARCH[r.day] || dbQuoteIndex[r.day])
             const isMarked = !!bookmarks[r.day]
+            const isToday  = r.day === TODAY_DAY
             return (
               <div
                 key={r.day}
-                style={{...s.row, ...(done ? s.rowDone : {})}}
+                style={{
+                  ...s.row,
+                  ...(done ? s.rowDone : {}),
+                  ...(isToday ? s.rowToday : {}),
+                }}
                 onClick={() => navigate(`/day/${r.day}`)}
               >
                 <button
@@ -492,7 +505,10 @@ export default function Dashboard() {
                 >
                   {done && <CheckIcon />}
                 </button>
-                <div style={s.dayNum}>Day {r.day}</div>
+                <div style={{...s.dayNum, ...(isToday ? {color:'var(--teal)', fontWeight:700} : {})}}>
+                  Day {r.day}
+                  {isToday && <span style={{fontSize:9, background:'var(--teal)', color:'white', borderRadius:4, padding:'1px 4px', marginLeft:4, verticalAlign:'middle', fontWeight:700, letterSpacing:'0.04em'}}>TODAY</span>}
+                </div>
                 <div style={s.rowMain}>
                   <div style={s.rowReading}>
                     <span className={badgeClass(r.src)}>{r.src}</span>
@@ -542,7 +558,24 @@ export default function Dashboard() {
         {/* Pagination */}
         <div style={s.pag}>
           <button className="btn btn-outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
-          <span style={{fontSize:13,color:'var(--ink-muted)'}}>Page {page} of {totalPages} &nbsp;·&nbsp; {filtered.length} entries</span>
+          <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
+            <span style={{fontSize:13,color:'var(--ink-muted)'}}>Page {page} of {totalPages} &nbsp;·&nbsp; {filtered.length} entries</span>
+            {!search && !filterSrc && (
+              <button
+                onClick={() => {
+                  setPage(Math.ceil(TODAY_DAY / PAGE))
+                }}
+                style={{
+                  fontSize:11, color:'var(--teal)', background:'none', border:'none',
+                  cursor:'pointer', padding:'0 4px', fontFamily:"'DM Sans',sans-serif",
+                  textDecoration:'underline', opacity: page === Math.ceil(TODAY_DAY / PAGE) ? 0.4 : 1,
+                }}
+                disabled={page === Math.ceil(TODAY_DAY / PAGE)}
+              >
+                Jump to Day {TODAY_DAY}
+              </button>
+            )}
+          </div>
           <button className="btn btn-outline" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
         </div>
       </main>
@@ -936,7 +969,8 @@ const s = {
     display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
     borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background 0.1s',
   },
-  rowDone: { background:'#fafaf8' },
+  rowDone:  { background:'#fafaf8' },
+  rowToday: { borderColor:'var(--teal)', boxShadow:'inset 3px 0 0 var(--teal)' },
   cb: {
     width:20, height:20, borderRadius:5, border:'1.5px solid var(--border-strong)',
     display:'flex', alignItems:'center', justifyContent:'center',

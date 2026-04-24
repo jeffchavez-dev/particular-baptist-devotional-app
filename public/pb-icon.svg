@@ -1,22 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <!-- Parchment background -->
-  <rect width="100" height="100" rx="6" fill="#f5f0e8"/>
-  <!-- Outer border -->
-  <rect x="4" y="4" width="92" height="92" rx="4" fill="none" stroke="#3d2e1e" stroke-width="2.2"/>
-  <!-- Inner border -->
-  <rect x="9" y="9" width="82" height="82" rx="2" fill="none" stroke="#3d2e1e" stroke-width="0.7"/>
-  <!-- Corner diamonds -->
-  <polygon points="4,4 9,6.5 4,9 -1,6.5" fill="#3d2e1e" transform="translate(4,4)"/>
-  <polygon points="0,0 5,2.5 0,5 -5,2.5" fill="#3d2e1e" transform="translate(96,6.5)"/>
-  <polygon points="0,0 5,2.5 0,5 -5,2.5" fill="#3d2e1e" transform="translate(96,88.5)"/>
-  <polygon points="0,0 5,2.5 0,5 -5,2.5" fill="#3d2e1e" transform="translate(4,88.5)"/>
-  <!-- Top divider with ornament -->
-  <line x1="16" y1="31" x2="40" y2="31" stroke="#3d2e1e" stroke-width="0.7"/>
-  <line x1="60" y1="31" x2="84" y2="31" stroke="#3d2e1e" stroke-width="0.7"/>
-  <text x="50" y="34.5" font-family="Georgia,serif" font-size="8" text-anchor="middle" fill="#3d2e1e">✦</text>
-  <!-- P.B. monogram -->
-  <text x="50" y="65" font-family="Georgia,'Times New Roman',serif" font-size="34" font-weight="bold" text-anchor="middle" fill="#3d2e1e" letter-spacing="1">P.B.</text>
-  <!-- Bottom divider with year -->
-  <line x1="16" y1="72" x2="84" y2="72" stroke="#3d2e1e" stroke-width="0.7"/>
-  <text x="50" y="85" font-family="Georgia,serif" font-size="8.5" text-anchor="middle" fill="#6b5744" letter-spacing="2.5">1689</text>
+  <!-- Solid dark background -->
+  <rect width="100" height="100" fill="#1a1410"/>
+
+  <!-- Gold inner border frame -->
+  <rect x="6" y="6" width="88" height="88" rx="3" fill="none" stroke="#c9a84c" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Thin inner inset rule -->
+  <rect x="10" y="10" width="80" height="80" rx="1.5" fill="none" stroke="#c9a84c" stroke-width="0.4" opacity="0.35"/>
+
+  <!-- Top ornament line pair -->
+  <line x1="18" y1="27" x2="40" y2="27" stroke="#c9a84c" stroke-width="0.7" opacity="0.55"/>
+  <line x1="60" y1="27" x2="82" y2="27" stroke="#c9a84c" stroke-width="0.7" opacity="0.55"/>
+  <!-- Diamond center ornament -->
+  <polygon points="50,23.5 52.5,27 50,30.5 47.5,27" fill="#c9a84c" opacity="0.7"/>
+
+  <!-- P.B. monogram — parchment, bold serif -->
+  <text
+    x="50" y="64"
+    font-family="Georgia,'Times New Roman',serif"
+    font-size="30"
+    font-weight="bold"
+    text-anchor="middle"
+    fill="#f5f0e8"
+    letter-spacing="2"
+  >P.B.</text>
+
+  <!-- Bottom rule -->
+  <line x1="18" y1="72" x2="82" y2="72" stroke="#c9a84c" stroke-width="0.7" opacity="0.55"/>
+
+  <!-- Year — gold, small caps style -->
+  <text
+    x="50" y="84"
+    font-family="Georgia,'Times New Roman',serif"
+    font-size="8"
+    text-anchor="middle"
+    fill="#c9a84c"
+    letter-spacing="3"
+    opacity="0.85"
+  >1689</text>
 </svg>

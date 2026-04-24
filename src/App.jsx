@@ -10,6 +10,7 @@ import ScripturePage from './pages/ScripturePage'
 import ConfessionsPage from './pages/ConfessionsPage'
 import AboutPage from './pages/AboutPage'
 import BottomNav from './components/BottomNav'
+import SplashScreen from './components/SplashScreen'
 
 export const AuthContext  = createContext(null)
 export const useAuth      = () => useContext(AuthContext)
@@ -23,6 +24,7 @@ export const usePrefs     = () => useContext(PrefsContext)
 export default function App() {
   const [session, setSession] = useState(undefined)
   const prevUser = useRef(null)
+  const [showSplash, setShowSplash] = useState(true)
 
   /* ── Online/offline detection ── */
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
@@ -63,10 +65,15 @@ export default function App() {
   }, [])
 
   if (session === undefined) {
+    /* Auth not yet resolved — show splash on top of the bare spinner so
+       there is no visible flash before the app loads */
     return (
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}>
-        <div className="spinner" />
-      </div>
+      <>
+        {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}>
+          <div className="spinner" />
+        </div>
+      </>
     )
   }
 
@@ -74,6 +81,7 @@ export default function App() {
     <ThemeContext.Provider value={{ dark, toggleDark }}>
       <PrefsContext.Provider value={{ prefs, updatePrefs }}>
         <AuthContext.Provider value={{ session }}>
+          {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
           {/* Offline banner */}
           {!isOnline && (
             <div id="pwa-offline-banner" style={{

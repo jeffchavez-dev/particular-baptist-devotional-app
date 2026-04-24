@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getFontCss } from '../components/FontPrefsPanel'
+import FontPrefsPanel, { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { LBCF2 }     from '../data/lbcf2'
@@ -104,7 +104,7 @@ const SOURCES = {
 
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { prefs } = usePrefs()
+  const { prefs, updatePrefs } = usePrefs()
 
   /* ── Restore saved state ── */
   const _saved = loadState('conf', { tab: '2lbcf', search: '' })
@@ -112,8 +112,13 @@ export default function ConfessionsPage() {
 
   const [activeChapter, setActiveChapter] = useState(null)
   const [search,        setSearch]        = useState(_saved.search)
-  const [navOpen,       setNavOpen]       = useState(false)   // mobile sidebar drawer
+  const [navOpen,       setNavOpen]       = useState(false)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
+  /* sidebarConf tracks which confession's chapters are shown in the sidebar,
+     independently of the currently displayed confession (tab).
+     Changing sidebarConf never touches the main content. */
+  const [sidebarConf,   setSidebarConf]   = useState(tab)
+  const pendingScrollRef = useRef(null)
   const contentRef = useRef(null)
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
@@ -132,41 +137,70 @@ export default function ConfessionsPage() {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
+  /* When tab changes (content switches), execute any pending chapter scroll */
+  useEffect(() => {
+    if (!pendingScrollRef.current) return
+    const id = pendingScrollRef.current
+    pendingScrollRef.current = null
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const el = document.getElementById(id)
+        if (el) {
+          window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
+          setActiveChapter(id)
+        }
+      }, 60)
+    })
+  }, [tab])
+
   const src = SOURCES[tab] || SOURCES['2lbcf']
+  const sidebarSrc = SOURCES[sidebarConf] || SOURCES['2lbcf']
   const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
 
+  /* Switch the displayed confession (main content) */
   function setTab(t) {
     setSearchParams({ t })
     setActiveChapter(null)
     setSearch('')
     setNavOpen(false)
-    window.scrollTo({ top: 0 })
   }
 
+  /* Scroll to a chapter within the currently displayed confession */
   function scrollToChapter(id) {
     const el = document.getElementById(id)
     if (el) {
-      const top = el.getBoundingClientRect().top + window.scrollY - 80
-      window.scrollTo({ top, behavior: 'smooth' })
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
     }
     setActiveChapter(id)
     if (isMobile) setNavOpen(false)
   }
 
-  /* ─── Chapter list for nav ─── */
+  /* Called when user clicks a chapter in the sidebar.
+     If the sidebar confession differs from the main tab, switch first then scroll. */
+  function handleChapterClick(chId) {
+    if (sidebarConf !== tab) {
+      pendingScrollRef.current = chId
+      setTab(sidebarConf)
+    } else {
+      scrollToChapter(chId)
+      if (isMobile) setNavOpen(false)
+    }
+  }
+
+  /* ─── Chapter list for nav — driven by sidebarConf, not tab ─── */
   const chapterNav = useMemo(() => {
-    if (tab === '2lbcf') {
+    if (sidebarConf === '2lbcf') {
       return Object.keys(LBCF2_CHAPTERS).map(ch => ({
         id: `ch-${ch}`, label: `Ch. ${ch}`, title: CHAPTER_TITLES[parseInt(ch)],
       }))
     }
-    if (tab === '1lbcf') {
+    if (sidebarConf === '1lbcf') {
       return Object.entries(LBCF1).map(([num, item]) => ({
         id: `art-${num}`, label: `Art. ${num}`, title: item.title,
       }))
     }
     return []
-  }, [tab])
+  }, [sidebarConf])
 
   /* ─── Search counts ─── */
   const q = search.toLowerCase().trim()
@@ -193,31 +227,41 @@ export default function ConfessionsPage() {
   /* ── Sidebar content (shared between desktop panel and mobile drawer) ── */
   const SidebarContent = (
     <div style={s.sidebarContent}>
-      {/* Confession selector */}
+      {/* Confession selector — only updates sidebarConf; never refreshes main content */}
       <div style={s.confSelector}>
-        <div style={s.confSelectorLabel}>Confession</div>
+        <div style={s.confSelectorLabel}>Browse</div>
         {Object.entries(SOURCES).map(([key, info]) => (
           <button
             key={key}
             style={{
               ...s.confSelectorBtn,
-              ...(tab === key ? {
+              ...(sidebarConf === key ? {
                 background: info.bg, color: info.color,
                 borderColor: info.color, fontWeight: 700,
               } : {}),
             }}
-            onClick={() => setTab(key)}
+            onClick={() => {
+              setSidebarConf(key)
+              /* Catechism has no chapter list — switch content immediately */
+              if (key === 'catechism') setTab(key)
+            }}
           >
-            <span style={{...s.confBadgeDot, background: tab === key ? info.color : 'var(--border-strong)'}} />
+            <span style={{...s.confBadgeDot, background: sidebarConf === key ? info.color : 'var(--border-strong)'}} />
             <span style={{flex:1, textAlign:'left'}}>{info.label}</span>
             <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>
               {key === '2lbcf' ? '1689' : key === 'catechism' ? '1693' : '1644'}
             </span>
           </button>
         ))}
+        {/* Hint when sidebar and main content are out of sync */}
+        {sidebarConf !== tab && sidebarConf !== 'catechism' && (
+          <p style={{fontSize:10, color:'var(--ink-faint)', margin:'6px 4px 0', lineHeight:1.5}}>
+            Select a chapter below to open it
+          </p>
+        )}
       </div>
 
-      {/* Chapter list */}
+      {/* Chapter list — tap a chapter to navigate (switches confession if needed) */}
       {chapterNav.length > 0 && (
         <>
           <div style={s.sidebarDivider} />
@@ -226,11 +270,14 @@ export default function ConfessionsPage() {
             {chapterNav.map(ch => (
               <button
                 key={ch.id}
-                style={{...s.chapBtn, ...(activeChapter === ch.id ? s.chapBtnActive : {})}}
-                onClick={() => scrollToChapter(ch.id)}
+                style={{
+                  ...s.chapBtn,
+                  ...(activeChapter === ch.id && sidebarConf === tab ? s.chapBtnActive : {}),
+                }}
+                onClick={() => handleChapterClick(ch.id)}
                 title={ch.title}
               >
-                <span style={{...s.chapLabel, color: src.color}}>{ch.label}</span>
+                <span style={{...s.chapLabel, color: sidebarSrc.color}}>{ch.label}</span>
                 <span style={s.chapTitle}>{ch.title}</span>
               </button>
             ))}
@@ -285,6 +332,7 @@ export default function ConfessionsPage() {
             />
             {search && <button onClick={() => setSearch('')} style={s.clearBtn}>×</button>}
           </div>
+          <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
         </div>
       </header>
 

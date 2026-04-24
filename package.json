@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -14,6 +15,7 @@
     "react-router-dom": "^6.21.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",

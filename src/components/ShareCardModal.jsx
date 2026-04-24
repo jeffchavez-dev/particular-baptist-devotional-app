@@ -377,7 +377,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
           <div style={m.preview}>
             <canvas
               ref={canvasRef}
-              style={{ maxWidth:'100%', maxHeight:300, borderRadius:8, boxShadow:'0 4px 24px rgba(0,0,0,0.25)' }}
+              style={{ maxWidth:'100%', maxHeight:320, borderRadius:8, boxShadow:'0 4px 24px rgba(0,0,0,0.25)', display:'block' }}
             />
           </div>
 
@@ -535,7 +535,7 @@ const m = {
   body: { padding:'20px', overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:16 },
   preview: {
     display:'flex', justifyContent:'center', alignItems:'center',
-    background:'#e8e8e8', borderRadius:10, padding:12, minHeight:120,
+    background:'#e8e8e8', borderRadius:10, padding:12,
   },
   section: { display:'flex', flexDirection:'column', gap:8 },
   label: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' },
