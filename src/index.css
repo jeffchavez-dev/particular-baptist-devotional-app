@@ -194,9 +194,10 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
 @media (min-width: 769px) {
   /* On desktop, cap width and center so it doesn't stretch across ultra-wide screens */
   nav[data-bottom-nav] {
+    width: 100%;
     max-width: 640px;
     left: 50%;
-    right: auto;
+    right: auto !important;
     transform: translateX(-50%);
     border-left: 1px solid var(--border);
     border-right: 1px solid var(--border);

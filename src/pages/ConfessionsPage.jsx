@@ -328,7 +328,6 @@ export default function ConfessionsPage() {
             <div style={{display:'flex', alignItems:'center', gap:8, minWidth:0}}>
               <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
               <span style={s.srcName}>{src.name}</span>
-              <a href={src.href} target="_blank" rel="noopener noreferrer" style={s.srcLink}>Source ↗</a>
             </div>
           )}
 
@@ -401,7 +400,6 @@ export default function ConfessionsPage() {
             <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:'1rem', flexWrap:'wrap'}}>
               <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
               <span style={{fontSize:12, color:'var(--ink-muted)', flex:1, fontFamily:"'Cormorant Garamond',serif"}}>{src.name}</span>
-              <a href={src.href} target="_blank" rel="noopener noreferrer" style={s.srcLink}>Source ↗</a>
             </div>
           )}
 

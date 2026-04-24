@@ -687,17 +687,6 @@ export default function Dashboard() {
                       <span style={s.sidebarSourceYear}>{src.year}</span>
                     </div>
                     <div style={s.sidebarSourceName}>{src.name}</div>
-                    <div style={{display:'flex', gap:10, marginTop:4}}>
-                      <button
-                        onClick={() => { navigate(src.internalHref); setSidebarOpen(false) }}
-                        style={{...s.sidebarSourceLink, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0, fontFamily:"'DM Sans',sans-serif"}}
-                      >
-                        Read in app →
-                      </button>
-                      <a href={src.href} target="_blank" rel="noopener noreferrer" style={{...s.sidebarSourceLink, color:'var(--ink-faint)'}}>
-                        Source ↗
-                      </a>
-                    </div>
                   </div>
                 ))}
               </div>

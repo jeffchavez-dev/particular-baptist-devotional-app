@@ -40,7 +40,7 @@ const NT_CATS = [
 const BOOK_META = Object.fromEntries(BIBLE_BOOKS.map(b => [b.name, b]))
 
 /* ── Sidebar book picker ── */
-function BookSidebar({ selectedBook, onSelect, onClose, isMobile }) {
+function BookSidebar({ selectedBook, onSelect, onClose, isMobile, selectedChapter, onChapterSelect }) {
   const [openCats, setOpenCats] = useState(() => {
     // Auto-open the category that contains the selected book
     const allCats = [...OT_CATS, ...NT_CATS]
@@ -76,19 +76,41 @@ function BookSidebar({ selectedBook, onSelect, onClose, isMobile }) {
           </button>
           {openCats.has(cat.id) && (
             <div style={sb.bookList}>
-              {cat.books.filter(b => BOOK_META[b]).map(b => (
-                <button
-                  key={b}
-                  style={{
-                    ...sb.bookBtn,
-                    ...(selectedBook === b ? {background: cat.bg, color: cat.color, fontWeight:700, borderLeft:`3px solid ${cat.color}`} : {}),
-                  }}
-                  onClick={() => { onSelect(b); if (isMobile && onClose) onClose() }}
-                >
-                  {b}
-                  <span style={sb.bookChCount}>{BOOK_META[b]?.chapters}ch</span>
-                </button>
-              ))}
+              {cat.books.filter(b => BOOK_META[b]).map(b => {
+                const bookChapterCount = BOOK_META[b]?.chapters || 1
+                const isSelected = selectedBook === b
+                return (
+                  <div key={b}>
+                    <button
+                      style={{
+                        ...sb.bookBtn,
+                        ...(isSelected ? {background: cat.bg, color: cat.color, fontWeight:700, borderLeft:`3px solid ${cat.color}`} : {}),
+                      }}
+                      onClick={() => { onSelect(b); if (isMobile && onClose) onClose() }}
+                    >
+                      {b}
+                      <span style={sb.bookChCount}>{bookChapterCount}ch</span>
+                    </button>
+                    {/* Show chapters when book is selected */}
+                    {isSelected && (
+                      <div style={sb.chapterGrid}>
+                        {Array.from({length: bookChapterCount}, (_, i) => i+1).map(ch => (
+                          <button
+                            key={ch}
+                            style={{
+                              ...sb.chapterBtn,
+                              ...(selectedChapter === ch ? {background: cat.color, color: 'white', fontWeight:700} : {}),
+                            }}
+                            onClick={() => { onChapterSelect(ch); if (isMobile && onClose) onClose() }}
+                          >
+                            {ch}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -116,7 +138,6 @@ export default function KjvReader({ todayChapter }) {
   const [fontSize,  setFontSize]  = useState(() => {
     try { return parseInt(localStorage.getItem('kjv-fontsize') || '17') } catch { return 17 }
   })
-  const [showChSel, setShowChSel] = useState(false)
   const readerRef = useRef(null)
   const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 768)
 
@@ -151,7 +172,14 @@ export default function KjvReader({ todayChapter }) {
   function selectBook(b) {
     setBook(b)
     setChapter(1)
-    setSideOpen(false)
+    // Only close on mobile
+    if (isMobile) setSideOpen(false)
+  }
+
+  function handleChapterSelect(ch) {
+    setChapter(ch)
+    // Close sidebar on mobile after selection
+    if (isMobile) setSideOpen(false)
   }
 
   function changeFontSize(delta) {
@@ -208,6 +236,8 @@ export default function KjvReader({ todayChapter }) {
           onSelect={selectBook}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
+          selectedChapter={chapter}
+          onChapterSelect={handleChapterSelect}
         />
       </aside>
 
@@ -231,31 +261,7 @@ export default function KjvReader({ todayChapter }) {
             <div style={r.bookTitle}>
               <span style={r.bookName}>{book}</span>
               <span style={{color:'var(--ink-faint)', margin:'0 4px'}}>·</span>
-              {/* Chapter selector */}
-              <div style={{position:'relative', display:'inline-block'}}>
-                <button style={r.chapterBadge} onClick={() => setShowChSel(s => !s)}>
-                  Ch. {chapter}
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:3}}>
-                    <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                  </svg>
-                </button>
-                {showChSel && (
-                  <div style={r.chDropdown}>
-                    <div style={r.chDropdownGrid}>
-                      {Array.from({length: totalChs}, (_, i) => i+1).map(ch => (
-                        <button
-                          key={ch}
-                          onClick={() => { setChapter(ch); setShowChSel(false) }}
-                          style={{
-                            ...r.chChip,
-                            ...(ch === chapter ? {background:'var(--teal)', color:'white', borderColor:'var(--teal)'} : {}),
-                          }}
-                        >{ch}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <span style={r.chapterDisplay}>Ch. {chapter}</span>
             </div>
             {isTodayChapter && (
               <span style={r.todayBadge}>Today</span>
@@ -268,9 +274,6 @@ export default function KjvReader({ todayChapter }) {
             <button style={r.toolBtn} onClick={() => changeFontSize(+1)} title="Larger text">A+</button>
           </div>
         </div>
-
-        {/* Click-outside for chapter dropdown */}
-        {showChSel && <div style={{position:'fixed',inset:0,zIndex:49}} onClick={() => setShowChSel(false)} />}
 
         {/* ── Chapter content ── */}
         <div style={r.content}>
@@ -377,6 +380,16 @@ const sb = {
     transition:'all 0.12s', textAlign:'left',
   },
   bookChCount: { fontSize:10, color:'var(--ink-faint)', marginLeft:4, flexShrink:0 },
+  chapterGrid: {
+    display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4,
+    padding:'8px 14px 4px 22px', background:'rgba(0,0,0,0.02)',
+  },
+  chapterBtn: {
+    padding:'4px 6px', border:'1px solid var(--border)', borderRadius:4,
+    background:'white', color:'var(--ink)', fontSize:10, fontWeight:500,
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.1s',
+  },
 }
 
 /* ── Reader styles ── */
@@ -412,13 +425,7 @@ const r = {
   },
   bookTitle: { display:'flex', alignItems:'center', flexWrap:'wrap', gap:4, minWidth:0 },
   bookName: { fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)', whiteSpace:'nowrap' },
-  chapterBadge: {
-    display:'inline-flex', alignItems:'center',
-    fontSize:13, fontWeight:600, color:'var(--teal)',
-    background:'var(--teal-light)', border:'none',
-    borderRadius:99, padding:'3px 10px',
-    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
-  },
+  chapterDisplay: { fontSize:13, fontWeight:600, color:'var(--teal)' },
   todayBadge: {
     fontSize:9, fontWeight:700, background:'var(--teal)', color:'white',
     borderRadius:99, padding:'2px 6px', letterSpacing:'0.04em',
@@ -430,23 +437,6 @@ const r = {
     fontSize:11, fontWeight:600, fontFamily:"'DM Sans',sans-serif",
     display:'flex', alignItems:'center', gap:4,
     transition:'background 0.12s',
-  },
-
-  /* Chapter dropdown */
-  chDropdown: {
-    position:'absolute', top:'calc(100% + 6px)', left:0,
-    background:'white', border:'1px solid var(--border)',
-    borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow)',
-    zIndex:50, maxHeight:260, overflowY:'auto', minWidth:200,
-    padding:8,
-  },
-  chDropdownGrid: { display:'flex', flexWrap:'wrap', gap:4 },
-  chChip: {
-    width:36, height:32, display:'flex', alignItems:'center', justifyContent:'center',
-    border:'1px solid var(--border)', borderRadius:'var(--radius)',
-    background:'var(--parchment)', color:'var(--ink)',
-    fontSize:11, fontWeight:500, cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", transition:'all 0.1s',
   },
 
   /* Content */

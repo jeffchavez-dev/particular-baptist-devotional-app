@@ -569,15 +569,6 @@ export default function ReadingPage() {
           </div>
           <h2 style={s.readingTitle}>{entry.reading}</h2>
           <p style={s.readingDetail}>{entry.detail}</p>
-
-          {entry.link && (
-            <a href={entry.link} target="_blank" rel="noopener noreferrer" style={s.readLink}>
-              Read online
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{marginLeft:4}}>
-                <path d="M3 9L9 3M9 3H5M9 3v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </a>
-          )}
         </div>
 
         {/* Inline confession / catechism text */}
