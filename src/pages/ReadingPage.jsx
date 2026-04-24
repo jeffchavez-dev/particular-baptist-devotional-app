@@ -544,12 +544,6 @@ export default function ReadingPage() {
             </svg>
             All days
           </button>
-          <img
-            src="/pb-icon.svg" alt="P.B."
-            style={{width:28, height:28, cursor:'pointer', position:'absolute', left:'50%', transform:'translateX(-50%)'}}
-            onClick={() => navigate('/')}
-            title="Home"
-          />
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>

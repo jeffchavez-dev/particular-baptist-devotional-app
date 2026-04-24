@@ -5,6 +5,7 @@ import CopyBtn from '../components/CopyBtn'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 }     from '../data/lbcf1'
+import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
@@ -126,13 +127,26 @@ const SOURCES = {
 export default function ConfessionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get('t') || '2lbcf'
+
+  /* ── Restore saved state (tab, search) from sessionStorage ── */
+  const _saved = loadState('conf', { tab: '2lbcf', search: '' })
+  const tab = searchParams.get('t') || _saved.tab
+
   const [activeChapter, setActiveChapter] = useState(null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(_saved.search)
   const [navOpen, setNavOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   const [prefs, setPrefsState] = useState(() => loadPrefs())
   const contentRef = useRef(null)
+
+  /* Save state on every meaningful change */
+  useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
+
+  /* Save scroll on unmount, restore on mount */
+  useEffect(() => {
+    restoreScroll('conf')
+    return () => saveScroll('conf')
+  }, [])
 
   function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
 
@@ -218,21 +232,6 @@ export default function ConfessionsPage() {
       {/* ── Sticky header ── */}
       <header style={s.header}>
         <div style={s.headerTop}>
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <img
-              src="/pb-icon.svg" alt="P.B."
-              style={{width:28, height:28, cursor:'pointer'}}
-              onClick={() => navigate('/')}
-              title="Home"
-            />
-            <button onClick={() => navigate('/')} className="btn btn-ghost" style={{gap:5, fontSize:13}}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              Dashboard
-            </button>
-          </div>
-
           <div style={s.tabs}>
             {Object.entries(SOURCES).map(([key, info]) => (
               <button
@@ -375,13 +374,13 @@ export default function ConfessionsPage() {
                                 {cleanRefs(p.refs)}
                               </div>
                             )}
-                          </div>
-                          <div style={s.paraActions}>
-                            <CopyBtn getText={() => {
-                              let t = p.text
-                              if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
-                              return t
-                            }} />
+                            <div style={s.paraActions}>
+                              <CopyBtn getText={() => {
+                                let t = p.text
+                                if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
+                                return t
+                              }} />
+                            </div>
                           </div>
                         </div>
                       )
@@ -582,7 +581,7 @@ const s = {
     minWidth:28, paddingTop:3, fontVariantNumeric:'tabular-nums',
   },
   paraBody: { flex:1 },
-  paraActions: { display:'flex', gap:8, flexShrink:0, alignItems:'flex-start' },
+  paraActions: { display:'flex', gap:8, alignItems:'flex-start', marginTop:6 },
   paraText: {
     fontSize:16, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.9,
     color:'var(--ink)', margin:'0 0 8px',
