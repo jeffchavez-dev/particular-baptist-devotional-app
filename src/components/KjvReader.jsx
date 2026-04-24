@@ -1,24 +1,40 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 
-/* ── Module-level chapter cache (persists across re-renders) ── */
-const KJV_CACHE = new Map()
+/* ── Module-level KJV data singleton — loaded once, all chapters in memory ── */
+let _kjvData = null        // full parsed JSON once loaded
+let _kjvPromise = null     // in-flight fetch promise (prevents duplicate requests)
 
-/* ── Book display name → API slug ── */
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 }
 
-/* ── Fetch a chapter; returns array of {verse, text} ── */
-async function fetchKjvChapter(bookName, ch) {
-  const key = `${bookSlug(bookName)}/${ch}`
-  if (KJV_CACHE.has(key)) return KJV_CACHE.get(key)
-  const url = `https://raw.githubusercontent.com/wldeh/bible-api/main/bibles/en-kjv/books/${bookSlug(bookName)}/chapters/${ch}.json`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Could not load ${bookName} ${ch}`)
-  const json = await res.json()
-  const verses = (json.data || []).map(v => ({ verse: parseInt(v.verse), text: v.text }))
-  KJV_CACHE.set(key, verses)
+/** Load the full bundled KJV JSON (≈3 MB gzipped). Cached by service worker after first fetch. */
+async function loadKjv() {
+  if (_kjvData) return _kjvData
+  if (!_kjvPromise) {
+    _kjvPromise = fetch('/kjv.json')
+      .then(r => { if (!r.ok) throw new Error('KJV data unavailable'); return r.json() })
+      .then(d => { _kjvData = d; return d })
+      .catch(e => { _kjvPromise = null; throw e })
+  }
+  return _kjvPromise
+}
+
+/** Retrieve a chapter's verses synchronously from in-memory data. */
+function getChapterVerses(bookName, ch) {
+  if (!_kjvData) return null
+  const slug = bookSlug(bookName)
+  const raw = _kjvData[slug]?.[ch]
+  if (!raw) return null
+  return raw.map(v => ({ verse: v.v, text: v.t }))
+}
+
+/** Public API: returns { verse, text }[] for any book+chapter, loading data if needed. */
+export async function fetchKjvChapter(bookName, ch) {
+  await loadKjv()
+  const verses = getChapterVerses(bookName, ch)
+  if (!verses) throw new Error(`${bookName} ${ch} not found in KJV data`)
   return verses
 }
 
@@ -128,18 +144,27 @@ function BookSidebar({ selectedBook, onSelect, onClose, isMobile, selectedChapte
 }
 
 /* ── Main KJV Reader ── */
-export default function KjvReader({ todayChapter }) {
-  const [book,      setBook]      = useState('Genesis')
-  const [chapter,   setChapter]   = useState(1)
-  const [verses,    setVerses]    = useState([])
-  const [loading,   setLoading]   = useState(false)
+export default function KjvReader({ todayChapter, initialBook, initialChapter }) {
+  /* Persist position across page navigations via sessionStorage */
+  const [book, setBook] = useState(() => {
+    if (initialBook) return initialBook
+    try { return sessionStorage.getItem('kjv-book') || 'Genesis' } catch { return 'Genesis' }
+  })
+  const [chapter, setChapter] = useState(() => {
+    if (initialChapter) return initialChapter
+    try { return parseInt(sessionStorage.getItem('kjv-chapter') || '1') } catch { return 1 }
+  })
+
+  const [verses,    setVerses]    = useState(() => getChapterVerses(book, chapter) || [])
+  const [loading,   setLoading]   = useState(!_kjvData) // true only on first-ever load
+  const [dataReady, setDataReady] = useState(!!_kjvData)
   const [error,     setError]     = useState(null)
-  const [sideOpen,  setSideOpen]  = useState(false) // mobile sidebar
+  const [sideOpen,  setSideOpen]  = useState(false)
   const [fontSize,  setFontSize]  = useState(() => {
     try { return parseInt(localStorage.getItem('kjv-fontsize') || '17') } catch { return 17 }
   })
   const readerRef = useRef(null)
-  const [isMobile,  setIsMobile]  = useState(() => window.innerWidth < 768)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -147,27 +172,45 @@ export default function KjvReader({ todayChapter }) {
     return () => window.removeEventListener('resize', h)
   }, [])
 
-  const bookInfo   = BOOK_META[book] || { chapters: 1 }
-  const totalChs   = bookInfo.chapters
-
-  /* Load chapter */
+  /* Persist position */
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setVerses([])
-    fetchKjvChapter(book, chapter)
-      .then(v => { if (!cancelled) { setVerses(v); setLoading(false) } })
-      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
-    // Scroll reader to top
-    if (readerRef.current) readerRef.current.scrollTop = 0
-    return () => { cancelled = true }
+    try {
+      sessionStorage.setItem('kjv-book', book)
+      sessionStorage.setItem('kjv-chapter', String(chapter))
+    } catch {}
   }, [book, chapter])
 
-  /* Prefetch next chapter */
+  const bookInfo = BOOK_META[book] || { chapters: 1 }
+  const totalChs = bookInfo.chapters
+
+  /* On first mount: load the KJV bundle if not yet in memory, then show chapter */
   useEffect(() => {
-    if (chapter < totalChs) fetchKjvChapter(book, chapter + 1).catch(() => {})
-  }, [book, chapter, totalChs])
+    let cancelled = false
+    if (!_kjvData) {
+      setLoading(true)
+      loadKjv()
+        .then(() => {
+          if (cancelled) return
+          setDataReady(true)
+          setLoading(false)
+          const v = getChapterVerses(book, chapter)
+          if (v) setVerses(v)
+        })
+        .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
+    }
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* When book/chapter changes (and data is already loaded) — instant from memory */
+  useEffect(() => {
+    if (!dataReady) return
+    const v = getChapterVerses(book, chapter)
+    if (v) {
+      setVerses(v)
+      setError(null)
+    }
+    if (readerRef.current) readerRef.current.scrollTop = 0
+  }, [book, chapter, dataReady])
 
   function selectBook(b) {
     setBook(b)

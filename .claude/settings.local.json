@@ -48,7 +48,9 @@
       "Bash(curl -s \"https://api.github.com/repos/wldeh/bible-api/contents/bibles/en-kjv/books/genesis/chapters\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/wldeh/bible-api/main/bibles/en-kjv/books/genesis/chapters/1.json\")",
       "Bash(curl -s \"https://api.github.com/repos/wldeh/bible-api/contents/bibles/en-kjv/books?per_page=100\")",
-      "Bash(curl -s \"https://raw.githubusercontent.com/wldeh/bible-api/main/bibles/en-kjv/books/matthew/chapters/1.json\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/wldeh/bible-api/main/bibles/en-kjv/books/matthew/chapters/1.json\")",
+      "Bash(node scripts/fetch-kjv.mjs)",
+      "Bash(powershell -command \"\\(Get-Item public/kjv.json\\).length / 1MB\")"
     ]
   }
 }

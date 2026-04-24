@@ -10,6 +10,8 @@ import ShareCardModal from '../components/ShareCardModal'
 import FontPrefsPanel, { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
+import { parseRefs } from '../lib/parseRefs'
+import KjvModal from '../components/KjvModal'
 
 const SCHEDULE = buildSchedule()
 
@@ -54,6 +56,14 @@ function getContent(entry) {
     return { type: '1lbcf', title: item.title, text: item.text, refs: item.refs, quoteKey: `lbcf1.${num}` }
   }
   return null
+}
+
+/** Parse "1 Corinthians 8" or "Isaiah 44" → { book, chapter, refDisplay } */
+function parseBibleChapterRef(str) {
+  if (!str) return null
+  const m = str.match(/^(.*?)\s+(\d+)$/)
+  if (!m) return null
+  return { book: m[1].trim(), chapter: parseInt(m[2]), refDisplay: str }
 }
 
 function BodyText({ text, textStyle = {} }) {
@@ -232,12 +242,14 @@ const cb = {
   },
 }
 
-function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote }) {
+function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, onScriptureRef }) {
   if (!content) return null
 
   const textStyle = prefs
     ? { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
     : {}
+
+  const parsedRefs = content.refs ? parseRefs(content.refs) : []
 
   function getContentText() {
     let text = content.type === 'catechism'
@@ -287,7 +299,21 @@ function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote })
       {content.refs && (
         <div style={s.refsBlock}>
           <div style={s.refsLabel}>Scripture Proofs</div>
-          <p style={s.refsText}>{content.refs}</p>
+          {parsedRefs.length > 0 ? (
+            <div style={s.refChips}>
+              {parsedRefs.map(({ book, chapter, display }) => (
+                <button
+                  key={`${book}|${chapter}`}
+                  style={s.refChip}
+                  onClick={() => onScriptureRef && onScriptureRef({ book, chapter, refDisplay: display })}
+                >
+                  {display}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p style={s.refsText}>{content.refs}</p>
+          )}
         </div>
       )}
 
@@ -436,8 +462,10 @@ export default function ReadingPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
+  const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
   const { prefs, updatePrefs } = usePrefs()
   const bibleChapter = entry?.bibleChapter || null
+  const parsedBibleChapter = parseBibleChapterRef(bibleChapter)
   const [bibleChapterDone, setBibleChapterDone] = useState(() =>
     bibleChapter ? !!getBibleProgress()[bibleChapter] : false
   )
@@ -577,6 +605,7 @@ export default function ReadingPage() {
           session={session}
           entry={entry}
           prefs={prefs}
+          onScriptureRef={ref => setKjvModal(ref)}
           onShare={({ text }) => setShareCard({
             type: 'reading',
             day: day,
@@ -624,8 +653,17 @@ export default function ReadingPage() {
             <div style={s.bibleCardInner}>
               <div style={s.bibleLeft}>
                 <span style={s.bibleLabel}>Scripture Reading</span>
-                <span style={s.bibleChapter}>{bibleChapter}</span>
-                <span style={s.bibleHint}>Read the full chapter alongside today's study</span>
+                <button
+                  style={s.bibleChapterBtn}
+                  onClick={() => parsedBibleChapter && setKjvModal(parsedBibleChapter)}
+                  title="Read chapter in KJV"
+                >
+                  {bibleChapter}
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{opacity:0.6, flexShrink:0}}>
+                    <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </button>
+                <span style={s.bibleHint}>Tap to read in KJV · check when done</span>
               </div>
               <button
                 onClick={toggleBibleChapter}
@@ -760,6 +798,16 @@ export default function ReadingPage() {
         onClose={() => setShareCard(null)}
         card={shareCard}
       />
+
+      {/* KJV chapter modal */}
+      {kjvModal && (
+        <KjvModal
+          book={kjvModal.book}
+          chapter={kjvModal.chapter}
+          refDisplay={kjvModal.refDisplay}
+          onClose={() => setKjvModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -804,10 +852,20 @@ const s = {
   },
   refsLabel: {
     fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em',
-    color:'var(--ink-faint)', marginBottom:6,
+    color:'var(--ink-faint)', marginBottom:8,
   },
   refsText: {
     fontSize:13, color:'var(--ink-muted)', lineHeight:1.7, margin:0,
+  },
+  refChips: {
+    display:'flex', flexWrap:'wrap', gap:6,
+  },
+  refChip: {
+    fontSize:12, fontWeight:500, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid transparent',
+    borderRadius:99, padding:'4px 10px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.4,
+    transition:'border-color 0.15s, background 0.15s',
   },
   quoteCard: {
     marginTop:20, paddingTop:20,
@@ -847,6 +905,13 @@ const s = {
   bibleLeft: { flex:1, display:'flex', flexDirection:'column', gap:2 },
   bibleLabel: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--teal)' },
   bibleChapter: { fontSize:18, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)' },
+  bibleChapterBtn: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:18, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)',
+    background:'none', border:'none', padding:0, cursor:'pointer', textAlign:'left',
+    textDecoration:'underline', textDecorationColor:'var(--teal)', textDecorationThickness:1,
+    textUnderlineOffset:3,
+  },
   bibleHint: { fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" },
   bibleCheck: {
     width:36, height:36, borderRadius:'50%', border:'2px solid',

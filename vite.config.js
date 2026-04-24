@@ -98,14 +98,13 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // KJV Bible chapters from GitHub raw CDN — cache forever once fetched
-          // (1,189 chapters max; chapters never change so CacheFirst is correct)
+          // Bundled KJV Bible (public/kjv.json) — cache forever after first load
           {
-            urlPattern: /^https:\/\/raw\.githubusercontent\.com\/wldeh\/bible-api\/.*/i,
+            urlPattern: ({ url }) => url.pathname === '/kjv.json',
             handler: 'CacheFirst',
             options: {
-              cacheName: 'kjv-bible-chapters',
-              expiration: { maxEntries: 1200, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheName: 'kjv-bible-data',
+              expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
