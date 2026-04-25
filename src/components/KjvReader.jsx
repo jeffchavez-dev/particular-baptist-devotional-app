@@ -1159,7 +1159,7 @@ const sb = {
 const r = {
   wrap: {
     display:'flex',
-    height:'calc(100vh - 130px)',
+    height:'100%',
     overflow:'hidden', position:'relative',
   },
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:199 },
@@ -1499,22 +1499,5 @@ const r = {
   srText: {
     fontSize:13, color:'var(--ink)', lineHeight:1.65,
     fontFamily:"'Georgia','Times New Roman',serif",
-  },
-
-  /* Nav bar */
-  navBar: {
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    padding:'12px 16px', background:'var(--surface)',
-    borderTop:'1px solid var(--border)',
-    position:'sticky', bottom:0, zIndex:10,
-    fontFamily:"'DM Sans',sans-serif",
-  },
-  navBtn: {
-    display:'flex', alignItems:'center', gap:6,
-    padding:'8px 14px', border:'1px solid var(--border)',
-    borderRadius:'var(--radius)', background:'white',
-    color:'var(--ink)', fontSize:12, fontWeight:600,
-    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
-    transition:'all 0.12s',
   },
 }
