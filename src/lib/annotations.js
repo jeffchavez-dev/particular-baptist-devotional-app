@@ -143,11 +143,21 @@ function _persist(key, obj) {
 // ── Highlight operations ──────────────────────────────────────────────────────
 
 /** colorId: one of HIGHLIGHT_COLORS ids, or null to remove */
-export function setHighlight(key, colorId) {
+export function setHighlight(key, colorId, userId) {
   const all = loadHighlights()
   if (colorId === null || colorId === undefined) delete all[key]
   else all[key] = colorId
   _persist(HL_KEY, all)
+  if (userId) {
+    if (colorId === null || colorId === undefined) {
+      supabase.from('pb_highlights').delete().match({ user_id: userId, item_key: key }).catch(() => {})
+    } else {
+      supabase.from('pb_highlights').upsert(
+        { user_id: userId, item_key: key, color: colorId, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,item_key' }
+      ).catch(() => {})
+    }
+  }
   return all
 }
 
@@ -157,11 +167,21 @@ export function getHighlight(key) {
 
 // ── Note operations ──────────────────────────────────────────────────────────
 
-export function setItemNote(key, text) {
+export function setItemNote(key, text, userId) {
   const all = loadItemNotes()
   if (text && text.trim()) all[key] = text.trim()
   else delete all[key]
   _persist(NOTE_KEY, all)
+  if (userId) {
+    if (!text || !text.trim()) {
+      supabase.from('pb_item_notes').delete().match({ user_id: userId, item_key: key }).catch(() => {})
+    } else {
+      supabase.from('pb_item_notes').upsert(
+        { user_id: userId, item_key: key, note_text: text.trim(), updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,item_key' }
+      ).catch(() => {})
+    }
+  }
   return all
 }
 

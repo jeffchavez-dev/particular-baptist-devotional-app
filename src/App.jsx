@@ -40,6 +40,17 @@ export default function App() {
     }
   }, [])
 
+  /* ── Sync annotations when tab becomes visible again ── */
+  useEffect(() => {
+    function onVisible() {
+      if (!document.hidden && prevUser.current) {
+        syncAnnotationsDown(prevUser.current.id)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
   /* ── Theme (dark mode) ── */
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('pb-dark') === '1' } catch { return false }

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { getFontCss } from '../components/FontPrefsPanel'
-import { usePrefs } from '../App'
+import { usePrefs, useAuth } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { LBCF2 }     from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -330,7 +330,6 @@ function ItemActions({
               <path d="M2 10l1.5-3L9.5 1l1.5 1.5L5 8.5 2 10Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
               <path d="M7 3l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
-            {currentColor ? HIGHLIGHT_COLORS.find(c => c.id === currentColor)?.label : 'Highlight'}
           </button>
           {showPicker && (
             <ConfColorPicker
@@ -354,7 +353,6 @@ function ItemActions({
             <path d="M1.5 10.5L2 8.5 8 2.5l2 2-6 6-2.5.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
             <line x1="7" y1="3" x2="9" y2="5" stroke="currentColor" strokeWidth="1.2"/>
           </svg>
-          {note ? 'Edit note' : 'Note'}
         </button>
 
         {/* Share button */}
@@ -365,11 +363,10 @@ function ItemActions({
             <circle cx="2.5" cy="6" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
             <path d="M3.8 5.3l4.2-2.8M3.8 6.7l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
           </svg>
-          Share
         </button>
 
         {/* Copy button */}
-        <CopyBtn getText={() => copyText} />
+        <CopyBtn getText={() => copyText} label="" />
       </div>
 
       {/* Saved note display */}
@@ -419,10 +416,10 @@ function ItemActions({
 const ia = {
   row: { display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginTop:6 },
   btn: {
-    display:'inline-flex', alignItems:'center', gap:4,
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
     fontSize:11, fontWeight:500, color:'var(--ink-muted)',
     background:'var(--parchment)', border:'1px solid var(--border)',
-    borderRadius:99, padding:'4px 9px', cursor:'pointer',
+    borderRadius:99, padding:'6px 8px', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
   },
   noteDisplay: {
@@ -469,6 +466,8 @@ const ia = {
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { prefs, updatePrefs } = usePrefs()
+  const { session } = useAuth()
+  const userId = session?.user?.id ?? null
 
   const _saved = loadState('conf', { tab: '2lbcf', search: '' })
   const tab    = searchParams.get('t') || _saved.tab
@@ -493,14 +492,14 @@ export default function ConfessionsPage() {
   const [noteData,  setNoteData]  = useState(() => loadItemNotes())
 
   const handleHighlight = useCallback((key, colorId) => {
-    const next = setHighlight(key, colorId)
+    const next = setHighlight(key, colorId, userId)
     setHlData({ ...next })
-  }, [])
+  }, [userId])
 
   const handleNote = useCallback((key, text) => {
-    const next = setItemNote(key, text)
+    const next = setItemNote(key, text, userId)
     setNoteData({ ...next })
-  }, [])
+  }, [userId])
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {

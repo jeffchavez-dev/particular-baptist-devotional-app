@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useEffect } from 'react'
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import KjvReader from '../components/KjvReader'
 import { buildSchedule, getBibleProgress, setBibleChapter, getTodayDayNum } from '../lib/supabase'
@@ -372,6 +372,11 @@ export default function ScripturePage() {
     return DAY_BIBLE[today] || null
   }, [])
 
+  const kjvRef = useRef(null)
+  const [readBook, setReadBook] = useState('Genesis')
+  const [readChapter, setReadChapter] = useState(1)
+  const [readSearch, setReadSearch] = useState('')
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   /* Close sidebar on Escape */
@@ -409,9 +414,55 @@ export default function ScripturePage() {
               <rect x="2" y="12.7" width="12" height="1.8" rx="0.9" fill="currentColor"/>
             </svg>
           </button>
-          <span style={s.headerMode}>{currentTab?.label}</span>
-          {currentTab?.hint && (
-            <span style={s.headerBadge}>{currentTab.hint}</span>
+          {mode === 'read' ? (
+            <>
+              {/* Book/chapter pill */}
+              <button
+                style={s.readBookPill}
+                onClick={() => kjvRef.current?.openSidebar()}
+                title="Select book & chapter"
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
+                  <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M3 3.5h5M3 5.5h5M3 7.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                <span style={s.readBookName}>{readBook}</span>
+                <span style={s.readBookCh}>Ch. {readChapter}</span>
+              </button>
+              {/* Inline search */}
+              <div style={s.readSearchWrap}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+                  <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                <input
+                  style={s.readSearchInput}
+                  value={readSearch}
+                  onChange={e => {
+                    setReadSearch(e.target.value)
+                    kjvRef.current?.setSearchQuery(e.target.value)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') kjvRef.current?.submitSearch(readSearch)
+                    if (e.key === 'Escape') { kjvRef.current?.clearSearch(); setReadSearch('') }
+                  }}
+                  placeholder="Search Bible…"
+                />
+                {readSearch && (
+                  <button
+                    style={{ background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', fontSize:16, lineHeight:1, padding:'0 2px', flexShrink:0 }}
+                    onClick={() => { setReadSearch(''); kjvRef.current?.clearSearch() }}
+                  >×</button>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <span style={s.headerMode}>{currentTab?.label}</span>
+              {currentTab?.hint && (
+                <span style={s.headerBadge}>{currentTab.hint}</span>
+              )}
+            </>
           )}
         </div>
       </header>
@@ -467,7 +518,12 @@ export default function ScripturePage() {
 
       {/* ══ KJV READER ══ */}
       {mode === 'read' && (
-        <KjvReader todayChapter={todayBibleChapter} />
+        <KjvReader
+          ref={kjvRef}
+          todayChapter={todayBibleChapter}
+          onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
+          onSearchChange={q => setReadSearch(q)}
+        />
       )}
 
       {/* ══ READING PLAN MODE ══ */}
@@ -633,7 +689,7 @@ const s = {
 
   /* header */
   header: { position:'sticky', top:0, zIndex:20, background:'var(--surface)', borderBottom:'1px solid var(--border)', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' },
-  headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:12 },
+  headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:8 },
   menuBtn: {
     display:'flex', alignItems:'center', justifyContent:'center',
     width:36, height:36, borderRadius:'var(--radius)', border:'1px solid var(--border)',
@@ -820,4 +876,34 @@ const s = {
     color:'var(--ink)', flex:1,
   },
   catBookProgress: { fontSize:11, color:'var(--ink-faint)', fontVariantNumeric:'tabular-nums' },
+
+  /* ── Read mode header controls ── */
+  readBookPill: {
+    display:'flex', alignItems:'center', gap:6, flexShrink:0,
+    padding:'5px 10px', borderRadius:'var(--radius-lg)',
+    border:'1.5px solid var(--border)', background:'var(--parchment)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'border-color 0.15s',
+  },
+  readBookName: {
+    fontSize:13, fontWeight:700,
+    fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)',
+    whiteSpace:'nowrap', maxWidth:100, overflow:'hidden', textOverflow:'ellipsis',
+  },
+  readBookCh: {
+    fontSize:11, fontWeight:600, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:99,
+    padding:'1px 7px', flexShrink:0,
+  },
+  readSearchWrap: {
+    flex:1, display:'flex', alignItems:'center', gap:6,
+    border:'1.5px solid var(--border)', borderRadius:'var(--radius)',
+    padding:'0 8px', background:'var(--parchment)',
+    minWidth:0,
+  },
+  readSearchInput: {
+    flex:1, border:'none', background:'transparent', outline:'none',
+    fontSize:12, color:'var(--ink)', padding:'6px 0',
+    fontFamily:"'DM Sans',sans-serif", minWidth:0,
+  },
 }
