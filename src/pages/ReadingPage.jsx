@@ -301,11 +301,11 @@ function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, o
           <div style={s.refsLabel}>Scripture Proofs</div>
           {parsedRefs.length > 0 ? (
             <div style={s.refChips}>
-              {parsedRefs.map(({ book, chapter, display }) => (
+              {parsedRefs.map(({ book, chapter, verse, display }) => (
                 <button
-                  key={`${book}|${chapter}`}
+                  key={`${book}|${chapter}|${verse ?? 0}`}
                   style={s.refChip}
-                  onClick={() => onScriptureRef && onScriptureRef({ book, chapter, refDisplay: display })}
+                  onClick={() => onScriptureRef && onScriptureRef({ book, chapter, verse: verse ?? null, refDisplay: display })}
                 >
                   {display}
                 </button>
@@ -804,6 +804,7 @@ export default function ReadingPage() {
         <KjvModal
           book={kjvModal.book}
           chapter={kjvModal.chapter}
+          verse={kjvModal.verse ?? null}
           refDisplay={kjvModal.refDisplay}
           onClose={() => setKjvModal(null)}
         />

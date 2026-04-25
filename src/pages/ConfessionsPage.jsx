@@ -128,7 +128,7 @@ function RefChips({ refs, onOpen }) {
         <button
           key={`${book}|${chapter}|${verse ?? 0}`}
           style={rc.chip}
-          onClick={() => onOpen({ book, chapter, refDisplay: display })}
+          onClick={() => onOpen({ book, chapter, verse: verse ?? null, refDisplay: display })}
         >
           {display}
         </button>
@@ -565,6 +565,7 @@ export default function ConfessionsPage() {
         <KjvModal
           book={kjvModal.book}
           chapter={kjvModal.chapter}
+          verse={kjvModal.verse ?? null}
           refDisplay={kjvModal.refDisplay}
           onClose={() => setKjvModal(null)}
         />

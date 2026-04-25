@@ -6,17 +6,18 @@ import { fetchKjvChapter } from './KjvReader'
  * KjvModal — inline popup for reading a KJV chapter directly from any page.
  *
  * Props:
- *   book       string  — full book name, e.g. "Romans"
- *   chapter    number  — chapter number
- *   refDisplay string  — original ref string shown in header, e.g. "Rom 8:28"
- *   onClose    fn      — called when user dismisses the modal
+ *   book       string      — full book name, e.g. "Romans"
+ *   chapter    number      — chapter number
+ *   verse      number|null — specific verse to scroll to on open (optional)
+ *   refDisplay string      — original ref string shown in header, e.g. "Rom 8:28"
+ *   onClose    fn          — called when user dismisses the modal
  */
-export default function KjvModal({ book, chapter, refDisplay, onClose }) {
+export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) {
   const navigate   = useNavigate()
   const [verses,   setVerses]   = useState([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(null)
-  const scrollRef  = useRef(null)
+  const bodyRef    = useRef(null)
 
   /* Load chapter */
   useEffect(() => {
@@ -28,6 +29,21 @@ export default function KjvModal({ book, chapter, refDisplay, onClose }) {
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     return () => { cancelled = true }
   }, [book, chapter])
+
+  /* Scroll to target verse after verses load */
+  useEffect(() => {
+    if (loading || !verse || !bodyRef.current) return
+    // Small delay to let the DOM render the verse list
+    const t = setTimeout(() => {
+      const el = bodyRef.current?.querySelector(`#mv${verse}`)
+      if (el) {
+        el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        // Nudge up slightly so the verse number isn't cut off by padding
+        if (bodyRef.current) bodyRef.current.scrollTop -= 12
+      }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [loading, verse])
 
   /* Close on Escape */
   useEffect(() => {
@@ -44,7 +60,6 @@ export default function KjvModal({ book, chapter, refDisplay, onClose }) {
   }, [])
 
   function goToScripture() {
-    /* Store the target so ScripturePage / KjvReader picks it up */
     try {
       sessionStorage.setItem('kjv-book', book)
       sessionStorage.setItem('kjv-chapter', String(chapter))
@@ -82,7 +97,7 @@ export default function KjvModal({ book, chapter, refDisplay, onClose }) {
         </div>
 
         {/* Body */}
-        <div style={m.body} ref={scrollRef}>
+        <div style={m.body} ref={bodyRef}>
           {loading && (
             <div style={m.center}>
               <div className="spinner" />
@@ -96,9 +111,16 @@ export default function KjvModal({ book, chapter, refDisplay, onClose }) {
           )}
           {!loading && !error && verses.length > 0 && (
             <div style={m.verseList}>
-              {verses.map(({ verse, text }) => (
-                <div key={verse} style={m.verseRow}>
-                  <span style={m.verseNum}>{verse}</span>
+              {verses.map(({ verse: v, text }) => (
+                <div
+                  key={v}
+                  id={`mv${v}`}
+                  style={{
+                    ...m.verseRow,
+                    ...(verse && v === verse ? m.verseHighlight : {}),
+                  }}
+                >
+                  <span style={m.verseNum}>{v}</span>
                   <span style={m.verseText}>{text}</span>
                 </div>
               ))}
@@ -166,6 +188,13 @@ const m = {
   verseList: { display:'flex', flexDirection:'column', gap:2 },
   verseRow: {
     display:'flex', gap:10, padding:'3px 0', lineHeight:1.8,
+    borderRadius:4,
+  },
+  verseHighlight: {
+    background:'var(--teal-light)',
+    marginLeft:-6, paddingLeft:6,
+    marginRight:-6, paddingRight:6,
+    borderLeft:'2px solid var(--teal)',
   },
   verseNum: {
     fontSize:10, fontWeight:700, color:'var(--teal)',
