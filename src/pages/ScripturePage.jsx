@@ -688,7 +688,7 @@ const s = {
   },
   navBadge: { fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99, transition:'all 0.15s', flexShrink:0 },
 
-  body: { maxWidth:1100, margin:'0 auto', padding:'1.5rem 20px 6rem' },
+  body: { maxWidth:1100, margin:'0 auto', padding:'1.5rem 20px 1.5rem' },
   empty: { textAlign:'center', padding:'4rem', color:'var(--ink-faint)', fontSize:14 },
 
   /* progress */
