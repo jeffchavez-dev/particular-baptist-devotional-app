@@ -60,7 +60,10 @@ export default function NotificationSettings({ userId }) {
         }),
       })
 
-      if (!res.ok) throw new Error(`Server responded ${res.status}`)
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Server error ${res.status}`)
+      }
 
       setSubscribed(true)
       setMsg('Notifications enabled — you\'ll receive a daily reminder each morning.')

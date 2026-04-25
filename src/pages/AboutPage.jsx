@@ -7,6 +7,7 @@ import { FONT_OPTIONS, FONT_SIZES } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
+import AchievementsSection from '../components/AchievementsSection'
 
 const SCHEDULE = buildSchedule()
 
@@ -52,6 +53,7 @@ export default function AboutPage() {
   const { dark, toggleDark } = useTheme()
   const { prefs, updatePrefs } = usePrefs()
 
+  const [progressData, setProgressData] = useState(null)
   const [exportOpen,   setExportOpen]   = useState(false)
   const [resetDone,    setResetDone]    = useState(false)
   const [resetting,    setResetting]    = useState(false)
@@ -63,14 +65,16 @@ export default function AboutPage() {
   const [notesTabOpen, setNotesTabOpen] = useState(true)
   const [bmTabOpen,    setBmTabOpen]    = useState(true)
 
-  /* Load notes */
+  /* Load notes + progress (for achievements) */
   useEffect(() => {
     if (session) {
-      supabase.from('progress').select('day_number, notes')
+      supabase.from('progress').select('day_number, completed, notes')
         .eq('user_id', session.user.id)
         .then(({ data }) => {
-          const notes = (data || []).filter(r => r.notes && r.notes.trim())
+          const rows = data || []
+          const notes = rows.filter(r => r.notes && r.notes.trim())
           setUserNotes(notes)
+          setProgressData(rows)
         })
     } else {
       const local = getLocalProgress()
@@ -78,6 +82,7 @@ export default function AboutPage() {
         .filter(([, d]) => d.notes && d.notes.trim())
         .map(([day, d]) => ({ day_number: parseInt(day), notes: d.notes }))
       setUserNotes(notes)
+      setProgressData(null) // AchievementsSection reads localStorage itself
     }
   }, [session])
 
@@ -300,6 +305,9 @@ export default function AboutPage() {
             )}
           </div>
         </section>
+
+        {/* ════════════════════════════════ ACHIEVEMENTS ════════════════════════ */}
+        <AchievementsSection supabaseProgress={session ? progressData : null} />
 
         {/* ════════════════════════════════ MY NOTES ════════════════════════════════ */}
         <section style={s.section}>

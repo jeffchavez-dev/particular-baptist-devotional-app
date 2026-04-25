@@ -7,7 +7,6 @@ import { QUOTES } from '../data/quotes'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
-import ShareCardModal from '../components/ShareCardModal'
 
 const SCHEDULE  = buildSchedule()
 const TODAY_DAY = Math.min(getTodayDayNum(), 365)
@@ -93,17 +92,13 @@ export default function Dashboard() {
   })
   const [page,         setPage]         = useState(() => Math.ceil(TODAY_DAY / PAGE))
   const [toggling,     setToggling]     = useState(new Set())
-  const [sidebarOpen,  setSidebarOpen]  = useState(false)
-  const [sidebarTab,   setSidebarTab]   = useState('sources') // 'sources' | 'notes' | 'bookmarks'
   const [bookmarks,    setBookmarks]    = useState(() => getBookmarks())
-  const [shareCard,    setShareCard]    = useState(null)
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const [todaySeeMore, setTodaySeeMore] = useState(false)
 
-  /* sidebar: user's own notes + quote search data */
+  /* search: user's notes + quote data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
   const [dbQuotes,     setDbQuotes]     = useState([])         // [{quote_key, quote, author, heading}]
-  const [notesLoading, setNotesLoading] = useState(false)
 
   const userName = session?.user?.user_metadata?.full_name?.split(' ')[0]
     || session?.user?.email?.split('@')[0]
@@ -147,12 +142,9 @@ export default function Dashboard() {
 
   /* ── load quote overrides for search ── */
   useEffect(() => {
-    setNotesLoading(true)
     supabase.from('quotes').select('quote_key, heading, quote, author, work')
-      .then(({ data }) => {
-        if (data) setDbQuotes(data)
-        setNotesLoading(false)
-      }).catch(() => setNotesLoading(false))
+      .then(({ data }) => { if (data) setDbQuotes(data) })
+      .catch(() => {})
   }, [])
 
   /* ── build note + quote search index ── */
@@ -229,39 +221,12 @@ export default function Dashboard() {
     setPage(filterStatus === 'todo' ? 1 : Math.ceil(TODAY_DAY / PAGE))
   }, [filterStatus])
 
-  /* ── close sidebar on ESC ── */
+  /* ── refresh bookmarks on focus (picks up changes from ReadingPage) ── */
   useEffect(() => {
-    const handler = e => { if (e.key === 'Escape') setSidebarOpen(false) }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    const handler = () => setBookmarks(getBookmarks())
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
   }, [])
-
-  /* ── refresh bookmarks when sidebar opens (picks up changes from ReadingPage) ── */
-  useEffect(() => {
-    if (sidebarOpen) setBookmarks(getBookmarks())
-  }, [sidebarOpen])
-
-  /* ── user's own notes sorted by day, with schedule info ── */
-  const enrichedNotes = useMemo(() => {
-    return userNotes
-      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
-      .filter(n => n.entry)
-      .sort((a, b) => a.day_number - b.day_number)
-  }, [userNotes])
-
-  /* ── bookmarked entries sorted by day ── */
-  const bookmarkedEntries = useMemo(() => {
-    return Object.keys(bookmarks)
-      .map(d => SCHEDULE.find(r => r.day === parseInt(d)))
-      .filter(Boolean)
-      .sort((a, b) => a.day - b.day)
-  }, [bookmarks])
-
-  function handleRemoveBookmark(day, e) {
-    e.stopPropagation()
-    toggleBookmark(day)
-    setBookmarks(prev => { const next = {...prev}; delete next[day]; return next })
-  }
 
   /* ── today entry ── */
   const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
@@ -324,20 +289,6 @@ export default function Dashboard() {
               ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
               : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
             }
-            {/* Notes / Resources sidebar toggle */}
-            <button
-              onClick={() => setSidebarOpen(o => !o)}
-              className="btn btn-ghost"
-              style={s.sidebarToggle}
-              aria-label="Open resources"
-              title="Resources & Notes"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="3" width="14" height="2" rx="1" fill="currentColor"/>
-                <rect x="2" y="8" width="9"  height="2" rx="1" fill="currentColor"/>
-                <rect x="2" y="13" width="11" height="2" rx="1" fill="currentColor"/>
-              </svg>
-            </button>
           </div>
         </div>
       </header>
@@ -606,273 +557,6 @@ export default function Dashboard() {
         </div>
       </footer>
 
-      {/* ── Modals ── */}
-      <ShareCardModal
-        isOpen={shareCard !== null}
-        onClose={() => setShareCard(null)}
-        card={shareCard}
-      />
-
-      {/* ── Sidebar backdrop ── */}
-      {sidebarOpen && (
-        <div style={s.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden />
-      )}
-
-      {/* ── Sidebar ── */}
-      <aside style={{...s.sidebar, transform: sidebarOpen ? 'translateX(0)' : 'translateX(100%)'}}>
-        {/* Sidebar header */}
-        <div style={s.sidebarHead}>
-          <div style={s.sidebarTabs}>
-            <button
-              style={{...s.sidebarTabBtn, ...(sidebarTab==='sources' ? s.sidebarTabActive : {})}}
-              onClick={() => setSidebarTab('sources')}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                <line x1="4.5" y1="5" x2="9.5" y2="5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                <line x1="4.5" y1="7.5" x2="9.5" y2="7.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                <line x1="4.5" y1="10" x2="7.5" y2="10" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-              </svg>
-              Sources
-            </button>
-            <button
-              style={{...s.sidebarTabBtn, ...(sidebarTab==='notes' ? s.sidebarTabActive : {})}}
-              onClick={() => setSidebarTab('notes')}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 2.5h10M2 5.5h7M2 8.5h9M2 11.5h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-              </svg>
-              Notes
-              {enrichedNotes.length > 0 && (
-                <span style={s.notesBadge}>{enrichedNotes.length}</span>
-              )}
-            </button>
-            <button
-              style={{...s.sidebarTabBtn, ...(sidebarTab==='bookmarks' ? s.sidebarTabActive : {})}}
-              onClick={() => setSidebarTab('bookmarks')}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
-                  stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
-                  fill={sidebarTab==='bookmarks' ? 'currentColor' : 'none'}
-                  fillOpacity={sidebarTab==='bookmarks' ? 0.15 : 0}
-                />
-              </svg>
-              Saved
-              {bookmarkedEntries.length > 0 && (
-                <span style={{...s.notesBadge, background:'var(--teal)'}}>{bookmarkedEntries.length}</span>
-              )}
-            </button>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} style={s.sidebarClose} aria-label="Close">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
-
-        <div style={s.sidebarBody}>
-
-          {/* ── Sources tab ── */}
-          {sidebarTab === 'sources' && (
-            <div>
-              <p style={s.sidebarDesc}>
-                The three primary sources used in this 365-day devotional plan.
-              </p>
-              <div style={s.sidebarSources}>
-                {SOURCES.map(src => (
-                  <div key={src.label} style={s.sidebarSourceCard}>
-                    <div style={s.sidebarSourceTop}>
-                      <span style={{...s.sourceBadge, background:src.bg, color:src.color}}>{src.label}</span>
-                      <span style={s.sidebarSourceYear}>{src.year}</span>
-                    </div>
-                    <div style={s.sidebarSourceName}>{src.name}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={s.sidebarDivider} />
-
-              <div style={s.sidebarSection}>
-                <div style={s.sidebarSectionTitle}>Tools</div>
-                <div style={{display:'flex', flexDirection:'column', gap:8}}>
-                  <button
-                    onClick={() => { navigate('/scripture'); setSidebarOpen(false) }}
-                    className="btn btn-outline"
-                    style={{width:'100%', justifyContent:'center', fontSize:13}}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{marginRight:6}}>
-                      <rect x="2" y="1" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                      <path d="M4.5 4.5h5M4.5 7h5M4.5 9.5h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                    </svg>
-                    Scripture Proof Text Index →
-                  </button>
-                  <button
-                    onClick={() => { navigate('/quiz'); setSidebarOpen(false) }}
-                    className="btn btn-outline"
-                    style={{width:'100%', justifyContent:'center', fontSize:13}}
-                  >
-                    How Particular Baptist Are You? →
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── Notes tab ── */}
-          {sidebarTab === 'notes' && (
-            <div>
-              {!session ? (
-                <div style={s.emptyNotes}>
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{opacity:.3, marginBottom:10}}>
-                    <path d="M6 4h20v24H6z" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M11 11h10M11 16h7M11 21h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:'0 0 1rem', textAlign:'center'}}>
-                    Sign in to sync and view all your notes here.
-                  </p>
-                  <button
-                    onClick={() => { navigate('/auth'); setSidebarOpen(false) }}
-                    className="btn btn-primary"
-                    style={{fontSize:13}}
-                  >
-                    Sign in →
-                  </button>
-                </div>
-              ) : enrichedNotes.length === 0 ? (
-                <div style={s.emptyNotes}>
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{opacity:.3, marginBottom:10}}>
-                    <path d="M6 4h20v24H6z" stroke="currentColor" strokeWidth="1.5"/>
-                    <path d="M11 11h10M11 16h7M11 21h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:0, textAlign:'center'}}>
-                    You haven't written any notes yet. Open a day's reading to add reflections.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p style={s.sidebarDesc}>
-                    {enrichedNotes.length} day{enrichedNotes.length !== 1 ? 's' : ''} with your notes.
-                    Click any to return to that reading.
-                  </p>
-                  <div style={s.notesList}>
-                    {enrichedNotes.map(n => (
-                      <div key={n.day_number} style={s.noteItemWrap}>
-                        <button
-                          style={s.noteItem}
-                          onClick={() => { navigate(`/day/${n.day_number}`); setSidebarOpen(false) }}
-                        >
-                          <div style={s.noteItemTop}>
-                            <span style={s.noteItemDay}>Day {n.day_number}</span>
-                            <span style={s.noteItemDate}>{n.entry.date}</span>
-                            <span className={badgeClass(n.entry.src)} style={{fontSize:9}}>{n.entry.src}</span>
-                          </div>
-                          <div style={s.noteItemReading}>{n.entry.reading}</div>
-                          <div style={s.noteItemPreview}>
-                            {n.notes.length > 100 ? n.notes.slice(0, 100) + '…' : n.notes}
-                          </div>
-                        </button>
-                        {/* Share / Copy action row */}
-                        <div style={s.noteActions}>
-                          <button
-                            style={s.noteActionBtn}
-                            title="Copy note"
-                            onClick={async () => {
-                              try { await navigator.clipboard.writeText(n.notes) } catch {}
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-                              <rect x="4" y="1.5" width="7.5" height="9" rx="1.3" stroke="currentColor" strokeWidth="1.2"/>
-                              <path d="M1.5 4v7a1.3 1.3 0 001.3 1.3H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                            </svg>
-                            Copy
-                          </button>
-                          <button
-                            style={{...s.noteActionBtn, color:'var(--purple-ink)'}}
-                            title="Create share image"
-                            onClick={() => {
-                              setShareCard({
-                                type: 'note',
-                                day: n.day_number,
-                                title: n.entry.reading,
-                                subtitle: `Day ${n.day_number} · ${n.entry.date}`,
-                                source: n.entry.src,
-                                text: n.notes,
-                                label: 'My Reflection',
-                              })
-                            }}
-                          >
-                            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-                              <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                              <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                              <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                              <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                            </svg>
-                            Share
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          {/* ── Bookmarks tab ── */}
-          {sidebarTab === 'bookmarks' && (
-            <div>
-              {bookmarkedEntries.length === 0 ? (
-                <div style={s.emptyNotes}>
-                  <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{opacity:.3, marginBottom:10}}>
-                    <path d="M6 4A2 2 0 018 2h16a2 2 0 012 2v26L16 23 6 30V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                  </svg>
-                  <p style={{fontSize:13, color:'var(--ink-faint)', margin:0, textAlign:'center'}}>
-                    No bookmarks yet. Open any devotional and tap the
-                    bookmark icon beside "My notes &amp; reflections".
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <p style={s.sidebarDesc}>
-                    {bookmarkedEntries.length} saved day{bookmarkedEntries.length !== 1 ? 's' : ''}.
-                    Click any to return to that reading.
-                  </p>
-                  <div style={s.notesList}>
-                    {bookmarkedEntries.map(r => (
-                      <div key={r.day} style={s.noteItemWrap}>
-                        <button
-                          style={{...s.noteItem, borderRadius:'var(--radius-lg)'}}
-                          onClick={() => { navigate(`/day/${r.day}`); setSidebarOpen(false) }}
-                        >
-                          <div style={s.noteItemTop}>
-                            <span style={s.noteItemDay}>Day {r.day}</span>
-                            <span style={s.noteItemDate}>{r.date}</span>
-                            <span className={badgeClass(r.src)} style={{fontSize:9}}>{r.src}</span>
-                          </div>
-                          <div style={s.noteItemReading}>{r.reading}</div>
-                          <div style={{...s.noteItemPreview, fontStyle:'normal'}}>{r.detail}</div>
-                        </button>
-                        <button
-                          style={{...s.noteActionBtn, display:'flex', alignItems:'center', gap:4, marginTop:2, color:'var(--ink-faint)', fontSize:11, padding:'2px 4px'}}
-                          title="Remove bookmark"
-                          onClick={e => handleRemoveBookmark(r.day, e)}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                            <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
-                              stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                          </svg>
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-        </div>
-      </aside>
     </div>
   )
 }
@@ -886,7 +570,6 @@ const s = {
   headerInner: { maxWidth:900, margin:'0 auto', padding:'14px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' },
   siteTitle: { fontSize:20, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)' },
   siteGreeting: { fontSize:12, color:'var(--ink-faint)', marginTop:1 },
-  sidebarToggle: { display:'flex', alignItems:'center', justifyContent:'center', padding:'7px', borderRadius:'var(--radius)' },
 
   /* main */
   main: { maxWidth:900, margin:'0 auto', padding:'2rem 24px' },
@@ -997,94 +680,4 @@ const s = {
   footerText: { fontSize:13, color:'var(--ink-faint)' },
   footerDot:  { color:'var(--border-strong)' },
   footerLink: { display:'inline-flex', alignItems:'center', color:'var(--ink-muted)', textDecoration:'none', fontWeight:500, fontSize:13 },
-
-  /* ── Sidebar ── */
-  backdrop: {
-    position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
-    zIndex:40, backdropFilter:'blur(2px)',
-  },
-  sidebar: {
-    position:'fixed', top:0, right:0, bottom:0, width:'clamp(300px,90vw,360px)',
-    background:'var(--surface)', borderLeft:'1px solid var(--border)',
-    boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
-    zIndex:50, display:'flex', flexDirection:'column',
-    transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
-    overflowY:'auto',
-  },
-  sidebarHead: {
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    padding:'16px 20px', borderBottom:'1px solid var(--border)',
-    position:'sticky', top:0, background:'var(--surface)', zIndex:5,
-    gap:8,
-  },
-  sidebarTabs: { display:'flex', gap:4 },
-  sidebarTabBtn: {
-    display:'flex', alignItems:'center', gap:6,
-    background:'none', border:'none', cursor:'pointer',
-    fontSize:13, fontWeight:500, color:'var(--ink-muted)',
-    padding:'5px 10px', borderRadius:'var(--radius)',
-    transition:'background 0.1s, color 0.1s',
-  },
-  sidebarTabActive: { background:'var(--parchment)', color:'var(--ink)' },
-  sidebarClose: {
-    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
-    display:'flex', alignItems:'center', justifyContent:'center',
-    padding:6, borderRadius:'var(--radius)', flexShrink:0,
-    transition:'background 0.1s',
-  },
-  sidebarBody: { padding:'20px', flex:1 },
-  sidebarDesc: { fontSize:12.5, color:'var(--ink-muted)', lineHeight:1.65, marginBottom:'1rem' },
-  sidebarDivider: { height:1, background:'var(--border)', margin:'1.5rem 0' },
-  sidebarSection: { marginBottom:4 },
-  sidebarSectionTitle: {
-    fontSize:11, fontWeight:700, textTransform:'uppercase',
-    letterSpacing:'0.08em', color:'var(--ink-faint)', marginBottom:'0.75rem',
-  },
-
-  /* sidebar sources */
-  sidebarSources: { display:'flex', flexDirection:'column', gap:8, marginBottom:4 },
-  sidebarSourceCard: {
-    display:'flex', flexDirection:'column', gap:5, padding:'14px 16px',
-    background:'var(--parchment)', borderRadius:'var(--radius-lg)',
-    border:'1px solid var(--border)', textDecoration:'none',
-    transition:'box-shadow 0.15s',
-  },
-  sidebarSourceTop: { display:'flex', alignItems:'center', justifyContent:'space-between' },
-  sidebarSourceYear: { fontSize:11, color:'var(--ink-faint)' },
-  sidebarSourceName: { fontSize:14, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', lineHeight:1.3 },
-  sidebarSourceLink: { fontSize:11, color:'var(--teal)', fontWeight:500, display:'flex', alignItems:'center' },
-  sourceBadge: { fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, letterSpacing:'0.04em' },
-
-  /* notes */
-  notesBadge: {
-    display:'inline-flex', alignItems:'center', justifyContent:'center',
-    background:'var(--teal)', color:'white', fontSize:10, fontWeight:700,
-    borderRadius:99, minWidth:16, height:16, padding:'0 4px', lineHeight:1,
-  },
-  emptyNotes: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'3rem 1rem', textAlign:'center' },
-  notesList: { display:'flex', flexDirection:'column', gap:6 },
-  noteItemWrap: { display:'flex', flexDirection:'column' },
-  noteItem: {
-    display:'block', width:'100%', textAlign:'left',
-    padding:'12px 14px', background:'var(--parchment)',
-    border:'1px solid var(--border)', borderRadius:'var(--radius-lg) var(--radius-lg) 0 0',
-    borderBottom:'none',
-    cursor:'pointer', transition:'box-shadow 0.15s', fontFamily:"'DM Sans',sans-serif",
-  },
-  noteItemTop: { display:'flex', alignItems:'center', gap:6, marginBottom:4 },
-  noteItemDay:  { fontSize:11, fontWeight:700, color:'var(--ink-faint)' },
-  noteItemDate: { fontSize:11, color:'var(--ink-faint)' },
-  noteItemReading: { fontSize:13, fontWeight:500, color:'var(--ink)', marginBottom:4, lineHeight:1.3 },
-  noteItemPreview: { fontSize:12, color:'var(--ink-muted)', lineHeight:1.55, fontStyle:'italic' },
-  noteActions: {
-    display:'flex', gap:6, padding:'6px 14px 8px',
-    background:'var(--parchment-dark)',
-    border:'1px solid var(--border)', borderRadius:'0 0 var(--radius-lg) var(--radius-lg)',
-  },
-  noteActionBtn: {
-    display:'inline-flex', alignItems:'center', gap:4,
-    background:'none', border:'none', cursor:'pointer',
-    fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
-    padding:'2px 6px', borderRadius:4, transition:'color 0.1s',
-  },
 }

@@ -372,6 +372,15 @@ export default function ScripturePage() {
     return DAY_BIBLE[today] || null
   }, [])
 
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  /* Close sidebar on Escape */
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') setSidebarOpen(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   /* Mode tabs */
   const tabs = [
     { id: 'read',       label: '📖 Read KJV',    hint: null },
@@ -380,33 +389,81 @@ export default function ScripturePage() {
     { id: 'prooftexts', label: 'Proof Texts',    hint: null },
   ]
 
+  const currentTab = tabs.find(t => t.id === mode)
+
   return (
     <div style={s.page}>
 
-      {/* ── Header ── */}
+      {/* ── Compact Header ── */}
       <header style={s.header}>
         <div style={s.headerInner}>
-          {/* Mode tabs */}
-          <div style={s.tabs}>
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            style={s.menuBtn}
+            aria-label="Open navigation"
+            title="Navigation"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="3.5" width="14" height="1.8" rx="0.9" fill="currentColor"/>
+              <rect x="2" y="8.1" width="10"  height="1.8" rx="0.9" fill="currentColor"/>
+              <rect x="2" y="12.7" width="12" height="1.8" rx="0.9" fill="currentColor"/>
+            </svg>
+          </button>
+          <span style={s.headerMode}>{currentTab?.label}</span>
+          {currentTab?.hint && (
+            <span style={s.headerBadge}>{currentTab.hint}</span>
+          )}
+        </div>
+      </header>
+
+      {/* ── Sidebar backdrop ── */}
+      {sidebarOpen && (
+        <div style={s.backdrop} onClick={() => setSidebarOpen(false)} aria-hidden />
+      )}
+
+      {/* ── Sidebar ── */}
+      <aside style={{...s.sidebar, transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'}}>
+        <div style={s.sidebarHead}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <img src="/pb-icon.svg" alt="P.B." style={{width:22, height:22, opacity:0.7}} />
+            <span style={s.sidebarTitle}>Scripture</span>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} style={s.sidebarClose} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div style={s.sidebarBody}>
+          <p style={s.sidebarHint}>Choose a mode</p>
+          <div style={s.navList}>
             {tabs.map(t => (
               <button
                 key={t.id}
-                onClick={() => setMode(t.id)}
-                style={{ ...s.tab, ...(mode === t.id ? s.tabActive : {}) }}
+                onClick={() => { setMode(t.id); setSidebarOpen(false) }}
+                style={{
+                  ...s.navBtn,
+                  ...(mode === t.id ? s.navBtnActive : {}),
+                }}
               >
-                {t.label}
+                <span style={{flex:1, textAlign:'left'}}>{t.label}</span>
                 {t.hint && (
                   <span style={{
-                    ...s.tabBadge,
+                    ...s.navBadge,
                     background: mode === t.id ? 'var(--teal)' : 'var(--border)',
-                    color: mode === t.id ? 'white' : 'var(--ink-faint)',
+                    color:      mode === t.id ? 'white'       : 'var(--ink-faint)',
                   }}>{t.hint}</span>
+                )}
+                {mode === t.id && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{flexShrink:0}}>
+                    <polyline points="1.5,6 4.5,9 10.5,3" stroke="var(--teal)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 )}
               </button>
             ))}
           </div>
         </div>
-      </header>
+      </aside>
 
       {/* ══ KJV READER ══ */}
       {mode === 'read' && (
@@ -576,18 +633,60 @@ const s = {
 
   /* header */
   header: { position:'sticky', top:0, zIndex:20, background:'var(--surface)', borderBottom:'1px solid var(--border)', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' },
-  headerInner: { maxWidth:1100, margin:'0 auto', padding:'10px 20px', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' },
-
-  tabs: { display:'flex', gap:4, flexWrap:'wrap' },
-  tab: {
-    display:'flex', alignItems:'center', gap:6, padding:'7px 14px',
-    borderRadius:'var(--radius)', border:'1.5px solid var(--border)',
-    background:'var(--parchment)', fontSize:12, fontWeight:600,
-    cursor:'pointer', color:'var(--ink-muted)', transition:'all 0.15s',
-    fontFamily:"'DM Sans',sans-serif",
+  headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:12 },
+  menuBtn: {
+    display:'flex', alignItems:'center', justifyContent:'center',
+    width:36, height:36, borderRadius:'var(--radius)', border:'1px solid var(--border)',
+    background:'var(--surface)', cursor:'pointer', flexShrink:0,
+    color:'var(--ink-muted)', transition:'background 0.15s',
   },
-  tabActive: { borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)' },
-  tabBadge: { fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:99, transition:'all 0.15s' },
+  headerMode: { fontSize:14, fontWeight:600, color:'var(--ink)', fontFamily:"'DM Sans',sans-serif" },
+  headerBadge: {
+    fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99,
+    background:'var(--teal-light)', color:'var(--teal)',
+  },
+
+  /* sidebar */
+  backdrop: {
+    position:'fixed', inset:0, background:'rgba(0,0,0,0.35)',
+    zIndex:40, backdropFilter:'blur(2px)',
+  },
+  sidebar: {
+    position:'fixed', top:0, left:0, bottom:0, width:'clamp(240px,80vw,300px)',
+    background:'var(--surface)', borderRight:'1px solid var(--border)',
+    boxShadow:'4px 0 24px rgba(0,0,0,0.12)',
+    zIndex:50, display:'flex', flexDirection:'column',
+    transition:'transform 0.26s cubic-bezier(0.4,0,0.2,1)',
+    overflowY:'auto',
+  },
+  sidebarHead: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'16px 20px', borderBottom:'1px solid var(--border)',
+    position:'sticky', top:0, background:'var(--surface)', zIndex:5, gap:8,
+  },
+  sidebarTitle: { fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' },
+  sidebarClose: {
+    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    padding:6, borderRadius:'var(--radius)', flexShrink:0,
+  },
+  sidebarBody: { padding:'16px 14px', flex:1 },
+  sidebarHint: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em',
+    color:'var(--ink-faint)', marginBottom:8,
+  },
+  navList: { display:'flex', flexDirection:'column', gap:4 },
+  navBtn: {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'11px 14px', borderRadius:'var(--radius-lg)',
+    border:'1.5px solid transparent', background:'var(--parchment)',
+    fontSize:13, fontWeight:500, color:'var(--ink-muted)', cursor:'pointer',
+    transition:'all 0.15s', fontFamily:"'DM Sans',sans-serif", width:'100%',
+  },
+  navBtnActive: {
+    borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)', fontWeight:700,
+  },
+  navBadge: { fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99, transition:'all 0.15s', flexShrink:0 },
 
   body: { maxWidth:1100, margin:'0 auto', padding:'1.5rem 20px 6rem' },
   empty: { textAlign:'center', padding:'4rem', color:'var(--ink-faint)', fontSize:14 },
