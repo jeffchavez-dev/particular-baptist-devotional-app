@@ -8,6 +8,23 @@ import ConfessionModal from './ConfessionModal'
 let _kjvData = null
 let _kjvPromise = null
 
+/* ── localStorage helpers for highlights + notes ── */
+const HL_KEY    = 'kjv-highlights'
+const NOTES_KEY = 'kjv-verse-notes'
+
+function loadHighlights() {
+  try { return JSON.parse(localStorage.getItem(HL_KEY)    || '{}') } catch { return {} }
+}
+function loadVerseNotes() {
+  try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') } catch { return {} }
+}
+function persistHighlights(obj) {
+  try { localStorage.setItem(HL_KEY,    JSON.stringify(obj)) } catch {}
+}
+function persistNotes(obj) {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(obj)) } catch {}
+}
+
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 }
@@ -221,6 +238,12 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   const [shareCard,      setShareCard]      = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
 
+  /* Highlights + notes */
+  const [highlights,   setHighlights]   = useState(() => loadHighlights())
+  const [verseNotes,   setVerseNotes]   = useState(() => loadVerseNotes())
+  const [editingNote,  setEditingNote]  = useState(null)  // verse key being edited
+  const [noteDraft,    setNoteDraft]    = useState('')
+
   /* Text selection */
   const [selection, setSelection] = useState('')
   const verseListRef = useRef(null)
@@ -242,9 +265,10 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     } catch {}
   }, [book, chapter])
 
-  /* Clear selection when chapter changes */
+  /* Clear selection + close note editor when chapter changes */
   useEffect(() => {
     setSelection('')
+    setEditingNote(null)
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -298,6 +322,43 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   }, [book, chapter, dataReady])
 
   /* getCrossRefs uses a pre-built O(1) index so calling it per-verse in render is fine */
+
+  /* ── Highlight handlers ── */
+  function toggleHighlight(verseKey) {
+    setHighlights(prev => {
+      const next = { ...prev }
+      if (next[verseKey]) delete next[verseKey]
+      else next[verseKey] = true
+      persistHighlights(next)
+      return next
+    })
+  }
+
+  /* ── Note handlers ── */
+  function openNoteEditor(verseKey) {
+    if (editingNote === verseKey) { setEditingNote(null); return }
+    setNoteDraft(verseNotes[verseKey] || '')
+    setEditingNote(verseKey)
+  }
+  function saveVerseNote(verseKey) {
+    setVerseNotes(prev => {
+      const next = { ...prev }
+      if (noteDraft.trim()) next[verseKey] = noteDraft.trim()
+      else delete next[verseKey]
+      persistNotes(next)
+      return next
+    })
+    setEditingNote(null)
+  }
+  function deleteVerseNote(verseKey) {
+    setVerseNotes(prev => {
+      const next = { ...prev }
+      delete next[verseKey]
+      persistNotes(next)
+      return next
+    })
+    setEditingNote(null)
+  }
 
   function navigate(newBook, newChapter) {
     setBook(newBook)
@@ -472,33 +533,107 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             <>
               <h2 style={r.chapterHeading}>{book} {chapter}</h2>
 
-              {/* Verses with inline confession cross-references */}
+              {/* Verses with inline confession cross-references, highlights, and notes */}
               <div style={r.verseList} ref={verseListRef}>
                 {verses.map(({ verse, text }) => {
-                  const verseRefs = getCrossRefs(book, chapter, verse)
+                  const verseKey     = `${book}|${chapter}|${verse}`
+                  const isHighlighted = !!highlights[verseKey]
+                  const note          = verseNotes[verseKey]
+                  const isEditing     = editingNote === verseKey
+                  const verseRefs     = getCrossRefs(book, chapter, verse)
                   return (
-                    <div key={verse} style={r.verseRow} id={`v${verse}`}>
-                      <span style={r.verseNum}>{verse}</span>
-                      <span style={r.verseBody}>
-                        <span style={{ ...r.verseText, fontSize }}>{text}</span>
-                        {verseRefs.length > 0 && (
-                          <span style={r.inlineCrossRefs}>
-                            {verseRefs.map(ref => {
-                              const chip = SRC_CHIP[ref.src] || {}
-                              return (
-                                <button
-                                  key={ref.key}
-                                  style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
-                                  onClick={() => setConfessionModal(ref)}
-                                >
-                                  <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
-                                  <span style={r.inlineChipLabel}>{ref.label}</span>
-                                </button>
-                              )
-                            })}
-                          </span>
-                        )}
-                      </span>
+                    <div
+                      key={verse}
+                      id={`v${verse}`}
+                      style={{
+                        ...r.verseOuter,
+                        ...(isHighlighted ? r.verseHighlighted : {}),
+                      }}
+                    >
+                      {/* ── main verse row ── */}
+                      <div style={r.verseRow}>
+                        {/* Verse number — click to highlight */}
+                        <button
+                          style={{
+                            ...r.verseNum,
+                            ...(isHighlighted ? r.verseNumHL : {}),
+                          }}
+                          onClick={() => toggleHighlight(verseKey)}
+                          title={isHighlighted ? 'Remove highlight' : 'Highlight verse'}
+                        >
+                          {verse}
+                        </button>
+
+                        <span style={r.verseBody}>
+                          <span style={{ ...r.verseText, fontSize }}>{text}</span>
+
+                          {/* Confession cross-ref chips */}
+                          {verseRefs.length > 0 && (
+                            <span style={r.inlineCrossRefs}>
+                              {verseRefs.map(ref => {
+                                const chip = SRC_CHIP[ref.src] || {}
+                                return (
+                                  <button
+                                    key={ref.key}
+                                    style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
+                                    onClick={() => setConfessionModal(ref)}
+                                  >
+                                    <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
+                                    <span style={r.inlineChipLabel}>{ref.label}</span>
+                                  </button>
+                                )
+                              })}
+                            </span>
+                          )}
+
+                          {/* Note icon button */}
+                          <button
+                            onClick={() => openNoteEditor(verseKey)}
+                            style={{
+                              ...r.noteIconBtn,
+                              ...(note ? r.noteIconBtnActive : {}),
+                            }}
+                            title={note ? 'View / edit note' : 'Add note'}
+                          >
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                              <path d="M1.5 9L2 7 7 2l2 2-5 4.5L1.5 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
+                              <line x1="6" y1="2.5" x2="8" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                            </svg>
+                          </button>
+                        </span>
+                      </div>
+
+                      {/* ── Saved note display (click to edit) ── */}
+                      {note && !isEditing && (
+                        <div style={r.noteDisplay} onClick={() => openNoteEditor(verseKey)}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                            <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                            <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                          </svg>
+                          <span>{note}</span>
+                        </div>
+                      )}
+
+                      {/* ── Inline note editor ── */}
+                      {isEditing && (
+                        <div style={r.noteEditorWrap}>
+                          <textarea
+                            value={noteDraft}
+                            onChange={e => setNoteDraft(e.target.value)}
+                            placeholder={`Note on ${book} ${chapter}:${verse}…`}
+                            style={r.noteTextarea}
+                            autoFocus
+                            rows={3}
+                          />
+                          <div style={r.noteEditorActions}>
+                            <button onClick={() => saveVerseNote(verseKey)} style={r.noteSaveBtn}>Save</button>
+                            <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                            {note && (
+                              <button onClick={() => deleteVerseNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -698,6 +833,20 @@ const r = {
     color:'var(--ink)', marginBottom:'1.5rem', letterSpacing:'-0.01em',
   },
   verseList: { display:'flex', flexDirection:'column', gap:0 },
+
+  /* ── Verse outer wrapper (handles highlight + note stacking) ── */
+  verseOuter: {
+    display:'flex', flexDirection:'column',
+    borderRadius:6, marginLeft:-8, paddingLeft:8,
+    borderLeft:'3px solid transparent',
+    transition:'background 0.15s, border-color 0.15s',
+  },
+  verseHighlighted: {
+    background:'rgba(210,160,0,0.10)',
+    borderLeftColor:'rgba(200,150,0,0.55)',
+  },
+
+  /* ── Inner flex row (verse number + body) ── */
   verseRow: {
     display:'flex', gap:12, padding:'4px 0', lineHeight:1.8, alignItems:'flex-start',
   },
@@ -706,6 +855,13 @@ const r = {
     minWidth:22, paddingTop:6, flexShrink:0,
     fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
     fontFamily:"'DM Sans',sans-serif",
+    background:'none', border:'none', cursor:'pointer',
+    borderRadius:4, padding:'4px 2px',
+    transition:'background 0.12s, color 0.12s',
+  },
+  verseNumHL: {
+    color:'rgba(160,120,0,0.9)',
+    background:'rgba(210,160,0,0.18)',
   },
   verseBody: {
     flex:1, minWidth:0,
@@ -713,6 +869,68 @@ const r = {
   verseText: {
     color:'var(--ink)', lineHeight:1.85,
     fontFamily:"'Georgia', 'Times New Roman', serif",
+  },
+
+  /* ── Note icon button (inline after verse text) ── */
+  noteIconBtn: {
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
+    width:18, height:18, background:'none',
+    border:'1px solid transparent', borderRadius:4,
+    cursor:'pointer', color:'var(--ink-faint)',
+    marginLeft:5, verticalAlign:'middle', flexShrink:0,
+    transition:'all 0.12s',
+  },
+  noteIconBtnActive: {
+    color:'rgba(150,110,0,0.9)',
+    borderColor:'rgba(200,150,0,0.35)',
+    background:'rgba(210,160,0,0.14)',
+  },
+
+  /* ── Saved note display bar ── */
+  noteDisplay: {
+    display:'flex', gap:6, alignItems:'flex-start',
+    marginLeft:34, marginTop:1, marginBottom:4,
+    padding:'5px 10px',
+    background:'rgba(210,160,0,0.08)',
+    borderLeft:'2px solid rgba(200,150,0,0.35)',
+    borderRadius:'0 4px 4px 0',
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.6,
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.12s',
+  },
+
+  /* ── Inline note editor ── */
+  noteEditorWrap: {
+    marginLeft:34, marginTop:4, marginBottom:6,
+    display:'flex', flexDirection:'column', gap:6,
+  },
+  noteTextarea: {
+    width:'100%', padding:'8px 10px',
+    border:'1.5px solid var(--teal)', borderRadius:'var(--radius)',
+    fontSize:13, color:'var(--ink)', lineHeight:1.6,
+    fontFamily:"'DM Sans',sans-serif",
+    background:'var(--surface)', resize:'vertical',
+    outline:'none', boxSizing:'border-box',
+  },
+  noteEditorActions: { display:'flex', gap:6, alignItems:'center' },
+  noteSaveBtn: {
+    fontSize:11, fontWeight:700, padding:'5px 12px',
+    background:'var(--teal)', color:'white',
+    border:'none', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  noteCancelBtn: {
+    fontSize:11, fontWeight:500, padding:'5px 10px',
+    background:'none', color:'var(--ink-muted)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  noteDeleteBtn: {
+    fontSize:11, fontWeight:500, padding:'5px 10px',
+    background:'none', color:'#b33',
+    border:'1px solid rgba(180,50,50,0.3)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    marginLeft:'auto',
   },
 
   /* Inline confession cross-reference chips — appear after verse text */
