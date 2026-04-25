@@ -560,7 +560,7 @@ export default function AboutPage() {
           title="Achievements"
           defaultOpen
         >
-          <AchievementsSection supabaseProgress={session ? progressData : null} />
+          <AchievementsSection supabaseProgress={session ? progressData : null} hideHeader />
         </CollapseSection>
 
         {/* ════ 2. NOTES, BOOKMARKS & HIGHLIGHTS ════ */}

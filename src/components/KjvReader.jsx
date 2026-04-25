@@ -55,6 +55,35 @@ export async function fetchKjvChapter(bookName, ch) {
   return verses
 }
 
+/* ── Slug → canonical book name map (built once) ── */
+const SLUG_TO_BOOK = Object.fromEntries(
+  BIBLE_BOOKS.map(b => [b.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''), b.name])
+)
+
+/** Search the full KJV — returns up to maxResults matches in canonical order */
+function searchBible(query, maxResults = 200) {
+  if (!_kjvData || !query.trim()) return []
+  const q = query.trim().toLowerCase()
+  const hits = []
+  for (const book of BIBLE_BOOKS) {
+    const slug = book.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+    const bookData = _kjvData[slug]
+    if (!bookData) continue
+    const chapterNums = Object.keys(bookData).map(Number).sort((a, b) => a - b)
+    for (const ch of chapterNums) {
+      const verses = bookData[ch]
+      if (!verses) continue
+      for (const v of verses) {
+        if (v.t && v.t.toLowerCase().includes(q)) {
+          hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch) })
+          if (hits.length >= maxResults) return hits
+        }
+      }
+    }
+  }
+  return hits
+}
+
 /* ── Bible category structure ── */
 const OT_CATS = [
   { id:'law',    label:'The Law',          color:'#7c5230', bg:'#fdf3e3', books:['Genesis','Exodus','Leviticus','Numbers','Deuteronomy'] },
@@ -297,10 +326,12 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   const [noteDraft,   setNoteDraft]       = useState('')
   const [colorPicker, setColorPicker]     = useState(null) // verseKey
 
-  /* Search in chapter */
-  const [searchOpen,  setSearchOpen]  = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchFocus, setSearchFocus] = useState(0)   // index within matches
+  /* Search — full-Bible mode */
+  const [searchOpen,   setSearchOpen]   = useState(false)
+  const [searchQuery,  setSearchQuery]  = useState('')
+  const [searchFocus,  setSearchFocus]  = useState(0)   // index within chapter matches (when results=null)
+  const [bibleResults, setBibleResults] = useState(null) // null = no search; [] = no matches; [{book,ch,verse,text}] = matches
+  const [searching,    setSearching]    = useState(false)
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('kjv'))
   const [showHistDrop,  setShowHistDrop]  = useState(false)
   const searchInputRef = useRef(null)
@@ -331,8 +362,8 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     setSelection('')
     setEditingNote(null)
     setColorPicker(null)
-    setSearchQuery('')
     setSearchFocus(0)
+    setBibleResults(null)  // close search results when navigating
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -363,24 +394,24 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     }
   }, [searchOpen])
 
-  /* Search matches in current chapter */
-  const searchMatches = useMemo(() => {
+  /* Chapter-level matches (used for in-chapter highlighting only when no Bible results) */
+  const chapterMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    if (!q || !verses.length) return []
+    if (!q || bibleResults !== null || !verses.length) return []
     return verses
       .map((v, idx) => ({ idx, verse: v.verse, match: v.text.toLowerCase().includes(q) }))
       .filter(v => v.match)
-  }, [searchQuery, verses])
+  }, [searchQuery, verses, bibleResults])
 
-  /* Scroll to focused match */
+  /* Scroll to focused match within current chapter */
   useEffect(() => {
-    if (!searchMatches.length) return
-    const safeIdx = Math.min(searchFocus, searchMatches.length - 1)
-    const verseNum = searchMatches[safeIdx]?.verse
+    if (!chapterMatches.length) return
+    const safeIdx = Math.min(searchFocus, chapterMatches.length - 1)
+    const verseNum = chapterMatches[safeIdx]?.verse
     if (!verseNum || !readerRef.current) return
     const el = readerRef.current.querySelector(`#v${verseNum}`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [searchFocus, searchMatches])
+  }, [searchFocus, chapterMatches])
 
   const bookInfo = BOOK_META[book] || { chapters: 1 }
   const totalChs = bookInfo.chapters
@@ -482,6 +513,23 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     addSearchHistory('kjv', trimmed)
     setSearchHistory(getSearchHistory('kjv'))
     setShowHistDrop(false)
+    // Run full-Bible search
+    if (dataReady) {
+      setSearching(true)
+      // Run in a microtask so the UI updates first
+      setTimeout(() => {
+        const hits = searchBible(trimmed)
+        setBibleResults(hits)
+        setSearching(false)
+      }, 0)
+    }
+  }
+
+  function closeSearch() {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setBibleResults(null)
+    setSearchFocus(0)
   }
 
   function navigate(newBook, newChapter) {
@@ -588,7 +636,7 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             {/* Search toggle */}
             <button
               style={{ ...r.toolBtn, ...(searchOpen ? { borderColor:'var(--teal)', color:'var(--teal)', background:'var(--teal-light)' } : {}) }}
-              onClick={() => { setSearchOpen(o => !o); setSearchQuery(''); setShowHistDrop(false) }}
+              onClick={() => { if (searchOpen) { closeSearch() } else { setSearchOpen(true) } }}
               title="Search in chapter"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -640,9 +688,9 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
                 onFocus={() => { if (!searchQuery && searchHistory.length) setShowHistDrop(true) }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') submitSearch(searchQuery)
-                  if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery('') }
-                  if (e.key === 'ArrowDown') setSearchFocus(f => Math.min(f + 1, searchMatches.length - 1))
-                  if (e.key === 'ArrowUp') setSearchFocus(f => Math.max(f - 1, 0))
+                  if (e.key === 'Escape') closeSearch()
+                  if (e.key === 'ArrowDown' && !bibleResults) setSearchFocus(f => Math.min(f + 1, chapterMatches.length - 1))
+                  if (e.key === 'ArrowUp'   && !bibleResults) setSearchFocus(f => Math.max(f - 1, 0))
                 }}
                 placeholder={`Search in ${book} ${chapter}…`}
               />
@@ -651,23 +699,40 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
               )}
             </div>
 
-            {/* Match count + nav */}
+            {/* Match count / status */}
             {searchQuery.trim() && (
               <div style={r.searchResults}>
-                {searchMatches.length === 0 ? (
-                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>No matches</span>
+                {searching ? (
+                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>Searching…</span>
+                ) : bibleResults !== null ? (
+                  bibleResults.length === 0 ? (
+                    <span style={{fontSize:12, color:'var(--ink-faint)'}}>No matches in Bible</span>
+                  ) : (
+                    <span style={{fontSize:12, color:'var(--teal)', fontWeight:600}}>
+                      {bibleResults.length}{bibleResults.length === 200 ? '+' : ''} verse{bibleResults.length !== 1 ? 's' : ''} found
+                    </span>
+                  )
+                ) : chapterMatches.length === 0 ? (
+                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>
+                    Not in this chapter —{' '}
+                    <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--teal)',fontSize:12,fontWeight:600,padding:0,fontFamily:"'DM Sans',sans-serif"}}
+                      onClick={() => submitSearch(searchQuery)}>
+                      Search Bible ↵
+                    </button>
+                  </span>
                 ) : (
                   <>
                     <span style={{fontSize:12, color:'var(--teal)', fontWeight:600}}>
-                      {searchFocus + 1} / {searchMatches.length}
+                      {searchFocus + 1} / {chapterMatches.length} in chapter
                     </span>
                     <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.max(0, f - 1))}>↑</button>
-                    <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(searchMatches.length - 1, f + 1))}>↓</button>
-                    <button style={r.searchSaveBtn} onClick={() => submitSearch(searchQuery)} title="Save to history">
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                        <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
-                        <path d="M5.5 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                      </svg>
+                    <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(chapterMatches.length - 1, f + 1))}>↓</button>
+                    <button
+                      style={{...r.searchNavBtn, color:'var(--teal)', borderColor:'var(--teal)', fontWeight:600}}
+                      onClick={() => submitSearch(searchQuery)}
+                      title="Search whole Bible"
+                    >
+                      Search Bible
                     </button>
                   </>
                 )}
@@ -728,7 +793,72 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
               }}>Retry</button>
             </div>
           )}
-          {!loading && !error && verses.length > 0 && (
+          {/* ── Bible-wide search results ── */}
+          {bibleResults !== null && (
+            <div>
+              <div style={r.srHeader}>
+                <span style={r.srTitle}>
+                  {bibleResults.length === 0
+                    ? `No results for "${searchQuery}"`
+                    : `${bibleResults.length}${bibleResults.length === 200 ? '+' : ''} results for "${searchQuery}"`
+                  }
+                </span>
+                <button style={r.srClose} onClick={() => { setBibleResults(null); setSearchQuery('') }}>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                  Close
+                </button>
+              </div>
+              {bibleResults.length === 0 ? (
+                <p style={{fontSize:13, color:'var(--ink-faint)', textAlign:'center', padding:'2rem'}}>
+                  Try a different word or phrase.
+                </p>
+              ) : (
+                <div style={r.srList}>
+                  {bibleResults.map(hit => {
+                    const q = searchQuery.trim()
+                    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                    let textEl = hit.text
+                    try {
+                      const parts = hit.text.split(new RegExp(`(${escaped})`, 'gi'))
+                      if (parts.length > 1) textEl = parts.map((p, i) =>
+                        p.toLowerCase() === q.toLowerCase()
+                          ? <mark key={i} style={{background:'#fef08a',color:'inherit',borderRadius:2,padding:'0 1px'}}>{p}</mark>
+                          : p
+                      )
+                    } catch {}
+                    return (
+                      <button
+                        key={`${hit.book}|${hit.chapter}|${hit.verse}`}
+                        style={r.srRow}
+                        onClick={() => {
+                          navigate(hit.book, hit.chapter)
+                          setBibleResults(null)
+                          setSearchQuery('')
+                          /* Scroll to verse after navigation */
+                          setTimeout(() => {
+                            const el = readerRef.current?.querySelector(`#v${hit.verse}`)
+                            if (el) el.scrollIntoView({ behavior:'smooth', block:'center' })
+                          }, 200)
+                        }}
+                      >
+                        <span style={r.srRef}>{hit.book} {hit.chapter}:{hit.verse}</span>
+                        <span style={r.srText}>{textEl}</span>
+                      </button>
+                    )
+                  })}
+                  {bibleResults.length === 200 && (
+                    <p style={{fontSize:11, color:'var(--ink-faint)', textAlign:'center', padding:'8px 0'}}>
+                      Showing first 200 results — try a more specific phrase.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!loading && !error && verses.length > 0 && bibleResults === null && (
             <>
               <h2 style={r.chapterHeading}>{book} {chapter}</h2>
 
@@ -742,8 +872,8 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
                   const isEditing     = editingNote === verseKey
                   const showPicker    = colorPicker === verseKey
                   const verseRefs     = getCrossRefs(book, chapter, verse)
-                  const isSearchMatch = searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
-                  const isFocusMatch  = searchMatches[searchFocus]?.verse === verse
+                  const isSearchMatch = !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
+                  const isFocusMatch  = !bibleResults && chapterMatches[searchFocus]?.verse === verse
 
                   return (
                     <div
@@ -1259,6 +1389,42 @@ const r = {
   },
   inlineChipLabel: {
     fontSize:9, fontWeight:600, lineHeight:1.4,
+  },
+
+  /* ── Bible search results panel ── */
+  srHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    marginBottom:16, gap:10, flexWrap:'wrap',
+  },
+  srTitle: {
+    fontSize:14, fontWeight:600, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif",
+  },
+  srClose: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:12, fontWeight:600, color:'var(--ink-muted)',
+    background:'none', border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    padding:'5px 10px', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  srList: {
+    display:'flex', flexDirection:'column', gap:2,
+    borderRadius:'var(--radius-lg)', overflow:'hidden',
+    border:'1px solid var(--border)',
+  },
+  srRow: {
+    display:'flex', flexDirection:'column', gap:3,
+    padding:'10px 14px', background:'var(--surface)',
+    border:'none', borderBottom:'1px solid var(--border)',
+    cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.1s',
+  },
+  srRef: {
+    fontSize:11, fontWeight:700, color:'var(--teal)',
+    letterSpacing:'0.02em',
+  },
+  srText: {
+    fontSize:14, color:'var(--ink)', lineHeight:1.6,
+    fontFamily:"'Georgia','Times New Roman',serif",
   },
 
   /* Nav bar */

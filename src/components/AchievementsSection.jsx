@@ -153,7 +153,7 @@ function ConfBadge({ src, stats }) {
 }
 
 /* ── Main component ── */
-export default function AchievementsSection({ supabaseProgress }) {
+export default function AchievementsSection({ supabaseProgress, hideHeader = false }) {
   const [open, setOpen] = useState(false)
   const confStats  = useConfessionStats(supabaseProgress)
   const bibleStats = useBibleStats()
@@ -168,29 +168,8 @@ export default function AchievementsSection({ supabaseProgress }) {
     (confStats['1LBCF']?.done  === confStats['1LBCF']?.total  ? 1 : 0) +
     totalBooksComplete
 
-  return (
-    <section style={a.section}>
-      {/* Collapsible header */}
-      <button onClick={() => setOpen(o => !o)} style={a.header} aria-expanded={open}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 1.5l1.5 4.5H14l-3.8 2.8 1.5 4.5L8 10.7l-3.7 2.6 1.5-4.5L2 6h4.5z"
-              stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"
-              fill="var(--teal)" fillOpacity="0.15"/>
-          </svg>
-          <h2 style={a.title}>Achievements</h2>
-          {totalEarned > 0 && (
-            <span style={a.countBadge}>{totalEarned}</span>
-          )}
-        </div>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
-          style={{ transition:'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', flexShrink:0 }}>
-          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-        </svg>
-      </button>
-
-      {open && (
-        <div style={{ marginTop:16, display:'flex', flexDirection:'column', gap:24 }}>
+  const content = (
+    <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
           {/* ── Confession Progress ── */}
           <div>
@@ -269,7 +248,34 @@ export default function AchievementsSection({ supabaseProgress }) {
           </div>
 
         </div>
-      )}
+  )
+
+  /* When used inside an outer collapsible (hideHeader=true), render content directly */
+  if (hideHeader) {
+    return content
+  }
+
+  return (
+    <section style={a.section}>
+      {/* Collapsible header */}
+      <button onClick={() => setOpen(o => !o)} style={a.header} aria-expanded={open}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 1.5l1.5 4.5H14l-3.8 2.8 1.5 4.5L8 10.7l-3.7 2.6 1.5-4.5L2 6h4.5z"
+              stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"
+              fill="var(--teal)" fillOpacity="0.15"/>
+          </svg>
+          <h2 style={a.title}>Achievements</h2>
+          {totalEarned > 0 && (
+            <span style={a.countBadge}>{totalEarned}</span>
+          )}
+        </div>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+          style={{ transition:'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', flexShrink:0 }}>
+          <path d="M3 6l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && <div style={{ marginTop:16 }}>{content}</div>}
     </section>
   )
 }
