@@ -33,15 +33,18 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
   /* Scroll to target verse after verses load */
   useEffect(() => {
     if (loading || !verse || !bodyRef.current) return
-    // Small delay to let the DOM render the verse list
+    // Delay slightly to let React finish painting the verse list
     const t = setTimeout(() => {
-      const el = bodyRef.current?.querySelector(`#mv${verse}`)
-      if (el) {
-        el.scrollIntoView({ block: 'start', behavior: 'smooth' })
-        // Nudge up slightly so the verse number isn't cut off by padding
-        if (bodyRef.current) bodyRef.current.scrollTop -= 12
-      }
-    }, 60)
+      const body = bodyRef.current
+      if (!body) return
+      const el = body.querySelector(`#mv${verse}`)
+      if (!el) return
+      // Use viewport-relative rects so this works reliably inside a fixed modal
+      const containerRect = body.getBoundingClientRect()
+      const elementRect   = el.getBoundingClientRect()
+      // Scroll the modal body (not the window) so the verse lands near the top
+      body.scrollTop += (elementRect.top - containerRect.top) - 16
+    }, 80)
     return () => clearTimeout(t)
   }, [loading, verse])
 
