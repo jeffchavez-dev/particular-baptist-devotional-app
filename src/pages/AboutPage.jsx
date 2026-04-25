@@ -4,7 +4,7 @@ import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { FONT_OPTIONS, FONT_SIZES } from '../components/FontPrefsPanel'
-import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
+import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
@@ -485,6 +485,8 @@ export default function AboutPage() {
   const [resetting,    setResetting]    = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [progressData, setProgressData] = useState(null)
+  const [syncMessage, setSyncMessage] = useState(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     if (!session) return
@@ -516,6 +518,27 @@ export default function AboutPage() {
       setResetting(false)
     }
   }, [session])
+
+  const handleSync = useCallback(async () => {
+    if (!session?.user?.id) {
+      setSyncMessage({ type: 'error', text: 'Sign in required to sync' })
+      return
+    }
+    setSyncing(true)
+    setSyncMessage(null)
+    try {
+      const result = await syncAll(session.user.id)
+      setSyncMessage({
+        type: result.success ? 'success' : 'error',
+        text: result.message,
+      })
+      setTimeout(() => setSyncMessage(null), 4000)
+    } catch (e) {
+      setSyncMessage({ type: 'error', text: e?.message || 'Sync failed' })
+    } finally {
+      setSyncing(false)
+    }
+  }, [session?.user?.id])
 
   const activeFont = FONT_OPTIONS.find(f => f.id === prefs.fontId) || FONT_OPTIONS[0]
 
@@ -682,6 +705,46 @@ export default function AboutPage() {
                 Download Backup
               </button>
             </div>
+
+            {/* Sync to Cloud */}
+            {session && (
+              <div style={s.settingRow}>
+                <div style={s.settingLabel}>
+                  <span style={s.settingName}>Sync Progress</span>
+                  <span style={s.settingHint}>Save your progress to cloud and sync across devices</span>
+                </div>
+                <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
+                  {syncing && <span style={{fontSize:12, color:'var(--ink-faint)'}}>Syncing…</span>}
+                  <button 
+                    onClick={handleSync} 
+                    disabled={syncing}
+                    className="btn btn-outline" 
+                    style={{fontSize:13, flexShrink:0}}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{marginRight:4}}>
+                      <path d="M2.5 6.5c0-2 1.5-3.5 3.5-3.5s3 1 3 2.5M10.5 6.5c0 2-1.5 3.5-3.5 3.5s-3-1-3-2.5"
+                        stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      <path d="M6 2v2.5M6 10.5v-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    </svg>
+                    Sync Now
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {syncMessage && (
+              <div style={{
+                padding:'10px 14px',
+                borderRadius:'var(--radius)',
+                background: syncMessage.type === 'success' ? 'var(--teal-light)' : 'rgba(255, 100, 100, 0.1)',
+                color: syncMessage.type === 'success' ? 'var(--teal)' : '#b33',
+                fontSize:12,
+                border: `1px solid ${syncMessage.type === 'success' ? 'rgba(29,107,90,0.2)' : 'rgba(180,50,50,0.2)'}`,
+                marginBottom: 12,
+              }}>
+                {syncMessage.text}
+              </div>
+            )}
 
             {/* Reset */}
             <div style={{...s.settingRow, borderBottom:'none', paddingBottom:0}}>

@@ -142,3 +142,178 @@ export function toggleBookmark(day) {
 export function isBookmarked(day) {
   return !!getBookmarks()[day]
 }
+
+// ── Manual Sync Functions (user-initiated from settings) ──────────────────────
+/**
+ * Sync devotional progress UP to Supabase (when logged in).
+ * Saves locally first, then pushes to cloud if user is signed in.
+ */
+export async function syncProgressUp(userId) {
+  if (!userId) return { success: false, message: 'Not logged in' }
+  try {
+    const local = getLocalProgress()
+    const rows = Object.entries(local).map(([day, data]) => ({
+      user_id: userId,
+      day_number: parseInt(day),
+      completed: !!data.completed,
+      notes: data.notes || '',
+      updated_at: new Date().toISOString(),
+    }))
+    if (!rows.length) return { success: true, message: 'No local progress to sync' }
+    
+    const { error } = await supabase
+      .from('progress')
+      .upsert(rows, { onConflict: 'user_id,day_number' })
+    
+    if (error) throw error
+    return { success: true, message: `Synced ${rows.length} day(s) to cloud`, count: rows.length }
+  } catch (e) {
+    console.error('[sync-progress-up]', e?.message)
+    return { success: false, message: e?.message || 'Sync failed' }
+  }
+}
+
+/**
+ * Sync devotional progress DOWN from Supabase (when logged in).
+ * Merges cloud data with local, keeping newest version.
+ */
+export async function syncProgressDown(userId) {
+  if (!userId) return { success: false, message: 'Not logged in' }
+  try {
+    const { data, error } = await supabase
+      .from('progress')
+      .select('day_number,completed,notes,updated_at')
+      .eq('user_id', userId)
+    
+    if (error) throw error
+    if (!data?.length) return { success: true, message: 'No cloud progress to download', count: 0 }
+    
+    const local = getLocalProgress()
+    let mergedCount = 0
+    
+    data.forEach(row => {
+      const day = String(row.day_number)
+      const existing = local[day]
+      
+      // Use cloud data if it's newer
+      const cloudTime = new Date(row.updated_at).getTime()
+      const localTime = existing?.updated_at ? new Date(existing.updated_at).getTime() : 0
+      
+      if (!existing || cloudTime > localTime) {
+        local[day] = {
+          completed: row.completed,
+          notes: row.notes || '',
+          updated_at: row.updated_at,
+        }
+        mergedCount++
+      }
+    })
+    
+    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(local)) } catch {}
+    window.dispatchEvent(new StorageEvent('storage', { key: LOCAL_KEY }))
+    
+    return { success: true, message: `Downloaded ${mergedCount} day(s) from cloud`, count: mergedCount }
+  } catch (e) {
+    console.error('[sync-progress-down]', e?.message)
+    return { success: false, message: e?.message || 'Sync failed' }
+  }
+}
+
+/**
+ * Sync Bible progress UP to Supabase (when logged in).
+ */
+export async function syncBibleUp(userId) {
+  if (!userId) return { success: false, message: 'Not logged in' }
+  try {
+    const all = getBibleProgress()
+    const done = Object.keys(all).filter(ch => all[ch])
+    if (!done.length) return { success: true, message: 'No Bible progress to sync', count: 0 }
+    
+    const rows = done.map(chapter => ({
+      user_id: userId,
+      chapter,
+      done: true,
+      updated_at: new Date().toISOString(),
+    }))
+    
+    const { error } = await supabase
+      .from('pb_bible_progress')
+      .upsert(rows, { onConflict: 'user_id,chapter' })
+    
+    if (error) throw error
+    return { success: true, message: `Synced ${rows.length} chapter(s) to cloud`, count: rows.length }
+  } catch (e) {
+    console.error('[sync-bible-up]', e?.message)
+    return { success: false, message: e?.message || 'Sync failed' }
+  }
+}
+
+/**
+ * Sync Bible progress DOWN from Supabase (when logged in).
+ */
+export async function syncBibleDown(userId) {
+  if (!userId) return { success: false, message: 'Not logged in' }
+  try {
+    const { data, error } = await supabase
+      .from('pb_bible_progress')
+      .select('chapter,done,updated_at')
+      .eq('user_id', userId)
+    
+    if (error) throw error
+    if (!data?.length) return { success: true, message: 'No Bible progress to download', count: 0 }
+    
+    const local = getBibleProgress()
+    let mergedCount = 0
+    
+    data.forEach(row => {
+      const existing = local[row.chapter]
+      const cloudTime = new Date(row.updated_at).getTime()
+      const localTime = 0 // Bible progress doesn't track updated_at locally
+      
+      if (!existing || (row.done && !existing)) {
+        if (row.done) local[row.chapter] = true
+        else delete local[row.chapter]
+        mergedCount++
+      }
+    })
+    
+    try { localStorage.setItem(BIBLE_KEY, JSON.stringify(local)) } catch {}
+    window.dispatchEvent(new StorageEvent('storage', { key: BIBLE_KEY }))
+    
+    return { success: true, message: `Downloaded ${mergedCount} chapter(s) from cloud`, count: mergedCount }
+  } catch (e) {
+    console.error('[sync-bible-down]', e?.message)
+    return { success: false, message: e?.message || 'Sync failed' }
+  }
+}
+
+/**
+ * Full sync: both up and down for devotional + Bible progress.
+ */
+export async function syncAll(userId) {
+  if (!userId) return { success: false, message: 'Not logged in' }
+  try {
+    const results = {
+      devUp: await syncProgressUp(userId),
+      devDown: await syncProgressDown(userId),
+      bibleUp: await syncBibleUp(userId),
+      bibleDown: await syncBibleDown(userId),
+    }
+    
+    const allSuccess = Object.values(results).every(r => r.success)
+    const totalItems = (results.devUp.count || 0) + (results.devDown.count || 0) +
+                       (results.bibleUp.count || 0) + (results.bibleDown.count || 0)
+    
+    return {
+      success: allSuccess,
+      message: allSuccess 
+        ? `Sync complete! (${totalItems} items)`
+        : 'Sync completed with some errors',
+      results,
+      totalItems,
+    }
+  } catch (e) {
+    console.error('[sync-all]', e?.message)
+    return { success: false, message: e?.message || 'Sync failed' }
+  }
+}
