@@ -463,11 +463,9 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const { prefs } = usePrefs()
 
   const [book, setBook] = useState(() => {
-    if (initialBook) return initialBook
     try { return sessionStorage.getItem('kjv-book') || 'Genesis' } catch { return 'Genesis' }
   })
   const [chapter, setChapter] = useState(() => {
-    if (initialChapter) return initialChapter
     try { return parseInt(sessionStorage.getItem('kjv-chapter') || '1') } catch { return 1 }
   })
 
