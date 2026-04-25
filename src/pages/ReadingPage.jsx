@@ -7,7 +7,7 @@ import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
 import { QUOTES } from '../data/quotes'
 import ShareCardModal from '../components/ShareCardModal'
-import FontPrefsPanel, { getFontCss } from '../components/FontPrefsPanel'
+import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { parseRefs } from '../lib/parseRefs'
@@ -580,7 +580,6 @@ export default function ReadingPage() {
           </button>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
-            <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
             {!session && (
               <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:12, padding:'5px 12px'}}>Sign in</button>
             )}

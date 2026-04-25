@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import FontPrefsPanel, { getFontCss } from '../components/FontPrefsPanel'
+import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { LBCF2 }     from '../data/lbcf2'
@@ -738,7 +738,6 @@ export default function ConfessionsPage() {
             )}
           </div>
 
-          <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
         </div>
       </header>
 
