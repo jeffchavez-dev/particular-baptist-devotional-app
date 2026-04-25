@@ -44,7 +44,7 @@ function highlight(text, q) {
     if (parts.length === 1) return text
     return parts.map((p, i) =>
       p.toLowerCase() === q.toLowerCase()
-        ? <mark key={i} style={{background:'#fef08a',color:'inherit',borderRadius:2,padding:'0 1px'}}>{p}</mark>
+        ? <mark key={i} style={{background:'var(--gold-light)',color:'var(--ink)',borderRadius:2,padding:'0 1px',opacity:0.8}}>{p}</mark>
         : p
     )
   } catch { return text }
@@ -893,7 +893,7 @@ const s = {
 
   guestBanner: {
     display:'flex', alignItems:'center', flexWrap:'wrap', gap:8,
-    background:'var(--gold-faint)', border:'1px solid rgba(154,124,63,0.2)',
+    background:'var(--gold-faint)', border:'1px solid var(--border)',
     borderRadius:'var(--radius)', padding:'10px 14px', marginBottom:'1.25rem',
     fontSize:13, color:'var(--ink-muted)',
   },
@@ -945,7 +945,7 @@ const s = {
   controls: { display:'flex', gap:8, flexWrap:'wrap', marginBottom:'0.5rem' },
   searchWrap: {
     flex:1, minWidth:200, position:'relative', display:'flex', alignItems:'center',
-    background:'white', border:'1px solid var(--border-strong)', borderRadius:'var(--radius)',
+    background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:'var(--radius)',
     padding:'0 10px',
   },
   searchIcon: { color:'var(--ink-faint)', flexShrink:0, marginRight:6 },
@@ -960,7 +960,7 @@ const s = {
   },
   select: {
     padding:'9px 12px', fontSize:13, border:'1px solid var(--border-strong)',
-    borderRadius:'var(--radius)', background:'white', color:'var(--ink)',
+    borderRadius:'var(--radius)', background:'var(--surface)', color:'var(--ink)',
     cursor:'pointer', minWidth:130,
   },
 
@@ -972,12 +972,12 @@ const s = {
     display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
     borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background 0.1s',
   },
-  rowDone:  { background:'#fafaf8' },
+  rowDone:  { background:'var(--parchment-dark)' },
   rowToday: { borderColor:'var(--teal)', boxShadow:'inset 3px 0 0 var(--teal)' },
   cb: {
     width:20, height:20, borderRadius:5, border:'1.5px solid var(--border-strong)',
     display:'flex', alignItems:'center', justifyContent:'center',
-    flexShrink:0, transition:'all 0.15s', background:'white', cursor:'pointer',
+    flexShrink:0, transition:'all 0.15s', background:'var(--surface)', cursor:'pointer',
   },
   cbDone: { background:'var(--teal)', borderColor:'var(--teal)' },
   dayNum: { fontSize:11, color:'var(--ink-faint)', fontWeight:500, minWidth:38, flexShrink:0 },
@@ -1000,7 +1000,7 @@ const s = {
 
   /* ── Sidebar ── */
   backdrop: {
-    position:'fixed', inset:0, background:'rgba(30,24,16,0.45)',
+    position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
     zIndex:40, backdropFilter:'blur(2px)',
   },
   sidebar: {

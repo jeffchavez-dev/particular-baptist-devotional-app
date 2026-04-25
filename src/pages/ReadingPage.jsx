@@ -897,7 +897,7 @@ const s = {
   cb: {
     width:24, height:24, borderRadius:6, border:'1.5px solid var(--border-strong)',
     display:'flex', alignItems:'center', justifyContent:'center',
-    flexShrink:0, transition:'all 0.2s', background:'white',
+    flexShrink:0, transition:'all 0.2s', background:'var(--surface)',
   },
   cbDone: { background:'var(--teal)', borderColor:'var(--teal)' },
   bibleCard: { padding:'16px 20px' },

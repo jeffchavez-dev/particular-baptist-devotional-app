@@ -2,7 +2,7 @@
  * Scripture reference parser for LBCF/Catechism proof texts.
  *
  * Input:  raw refs string, e.g. "aGen 1:1; bPs 33:6; c1 Cor 15:45"
- * Output: array of { book (full name), chapter (int), display (string) }
+ * Output: array of { book (full name), chapter (int), verse (int|null), display (string) }
  *
  * The LBCF source data uses lowercase letters as footnote markers immediately
  * before each reference (a, b, c…). cleanRefs() strips those first.
@@ -156,8 +156,12 @@ function resolveBook(numStr, abbr) {
 }
 
 /**
- * Parse a refs string into an array of { book, chapter, display }.
- * Deduplicates by book+chapter so clicking shows one modal per chapter.
+ * Parse a refs string into an array of { book, chapter, verse, display }.
+ *
+ * - `verse` is the specific verse number (int) or null for chapter-only refs.
+ * - Comma-separated additional verses within the same chapter are each emitted
+ *   as separate entries, e.g. "Gen 1:1,3" → two entries with verse 1 and 3.
+ * - Deduplicates by book+chapter+verse.
  */
 export function parseRefs(refsStr) {
   if (!refsStr) return []
@@ -165,29 +169,43 @@ export function parseRefs(refsStr) {
   const seen = new Set()
   const results = []
 
-  // Split on semicolons and commas
+  // Split on semicolons — each part is one reference group
   const parts = cleaned.split(/[;]/).map(s => s.trim()).filter(Boolean)
 
   for (const part of parts) {
-    // Match patterns like:
-    //   "Gen 1:1"   "1Cor 15:45"  "Ps23:1"  "1 Sam 17:4"  "Matt 5:3-12"
-    // Capture: optional leading digit (for 1/2/3 books), book letters, chapter number
-    // Accept "Gen 1:31" (with verse) OR "Gen 1" (chapter-only reference)
-    const m = part.match(/^(\d\s*)?([A-Za-z]+)\.?\s*(\d+)/)
+    // Match: optional leading digit (1/2/3), book letters, chapter, optional verse
+    // Accepts "Gen 1:1", "1Cor 15:45", "Ps23:1", "Matt 5:3-12", "Gen 1" (chapter-only)
+    const m = part.match(/^(\d\s*)?([A-Za-z]+)\.?\s*(\d+)(?:[:.]\s*(\d+))?/)
     if (!m) continue
 
     const numPart = m[1] ? m[1].replace(/\s+/g, '') : ''
     const bookPart = m[2]
-    const chapter = parseInt(m[3])
+    const chapter  = parseInt(m[3])
+    const primaryVerse = m[4] ? parseInt(m[4]) : null
 
     const book = resolveBook(numPart, bookPart)
     if (!book || !chapter) continue
 
-    const key = `${book}|${chapter}`
-    if (seen.has(key)) continue
-    seen.add(key)
+    function addRef(verse, display) {
+      const key = `${book}|${chapter}|${verse ?? 0}`
+      if (seen.has(key)) return
+      seen.add(key)
+      results.push({ book, chapter, verse: verse ?? null, display })
+    }
 
-    results.push({ book, chapter, display: part.trim() })
+    addRef(primaryVerse, part.trim())
+
+    // Handle comma-separated additional verses in the same chapter:
+    // e.g. "Gen 1:1,3,5" — after the main match, scan for ",<number>"
+    if (primaryVerse !== null) {
+      const afterMatch = part.slice(m[0].length)
+      let commaMatch
+      const commaRe = /,\s*(\d+)/g
+      while ((commaMatch = commaRe.exec(afterMatch)) !== null) {
+        const v = parseInt(commaMatch[1])
+        if (v) addRef(v, `${book} ${chapter}:${v}`)
+      }
+    }
   }
 
   return results

@@ -736,7 +736,7 @@ function ResultsScreen({ score, total, tier, answers, questions, navigate }) {
 const s = {
   page: { minHeight: '100vh', background: 'var(--parchment)', fontFamily: "'DM Sans', sans-serif" },
 
-  nav: { borderBottom: '1px solid var(--border)', background: 'rgba(245,240,232,0.97)', backdropFilter: 'blur(8px)', position: 'sticky', top: 0, zIndex: 20 },
+  nav: { borderBottom: '1px solid var(--border)', background: 'var(--surface)', backdropFilter: 'blur(8px)', position: 'sticky', top: 0, zIndex: 20 },
   navInner: { maxWidth: 760, margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   navTitle: { fontSize: 14, fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, color: 'var(--ink)' },
   navCount: { fontSize: 13, color: 'var(--ink-muted)', fontWeight: 500 },
@@ -746,7 +746,7 @@ const s = {
 
   body: { maxWidth: 640, margin: '0 auto', padding: '2.5rem 24px 4rem' },
 
-  card: { background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '2rem', boxShadow: 'var(--shadow-sm)' },
+  card: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '2rem', boxShadow: 'var(--shadow-sm)' },
 
   badgeRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem' },
   levelBadge: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', padding: '3px 10px', borderRadius: 99 },
@@ -762,7 +762,7 @@ const s = {
     lineHeight: 1.5, transition: 'border-color 0.15s, background 0.15s', fontFamily: "'DM Sans', sans-serif",
   },
   optionCorrect: { borderColor: 'var(--teal)', background: 'var(--teal-light)', color: 'var(--teal)' },
-  optionWrong:   { borderColor: '#e07070', background: '#fff0f0', color: '#c05050' },
+  optionWrong:   { borderColor: '#e07070', background: 'rgba(224, 112, 112, 0.1)', color: '#ff9999' },
   optionLetter: { fontWeight: 700, fontSize: 13, minWidth: 20, paddingTop: 1, color: 'var(--ink-faint)' },
 
   dots: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: '2rem' },
@@ -770,14 +770,14 @@ const s = {
 
   // Results
   resultsBody: { maxWidth: 640, margin: '0 auto', padding: '2.5rem 24px 5rem', display: 'flex', flexDirection: 'column', gap: 20 },
-  scoreCard: { background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-sm)' },
+  scoreCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '2.5rem 2rem', textAlign: 'center', boxShadow: 'var(--shadow-sm)' },
   tierLabel: { display: 'inline-block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '5px 16px', borderRadius: 99, marginBottom: '1rem' },
   scoreNum: { fontSize: 56, fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, color: 'var(--ink)', lineHeight: 1 },
   scoreOf: { fontSize: 28, color: 'var(--ink-muted)' },
   scorePct: { fontSize: 14, color: 'var(--ink-faint)', marginTop: 4, marginBottom: '1rem' },
   tierDesc: { fontSize: 15, color: 'var(--ink-muted)', lineHeight: 1.7, maxWidth: 400, margin: '0 auto 0' },
 
-  breakdownCard: { background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' },
+  breakdownCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' },
   breakdownTitle: { fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--ink-faint)', marginBottom: '1rem' },
   breakdownRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 },
   breakdownCat: { fontSize: 13, color: 'var(--ink)', fontWeight: 500, width: 130, flexShrink: 0 },
@@ -785,7 +785,7 @@ const s = {
   breakdownFill: { height: '100%', background: 'var(--teal)', borderRadius: 99 },
   breakdownScore: { fontSize: 12, color: 'var(--ink-faint)', width: 30, textAlign: 'right' },
 
-  reviewCard: { background: 'white', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' },
+  reviewCard: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '1.5rem', boxShadow: 'var(--shadow-sm)' },
   reviewItem: { borderLeft: '3px solid', paddingLeft: 14, marginBottom: 20 },
   reviewMeta: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 },
   reviewQ: { fontSize: 14, fontWeight: 500, color: 'var(--ink)', margin: '0 0 4px', lineHeight: 1.4 },

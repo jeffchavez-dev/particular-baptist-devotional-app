@@ -124,9 +124,9 @@ function RefChips({ refs, onOpen }) {
   if (!parsed.length) return <span style={{ fontSize:13, color:'var(--ink-muted)' }}>{refs}</span>
   return (
     <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:2 }}>
-      {parsed.map(({ book, chapter, display }) => (
+      {parsed.map(({ book, chapter, verse, display }) => (
         <button
-          key={`${book}|${chapter}`}
+          key={`${book}|${chapter}|${verse ?? 0}`}
           style={rc.chip}
           onClick={() => onOpen({ book, chapter, refDisplay: display })}
         >
@@ -597,7 +597,7 @@ const s = {
   searchBox: {
     display:'flex', alignItems:'center', gap:6,
     border:'1px solid var(--border-strong)', borderRadius:'var(--radius)',
-    padding:'0 10px', background:'var(--parchment)', minWidth:140, maxWidth:240, flex:1,
+    padding:'0 10px', background:'var(--surface)', minWidth:140, maxWidth:240, flex:1,
   },
   searchInput: {
     border:'none', background:'transparent', outline:'none',
@@ -659,7 +659,7 @@ const s = {
 
   /* Mobile sidebar */
   backdrop: {
-    position:'fixed', inset:0, background:'rgba(30,24,16,0.45)',
+    position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
     zIndex:40, backdropFilter:'blur(2px)',
   },
   mobileSidebar: {

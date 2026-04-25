@@ -23,12 +23,30 @@ async function loadKjv() {
   return _kjvPromise
 }
 
+/**
+ * Strip inline KJV footnotes that the source data appends to verse text.
+ * They follow the pattern ".{chapter}.{verse} footnote text", e.g.
+ * "…sixth day.1.31 And the evening…: Heb. …"
+ */
+function stripFootnotes(text, chapter) {
+  // Match ".{chapter}.{verse_digits}[\s\S]*" and replace with "." (restore sentence period)
+  return text.replace(new RegExp(`\\.${chapter}\\.\\d+[\\s\\S]*$`), '.').trim()
+}
+
 function getChapterVerses(bookName, ch) {
   if (!_kjvData) return null
   const slug = bookSlug(bookName)
   const raw = _kjvData[slug]?.[ch]
   if (!raw) return null
-  return raw.map(v => ({ verse: v.v, text: v.t }))
+  // Deduplicate by verse number (some chapters have the data doubled in the source)
+  const seen = new Set()
+  return raw
+    .filter(v => {
+      if (seen.has(v.v)) return false
+      seen.add(v.v)
+      return true
+    })
+    .map(v => ({ verse: v.v, text: stripFootnotes(v.t, ch) }))
 }
 
 export async function fetchKjvChapter(bookName, ch) {
@@ -279,8 +297,7 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     if (readerRef.current) readerRef.current.scrollTop = 0
   }, [book, chapter, dataReady])
 
-  /* Cross-references for current chapter */
-  const crossRefs = useMemo(() => getCrossRefs(book, chapter), [book, chapter])
+  /* getCrossRefs uses a pre-built O(1) index so calling it per-verse in render is fine */
 
   function navigate(newBook, newChapter) {
     setBook(newBook)
@@ -455,42 +472,37 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             <>
               <h2 style={r.chapterHeading}>{book} {chapter}</h2>
 
-              {/* Verses */}
+              {/* Verses with inline confession cross-references */}
               <div style={r.verseList} ref={verseListRef}>
-                {verses.map(({ verse, text }) => (
-                  <div key={verse} style={r.verseRow} id={`v${verse}`}>
-                    <span style={r.verseNum}>{verse}</span>
-                    <span style={{ ...r.verseText, fontSize }}>{text}</span>
-                  </div>
-                ))}
+                {verses.map(({ verse, text }) => {
+                  const verseRefs = getCrossRefs(book, chapter, verse)
+                  return (
+                    <div key={verse} style={r.verseRow} id={`v${verse}`}>
+                      <span style={r.verseNum}>{verse}</span>
+                      <span style={r.verseBody}>
+                        <span style={{ ...r.verseText, fontSize }}>{text}</span>
+                        {verseRefs.length > 0 && (
+                          <span style={r.inlineCrossRefs}>
+                            {verseRefs.map(ref => {
+                              const chip = SRC_CHIP[ref.src] || {}
+                              return (
+                                <button
+                                  key={ref.key}
+                                  style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
+                                  onClick={() => setConfessionModal(ref)}
+                                >
+                                  <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
+                                  <span style={r.inlineChipLabel}>{ref.label}</span>
+                                </button>
+                              )
+                            })}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
-
-              {/* Cross-references */}
-              {crossRefs.length > 0 && (
-                <div style={r.crossRefSection}>
-                  <div style={r.crossRefHeader}>
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0, opacity:0.6 }}>
-                      <path d="M1.5 6.5h10M6.5 1.5v10" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
-                    <span style={r.crossRefTitle}>Referenced in Confession &amp; Catechism</span>
-                  </div>
-                  <div style={r.crossRefList}>
-                    {crossRefs.map(ref => {
-                      const chip = SRC_CHIP[ref.src] || {}
-                      return (
-                        <button
-                          key={ref.key}
-                          style={{ ...r.crossRefChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
-                          onClick={() => setConfessionModal(ref)}
-                        >
-                          <span style={{ ...r.crossRefSrcBadge, background: chip.color, color:'white' }}>{ref.src}</span>
-                          <span style={r.crossRefLabel}>{ref.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -687,7 +699,7 @@ const r = {
   },
   verseList: { display:'flex', flexDirection:'column', gap:0 },
   verseRow: {
-    display:'flex', gap:12, padding:'4px 0', lineHeight:1.8,
+    display:'flex', gap:12, padding:'4px 0', lineHeight:1.8, alignItems:'flex-start',
   },
   verseNum: {
     fontSize:10, fontWeight:700, color:'var(--teal)',
@@ -695,41 +707,35 @@ const r = {
     fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
     fontFamily:"'DM Sans',sans-serif",
   },
+  verseBody: {
+    flex:1, minWidth:0,
+  },
   verseText: {
     color:'var(--ink)', lineHeight:1.85,
     fontFamily:"'Georgia', 'Times New Roman', serif",
   },
 
-  /* Cross-references */
-  crossRefSection: {
-    marginTop:'2.5rem', paddingTop:'1.5rem',
-    borderTop:'1px solid var(--border)',
+  /* Inline confession cross-reference chips — appear after verse text */
+  inlineCrossRefs: {
+    display:'inline-flex', flexWrap:'wrap', gap:4,
+    marginLeft:6, verticalAlign:'middle',
   },
-  crossRefHeader: {
-    display:'flex', alignItems:'center', gap:6, marginBottom:12,
-  },
-  crossRefTitle: {
-    fontSize:10, fontWeight:700, textTransform:'uppercase',
-    letterSpacing:'0.08em', color:'var(--ink-faint)',
-  },
-  crossRefList: {
-    display:'flex', flexDirection:'column', gap:8,
-  },
-  crossRefChip: {
-    display:'flex', alignItems:'flex-start', gap:8,
-    padding:'10px 12px', border:'1px solid',
-    borderRadius:'var(--radius)', cursor:'pointer',
-    textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+  inlineChip: {
+    display:'inline-flex', alignItems:'center', gap:4,
+    padding:'1px 6px 1px 3px', border:'1px solid',
+    borderRadius:99, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+    fontSize:9, lineHeight:1.6,
     transition:'opacity 0.12s',
-    width:'100%',
+    verticalAlign:'middle',
   },
-  crossRefSrcBadge: {
-    fontSize:8, fontWeight:700, letterSpacing:'0.07em',
-    padding:'2px 6px', borderRadius:99, flexShrink:0, marginTop:2,
+  inlineChipSrc: {
+    fontSize:7, fontWeight:800, letterSpacing:'0.06em',
+    color:'white', padding:'1px 4px', borderRadius:99,
+    lineHeight:1.5,
   },
-  crossRefLabel: {
-    fontSize:13, fontWeight:500, lineHeight:1.4,
-    fontFamily:"'Cormorant Garamond',serif",
+  inlineChipLabel: {
+    fontSize:9, fontWeight:600, lineHeight:1.4,
   },
 
   /* Nav bar */

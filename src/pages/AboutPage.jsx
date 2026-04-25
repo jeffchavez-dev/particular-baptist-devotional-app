@@ -6,6 +6,7 @@ import { usePrefs } from '../App'
 import { FONT_OPTIONS, FONT_SIZES } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
+import NotificationSettings from '../components/NotificationSettings'
 
 const SCHEDULE = buildSchedule()
 
@@ -181,6 +182,9 @@ export default function AboutPage() {
               }} />
             </button>
           </div>
+
+          {/* ── Notifications ── */}
+          <NotificationSettings userId={session?.user?.id} />
 
           {/* ── Font Size ── */}
           <div style={s.settingRow}>
@@ -569,7 +573,7 @@ const s = {
   },
   toggleKnob: {
     position:'absolute', top:2, width:20, height:20,
-    borderRadius:'50%', background:'white', transition:'transform 0.2s',
+    borderRadius:'50%', background:'var(--parchment)', transition:'transform 0.2s',
     boxShadow:'0 1px 4px rgba(0,0,0,0.2)',
   },
 

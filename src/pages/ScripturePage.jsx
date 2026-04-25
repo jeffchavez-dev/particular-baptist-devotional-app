@@ -79,7 +79,7 @@ function ChapterBlock({ chId, done, inPlan, onToggle, label }) {
       style={{
         width: 32, height: 32, borderRadius: 6,
         border: `1.5px solid ${done ? 'var(--teal)' : inPlan ? 'rgba(29,107,90,0.35)' : 'var(--border)'}`,
-        background: done ? 'var(--teal)' : inPlan ? 'var(--teal-light)' : 'white',
+        background: done ? 'var(--teal)' : inPlan ? 'var(--teal-light)' : 'var(--surface)',
         color: done ? 'white' : inPlan ? 'var(--teal)' : 'var(--ink-faint)',
         fontSize: 10, fontWeight: done ? 700 : inPlan ? 600 : 400,
         cursor: 'pointer', transition: 'all 0.12s',
@@ -167,7 +167,7 @@ function CategoryBox({ cat, planByBook, bibBooks, progress, mode, onToggle, onNa
   return (
     <div style={{...s.catBox, borderColor: isOpen ? cat.color : 'var(--border)'}}>
       <button
-        style={{...s.catHeader, background: isOpen ? cat.bg : 'white'}}
+        style={{...s.catHeader, background: isOpen ? cat.bg : 'var(--surface)'}}
         onClick={onOpenToggle}
       >
         <div style={{flex:1, minWidth:0}}>
@@ -449,7 +449,7 @@ export default function ScripturePage() {
               <span style={{marginLeft:10}}>
                 <span style={s.legend}><span style={{...s.dot, background:'var(--teal)'}} />Read</span>
                 <span style={s.legend}><span style={{...s.dot, background:'var(--teal-light)', border:'1.5px solid rgba(29,107,90,0.35)'}} />In plan</span>
-                <span style={s.legend}><span style={{...s.dot, background:'white', border:'1.5px solid var(--border)'}} />Unread</span>
+                <span style={s.legend}><span style={{...s.dot, background:'var(--surface)', border:'1.5px solid var(--border)'}} />Unread</span>
               </span>
             </p>
           </div>
@@ -575,7 +575,7 @@ const s = {
   page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif" },
 
   /* header */
-  header: { position:'sticky', top:0, zIndex:20, background:'white', borderBottom:'1px solid var(--border)', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' },
+  header: { position:'sticky', top:0, zIndex:20, background:'var(--surface)', borderBottom:'1px solid var(--border)', boxShadow:'0 1px 4px rgba(0,0,0,0.05)' },
   headerInner: { maxWidth:1100, margin:'0 auto', padding:'10px 20px', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap' },
 
   tabs: { display:'flex', gap:4, flexWrap:'wrap' },
@@ -594,7 +594,7 @@ const s = {
 
   /* progress */
   progressCard: {
-    background:'white', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)',
+    background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)',
     padding:'16px 20px', marginBottom:'1rem', display:'flex', flexDirection:'column', gap:10,
   },
   progressNote: { fontSize:12, color:'var(--ink-muted)', lineHeight:1.7, margin:0, display:'flex', alignItems:'center', flexWrap:'wrap', gap:4 },
@@ -605,7 +605,7 @@ const s = {
   accordWrap: { marginBottom:8 },
   accordHeader: {
     display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
-    padding:'12px 16px', background:'white', border:'1px solid var(--border)',
+    padding:'12px 16px', background:'var(--surface)', border:'1px solid var(--border)',
     borderRadius:'var(--radius-lg)', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'background 0.1s',
   },
@@ -614,7 +614,7 @@ const s = {
 
   /* book block */
   bookBlock: {
-    background:'white', border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius)',
     padding:'10px 14px', marginBottom:6,
   },
   bookHead: { display:'flex', alignItems:'center', gap:8, marginBottom:8, flexWrap:'wrap' },
@@ -635,7 +635,7 @@ const s = {
   },
 
   /* proof texts */
-  controls: { background:'white', borderBottom:'1px solid var(--border)', padding:'12px 20px' },
+  controls: { background:'var(--surface)', borderBottom:'1px solid var(--border)', padding:'12px 20px' },
   controlsInner: { maxWidth:1100, margin:'0 auto', display:'flex', gap:8, flexWrap:'wrap' },
   searchWrap: {
     flex:1, minWidth:180, display:'flex', alignItems:'center',
@@ -649,18 +649,18 @@ const s = {
   clearBtn: { background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', padding:4 },
   select: {
     padding:'8px 12px', fontSize:13, border:'1px solid var(--border-strong)',
-    borderRadius:'var(--radius)', background:'white', color:'var(--ink)', cursor:'pointer',
+    borderRadius:'var(--radius)', background:'var(--surface)', color:'var(--ink)', cursor:'pointer',
   },
 
   ptBookSection: { marginBottom:4 },
   bookHeading: {
     display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
-    padding:'10px 14px', background:'white', border:'1px solid var(--border)',
+    padding:'10px 14px', background:'var(--surface)', border:'1px solid var(--border)',
     borderRadius:'var(--radius)', marginBottom:2, cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", transition:'background 0.1s',
   },
   entryList: {
-    border:'1px solid var(--border)', borderTop:'none', background:'white',
+    border:'1px solid var(--border)', borderTop:'none', background:'var(--surface)',
     borderRadius:'0 0 var(--radius) var(--radius)', marginBottom:8,
   },
   entryRow: {
@@ -694,7 +694,7 @@ const s = {
     gap:10,
   },
   catBox: {
-    background:'white', border:'1.5px solid var(--border)',
+    background:'var(--surface)', border:'1.5px solid var(--border)',
     borderRadius:'var(--radius-lg)', overflow:'hidden',
     transition:'border-color 0.15s',
   },

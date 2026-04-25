@@ -153,19 +153,34 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
 .btn-primary {
   background: var(--ink); color: var(--parchment);
 }
-.btn-primary:hover { background: #2e2820; }
+.btn-primary:hover { background: var(--ink-muted); }
+.btn-primary:active { transform: scale(0.98); }
 
 .btn-outline {
   background: transparent; color: var(--ink);
   border-color: var(--border-strong);
 }
-.btn-outline:hover { background: var(--parchment-dark); }
+.btn-outline:hover { background: var(--parchment-dark); color: var(--ink); }
 
 .btn-ghost {
   background: transparent; color: var(--ink-muted);
   border: none; padding: 6px 10px;
 }
 .btn-ghost:hover { color: var(--ink); background: var(--parchment-dark); }
+
+[data-theme="dark"] .btn-primary {
+  background: var(--gold-light); color: var(--ink);
+}
+[data-theme="dark"] .btn-primary:hover {
+  background: var(--gold); color: var(--ink);
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 0 3px rgba(212,185,126,0.2);
+}
 
 .badge {
   display: inline-block; font-size: 10px; font-weight: 500;
@@ -181,6 +196,12 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
   border: 1px solid var(--border); box-shadow: var(--shadow-sm);
 }
 
+[data-theme="dark"] .card {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
 @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 .fade-in { animation: fadeIn 0.3s ease forwards; }
 
@@ -188,6 +209,11 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
 .spinner {
   width:20px; height:20px; border:2px solid var(--border);
   border-top-color:var(--gold); border-radius:50%; animation: spin 0.7s linear infinite;
+}
+
+[data-theme="dark"] .spinner {
+  border-color: rgba(212,185,126,0.2);
+  border-top-color: var(--gold-light);
 }
 
 /* ── Bottom navigation — visible on all screen sizes ── */

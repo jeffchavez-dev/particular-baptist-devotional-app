@@ -50,6 +50,9 @@ export default defineConfig({
       },
 
       workbox: {
+        // Inject push notification handler into the generated service worker
+        importScripts: ['push-handler.js'],
+
         // Pre-cache all app assets (JS, CSS, HTML, fonts, icons)
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
 
