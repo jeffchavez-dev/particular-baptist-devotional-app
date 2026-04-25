@@ -288,10 +288,23 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
 
   /* Redraw whenever inputs change */
   useEffect(() => {
-    if (!isOpen || !canvasRef.current || !card) return
-    document.fonts.ready.then(() => {
-      drawCard(canvasRef.current, card, preset, format, customBg, customText, cardScale.scale)
-    })
+    if (!isOpen || !card) return
+
+    function render() {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      try {
+        drawCard(canvas, card, preset, format, customBg, customText, cardScale.scale)
+      } catch (err) {
+        console.error('[ShareCard] draw error:', err)
+      }
+    }
+
+    // Draw immediately — canvas ref is set by React before effects run
+    render()
+    // Draw again after fonts settle (web fonts can load slightly after DOM commit)
+    const t = setTimeout(render, 120)
+    return () => clearTimeout(t)
   }, [isOpen, card, preset, format, customBg, customText, cardScale])
 
   /* ESC to close */
