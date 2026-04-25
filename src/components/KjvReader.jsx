@@ -1159,12 +1159,14 @@ const sb = {
 const r = {
   wrap: {
     display:'flex',
+    flexDirection:'column',
     height:'100%',
     overflow:'hidden', position:'relative',
   },
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:199 },
   sidebar: {
-    width:220, flexShrink:0, background:'var(--surface)',
+    position:'absolute', left:0, top:0, bottom:0,
+    width:220, background:'var(--surface)',
     borderRight:'1px solid var(--border)', overflowY:'auto',
   },
   mobileNavHeader: {

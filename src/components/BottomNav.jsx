@@ -101,12 +101,11 @@ export default function BottomNav() {
               key={tab.path}
               onClick={() => navigate(tab.path)}
               style={{ ...n.tab, color: isActive ? 'var(--teal)' : 'var(--ink-faint)' }}
+              title={tab.label}
+              aria-label={tab.label}
               aria-current={isActive ? 'page' : undefined}
             >
               <span style={n.icon}>{tab.icon(isActive)}</span>
-              <span style={{ ...n.label, fontWeight: isActive ? 700 : 400, color: isActive ? 'var(--teal)' : 'var(--ink-faint)' }}>
-                {tab.label}
-              </span>
               {isActive && <span style={n.indicator} />}
             </button>
           )
@@ -130,13 +129,12 @@ const n = {
   tabWrap: { height: 64 },
   tab: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    justifyContent: 'center', gap: 3, background: 'none', border: 'none',
-    cursor: 'pointer', padding: '8px 4px 4px', position: 'relative',
+    justifyContent: 'center', gap: 0, background: 'none', border: 'none',
+    cursor: 'pointer', padding: '12px 4px 8px', position: 'relative',
     transition: 'color 0.15s', fontFamily: "'DM Sans', sans-serif",
-    WebkitTapHighlightColor: 'transparent',
+    WebKitTapHighlightColor: 'transparent',
   },
   icon: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  label: { fontSize: 10, letterSpacing: '0.02em', lineHeight: 1, fontWeight: 500 },
   indicator: {
     position: 'absolute', top: 0, left: '20%', right: '20%',
     height: 2, borderRadius: '0 0 2px 2px', background: 'var(--teal)',

@@ -680,13 +680,14 @@ export default function ConfessionsPage() {
               onClick={() => setNavOpen(o => !o)}
               className="btn btn-ghost"
               style={{gap:5, fontSize:12, padding:'5px 10px', flexShrink:0}}
+              aria-label="Open navigation"
+              title="Navigation"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="2.5" width="14" height="1.5" rx=".75" fill="currentColor"/>
                 <rect x="1" y="7"   width="9"  height="1.5" rx=".75" fill="currentColor"/>
                 <rect x="1" y="11.5" width="11" height="1.5" rx=".75" fill="currentColor"/>
               </svg>
-              {src.label}
             </button>
           )}
 

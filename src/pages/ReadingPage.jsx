@@ -572,11 +572,10 @@ export default function ReadingPage() {
     <div style={s.page}>
       <header style={s.header}>
         <div style={s.headerInner}>
-          <button onClick={()=>navigate('/')} className="btn btn-ghost" style={{gap:4}}>
+          <button onClick={()=>navigate('/')} className="btn btn-ghost" style={{gap:4}} title="Back to all days" aria-label="Back to all days">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            All days
           </button>
           <div style={{display:'flex', alignItems:'center', gap:8}}>
             <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
