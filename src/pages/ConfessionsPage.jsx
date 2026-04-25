@@ -501,6 +501,16 @@ export default function ConfessionsPage() {
     setNoteData({ ...next })
   }, [userId])
 
+  /* Refresh annotations when a cross-device sync completes */
+  useEffect(() => {
+    function onSync(e) {
+      setHlData({ ...e.detail.highlights })
+      setNoteData({ ...e.detail.notes })
+    }
+    window.addEventListener('pb-annotations-updated', onSync)
+    return () => window.removeEventListener('pb-annotations-updated', onSync)
+  }, [])
+
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
     restoreScroll('conf')

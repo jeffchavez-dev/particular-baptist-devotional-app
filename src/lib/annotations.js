@@ -247,25 +247,37 @@ export async function syncAnnotationsUp(userId) {
 }
 
 export async function syncAnnotationsDown(userId) {
+  let hlMerged  = loadHighlights()
+  let noteMerged = loadItemNotes()
+  let changed = false
+
   try {
     const { data, error } = await supabase
       .from('pb_highlights').select('item_key,color').eq('user_id', userId)
-    if (!error && data) {
-      const obj = {}
-      data.forEach(r => { obj[r.item_key] = r.color })
-      _persist(HL_KEY, obj)
+    if (!error && data && data.length > 0) {
+      // Merge: Supabase wins for items it knows about; local-only items survive
+      data.forEach(r => { hlMerged[r.item_key] = r.color })
+      _persist(HL_KEY, hlMerged)
+      changed = true
     }
   } catch (e) { console.warn('[annotations] highlights sync down:', e?.message) }
 
   try {
     const { data, error } = await supabase
       .from('pb_item_notes').select('item_key,note_text').eq('user_id', userId)
-    if (!error && data) {
-      const obj = {}
-      data.forEach(r => { obj[r.item_key] = r.note_text })
-      _persist(NOTE_KEY, obj)
+    if (!error && data && data.length > 0) {
+      data.forEach(r => { noteMerged[r.item_key] = r.note_text })
+      _persist(NOTE_KEY, noteMerged)
+      changed = true
     }
   } catch (e) { console.warn('[annotations] notes sync down:', e?.message) }
+
+  // Notify any open components to refresh their state from localStorage
+  if (changed) {
+    window.dispatchEvent(new CustomEvent('pb-annotations-updated', {
+      detail: { highlights: hlMerged, notes: noteMerged },
+    }))
+  }
 }
 
 // ── Derived helpers for the Settings/About page ───────────────────────────────

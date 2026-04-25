@@ -529,6 +529,16 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   /* Notify parent of search query changes */
   useEffect(() => { onSearchChange?.(searchQuery) }, [searchQuery]) // eslint-disable-line
 
+  /* Refresh highlights + notes when a cross-device sync completes */
+  useEffect(() => {
+    function onSync(e) {
+      setHighlightsState({ ...e.detail.highlights })
+      setItemNotesState({ ...e.detail.notes })
+    }
+    window.addEventListener('pb-annotations-updated', onSync)
+    return () => window.removeEventListener('pb-annotations-updated', onSync)
+  }, [])
+
   /* Persist position */
   useEffect(() => {
     try {

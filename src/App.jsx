@@ -52,6 +52,17 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [])
 
+  /* ── Poll every 60 s when online + logged in (cross-device live sync) ── */
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (navigator.onLine && prevUser.current) {
+        syncAnnotationsDown(prevUser.current.id)
+        syncBibleProgressDown(prevUser.current.id)
+      }
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   /* ── Theme (dark mode) ── */
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem('pb-dark') === '1' } catch { return false }
