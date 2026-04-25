@@ -103,6 +103,21 @@ const NT_CATS = [
 
 const BOOK_META = Object.fromEntries(BIBLE_BOOKS.map(b => [b.name, b]))
 
+/** Get the chapter that follows a given book/chapter (or null at end of Bible) */
+function getNextChapter(bookName, ch) {
+  const meta = BOOK_META[bookName]
+  if (!meta) return null
+  if (ch < meta.chapters) return { book: bookName, chapter: ch + 1 }
+  const idx = BIBLE_BOOKS.findIndex(b => b.name === bookName)
+  if (idx >= 0 && idx < BIBLE_BOOKS.length - 1) return { book: BIBLE_BOOKS[idx + 1].name, chapter: 1 }
+  return null
+}
+
+/** Stable DOM id for a given verse (book/chapter/verse) */
+function verseId(bookName, ch, verse) {
+  return `v-${bookName.replace(/\s+/g, '')}-${ch}-${verse}`
+}
+
 /* ── Source chip colours for cross-references ── */
 const SRC_CHIP = {
   '2LBCF':    { bg:'rgba(61,43,107,0.10)', color:'#3d2b6b', border:'rgba(61,43,107,0.2)' },
@@ -307,7 +322,7 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
                           onNavigate(hit.book, hit.chapter)
                           onClose()
                           setTimeout(() => {
-                            const el = readerRef.current?.querySelector(`#v${hit.verse}`)
+                            const el = readerRef.current?.querySelector(`#${verseId(hit.book, hit.chapter, hit.verse)}`)
                             if (el) el.scrollIntoView({ behavior:'smooth', block:'center' })
                           }, 200)
                         }}
@@ -456,11 +471,13 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     try { return parseInt(sessionStorage.getItem('kjv-chapter') || '1') } catch { return 1 }
   })
 
-  const [verses,    setVerses]    = useState(() => getChapterVerses(book, chapter) || [])
-  const [loading,   setLoading]   = useState(!_kjvData)
-  const [dataReady, setDataReady] = useState(!!_kjvData)
-  const [error,     setError]     = useState(null)
-  const [sideOpen,  setSideOpen]  = useState(false)
+  /* segments = [{book, chapter, verses[]}] — first entry is navigated chapter, rest are auto-loaded */
+  const [segments,    setSegments]    = useState([])
+  const [loading,     setLoading]     = useState(!_kjvData)
+  const [dataReady,   setDataReady]   = useState(!!_kjvData)
+  const [error,       setError]       = useState(null)
+  const [sideOpen,    setSideOpen]    = useState(false)
+  const sentinelRef   = useRef(null)
 
   /* Share + confession modals */
   const [shareCard,       setShareCard]       = useState(null)
@@ -536,27 +553,25 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
 
   /* (search input is always visible in toolbar — no open/close toggle needed) */
 
-  /* Chapter-level matches (used for in-chapter highlighting only when no Bible results) */
+  /* Chapter-level matches — only against the first (navigated) segment */
   const chapterMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    if (!q || bibleResults !== null || !verses.length) return []
-    return verses
+    const firstVerses = segments[0]?.verses || []
+    if (!q || bibleResults !== null || !firstVerses.length) return []
+    return firstVerses
       .map((v, idx) => ({ idx, verse: v.verse, match: v.text.toLowerCase().includes(q) }))
       .filter(v => v.match)
-  }, [searchQuery, verses, bibleResults])
+  }, [searchQuery, segments, bibleResults])
 
-  /* Scroll to focused match within current chapter */
+  /* Scroll to focused match within navigated chapter */
   useEffect(() => {
     if (!chapterMatches.length) return
     const safeIdx = Math.min(searchFocus, chapterMatches.length - 1)
     const verseNum = chapterMatches[safeIdx]?.verse
     if (!verseNum || !readerRef.current) return
-    const el = readerRef.current.querySelector(`#v${verseNum}`)
+    const el = readerRef.current.querySelector(`#${verseId(book, chapter, verseNum)}`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [searchFocus, chapterMatches])
-
-  const bookInfo = BOOK_META[book] || { chapters: 1 }
-  const totalChs = bookInfo.chapters
+  }, [searchFocus, chapterMatches, book, chapter])
 
   /* First-mount: load KJV bundle */
   useEffect(() => {
@@ -569,20 +584,46 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
           setDataReady(true)
           setLoading(false)
           const v = getChapterVerses(book, chapter)
-          if (v) setVerses(v)
+          if (v) setSegments([{ book, chapter, verses: v }])
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     }
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Chapter change — instant from memory */
+  /* Chapter navigation — reset to single segment, scroll to top */
   useEffect(() => {
     if (!dataReady) return
     const v = getChapterVerses(book, chapter)
-    if (v) { setVerses(v); setError(null) }
+    if (v) { setSegments([{ book, chapter, verses: v }]); setError(null) }
+    else    { setError('Chapter not found') }
     if (readerRef.current) readerRef.current.scrollTop = 0
   }, [book, chapter, dataReady])
+
+  /* Append next chapter when sentinel becomes visible */
+  useEffect(() => {
+    if (!dataReady || !sentinelRef.current) return
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        setSegments(prev => {
+          if (!prev.length) return prev
+          const last = prev[prev.length - 1]
+          const next = getNextChapter(last.book, last.chapter)
+          if (!next) return prev
+          // Avoid double-loading
+          const alreadyLoaded = prev.some(s => s.book === next.book && s.chapter === next.chapter)
+          if (alreadyLoaded) return prev
+          const v = getChapterVerses(next.book, next.chapter)
+          if (!v) return prev
+          return [...prev, { book: next.book, chapter: next.chapter, verses: v }]
+        })
+      },
+      { rootMargin: '300px' }
+    )
+    obs.observe(sentinelRef.current)
+    return () => obs.disconnect()
+  }, [dataReady, segments])
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
@@ -623,10 +664,12 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   }
 
   function handleShareChapter() {
-    const chText = verses.map(v => `${v.verse} ${v.text}`).join('\n')
+    const firstSeg = segments[0]
+    if (!firstSeg) return
+    const chText = firstSeg.verses.map(v => `${v.verse} ${v.text}`).join('\n')
     setShareCard({
       type: 'reading',
-      title: `${book} ${chapter}`,
+      title: `${firstSeg.book} ${firstSeg.chapter}`,
       subtitle: 'King James Version',
       source: 'KJV',
       text: chText.slice(0, 1200),
@@ -678,13 +721,7 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     setChapter(newChapter)
   }
 
-  const todayLink      = todayChapter
-  const isTodayChapter = todayLink && todayLink === `${book} ${chapter}`
-  const canPrev        = chapter > 1
-  const canNext        = chapter < totalChs
-  const bookIdx        = BIBLE_BOOKS.findIndex(b => b.name === book)
-  const prevBook       = chapter === 1 && bookIdx > 0 ? BIBLE_BOOKS[bookIdx - 1] : null
-  const nextBook       = chapter === totalChs && bookIdx < BIBLE_BOOKS.length - 1 ? BIBLE_BOOKS[bookIdx + 1] : null
+  const isTodayChapter = todayChapter && todayChapter === `${book} ${chapter}`
 
   /* Highlight text in verse for search */
   function highlightSearchInText(text) {
@@ -904,212 +941,151 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             />
           )}
 
-          {!loading && !error && verses.length > 0 && bibleResults === null && (
-            <>
-              <h2 style={r.chapterHeading}>{book} {chapter}</h2>
-
-              {/* Verses */}
-              <div style={r.verseList} ref={verseListRef}>
-                {verses.map(({ verse, text }) => {
-                  const verseKey      = `kjv|${book}|${chapter}|${verse}`
-                  const hlColorId     = highlights[verseKey] || null
-                  const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
-                  const note          = itemNotes[verseKey]
-                  const isEditing     = editingNote === verseKey
-                  const showPicker    = colorPicker === verseKey
-                  const verseRefs     = getCrossRefs(book, chapter, verse)
-                  const isSearchMatch = !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
-                  const isFocusMatch  = !bibleResults && chapterMatches[searchFocus]?.verse === verse
-
-                  return (
-                    <div
-                      key={verse}
-                      id={`v${verse}`}
-                      style={{
-                        ...r.verseOuter,
-                        ...(hlColorId ? {
-                          background: hlStyle.rowBg,
-                          borderLeftColor: hlStyle.border,
-                        } : {}),
-                        ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
-                        ...(isSearchMatch && !isFocusMatch ? { background:'rgba(254,240,138,0.25)' } : {}),
-                      }}
-                    >
-                      {/* ── main verse row ── */}
-                      <div style={r.verseRow}>
-                        {/* Verse number — click to open colour picker */}
-                        <button
-                          style={{
-                            ...r.verseNum,
-                            ...(hlColorId ? {
-                              color: hlStyle.numClr,
-                              background: hlStyle.numBg,
-                            } : {}),
-                          }}
-                          onClick={() => {
-                            setColorPicker(prev => prev === verseKey ? null : verseKey)
-                            setEditingNote(null)
-                          }}
-                          title="Highlight verse"
-                        >
-                          {verse}
-                        </button>
-
-                        <span style={r.verseBody}>
-                          <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
-
-                          {/* Confession cross-ref chips */}
-                          {verseRefs.length > 0 && (
-                            <span style={r.inlineCrossRefs}>
-                              {verseRefs.map(ref => {
-                                const chip = SRC_CHIP[ref.src] || {}
-                                return (
-                                  <button
-                                    key={ref.key}
-                                    style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
-                                    onClick={() => setConfessionModal(ref)}
-                                  >
-                                    <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
-                                    <span style={r.inlineChipLabel}>{ref.label}</span>
-                                  </button>
-                                )
-                              })}
-                            </span>
-                          )}
-
-                          {/* Note icon button */}
-                          <button
-                            onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
-                            style={{
-                              ...r.noteIconBtn,
-                              ...(note ? r.noteIconBtnActive : {}),
-                            }}
-                            title={note ? 'View / edit note' : 'Add note'}
-                          >
-                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                              <path d="M1.5 9L2 7 7 2l2 2-5 4.5L1.5 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
-                              <line x1="6" y1="2.5" x2="8" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
-                            </svg>
-                          </button>
-
-                          {/* Share verse icon button */}
-                          <button
-                            onClick={() => setShareCard({
-                              type: 'reading',
-                              title: `${book} ${chapter}:${verse}`,
-                              subtitle: 'King James Version',
-                              source: 'KJV',
-                              text: text,
-                              label: '',
-                            })}
-                            style={r.noteIconBtn}
-                            title="Share verse"
-                          >
-                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                              <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                        </span>
-                      </div>
-
-                      {/* Colour picker */}
-                      {showPicker && (
-                        <div style={{ marginLeft:34, marginBottom:4 }}>
-                          <ColorPicker
-                            currentColor={hlColorId}
-                            onSelect={colorId => handleHighlight(verseKey, colorId)}
-                            onClose={() => setColorPicker(null)}
-                          />
-                        </div>
-                      )}
-
-                      {/* Saved note display */}
-                      {note && !isEditing && (
-                        <div style={r.noteDisplay} onClick={() => openNoteEditor(verseKey)}>
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
-                            <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                            <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
-                          </svg>
-                          <span style={{flex:1}}>{note}</span>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }}
-                            style={r.noteShareBtn}
-                            title="Share note"
-                          >
-                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                              <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                              <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Inline note editor */}
-                      {isEditing && (
-                        <div style={r.noteEditorWrap}>
-                          <textarea
-                            value={noteDraft}
-                            onChange={e => setNoteDraft(e.target.value)}
-                            placeholder={`Note on ${book} ${chapter}:${verse}…`}
-                            style={r.noteTextarea}
-                            autoFocus
-                            rows={3}
-                          />
-                          <div style={r.noteEditorActions}>
-                            <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
-                            <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
-                            {note && (
-                              <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>
-                            )}
-                          </div>
-                        </div>
-                      )}
+          {/* ── Continuous chapter segments ── */}
+          <div ref={verseListRef}>
+            {!loading && !error && segments.length > 0 && bibleResults === null && segments.map((seg, segIdx) => (
+              <div key={`${seg.book}|${seg.chapter}`}>
+                {/* Chapter heading — first one is an <h2>, subsequent are dividers */}
+                {segIdx === 0
+                  ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
+                  : <div style={r.chapterDivider}>
+                      <span style={r.chapterDividerLine} />
+                      <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
+                      <span style={r.chapterDividerLine} />
                     </div>
-                  )
-                })}
+                }
+
+                <div style={r.verseList}>
+                  {seg.verses.map(({ verse, text }) => {
+                    const verseKey      = `kjv|${seg.book}|${seg.chapter}|${verse}`
+                    const hlColorId     = highlights[verseKey] || null
+                    const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
+                    const note          = itemNotes[verseKey]
+                    const isEditing     = editingNote === verseKey
+                    const showPicker    = colorPicker === verseKey
+                    const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
+                    /* Search highlights only on first segment */
+                    const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
+                    const isFocusMatch  = segIdx === 0 && !bibleResults && chapterMatches[searchFocus]?.verse === verse
+
+                    return (
+                      <div
+                        key={verse}
+                        id={verseId(seg.book, seg.chapter, verse)}
+                        style={{
+                          ...r.verseOuter,
+                          ...(hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
+                          ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
+                          ...(isSearchMatch && !isFocusMatch ? { background:'rgba(254,240,138,0.25)' } : {}),
+                        }}
+                      >
+                        {/* ── main verse row ── */}
+                        <div style={r.verseRow}>
+                          <button
+                            style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
+                            onClick={() => { setColorPicker(prev => prev === verseKey ? null : verseKey); setEditingNote(null) }}
+                            title="Highlight verse"
+                          >
+                            {verse}
+                          </button>
+
+                          <span style={r.verseBody}>
+                            <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
+
+                            {verseRefs.length > 0 && (
+                              <span style={r.inlineCrossRefs}>
+                                {verseRefs.map(ref => {
+                                  const chip = SRC_CHIP[ref.src] || {}
+                                  return (
+                                    <button
+                                      key={ref.key}
+                                      style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
+                                      onClick={() => setConfessionModal(ref)}
+                                    >
+                                      <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
+                                      <span style={r.inlineChipLabel}>{ref.label}</span>
+                                    </button>
+                                  )
+                                })}
+                              </span>
+                            )}
+
+                            <button
+                              onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
+                              style={{ ...r.noteIconBtn, ...(note ? r.noteIconBtnActive : {}) }}
+                              title={note ? 'View / edit note' : 'Add note'}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                <path d="M1.5 9L2 7 7 2l2 2-5 4.5L1.5 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
+                                <line x1="6" y1="2.5" x2="8" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                              </svg>
+                            </button>
+
+                            <button
+                              onClick={() => setShareCard({ type:'reading', title:`${seg.book} ${seg.chapter}:${verse}`, subtitle:'King James Version', source:'KJV', text, label:'' })}
+                              style={r.noteIconBtn}
+                              title="Share verse"
+                            >
+                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          </span>
+                        </div>
+
+                        {showPicker && (
+                          <div style={{ marginLeft:34, marginBottom:4 }}>
+                            <ColorPicker currentColor={hlColorId} onSelect={colorId => handleHighlight(verseKey, colorId)} onClose={() => setColorPicker(null)} />
+                          </div>
+                        )}
+
+                        {note && !isEditing && (
+                          <div style={r.noteDisplay} onClick={() => openNoteEditor(verseKey)}>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                              <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                              <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                            </svg>
+                            <span style={{flex:1}}>{note}</span>
+                            <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }} style={r.noteShareBtn} title="Share note">
+                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        )}
+
+                        {isEditing && (
+                          <div style={r.noteEditorWrap}>
+                            <textarea
+                              value={noteDraft}
+                              onChange={e => setNoteDraft(e.target.value)}
+                              placeholder={`Note on ${seg.book} ${seg.chapter}:${verse}…`}
+                              style={r.noteTextarea}
+                              autoFocus rows={3}
+                            />
+                            <div style={r.noteEditorActions}>
+                              <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
+                              <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                              {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </>
-          )}
-        </div>
+            ))}
 
-        {/* Chapter navigation */}
-        <div style={r.navBar}>
-          <button
-            style={{ ...r.navBtn, opacity: (!canPrev && !prevBook) ? 0.35 : 1 }}
-            disabled={!canPrev && !prevBook}
-            onClick={() => {
-              if (canPrev) navigate(book, chapter - 1)
-              else if (prevBook) navigate(prevBook.name, prevBook.chapters)
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
-            {canPrev ? `Ch. ${chapter - 1}` : prevBook ? prevBook.name : 'Prev'}
-          </button>
-
-          <div style={{ textAlign:'center', fontSize:11, color:'var(--ink-faint)' }}>
-            {chapter} / {totalChs}
+            {/* Sentinel — IntersectionObserver triggers next chapter load here */}
+            {!loading && !bibleResults && <div ref={sentinelRef} style={{ height:40 }} />}
           </div>
-
-          <button
-            style={{ ...r.navBtn, opacity: (!canNext && !nextBook) ? 0.35 : 1 }}
-            disabled={!canNext && !nextBook}
-            onClick={() => {
-              if (canNext) navigate(book, chapter + 1)
-              else if (nextBook) navigate(nextBook.name, 1)
-            }}
-          >
-            {canNext ? `Ch. ${chapter + 1}` : nextBook ? nextBook.name : 'Next'}
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -1321,6 +1297,17 @@ const r = {
   chapterHeading: {
     fontFamily:"'Cormorant Garamond',serif", fontSize:24, fontWeight:500,
     color:'var(--ink)', marginBottom:'1.5rem', letterSpacing:'-0.01em',
+  },
+  chapterDivider: {
+    display:'flex', alignItems:'center', gap:12,
+    margin:'2.5rem 0 1.5rem',
+  },
+  chapterDividerLine: {
+    flex:1, height:1, background:'var(--border)',
+  },
+  chapterDividerLabel: {
+    fontFamily:"'Cormorant Garamond',serif", fontSize:18, fontWeight:500,
+    color:'var(--ink-muted)', letterSpacing:'0.01em', flexShrink:0,
   },
   verseList: { display:'flex', flexDirection:'column', gap:0 },
 

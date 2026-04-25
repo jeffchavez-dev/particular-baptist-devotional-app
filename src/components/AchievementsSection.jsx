@@ -117,37 +117,26 @@ function useBibleStats() {
   }, [bibleProgress])
 }
 
-/* ── Single confession badge ── */
-function ConfBadge({ src, stats }) {
-  const meta    = CONF_META[src]
-  const done    = stats.done === stats.total
+/* ── Confession chip (compact, like Bible book chips) ── */
+function ConfChip({ src, stats }) {
+  const meta = CONF_META[src]
+  const done = stats.total > 0 && stats.done === stats.total
   return (
-    <div style={{
-      ...a.confCard,
-      background: done ? meta.bg : 'var(--surface)',
-      borderColor: done ? meta.border : 'var(--border)',
-      opacity: done ? 1 : 0.85,
-    }}>
-      <div style={{ ...a.confIcon, color: meta.color, background: done ? meta.bg : 'var(--parchment)' }}>
-        {done
-          ? <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10l4.5 4.5L16 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          : meta.icon
-        }
-      </div>
-      <div style={a.confBody}>
-        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-          <span style={{ ...a.confLabel, color: meta.color }}>{meta.label}</span>
-          {done && <span style={{ ...a.earnedBadge, background: meta.color }}>✓ Complete</span>}
-        </div>
-        <span style={a.confName}>{meta.fullName}</span>
-        <div style={a.progressRow}>
-          <div style={a.progressBar}>
-            <div style={{ ...a.progressFill, width: `${stats.pct}%`, background: meta.color }} />
-          </div>
-          <span style={{ ...a.progressLabel, color: meta.color }}>{stats.pct}%</span>
-        </div>
-        <span style={a.progressCount}>{stats.done} / {stats.total} readings completed</span>
-      </div>
+    <div
+      title={`${meta.fullName}: ${stats.done}/${stats.total} readings completed`}
+      style={{
+        ...a.confChip,
+        background:   done ? meta.bg : stats.pct > 0 ? meta.bg : 'var(--parchment)',
+        borderColor:  done ? meta.border : stats.pct > 0 ? meta.border : 'var(--border)',
+        color:        done ? meta.color : stats.pct > 0 ? meta.color : 'var(--ink-faint)',
+      }}
+    >
+      <span style={{ fontWeight:700, color: meta.color }}>{meta.label}</span>
+      <span style={{ opacity:0.4 }}>·</span>
+      {done
+        ? <span style={{ fontSize:10 }}>✓</span>
+        : <span style={{ fontSize:10, fontWeight:500 }}>{stats.done}/{stats.total}</span>
+      }
     </div>
   )
 }
@@ -171,12 +160,19 @@ export default function AchievementsSection({ supabaseProgress, hideHeader = fal
   const content = (
     <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
 
-          {/* ── Confession Progress ── */}
+          {/* ── Confession Progress — compact chips ── */}
           <div>
-            <div style={a.groupLabel}>Confession Reading</div>
-            <div style={a.confGrid}>
+            <div style={a.groupLabel}>
+              Confession Reading
+              <span style={a.groupSub}>
+                {['2LBCF','Catechism','1LBCF'].filter(src => {
+                  const s = confStats[src]; return s && s.total > 0 && s.done === s.total
+                }).length} / 3 complete
+              </span>
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {['2LBCF','Catechism','1LBCF'].map(src => (
-                <ConfBadge key={src} src={src} stats={confStats[src] || { done:0, total:1, pct:0 }} />
+                <ConfChip key={src} src={src} stats={confStats[src] || { done:0, total:1, pct:0 }} />
               ))}
             </div>
           </div>
@@ -310,29 +306,14 @@ const a = {
     padding:'1px 7px',
   },
 
-  /* Confession cards */
-  confGrid: { display:'flex', flexDirection:'column', gap:10 },
-  confCard: {
-    display:'flex', alignItems:'flex-start', gap:12,
-    padding:'12px 14px', borderRadius:'var(--radius-lg)', border:'1.5px solid',
-    transition:'all 0.2s',
+  /* Confession chips — compact, like Bible book chips */
+  confChip: {
+    display:'inline-flex', alignItems:'center', gap:6,
+    fontSize:11, fontWeight:500, padding:'6px 13px',
+    border:'1.5px solid', borderRadius:99,
+    transition:'all 0.15s', cursor:'default',
+    fontFamily:"'DM Sans',sans-serif",
   },
-  confIcon: {
-    width:36, height:36, borderRadius:10, display:'flex',
-    alignItems:'center', justifyContent:'center', flexShrink:0,
-  },
-  confBody:  { flex:1, minWidth:0 },
-  confLabel: { fontSize:12, fontWeight:700, letterSpacing:'0.04em' },
-  confName:  { fontSize:11, color:'var(--ink-faint)', display:'block', marginTop:1, marginBottom:6 },
-  earnedBadge: {
-    fontSize:9, fontWeight:700, color:'white', borderRadius:99,
-    padding:'2px 7px', letterSpacing:'0.04em',
-  },
-  progressRow:   { display:'flex', alignItems:'center', gap:8, marginBottom:3 },
-  progressBar:   { flex:1, height:5, borderRadius:99, background:'var(--border)', overflow:'hidden' },
-  progressFill:  { height:'100%', borderRadius:99, transition:'width 0.4s ease' },
-  progressLabel: { fontSize:11, fontWeight:700, flexShrink:0 },
-  progressCount: { fontSize:11, color:'var(--ink-faint)' },
 
   /* Testament badges */
   testamentBadge: {
