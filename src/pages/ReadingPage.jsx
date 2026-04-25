@@ -507,7 +507,7 @@ export default function ReadingPage() {
     setCompleted(newVal)
     // Auto-mark the linked bible chapter when day is completed
     if (newVal && bibleChapter && !bibleChapterDone) {
-      setBibleChapter(bibleChapter, true)
+      setBibleChapter(bibleChapter, true, session?.user?.id)
       setBibleChapterDone(true)
     }
     if (session) {
@@ -526,7 +526,7 @@ export default function ReadingPage() {
   function toggleBibleChapter() {
     const newVal = !bibleChapterDone
     setBibleChapterDone(newVal)
-    if (bibleChapter) setBibleChapter(bibleChapter, newVal)
+    if (bibleChapter) setBibleChapter(bibleChapter, newVal, session?.user?.id)
   }
 
   function handleBookmark(e) {

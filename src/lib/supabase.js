@@ -54,15 +54,73 @@ export function getBibleProgress() {
   catch { return {} }
 }
 
-export function setBibleChapter(chapter, done) {
+export function setBibleChapter(chapter, done, userId) {
   const all = getBibleProgress()
   if (done) all[chapter] = true
   else delete all[chapter]
   try { localStorage.setItem(BIBLE_KEY, JSON.stringify(all)) } catch {}
+  // Fire-and-forget Supabase sync when logged in
+  if (userId) {
+    if (done) {
+      supabase.from('pb_bible_progress')
+        .upsert({ user_id: userId, chapter, done: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,chapter' })
+        .catch(() => {})
+    } else {
+      supabase.from('pb_bible_progress')
+        .delete().match({ user_id: userId, chapter })
+        .catch(() => {})
+    }
+  }
 }
 
 export function isBibleChapterDone(chapter) {
   return !!getBibleProgress()[chapter]
+}
+
+// ── Bible progress Supabase sync ─────────────────────────────────────────────
+// Required Supabase table (run once in your project):
+//
+//   create table pb_bible_progress (
+//     id uuid default gen_random_uuid() primary key,
+//     user_id uuid references auth.users(id) on delete cascade not null,
+//     chapter text not null,
+//     done boolean not null default true,
+//     updated_at timestamptz default now(),
+//     unique(user_id, chapter)
+//   );
+//   alter table pb_bible_progress enable row level security;
+//   create policy "own bible progress" on pb_bible_progress
+//     for all using (auth.uid() = user_id);
+
+export async function syncBibleProgressUp(userId) {
+  const all = getBibleProgress()
+  const done = Object.keys(all).filter(ch => all[ch])
+  if (!done.length) return
+  try {
+    const rows = done.map(chapter => ({
+      user_id: userId, chapter, done: true, updated_at: new Date().toISOString(),
+    }))
+    await supabase.from('pb_bible_progress')
+      .upsert(rows, { onConflict: 'user_id,chapter' })
+  } catch (e) { console.warn('[bible-progress] sync up:', e?.message) }
+}
+
+export async function syncBibleProgressDown(userId) {
+  try {
+    const { data, error } = await supabase
+      .from('pb_bible_progress')
+      .select('chapter,done')
+      .eq('user_id', userId)
+    if (error || !data) return
+    const merged = getBibleProgress()
+    data.forEach(r => {
+      if (r.done) merged[r.chapter] = true
+      else delete merged[r.chapter]
+    })
+    try { localStorage.setItem(BIBLE_KEY, JSON.stringify(merged)) } catch {}
+    // Dispatch a storage event so open pages (AchievementsSection etc.) react
+    window.dispatchEvent(new StorageEvent('storage', { key: BIBLE_KEY }))
+  } catch (e) { console.warn('[bible-progress] sync down:', e?.message) }
 }
 
 // ── Bookmarks (localStorage) ─────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../App'
 import KjvReader from '../components/KjvReader'
 import { buildSchedule, getBibleProgress, setBibleChapter, getTodayDayNum } from '../lib/supabase'
 import { LBCF2 }     from '../data/lbcf2'
@@ -291,6 +292,8 @@ function TestamentSection({ testament, categories, planByBook, bibBooks, progres
 /* ══════════════════════════════════════════════════════════════════ */
 export default function ScripturePage() {
   const navigate = useNavigate()
+  const { session } = useAuth()
+  const userId = session?.user?.id ?? null
 
   /* Restore saved state */
   const _saved = loadState('scripture', { mode: 'read' })
@@ -350,16 +353,16 @@ export default function ScripturePage() {
     return Array.from(groups.values()).sort((a, b) => a.bookInfo.order - b.bookInfo.order)
   }, [filtered])
 
-  /* Toggle a chapter — updates state + localStorage */
+  /* Toggle a chapter — updates state + localStorage + Supabase */
   const toggleChapter = useCallback((chId, done) => {
-    setBibleChapter(chId, done)
+    setBibleChapter(chId, done, userId)
     setProgress(prev => {
       const next = { ...prev }
       if (done) next[chId] = true
       else delete next[chId]
       return next
     })
-  }, [])
+  }, [userId])
 
   /* Counts for tab badges */
   const planDone  = useMemo(() => PLAN_BOOKS_ORDERED.reduce((s, b) =>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { supabase, migrateLocalToSupabase } from './lib/supabase'
+import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgressDown } from './lib/supabase'
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
@@ -45,6 +45,7 @@ export default function App() {
     function onVisible() {
       if (!document.hidden && prevUser.current) {
         syncAnnotationsDown(prevUser.current.id)
+        syncBibleProgressDown(prevUser.current.id)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -73,6 +74,8 @@ export default function App() {
         migrateLocalToSupabase(s.user.id)
         /* Sync annotations: push local data up, then pull server data down */
         syncAnnotationsUp(s.user.id).then(() => syncAnnotationsDown(s.user.id))
+        /* Sync Bible chapter progress: same pattern */
+        syncBibleProgressUp(s.user.id).then(() => syncBibleProgressDown(s.user.id))
       }
       prevUser.current = s?.user ?? null
       setSession(s)
