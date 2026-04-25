@@ -558,7 +558,7 @@ export default function AboutPage() {
             </svg>
           }
           title="Achievements"
-          defaultOpen
+          defaultOpen={false}
         >
           <AchievementsSection supabaseProgress={session ? progressData : null} hideHeader />
         </CollapseSection>

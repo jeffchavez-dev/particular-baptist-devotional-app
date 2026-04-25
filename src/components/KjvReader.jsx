@@ -500,6 +500,9 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   const searchInputRef = useRef(null)
   const searchWrapRef  = useRef(null)
 
+  /* Copy feedback */
+  const [copiedKey, setCopiedKey] = useState(null)
+
   /* Text selection */
   const [selection, setSelection] = useState('')
   const verseListRef = useRef(null)
@@ -780,138 +783,7 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
       {/* Reader panel */}
       <div style={r.readerWrap} ref={readerRef}>
 
-        {/* ── Toolbar — book pill + inline search ── */}
-        <div style={r.toolbar}>
-          {/* Book / chapter pill — taps to open sidebar on mobile */}
-          <button
-            style={r.bookPill}
-            onClick={() => isMobile && setSideOpen(true)}
-            title={isMobile ? 'Select book' : undefined}
-            disabled={!isMobile}
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
-              <rect x="1" y="1" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M4 4h5M4 6.5h5M4 9h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-            </svg>
-            <span style={r.bookPillName}>{book}</span>
-            <span style={r.bookPillCh}>Ch. {chapter}</span>
-            {isTodayChapter && <span style={r.todayBadge}>Today</span>}
-            {isMobile && (
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ marginLeft:'auto', flexShrink:0, opacity:0.4 }}>
-                <path d="M2 4l3.5 3.5L9 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            )}
-          </button>
-
-          {/* Inline search — always visible, flex:1 */}
-          <div ref={searchWrapRef} style={{ position:'relative', flex:1, minWidth:0 }} onClick={e => e.stopPropagation()}>
-            <div style={r.searchInputWrap}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
-                <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
-                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-              </svg>
-              <input
-                ref={searchInputRef}
-                style={r.searchInput}
-                value={searchQuery}
-                onChange={e => {
-                  setSearchQuery(e.target.value)
-                  setSearchFocus(0)
-                  setBibleResults(null)
-                  setShowHistDrop(!e.target.value && searchHistory.length > 0)
-                }}
-                onFocus={() => { if (!searchQuery && searchHistory.length) setShowHistDrop(true) }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') submitSearch(searchQuery)
-                  if (e.key === 'Escape') { closeSearch(); setShowHistDrop(false) }
-                  if (e.key === 'ArrowDown' && !bibleResults) setSearchFocus(f => Math.min(f + 1, chapterMatches.length - 1))
-                  if (e.key === 'ArrowUp'   && !bibleResults) setSearchFocus(f => Math.max(f - 1, 0))
-                }}
-                placeholder={`Search ${book} or whole Bible…`}
-              />
-              {searchQuery && (
-                <button style={r.searchClear} onClick={() => { setSearchQuery(''); setSearchFocus(0); setBibleResults(null) }}>×</button>
-              )}
-            </div>
-
-            {/* History dropdown — positioned below input */}
-            {showHistDrop && searchHistory.length > 0 && (
-              <div style={{ position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:30 }}>
-                <SearchHistoryDropdown
-                  history={searchHistory}
-                  onSelect={q => { setSearchQuery(q); setSearchFocus(0); setShowHistDrop(false) }}
-                  onRemove={q => {
-                    removeSearchEntry('kjv', q)
-                    setSearchHistory(getSearchHistory('kjv'))
-                  }}
-                  onClear={() => {
-                    clearSearchHistory('kjv')
-                    setSearchHistory([])
-                    setShowHistDrop(false)
-                  }}
-                  onClose={() => setShowHistDrop(false)}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Search status bar — shows below toolbar when query is active ── */}
-        {searchQuery.trim() && (
-          <div style={r.searchStatusBar}>
-            {searching ? (
-              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Searching…</span>
-            ) : bibleResults !== null ? (
-              bibleResults.length === 0 ? (
-                <span style={{ fontSize:12, color:'var(--ink-faint)' }}>No matches in Bible</span>
-              ) : (
-                <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
-                  {bibleResults.length}{bibleResults.length === 200 ? '+' : ''} verse{bibleResults.length !== 1 ? 's' : ''} found
-                </span>
-              )
-            ) : chapterMatches.length === 0 ? (
-              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>
-                Not in {book} {chapter} —{' '}
-                <button
-                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--teal)', fontSize:12, fontWeight:600, padding:0, fontFamily:"'DM Sans',sans-serif" }}
-                  onClick={() => submitSearch(searchQuery)}
-                >
-                  Search whole Bible ↵
-                </button>
-              </span>
-            ) : (
-              <>
-                <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
-                  {searchFocus + 1} / {chapterMatches.length} in chapter
-                </span>
-                <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.max(0, f - 1))}>↑</button>
-                <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(chapterMatches.length - 1, f + 1))}>↓</button>
-                <button
-                  style={{ ...r.searchNavBtn, color:'var(--teal)', borderColor:'var(--teal)', fontWeight:600 }}
-                  onClick={() => submitSearch(searchQuery)}
-                  title="Search whole Bible"
-                >
-                  Search Bible
-                </button>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Selection hint bar */}
-        {selection && !bibleResults && (
-          <div style={r.selectionBar}>
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
-              <path d="M2 4h8M2 8h5" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            <span style={r.selectionText}>
-              {selection.length > 80 ? selection.slice(0, 80) + '…' : selection}
-            </span>
-            <button style={r.selectionClear} onClick={() => { try { window.getSelection().removeAllRanges() } catch {} setSelection('') }}>✕</button>
-          </div>
-        )}
-
-        {/* Chapter content */}
+          {/* Chapter content */}
         <div style={r.content}>
           {loading && (
             <div style={r.loadingState}>
@@ -1010,30 +882,71 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
                               </span>
                             )}
 
-                            <button
-                              onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
-                              style={{ ...r.noteIconBtn, ...(note ? r.noteIconBtnActive : {}) }}
-                              title={note ? 'View / edit note' : 'Add note'}
-                            >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                <path d="M1.5 9L2 7 7 2l2 2-5 4.5L1.5 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
-                                <line x1="6" y1="2.5" x2="8" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
-                              </svg>
-                            </button>
-
-                            <button
-                              onClick={() => setShareCard({ type:'reading', title:`${seg.book} ${seg.chapter}:${verse}`, subtitle:'King James Version', source:'KJV', text, label:'' })}
-                              style={r.noteIconBtn}
-                              title="Share verse"
-                            >
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                              </svg>
-                            </button>
                           </span>
+                        </div>
+
+                        {/* ── 4 icon-only verse actions ── */}
+                        <div style={r.verseActions}>
+                          {/* Highlight */}
+                          <button
+                            style={{ ...r.verseActionBtn, ...(hlColorId ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+                            onClick={() => { setColorPicker(prev => prev === verseKey ? null : verseKey); setEditingNote(null) }}
+                            title="Highlight"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <path d="M2 11h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                              <path d="M4 8.5L8.5 4 10 5.5 5.5 10 3.5 10.5 4 8.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill={hlColorId ? 'currentColor' : 'none'} fillOpacity="0.25"/>
+                            </svg>
+                          </button>
+                          {/* Note */}
+                          <button
+                            style={{ ...r.verseActionBtn, ...(note ? { color:'rgba(150,110,0,0.9)', borderColor:'rgba(200,150,0,0.35)', background:'rgba(210,160,0,0.12)' } : {}) }}
+                            onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
+                            title={note ? 'View / edit note' : 'Add note'}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <path d="M2 11l.6-2.4L8 3l2 2-5.4 5.6L2 11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
+                              <line x1="7" y1="3.5" x2="9" y2="5.5" stroke="currentColor" strokeWidth="1.2"/>
+                            </svg>
+                          </button>
+                          {/* Share */}
+                          <button
+                            style={r.verseActionBtn}
+                            onClick={() => setShareCard({ type:'reading', title:`${seg.book} ${seg.chapter}:${verse}`, subtitle:'King James Version', source:'KJV', text, label:'' })}
+                            title="Share verse"
+                          >
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                              <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                              <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                              <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                            </svg>
+                          </button>
+                          {/* Copy */}
+                          <button
+                            style={{ ...r.verseActionBtn, ...(copiedKey === verseKey ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${seg.book} ${seg.chapter}:${verse} — ${text}`)
+                                .then(() => {
+                                  setCopiedKey(verseKey)
+                                  setTimeout(() => setCopiedKey(null), 1500)
+                                })
+                                .catch(() => {})
+                            }}
+                            title={copiedKey === verseKey ? 'Copied!' : 'Copy verse'}
+                          >
+                            {copiedKey === verseKey ? (
+                              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                <polyline points="2,7 5,10 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            ) : (
+                              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                <rect x="4.5" y="4.5" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                                <path d="M4.5 4V3a1 1 0 011-1h4a1 1 0 011 1v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                <rect x="1.5" y="2" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                              </svg>
+                            )}
+                          </button>
                         </div>
 
                         {showPicker && (
@@ -1085,6 +998,140 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
 
             {/* Sentinel — IntersectionObserver triggers next chapter load here */}
             {!loading && !bibleResults && <div ref={sentinelRef} style={{ height:40 }} />}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Fixed bottom toolbar — always accessible above BottomNav ── */}
+      <div style={{
+        position: 'fixed',
+        bottom: 'calc(64px + env(safe-area-inset-bottom))',
+        left: !isMobile ? '50%' : 0,
+        right: !isMobile ? 'auto' : 0,
+        transform: !isMobile ? 'translateX(-50%)' : undefined,
+        width: !isMobile ? 640 : undefined,
+        zIndex: 50,
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--border)',
+        boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
+        ...(!isMobile ? { borderLeft:'1px solid var(--border)', borderRight:'1px solid var(--border)' } : {}),
+        fontFamily: "'DM Sans',sans-serif",
+      }}>
+        {/* Search status row — only when search query active */}
+        {searchQuery.trim() && (
+          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', padding:'5px 14px', borderBottom:'1px solid var(--border)', background:'var(--surface)' }}>
+            {searching ? (
+              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Searching…</span>
+            ) : bibleResults !== null ? (
+              bibleResults.length === 0 ? (
+                <span style={{ fontSize:12, color:'var(--ink-faint)' }}>No matches in Bible</span>
+              ) : (
+                <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
+                  {bibleResults.length}{bibleResults.length === 200 ? '+' : ''} verse{bibleResults.length !== 1 ? 's' : ''} found
+                </span>
+              )
+            ) : chapterMatches.length === 0 ? (
+              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>
+                Not in {book} {chapter} —{' '}
+                <button
+                  style={{ background:'none', border:'none', cursor:'pointer', color:'var(--teal)', fontSize:12, fontWeight:600, padding:0, fontFamily:"'DM Sans',sans-serif" }}
+                  onClick={() => submitSearch(searchQuery)}
+                >
+                  Search whole Bible ↵
+                </button>
+              </span>
+            ) : (
+              <>
+                <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
+                  {searchFocus + 1} / {chapterMatches.length} in chapter
+                </span>
+                <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.max(0, f - 1))}>↑</button>
+                <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(chapterMatches.length - 1, f + 1))}>↓</button>
+                <button
+                  style={{ ...r.searchNavBtn, color:'var(--teal)', borderColor:'var(--teal)', fontWeight:600 }}
+                  onClick={() => submitSearch(searchQuery)}
+                  title="Search whole Bible"
+                >
+                  Search Bible
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Main toolbar row — book pill + search */}
+        <div style={r.toolbar}>
+          {/* Book / chapter pill */}
+          <button
+            style={r.bookPill}
+            onClick={() => isMobile && setSideOpen(true)}
+            title={isMobile ? 'Select book' : undefined}
+            disabled={!isMobile}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
+              <rect x="1" y="1" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M4 4h5M4 6.5h5M4 9h3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+            <span style={r.bookPillName}>{book}</span>
+            <span style={r.bookPillCh}>Ch. {chapter}</span>
+            {isTodayChapter && <span style={r.todayBadge}>Today</span>}
+            {isMobile && (
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ marginLeft:'auto', flexShrink:0, opacity:0.4 }}>
+                <path d="M2 4l3.5 3.5L9 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Inline search — always visible, flex:1 */}
+          <div ref={searchWrapRef} style={{ position:'relative', flex:1, minWidth:0 }} onClick={e => e.stopPropagation()}>
+            <div style={r.searchInputWrap}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+                <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <input
+                ref={searchInputRef}
+                style={r.searchInput}
+                value={searchQuery}
+                onChange={e => {
+                  setSearchQuery(e.target.value)
+                  setSearchFocus(0)
+                  setBibleResults(null)
+                  setShowHistDrop(!e.target.value && searchHistory.length > 0)
+                }}
+                onFocus={() => { if (!searchQuery && searchHistory.length) setShowHistDrop(true) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') submitSearch(searchQuery)
+                  if (e.key === 'Escape') { closeSearch(); setShowHistDrop(false) }
+                  if (e.key === 'ArrowDown' && !bibleResults) setSearchFocus(f => Math.min(f + 1, chapterMatches.length - 1))
+                  if (e.key === 'ArrowUp'   && !bibleResults) setSearchFocus(f => Math.max(f - 1, 0))
+                }}
+                placeholder={`Search ${book} or whole Bible…`}
+              />
+              {searchQuery && (
+                <button style={r.searchClear} onClick={() => { setSearchQuery(''); setSearchFocus(0); setBibleResults(null) }}>×</button>
+              )}
+            </div>
+
+            {/* History dropdown — positioned ABOVE input (bottom bar is at bottom) */}
+            {showHistDrop && searchHistory.length > 0 && (
+              <div style={{ position:'absolute', bottom:'calc(100% + 4px)', left:0, right:0, zIndex:60 }}>
+                <SearchHistoryDropdown
+                  history={searchHistory}
+                  onSelect={q => { setSearchQuery(q); setSearchFocus(0); setShowHistDrop(false) }}
+                  onRemove={q => {
+                    removeSearchEntry('kjv', q)
+                    setSearchHistory(getSearchHistory('kjv'))
+                  }}
+                  onClear={() => {
+                    clearSearchHistory('kjv')
+                    setSearchHistory([])
+                    setShowHistDrop(false)
+                  }}
+                  onClose={() => setShowHistDrop(false)}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1184,8 +1231,6 @@ const r = {
   toolbar: {
     display:'flex', alignItems:'center', gap:8,
     padding:'8px 12px', background:'var(--surface)',
-    borderBottom:'1px solid var(--border)',
-    position:'sticky', top:0, zIndex:10,
     fontFamily:"'DM Sans',sans-serif",
   },
   bookPill: {
@@ -1234,12 +1279,11 @@ const r = {
     background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
     fontSize:16, lineHeight:1, padding:'0 2px', flexShrink:0,
   },
-  /* Status bar — sticky just below toolbar, only when query is active */
+  /* Status bar — inside fixed bottom bar, above toolbar row */
   searchStatusBar: {
     display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
     padding:'5px 14px', background:'var(--surface)',
     borderBottom:'1px solid var(--border)',
-    position:'sticky', top:49, zIndex:9,
     fontFamily:"'DM Sans',sans-serif",
   },
   searchNavBtn: {
@@ -1291,7 +1335,7 @@ const r = {
 
   /* Content */
   content: {
-    flex:1, padding:'1.5rem 1.5rem 2rem',
+    flex:1, padding:'1.5rem 1.5rem 8rem',
     maxWidth:720, margin:'0 auto', width:'100%',
   },
   loadingState: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'4rem', gap:8 },
@@ -1365,6 +1409,19 @@ const r = {
     color:'rgba(150,110,0,0.9)',
     borderColor:'rgba(200,150,0,0.35)',
     background:'rgba(210,160,0,0.14)',
+  },
+
+  /* ── 4 icon-only verse action buttons ── */
+  verseActions: {
+    display:'flex', gap:4, alignItems:'center',
+    marginLeft:34, marginBottom:6, marginTop:2,
+  },
+  verseActionBtn: {
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
+    width:26, height:26, background:'none',
+    border:'1px solid var(--border)', borderRadius:5,
+    cursor:'pointer', color:'var(--ink-faint)',
+    transition:'all 0.12s', padding:0, flexShrink:0,
   },
 
   /* ── Saved note display bar ── */
