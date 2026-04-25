@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import FontPrefsPanel, { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs } from '../App'
@@ -9,6 +9,13 @@ import { LBCF1 }     from '../data/lbcf1'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 import { parseRefs } from '../lib/parseRefs'
 import KjvModal from '../components/KjvModal'
+import ShareCardModal from '../components/ShareCardModal'
+import {
+  HIGHLIGHT_COLORS, getHlStyle,
+  loadHighlights, loadItemNotes,
+  setHighlight, setItemNote,
+  addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
+} from '../lib/annotations'
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
@@ -46,7 +53,6 @@ const CHAPTER_TITLES = {
   32: 'Of the Last Judgment',
 }
 
-/* ── group 2LBCF entries by chapter ── */
 function buildChapters() {
   const chapters = {}
   Object.entries(LBCF2).forEach(([key, item]) => {
@@ -145,11 +151,325 @@ const rc = {
   },
 }
 
+/* ── Highlight colour picker ── */
+function ConfColorPicker({ currentColor, onSelect, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    function onClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    setTimeout(() => document.addEventListener('mousedown', onClick), 0)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [onClose])
+
+  return (
+    <div ref={ref} style={cp.wrap}>
+      {HIGHLIGHT_COLORS.map(c => (
+        <button
+          key={c.id}
+          title={c.label}
+          onClick={() => { onSelect(currentColor === c.id ? null : c.id); onClose() }}
+          style={{
+            width: 22, height: 22, borderRadius: '50%',
+            background: c.dot, border: 'none', cursor: 'pointer', padding: 0,
+            outline: currentColor === c.id ? `3px solid ${c.border}` : '2px solid transparent',
+            outlineOffset: 1,
+            transform: currentColor === c.id ? 'scale(1.2)' : 'scale(1)',
+            transition: 'outline 0.1s, transform 0.1s',
+          }}
+        />
+      ))}
+      {currentColor && (
+        <button
+          title="Remove highlight"
+          onClick={() => { onSelect(null); onClose() }}
+          style={{
+            width:22, height:22, borderRadius:'50%', background:'var(--border-strong)',
+            border:'none', cursor:'pointer', fontSize:13, color:'var(--ink-muted)',
+            display:'flex', alignItems:'center', justifyContent:'center', padding:0, flexShrink:0,
+          }}
+        >×</button>
+      )}
+    </div>
+  )
+}
+const cp = {
+  wrap: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    padding:'5px 8px', background:'var(--surface)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius-lg)',
+    boxShadow:'0 2px 12px rgba(0,0,0,0.12)', marginTop:4,
+  },
+}
+
+/* ── Search history dropdown ── */
+function SearchHistDrop({ history, onSelect, onRemove, onClear, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    function onClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    setTimeout(() => document.addEventListener('mousedown', onClick), 0)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [onClose])
+  if (!history.length) return null
+  return (
+    <div ref={ref} style={sh.drop}>
+      <div style={sh.header}>
+        <span style={sh.title}>Recent searches</span>
+        <button style={sh.clearAll} onClick={() => { onClear(); onClose() }}>Clear all</button>
+      </div>
+      {history.map(q => (
+        <div key={q} style={sh.row}>
+          <button style={sh.item} onClick={() => { onSelect(q); onClose() }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{flexShrink:0,opacity:0.4}}>
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M5.5 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <span style={sh.itemText}>{q}</span>
+          </button>
+          <button style={sh.rm} onClick={() => onRemove(q)}>×</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+const sh = {
+  drop: {
+    position:'absolute', top:'100%', left:0, right:0, zIndex:30,
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+    overflow:'hidden', marginTop:2, fontFamily:"'DM Sans',sans-serif",
+  },
+  header: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'7px 12px', borderBottom:'1px solid var(--border)',
+  },
+  title: { fontSize:10, fontWeight:700, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.06em' },
+  clearAll: { fontSize:11, fontWeight:600, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0 },
+  row: { display:'flex', alignItems:'center' },
+  item: { display:'flex', alignItems:'center', gap:8, flex:1, padding:'8px 12px', background:'none', border:'none', cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif" },
+  itemText: { fontSize:13, color:'var(--ink)', flex:1 },
+  rm: { background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', fontSize:16, padding:'0 12px', flexShrink:0 },
+}
+
+/* ── Per-item annotation toolbar ── */
+function ItemActions({
+  itemKey, label, copyText, shareTitle, shareSource,
+  onOpenKjv, refs,
+  highlights, itemNotes, onHighlight, onNote, onShare,
+}) {
+  const [showPicker, setShowPicker] = useState(false)
+  const [editingNote, setEditingNote] = useState(false)
+  const [draft, setDraft] = useState('')
+  const currentColor = highlights[itemKey] || null
+  const note = itemNotes[itemKey] || null
+  const hlStyle = currentColor ? getHlStyle(currentColor) : null
+
+  function openNote() {
+    setDraft(note || '')
+    setEditingNote(true)
+  }
+
+  function saveNote() {
+    onNote(itemKey, draft)
+    setEditingNote(false)
+  }
+
+  function deleteNote() {
+    onNote(itemKey, '')
+    setEditingNote(false)
+  }
+
+  function handleShare() {
+    onShare({
+      type: 'reading',
+      title: shareTitle,
+      subtitle: label,
+      source: shareSource,
+      text: copyText,
+      label: '',
+    })
+  }
+
+  function handleShareNote() {
+    onShare({
+      type: 'reading',
+      title: shareTitle,
+      subtitle: label,
+      source: shareSource,
+      text: `${copyText.slice(0, 300)}${copyText.length > 300 ? '…' : ''}\n\n— My note:\n${note}`,
+      label: '',
+    })
+  }
+
+  return (
+    <div>
+      {/* Highlight tint bar */}
+      {currentColor && (
+        <div style={{
+          height: 3, borderRadius: 99, marginBottom: 6,
+          background: hlStyle.dot, opacity: 0.5,
+        }} />
+      )}
+
+      {/* Action row */}
+      <div style={ia.row}>
+        {/* Highlight button */}
+        <div style={{position:'relative'}}>
+          <button
+            style={{
+              ...ia.btn,
+              ...(currentColor ? { color: hlStyle.numClr, background: hlStyle.numBg, borderColor: hlStyle.border } : {}),
+            }}
+            onClick={() => setShowPicker(p => !p)}
+            title="Highlight"
+          >
+            {/* Highlighter icon */}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 10l1.5-3L9.5 1l1.5 1.5L5 8.5 2 10Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M7 3l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            {currentColor ? HIGHLIGHT_COLORS.find(c => c.id === currentColor)?.label : 'Highlight'}
+          </button>
+          {showPicker && (
+            <ConfColorPicker
+              currentColor={currentColor}
+              onSelect={colorId => onHighlight(itemKey, colorId)}
+              onClose={() => setShowPicker(false)}
+            />
+          )}
+        </div>
+
+        {/* Note button */}
+        <button
+          style={{
+            ...ia.btn,
+            ...(note ? { color:'rgba(150,110,0,0.9)', borderColor:'rgba(200,150,0,0.35)', background:'rgba(210,160,0,0.14)' } : {}),
+          }}
+          onClick={openNote}
+          title={note ? 'View note' : 'Add note'}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1.5 10.5L2 8.5 8 2.5l2 2-6 6-2.5.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
+            <line x1="7" y1="3" x2="9" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+          </svg>
+          {note ? 'Edit note' : 'Note'}
+        </button>
+
+        {/* Share button */}
+        <button style={ia.btn} onClick={handleShare} title="Share">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="9.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+            <circle cx="9.5" cy="10" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+            <circle cx="2.5" cy="6" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+            <path d="M3.8 5.3l4.2-2.8M3.8 6.7l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+          </svg>
+          Share
+        </button>
+
+        {/* Copy button */}
+        <CopyBtn getText={() => copyText} />
+      </div>
+
+      {/* Saved note display */}
+      {note && !editingNote && (
+        <div style={ia.noteDisplay} onClick={openNote}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{flexShrink:0,marginTop:2,opacity:0.5}}>
+            <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+          </svg>
+          <span style={{flex:1}}>{note}</span>
+          <button
+            onClick={e => { e.stopPropagation(); handleShareNote() }}
+            style={ia.noteShareBtn}
+            title="Share note"
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+              <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+              <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+              <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Inline note editor */}
+      {editingNote && (
+        <div style={ia.noteEditor}>
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder={`Note on ${shareTitle}…`}
+            style={ia.textarea}
+            autoFocus
+            rows={3}
+          />
+          <div style={ia.editorActions}>
+            <button onClick={saveNote} style={ia.saveBtn}>Save</button>
+            <button onClick={() => setEditingNote(false)} style={ia.cancelBtn}>Cancel</button>
+            {note && <button onClick={deleteNote} style={ia.deleteBtn}>Delete</button>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ia = {
+  row: { display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginTop:6 },
+  btn: {
+    display:'inline-flex', alignItems:'center', gap:4,
+    fontSize:11, fontWeight:500, color:'var(--ink-muted)',
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:99, padding:'4px 9px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
+  },
+  noteDisplay: {
+    display:'flex', gap:6, alignItems:'flex-start',
+    marginTop:6, padding:'6px 10px',
+    background:'rgba(210,160,0,0.08)',
+    borderLeft:'2px solid rgba(200,150,0,0.35)',
+    borderRadius:'0 4px 4px 0',
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.6,
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  noteShareBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', display:'flex', alignItems:'center',
+    padding:'2px 4px', borderRadius:4, flexShrink:0,
+  },
+  noteEditor: { marginTop:8, display:'flex', flexDirection:'column', gap:6 },
+  textarea: {
+    width:'100%', padding:'8px 10px',
+    border:'1.5px solid var(--teal)', borderRadius:'var(--radius)',
+    fontSize:13, color:'var(--ink)', lineHeight:1.6,
+    fontFamily:"'DM Sans',sans-serif", background:'var(--surface)',
+    resize:'vertical', outline:'none', boxSizing:'border-box',
+  },
+  editorActions: { display:'flex', gap:6, alignItems:'center' },
+  saveBtn: {
+    fontSize:11, fontWeight:700, padding:'5px 12px',
+    background:'var(--teal)', color:'white', border:'none',
+    borderRadius:'var(--radius)', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  cancelBtn: {
+    fontSize:11, padding:'5px 10px', background:'none', color:'var(--ink-muted)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  deleteBtn: {
+    fontSize:11, padding:'5px 10px', background:'none', color:'#b33',
+    border:'1px solid rgba(180,50,50,0.3)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif", marginLeft:'auto',
+  },
+}
+
+/* ══════════════════════════════════════════════════════════════ */
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { prefs, updatePrefs } = usePrefs()
 
-  /* ── Restore saved state ── */
   const _saved = loadState('conf', { tab: '2lbcf', search: '' })
   const tab    = searchParams.get('t') || _saved.tab
 
@@ -157,13 +477,30 @@ export default function ConfessionsPage() {
   const [search,        setSearch]        = useState(_saved.search)
   const [navOpen,       setNavOpen]       = useState(false)
   const [kjvModal,      setKjvModal]      = useState(null)
+  const [shareCard,     setShareCard]     = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
-  /* sidebarConf tracks which confession's chapters are shown in the sidebar,
-     independently of the currently displayed confession (tab).
-     Changing sidebarConf never touches the main content. */
   const [sidebarConf,   setSidebarConf]   = useState(tab)
   const pendingScrollRef = useRef(null)
   const contentRef = useRef(null)
+  const searchWrapRef = useRef(null)
+
+  /* Search history */
+  const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('conf'))
+  const [showHistDrop,  setShowHistDrop]  = useState(false)
+
+  /* Annotations */
+  const [hlData,    setHlData]    = useState(() => loadHighlights())
+  const [noteData,  setNoteData]  = useState(() => loadItemNotes())
+
+  const handleHighlight = useCallback((key, colorId) => {
+    const next = setHighlight(key, colorId)
+    setHlData({ ...next })
+  }, [])
+
+  const handleNote = useCallback((key, text) => {
+    const next = setItemNote(key, text)
+    setNoteData({ ...next })
+  }, [])
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
@@ -181,7 +518,6 @@ export default function ConfessionsPage() {
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  /* When tab changes (content switches), execute any pending chapter scroll */
   useEffect(() => {
     if (!pendingScrollRef.current) return
     const id = pendingScrollRef.current
@@ -201,7 +537,6 @@ export default function ConfessionsPage() {
   const sidebarSrc = SOURCES[sidebarConf] || SOURCES['2lbcf']
   const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
 
-  /* Switch the displayed confession (main content) */
   function setTab(t) {
     setSearchParams({ t })
     setActiveChapter(null)
@@ -209,7 +544,6 @@ export default function ConfessionsPage() {
     setNavOpen(false)
   }
 
-  /* Scroll to a chapter within the currently displayed confession */
   function scrollToChapter(id) {
     const el = document.getElementById(id)
     if (el) {
@@ -219,8 +553,6 @@ export default function ConfessionsPage() {
     if (isMobile) setNavOpen(false)
   }
 
-  /* Called when user clicks a chapter in the sidebar.
-     If the sidebar confession differs from the main tab, switch first then scroll. */
   function handleChapterClick(chId) {
     if (sidebarConf !== tab) {
       pendingScrollRef.current = chId
@@ -231,7 +563,18 @@ export default function ConfessionsPage() {
     }
   }
 
-  /* ─── Chapter list for nav — driven by sidebarConf, not tab ─── */
+  /* Search submission */
+  function submitSearch(q) {
+    const trimmed = q.trim()
+    setSearch(trimmed)
+    if (trimmed) {
+      addSearchHistory('conf', trimmed)
+      setSearchHistory(getSearchHistory('conf'))
+    }
+    setShowHistDrop(false)
+  }
+
+  /* Chapter nav for sidebar */
   const chapterNav = useMemo(() => {
     if (sidebarConf === '2lbcf') {
       return Object.keys(LBCF2_CHAPTERS).map(ch => ({
@@ -246,7 +589,6 @@ export default function ConfessionsPage() {
     return []
   }, [sidebarConf])
 
-  /* ─── Search counts ─── */
   const q = search.toLowerCase().trim()
 
   const resultCounts = useMemo(() => {
@@ -268,10 +610,9 @@ export default function ConfessionsPage() {
     return { lbcf2: lbcf2Count, catechism: catCount, lbcf1: lbcf1Count }
   }, [q])
 
-  /* ── Sidebar content (shared between desktop panel and mobile drawer) ── */
+  /* ── Sidebar content ── */
   const SidebarContent = (
     <div style={s.sidebarContent}>
-      {/* Confession selector — only updates sidebarConf; never refreshes main content */}
       <div style={s.confSelector}>
         <div style={s.confSelectorLabel}>Browse</div>
         {Object.entries(SOURCES).map(([key, info]) => (
@@ -286,7 +627,6 @@ export default function ConfessionsPage() {
             }}
             onClick={() => {
               setSidebarConf(key)
-              /* Catechism has no chapter list — switch content immediately */
               if (key === 'catechism') setTab(key)
             }}
           >
@@ -297,7 +637,6 @@ export default function ConfessionsPage() {
             </span>
           </button>
         ))}
-        {/* Hint when sidebar and main content are out of sync */}
         {sidebarConf !== tab && sidebarConf !== 'catechism' && (
           <p style={{fontSize:10, color:'var(--ink-faint)', margin:'6px 4px 0', lineHeight:1.5}}>
             Select a chapter below to open it
@@ -305,7 +644,6 @@ export default function ConfessionsPage() {
         )}
       </div>
 
-      {/* Chapter list — tap a chapter to navigate (switches confession if needed) */}
       {chapterNav.length > 0 && (
         <>
           <div style={s.sidebarDivider} />
@@ -334,10 +672,9 @@ export default function ConfessionsPage() {
   return (
     <div style={s.page}>
 
-      {/* ── Sticky header: search only ── */}
+      {/* ── Sticky header ── */}
       <header style={s.header}>
         <div style={s.headerInner}>
-          {/* Mobile sidebar toggle */}
           {isMobile && (
             <button
               onClick={() => setNavOpen(o => !o)}
@@ -353,7 +690,6 @@ export default function ConfessionsPage() {
             </button>
           )}
 
-          {/* Source name (desktop) */}
           {!isMobile && (
             <div style={{display:'flex', alignItems:'center', gap:8, minWidth:0}}>
               <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
@@ -361,8 +697,8 @@ export default function ConfessionsPage() {
             </div>
           )}
 
-          {/* Search */}
-          <div style={s.searchBox}>
+          {/* Search with history */}
+          <div style={{...s.searchBox, position:'relative'}} ref={searchWrapRef}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
               <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
               <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -370,30 +706,54 @@ export default function ConfessionsPage() {
             <input
               style={s.searchInput}
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => {
+                setSearch(e.target.value)
+                setShowHistDrop(!e.target.value && searchHistory.length > 0)
+              }}
+              onFocus={() => { if (!search && searchHistory.length) setShowHistDrop(true) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') submitSearch(search)
+                if (e.key === 'Escape') { setSearch(''); setShowHistDrop(false) }
+              }}
               placeholder="Search…"
             />
-            {search && <button onClick={() => setSearch('')} style={s.clearBtn}>×</button>}
+            {search && (
+              <button onClick={() => { setSearch(''); setShowHistDrop(false) }} style={s.clearBtn}>×</button>
+            )}
+            {showHistDrop && searchHistory.length > 0 && (
+              <SearchHistDrop
+                history={searchHistory}
+                onSelect={q => { setSearch(q); setShowHistDrop(false) }}
+                onRemove={q => {
+                  removeSearchEntry('conf', q)
+                  setSearchHistory(getSearchHistory('conf'))
+                }}
+                onClear={() => {
+                  clearSearchHistory('conf')
+                  setSearchHistory([])
+                  setShowHistDrop(false)
+                }}
+                onClose={() => setShowHistDrop(false)}
+              />
+            )}
           </div>
+
           <FontPrefsPanel prefs={prefs} onUpdate={updatePrefs} />
         </div>
       </header>
 
-      {/* ── Mobile drawer backdrop ── */}
       {isMobile && navOpen && (
         <div style={s.backdrop} onClick={() => setNavOpen(false)} />
       )}
 
       <div style={s.layout}>
 
-        {/* ── Desktop sidebar (always visible) ── */}
         {!isMobile && (
           <aside style={s.desktopSidebar}>
             {SidebarContent}
           </aside>
         )}
 
-        {/* ── Mobile sidebar drawer ── */}
         {isMobile && (
           <aside style={{
             ...s.mobileSidebar,
@@ -414,10 +774,21 @@ export default function ConfessionsPage() {
         {/* ── Main content ── */}
         <main style={s.main} ref={contentRef}>
 
-          {/* Search result banner */}
           {q && resultCounts && (() => {
             const count = resultCounts[tab === '2lbcf' ? 'lbcf2' : tab === 'catechism' ? 'catechism' : 'lbcf1']
-            if (count === 0) return <div style={s.empty}>No results for "{search}"</div>
+            if (count === 0) return (
+              <div style={s.empty}>No results for "{search}"
+                {searchHistory.length > 0 && (
+                  <div style={{marginTop:10, fontSize:12, color:'var(--teal)'}}>
+                    Recent: {searchHistory.slice(0,3).map((q, i) => (
+                      <button key={q} onClick={() => setSearch(q)} style={{background:'none',border:'none',color:'var(--teal)',cursor:'pointer',textDecoration:'underline',fontSize:12,marginLeft:i>0?8:0}}>
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
             return (
               <div style={s.resultBanner}>
                 {count} {tab === 'catechism' ? 'Q&A' : 'section'}{count !== 1 ? 's' : ''} matched "{search}"
@@ -425,7 +796,6 @@ export default function ConfessionsPage() {
             )
           })()}
 
-          {/* Mobile: source link */}
           {isMobile && (
             <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:'1rem', flexWrap:'wrap'}}>
               <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
@@ -457,8 +827,18 @@ export default function ConfessionsPage() {
                       const paraMatches = !q || chTitleMatches ||
                         textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)
                       if (!paraMatches) return null
+                      const itemKey = `conf|2lbcf|${p.key}`
+                      const hlColor = hlData[itemKey] || null
+                      const hlStyle = hlColor ? getHlStyle(hlColor) : null
                       return (
-                        <div key={p.key} style={s.paragraph} id={`p-${p.key}`}>
+                        <div
+                          key={p.key}
+                          style={{
+                            ...s.paragraph,
+                            ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                          }}
+                          id={`p-${p.key}`}
+                        >
                           <div style={s.paraNum}>§{p.para}</div>
                           <div style={s.paraBody}>
                             <p style={{...s.paraText, ...textStyle}}>{highlight(p.text, q)}</p>
@@ -468,13 +848,18 @@ export default function ConfessionsPage() {
                                 <RefChips refs={p.refs} onOpen={setKjvModal} />
                               </div>
                             )}
-                            <div style={s.paraActions}>
-                              <CopyBtn getText={() => {
-                                let t = p.text
-                                if (p.refs) t += '\n\nScripture proofs: ' + cleanRefs(p.refs)
-                                return t
-                              }} />
-                            </div>
+                            <ItemActions
+                              itemKey={itemKey}
+                              label="2LBCF"
+                              copyText={p.text + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
+                              shareTitle={`2LBCF ${p.key}`}
+                              shareSource="2LBCF"
+                              highlights={hlData}
+                              itemNotes={noteData}
+                              onHighlight={handleHighlight}
+                              onNote={handleNote}
+                              onShare={setShareCard}
+                            />
                           </div>
                         </div>
                       )
@@ -490,8 +875,18 @@ export default function ConfessionsPage() {
             <div style={s.catechismList}>
               {Object.entries(CATECHISM).map(([num, item]) => {
                 if (q && !textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.catechism[num] || '', q)) return null
+                const itemKey = `conf|catechism|${num}`
+                const hlColor = hlData[itemKey] || null
+                const hlStyle = hlColor ? getHlStyle(hlColor) : null
                 return (
-                  <div key={num} style={s.qaBlock} id={`qa-${num}`}>
+                  <div
+                    key={num}
+                    style={{
+                      ...s.qaBlock,
+                      ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                    }}
+                    id={`qa-${num}`}
+                  >
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
                       <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
@@ -502,13 +897,18 @@ export default function ConfessionsPage() {
                           <RefChips refs={item.refs} onOpen={setKjvModal} />
                         </div>
                       )}
-                      <div style={s.paraActions}>
-                        <CopyBtn getText={() => {
-                          let t = `Q. ${item.q}\n\nA. ${item.a}`
-                          if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
-                          return t
-                        }} />
-                      </div>
+                      <ItemActions
+                        itemKey={itemKey}
+                        label="Catechism"
+                        copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                        shareTitle={`Catechism Q.${num}`}
+                        shareSource="Catechism"
+                        highlights={hlData}
+                        itemNotes={noteData}
+                        onHighlight={handleHighlight}
+                        onNote={handleNote}
+                        onShare={setShareCard}
+                      />
                     </div>
                   </div>
                 )
@@ -523,19 +923,22 @@ export default function ConfessionsPage() {
                 const artId = `art-${num}`
                 if (q && !textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) return null
                 const lines = item.text.split('\n').filter(l => l.trim())
+                const itemKey = `conf|1lbcf|${num}`
+                const hlColor = hlData[itemKey] || null
+                const hlStyle = hlColor ? getHlStyle(hlColor) : null
                 return (
-                  <section key={num} id={artId} style={s.article}>
+                  <section
+                    key={num}
+                    id={artId}
+                    style={{
+                      ...s.article,
+                      ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                    }}
+                  >
                     <div style={{...s.articleHeader, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
                       <div>
                         <span style={s.articleNum}>Article {num}</span>
                         <h2 style={s.articleTitle}>{item.title}</h2>
-                      </div>
-                      <div style={s.articleActions}>
-                        <CopyBtn getText={() => {
-                          let t = `${item.title}\n\n${item.text}`
-                          if (item.refs) t += '\n\nScripture proofs: ' + cleanRefs(item.refs)
-                          return t
-                        }} />
                       </div>
                     </div>
                     <div style={s.articleBody}>
@@ -550,6 +953,18 @@ export default function ConfessionsPage() {
                           <RefChips refs={item.refs} onOpen={setKjvModal} />
                         </div>
                       )}
+                      <ItemActions
+                        itemKey={itemKey}
+                        label="1LBCF"
+                        copyText={`${item.title}\n\n${item.text}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                        shareTitle={`1LBCF Art. ${num}`}
+                        shareSource="1LBCF"
+                        highlights={hlData}
+                        itemNotes={noteData}
+                        onHighlight={handleHighlight}
+                        onNote={handleNote}
+                        onShare={setShareCard}
+                      />
                     </div>
                   </section>
                 )
@@ -570,6 +985,13 @@ export default function ConfessionsPage() {
           onClose={() => setKjvModal(null)}
         />
       )}
+
+      {/* Share card modal */}
+      <ShareCardModal
+        isOpen={shareCard !== null}
+        onClose={() => setShareCard(null)}
+        card={shareCard}
+      />
     </div>
   )
 }
@@ -578,7 +1000,6 @@ export default function ConfessionsPage() {
 const s = {
   page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", paddingBottom:'env(safe-area-inset-bottom)' },
 
-  /* header */
   header: {
     position:'sticky', top:0, zIndex:30,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
@@ -590,10 +1011,8 @@ const s = {
     padding:'8px 16px', gap:10,
   },
 
-  /* source info in header */
   srcBadge: { fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, letterSpacing:'0.05em', flexShrink:0 },
   srcName:  { fontSize:13, color:'var(--ink)', fontFamily:"'Cormorant Garamond',serif", fontWeight:600, flex:1, minWidth:0, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' },
-  srcLink:  { display:'inline-flex', alignItems:'center', fontSize:11, color:'var(--teal)', textDecoration:'none', fontWeight:500, whiteSpace:'nowrap', flexShrink:0 },
 
   searchBox: {
     display:'flex', alignItems:'center', gap:6,
@@ -610,10 +1029,8 @@ const s = {
     color:'var(--ink-faint)', fontSize:16, lineHeight:1, padding:'0 2px',
   },
 
-  /* layout */
   layout: { display:'flex', maxWidth:1200, margin:'0 auto' },
 
-  /* Desktop sidebar */
   desktopSidebar: {
     width:240, flexShrink:0,
     position:'sticky', top:53, alignSelf:'flex-start',
@@ -622,10 +1039,8 @@ const s = {
     background:'var(--surface)',
   },
 
-  /* sidebar shared content */
   sidebarContent: { padding:'12px 8px 24px' },
 
-  /* Confession selector */
   confSelector: { marginBottom:4 },
   confSelectorLabel: {
     fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em',
@@ -641,7 +1056,6 @@ const s = {
 
   sidebarDivider: { height:1, background:'var(--border)', margin:'10px 4px' },
 
-  /* Chapter list */
   chapterListLabel: {
     fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em',
     color:'var(--ink-faint)', padding:'0 8px', marginBottom:4,
@@ -658,7 +1072,6 @@ const s = {
   chapLabel: { fontSize:10, fontWeight:700, letterSpacing:'0.04em' },
   chapTitle: { fontSize:10, color:'var(--ink-muted)', lineHeight:1.35, marginTop:1 },
 
-  /* Mobile sidebar */
   backdrop: {
     position:'fixed', inset:0, background:'rgba(0,0,0,0.4)',
     zIndex:40, backdropFilter:'blur(2px)',
@@ -682,7 +1095,6 @@ const s = {
     justifyContent:'center', padding:6, borderRadius:'var(--radius)',
   },
 
-  /* main reading area */
   main: { flex:1, padding:'1.5rem 1.5rem 5rem', maxWidth:760, minWidth:0 },
   empty: { textAlign:'center', padding:'4rem', color:'var(--ink-faint)', fontSize:14 },
   resultBanner: {
@@ -691,36 +1103,30 @@ const s = {
     padding:'8px 14px', marginBottom:'1.5rem', fontWeight:500,
   },
 
-  /* 2LBCF */
   chapter: { marginBottom:'3rem', paddingBottom:'2rem', borderBottom:'1px solid var(--border)' },
   chapterHeader: { marginBottom:'1.5rem' },
   chapterNum: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'var(--teal)', display:'block', marginBottom:4 },
   chapterTitle: { fontSize:26, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', lineHeight:1.2 },
 
-  paragraph: { display:'flex', gap:12, marginBottom:'1.5rem', alignItems:'flex-start' },
+  paragraph: { display:'flex', gap:12, marginBottom:'1.5rem', alignItems:'flex-start', transition:'background 0.15s, border-color 0.15s' },
   paraNum: { fontSize:12, fontWeight:700, color:'var(--ink-faint)', flexShrink:0, minWidth:24, paddingTop:3, fontVariantNumeric:'tabular-nums' },
   paraBody: { flex:1, minWidth:0 },
-  paraActions: { display:'flex', gap:8, alignItems:'flex-start', marginTop:6 },
   paraText: { fontSize:16, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.9, color:'var(--ink)', margin:'0 0 8px' },
 
-  /* Catechism */
   catechismList: {},
-  qaBlock: { display:'flex', gap:14, marginBottom:'1.75rem', paddingBottom:'1.75rem', borderBottom:'1px solid var(--border)', alignItems:'flex-start' },
+  qaBlock: { display:'flex', gap:14, marginBottom:'1.75rem', paddingBottom:'1.75rem', borderBottom:'1px solid var(--border)', alignItems:'flex-start', transition:'background 0.15s' },
   qaNum: { fontSize:12, fontWeight:700, color:'var(--teal)', flexShrink:0, minWidth:30, paddingTop:2, fontVariantNumeric:'tabular-nums' },
   qaBody: { flex:1, minWidth:0 },
   qaQuestion: { fontSize:17, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', lineHeight:1.55, margin:'0 0 8px' },
   qaAnswer: { fontSize:16, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.85, color:'var(--ink)', margin:'0 0 8px' },
 
-  /* 1LBCF */
-  article: { marginBottom:'2.5rem', paddingBottom:'2rem', borderBottom:'1px solid var(--border)' },
+  article: { marginBottom:'2.5rem', paddingBottom:'2rem', borderBottom:'1px solid var(--border)', transition:'background 0.15s' },
   articleHeader: { marginBottom:'1rem' },
-  articleActions: { display:'flex', gap:8, flexShrink:0, alignItems:'flex-start' },
   articleNum: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.1em', color:'var(--amber-ink)', display:'block', marginBottom:4 },
   articleTitle: { fontSize:24, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)', lineHeight:1.25 },
   articleBody: { paddingLeft:4 },
   articleLine: { fontSize:16, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.9, color:'var(--ink)', margin:'0 0 6px' },
 
-  /* Proof texts */
   refs: { fontSize:12, color:'var(--ink-faint)', lineHeight:1.65, marginTop:8, borderLeft:'2px solid var(--border)', paddingLeft:10, fontFamily:"'DM Sans',sans-serif" },
   refsLabel: { fontWeight:600, color:'var(--ink-muted)' },
 }

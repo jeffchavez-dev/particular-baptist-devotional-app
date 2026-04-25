@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase, migrateLocalToSupabase } from './lib/supabase'
+import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -57,7 +58,11 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (s?.user && !prevUser.current) migrateLocalToSupabase(s.user.id)
+      if (s?.user && !prevUser.current) {
+        migrateLocalToSupabase(s.user.id)
+        /* Sync annotations: push local data up, then pull server data down */
+        syncAnnotationsUp(s.user.id).then(() => syncAnnotationsDown(s.user.id))
+      }
       prevUser.current = s?.user ?? null
       setSession(s)
     })

@@ -1,29 +1,18 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
+import {
+  HIGHLIGHT_COLORS, getHlStyle,
+  loadHighlights, loadItemNotes,
+  setHighlight, setItemNote,
+  addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
+} from '../lib/annotations'
 
 /* ── Module-level KJV data singleton — loaded once, all chapters in memory ── */
 let _kjvData = null
 let _kjvPromise = null
-
-/* ── localStorage helpers for highlights + notes ── */
-const HL_KEY    = 'kjv-highlights'
-const NOTES_KEY = 'kjv-verse-notes'
-
-function loadHighlights() {
-  try { return JSON.parse(localStorage.getItem(HL_KEY)    || '{}') } catch { return {} }
-}
-function loadVerseNotes() {
-  try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') } catch { return {} }
-}
-function persistHighlights(obj) {
-  try { localStorage.setItem(HL_KEY,    JSON.stringify(obj)) } catch {}
-}
-function persistNotes(obj) {
-  try { localStorage.setItem(NOTES_KEY, JSON.stringify(obj)) } catch {}
-}
 
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
@@ -40,13 +29,7 @@ async function loadKjv() {
   return _kjvPromise
 }
 
-/**
- * Strip inline KJV footnotes that the source data appends to verse text.
- * They follow the pattern ".{chapter}.{verse} footnote text", e.g.
- * "…sixth day.1.31 And the evening…: Heb. …"
- */
 function stripFootnotes(text, chapter) {
-  // Match ".{chapter}.{verse_digits}[\s\S]*" and replace with "." (restore sentence period)
   return text.replace(new RegExp(`\\.${chapter}\\.\\d+[\\s\\S]*$`), '.').trim()
 }
 
@@ -55,7 +38,6 @@ function getChapterVerses(bookName, ch) {
   const slug = bookSlug(bookName)
   const raw = _kjvData[slug]?.[ch]
   if (!raw) return null
-  // Deduplicate by verse number (some chapters have the data doubled in the source)
   const seen = new Set()
   return raw
     .filter(v => {
@@ -97,11 +79,86 @@ const SRC_CHIP = {
   '1LBCF':    { bg:'rgba(124,82,48,0.10)', color:'#7c5230', border:'rgba(124,82,48,0.2)' },
 }
 
+/* ── Highlight colour picker popup ── */
+function ColorPicker({ currentColor, onSelect, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    function onClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [onClose])
+
+  return (
+    <div ref={ref} style={r.colorPicker}>
+      {HIGHLIGHT_COLORS.map(c => (
+        <button
+          key={c.id}
+          title={c.label}
+          onClick={() => { onSelect(currentColor === c.id ? null : c.id); onClose() }}
+          style={{
+            width: 22, height: 22, borderRadius: '50%',
+            background: c.dot, border: 'none', cursor: 'pointer', padding: 0,
+            outline: currentColor === c.id ? `3px solid ${c.border}` : '2px solid transparent',
+            outlineOffset: 1, transition: 'outline 0.1s, transform 0.1s',
+            transform: currentColor === c.id ? 'scale(1.2)' : 'scale(1)',
+          }}
+        />
+      ))}
+      {currentColor && (
+        <button
+          title="Remove highlight"
+          onClick={() => { onSelect(null); onClose() }}
+          style={{
+            width: 22, height: 22, borderRadius: '50%', background: 'var(--border-strong)',
+            border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--ink-muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            flexShrink: 0,
+          }}
+        >×</button>
+      )}
+    </div>
+  )
+}
+
+/* ── Search history dropdown ── */
+function SearchHistoryDropdown({ history, onSelect, onRemove, onClear, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    function onClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    setTimeout(() => document.addEventListener('mousedown', onClick), 0)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [onClose])
+
+  if (!history.length) return null
+  return (
+    <div ref={ref} style={r.histDropdown}>
+      <div style={r.histHeader}>
+        <span style={r.histTitle}>Recent searches</span>
+        <button style={r.histClearAll} onClick={() => { onClear(); onClose() }}>Clear all</button>
+      </div>
+      {history.map(q => (
+        <div key={q} style={r.histRow}>
+          <button style={r.histItem} onClick={() => { onSelect(q); onClose() }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{flexShrink:0, opacity:0.4}}>
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M5.5 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <span style={r.histItemText}>{q}</span>
+          </button>
+          <button style={r.histRemove} onClick={() => onRemove(q)} title="Remove">×</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /* ── Sidebar ── */
 function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile }) {
-  /* Start with all categories collapsed */
   const [openCats, setOpenCats] = useState(() => new Set())
-  /* Track which book is expanded to show chapters (separate from current reading) */
   const [expandedBook, setExpandedBook] = useState(selectedBook)
 
   function toggleCat(id) {
@@ -116,11 +173,9 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
     const meta = BOOK_META[bookName]
     const chCount = meta?.chapters || 1
     if (chCount === 1) {
-      /* Single-chapter book → navigate immediately */
       onNavigate(bookName, 1)
       if (isMobile && onClose) onClose()
     } else {
-      /* Multi-chapter → expand chapter grid; don't navigate yet */
       setExpandedBook(prev => prev === bookName ? null : bookName)
     }
   }
@@ -148,7 +203,6 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
               <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </button>
-
           {openCats.has(cat.id) && (
             <div style={sb.bookList}>
               {cat.books.filter(b => BOOK_META[b]).map(b => {
@@ -175,8 +229,6 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                         )}
                       </span>
                     </button>
-
-                    {/* Chapter grid — shown for expanded book */}
                     {isExpanded && chCount > 1 && (
                       <div style={sb.chapterGrid}>
                         {Array.from({ length: chCount }, (_, i) => i + 1).map(ch => (
@@ -235,14 +287,23 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
   })
 
   /* Share + confession modals */
-  const [shareCard,      setShareCard]      = useState(null)
+  const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
 
-  /* Highlights + notes */
-  const [highlights,   setHighlights]   = useState(() => loadHighlights())
-  const [verseNotes,   setVerseNotes]   = useState(() => loadVerseNotes())
-  const [editingNote,  setEditingNote]  = useState(null)  // verse key being edited
-  const [noteDraft,    setNoteDraft]    = useState('')
+  /* Annotations */
+  const [highlights,  setHighlightsState] = useState(() => loadHighlights())
+  const [itemNotes,   setItemNotesState]  = useState(() => loadItemNotes())
+  const [editingNote, setEditingNote]     = useState(null)
+  const [noteDraft,   setNoteDraft]       = useState('')
+  const [colorPicker, setColorPicker]     = useState(null) // verseKey
+
+  /* Search in chapter */
+  const [searchOpen,  setSearchOpen]  = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchFocus, setSearchFocus] = useState(0)   // index within matches
+  const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('kjv'))
+  const [showHistDrop,  setShowHistDrop]  = useState(false)
+  const searchInputRef = useRef(null)
 
   /* Text selection */
   const [selection, setSelection] = useState('')
@@ -265,10 +326,13 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     } catch {}
   }, [book, chapter])
 
-  /* Clear selection + close note editor when chapter changes */
+  /* Clear state when chapter changes */
   useEffect(() => {
     setSelection('')
     setEditingNote(null)
+    setColorPicker(null)
+    setSearchQuery('')
+    setSearchFocus(0)
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -291,6 +355,32 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     document.addEventListener('selectionchange', onSelChange)
     return () => document.removeEventListener('selectionchange', onSelChange)
   }, [])
+
+  /* Focus search input when opened */
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 60)
+    }
+  }, [searchOpen])
+
+  /* Search matches in current chapter */
+  const searchMatches = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q || !verses.length) return []
+    return verses
+      .map((v, idx) => ({ idx, verse: v.verse, match: v.text.toLowerCase().includes(q) }))
+      .filter(v => v.match)
+  }, [searchQuery, verses])
+
+  /* Scroll to focused match */
+  useEffect(() => {
+    if (!searchMatches.length) return
+    const safeIdx = Math.min(searchFocus, searchMatches.length - 1)
+    const verseNum = searchMatches[safeIdx]?.verse
+    if (!verseNum || !readerRef.current) return
+    const el = readerRef.current.querySelector(`#v${verseNum}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [searchFocus, searchMatches])
 
   const bookInfo = BOOK_META[book] || { chapters: 1 }
   const totalChs = bookInfo.chapters
@@ -321,58 +411,33 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     if (readerRef.current) readerRef.current.scrollTop = 0
   }, [book, chapter, dataReady])
 
-  /* getCrossRefs uses a pre-built O(1) index so calling it per-verse in render is fine */
-
-  /* ── Highlight handlers ── */
-  function toggleHighlight(verseKey) {
-    setHighlights(prev => {
-      const next = { ...prev }
-      if (next[verseKey]) delete next[verseKey]
-      else next[verseKey] = true
-      persistHighlights(next)
-      return next
-    })
-  }
+  /* ── Highlight handler ── */
+  const handleHighlight = useCallback((verseKey, colorId) => {
+    const next = setHighlight(verseKey, colorId)
+    setHighlightsState({ ...next })
+  }, [])
 
   /* ── Note handlers ── */
   function openNoteEditor(verseKey) {
     if (editingNote === verseKey) { setEditingNote(null); return }
-    setNoteDraft(verseNotes[verseKey] || '')
+    setNoteDraft(itemNotes[verseKey] || '')
     setEditingNote(verseKey)
+    setColorPicker(null)
   }
-  function saveVerseNote(verseKey) {
-    setVerseNotes(prev => {
-      const next = { ...prev }
-      if (noteDraft.trim()) next[verseKey] = noteDraft.trim()
-      else delete next[verseKey]
-      persistNotes(next)
-      return next
-    })
-    setEditingNote(null)
-  }
-  function deleteVerseNote(verseKey) {
-    setVerseNotes(prev => {
-      const next = { ...prev }
-      delete next[verseKey]
-      persistNotes(next)
-      return next
-    })
+
+  function saveNote(verseKey) {
+    const next = setItemNote(verseKey, noteDraft)
+    setItemNotesState({ ...next })
     setEditingNote(null)
   }
 
-  function navigate(newBook, newChapter) {
-    setBook(newBook)
-    setChapter(newChapter)
+  function deleteNote(verseKey) {
+    const next = setItemNote(verseKey, '')
+    setItemNotesState({ ...next })
+    setEditingNote(null)
   }
 
-  function changeFontSize(delta) {
-    setFontSize(prev => {
-      const next = Math.min(24, Math.max(13, prev + delta))
-      try { localStorage.setItem('kjv-fontsize', String(next)) } catch {}
-      return next
-    })
-  }
-
+  /* ── Share helpers ── */
   function handleShareSelection() {
     setShareCard({
       type: 'reading',
@@ -396,13 +461,65 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
     })
   }
 
-  const todayLink     = todayChapter
+  function handleShareNote(verseKey, note, verseText) {
+    const [, b, ch, v] = verseKey.split('|')
+    setShareCard({
+      type: 'reading',
+      title: `${b} ${ch}:${v}`,
+      subtitle: 'King James Version',
+      source: 'KJV',
+      text: `"${verseText}"\n\n— My reflection:\n${note}`,
+      label: '',
+    })
+  }
+
+  /* ── Search handlers ── */
+  function submitSearch(q) {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    setSearchQuery(trimmed)
+    setSearchFocus(0)
+    addSearchHistory('kjv', trimmed)
+    setSearchHistory(getSearchHistory('kjv'))
+    setShowHistDrop(false)
+  }
+
+  function navigate(newBook, newChapter) {
+    setBook(newBook)
+    setChapter(newChapter)
+  }
+
+  function changeFontSize(delta) {
+    setFontSize(prev => {
+      const next = Math.min(24, Math.max(13, prev + delta))
+      try { localStorage.setItem('kjv-fontsize', String(next)) } catch {}
+      return next
+    })
+  }
+
+  const todayLink      = todayChapter
   const isTodayChapter = todayLink && todayLink === `${book} ${chapter}`
-  const canPrev       = chapter > 1
-  const canNext       = chapter < totalChs
-  const bookIdx       = BIBLE_BOOKS.findIndex(b => b.name === book)
-  const prevBook      = chapter === 1 && bookIdx > 0 ? BIBLE_BOOKS[bookIdx - 1] : null
-  const nextBook      = chapter === totalChs && bookIdx < BIBLE_BOOKS.length - 1 ? BIBLE_BOOKS[bookIdx + 1] : null
+  const canPrev        = chapter > 1
+  const canNext        = chapter < totalChs
+  const bookIdx        = BIBLE_BOOKS.findIndex(b => b.name === book)
+  const prevBook       = chapter === 1 && bookIdx > 0 ? BIBLE_BOOKS[bookIdx - 1] : null
+  const nextBook       = chapter === totalChs && bookIdx < BIBLE_BOOKS.length - 1 ? BIBLE_BOOKS[bookIdx + 1] : null
+
+  /* Highlight text in verse for search */
+  function highlightSearchInText(text) {
+    const q = searchQuery.trim()
+    if (!q) return text
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    try {
+      const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+      if (parts.length === 1) return text
+      return parts.map((p, i) =>
+        p.toLowerCase() === q.toLowerCase()
+          ? <mark key={i} style={{ background:'#fef08a', color:'inherit', borderRadius:2, padding:'0 1px' }}>{p}</mark>
+          : p
+      )
+    } catch { return text }
+  }
 
   return (
     <div style={r.wrap}>
@@ -447,7 +564,6 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
 
         {/* Toolbar */}
         <div style={r.toolbar}>
-          {/* Book pill — tap on mobile to open sidebar */}
           <button
             style={r.bookPill}
             onClick={() => isMobile && setSideOpen(true)}
@@ -468,8 +584,19 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             )}
           </button>
 
-          {/* Right toolbar controls */}
           <div style={{ display:'flex', alignItems:'center', gap:4, flexShrink:0, marginLeft:'auto' }}>
+            {/* Search toggle */}
+            <button
+              style={{ ...r.toolBtn, ...(searchOpen ? { borderColor:'var(--teal)', color:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+              onClick={() => { setSearchOpen(o => !o); setSearchQuery(''); setShowHistDrop(false) }}
+              title="Search in chapter"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
+
             {/* Share selection / chapter */}
             {selection ? (
               <button style={{ ...r.toolBtn, color:'var(--teal)', borderColor:'var(--teal)' }} onClick={handleShareSelection} title="Share selected text">
@@ -497,8 +624,80 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
           </div>
         </div>
 
+        {/* Search bar */}
+        {searchOpen && (
+          <div style={r.searchBar} onClick={e => e.stopPropagation()}>
+            <div style={r.searchInputWrap}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
+                <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <input
+                ref={searchInputRef}
+                style={r.searchInput}
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setSearchFocus(0); setShowHistDrop(!!e.target.value === false && searchHistory.length > 0) }}
+                onFocus={() => { if (!searchQuery && searchHistory.length) setShowHistDrop(true) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') submitSearch(searchQuery)
+                  if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery('') }
+                  if (e.key === 'ArrowDown') setSearchFocus(f => Math.min(f + 1, searchMatches.length - 1))
+                  if (e.key === 'ArrowUp') setSearchFocus(f => Math.max(f - 1, 0))
+                }}
+                placeholder={`Search in ${book} ${chapter}…`}
+              />
+              {searchQuery && (
+                <button style={r.searchClear} onClick={() => { setSearchQuery(''); setSearchFocus(0) }}>×</button>
+              )}
+            </div>
+
+            {/* Match count + nav */}
+            {searchQuery.trim() && (
+              <div style={r.searchResults}>
+                {searchMatches.length === 0 ? (
+                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>No matches</span>
+                ) : (
+                  <>
+                    <span style={{fontSize:12, color:'var(--teal)', fontWeight:600}}>
+                      {searchFocus + 1} / {searchMatches.length}
+                    </span>
+                    <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.max(0, f - 1))}>↑</button>
+                    <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(searchMatches.length - 1, f + 1))}>↓</button>
+                    <button style={r.searchSaveBtn} onClick={() => submitSearch(searchQuery)} title="Save to history">
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                        <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                        <path d="M5.5 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* History dropdown */}
+            {showHistDrop && searchHistory.length > 0 && (
+              <div style={{position:'relative'}}>
+                <SearchHistoryDropdown
+                  history={searchHistory}
+                  onSelect={q => { setSearchQuery(q); setSearchFocus(0); setShowHistDrop(false) }}
+                  onRemove={q => {
+                    removeSearchEntry('kjv', q)
+                    setSearchHistory(getSearchHistory('kjv'))
+                  }}
+                  onClear={() => {
+                    clearSearchHistory('kjv')
+                    setSearchHistory([])
+                    setShowHistDrop(false)
+                  }}
+                  onClose={() => setShowHistDrop(false)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Selection hint bar */}
-        {selection && (
+        {selection && !searchOpen && (
           <div style={r.selectionBar}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
               <path d="M2 4h8M2 8h5" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
@@ -533,39 +732,55 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
             <>
               <h2 style={r.chapterHeading}>{book} {chapter}</h2>
 
-              {/* Verses with inline confession cross-references, highlights, and notes */}
+              {/* Verses */}
               <div style={r.verseList} ref={verseListRef}>
                 {verses.map(({ verse, text }) => {
-                  const verseKey     = `${book}|${chapter}|${verse}`
-                  const isHighlighted = !!highlights[verseKey]
-                  const note          = verseNotes[verseKey]
+                  const verseKey      = `kjv|${book}|${chapter}|${verse}`
+                  const hlColorId     = highlights[verseKey] || null
+                  const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
+                  const note          = itemNotes[verseKey]
                   const isEditing     = editingNote === verseKey
+                  const showPicker    = colorPicker === verseKey
                   const verseRefs     = getCrossRefs(book, chapter, verse)
+                  const isSearchMatch = searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
+                  const isFocusMatch  = searchMatches[searchFocus]?.verse === verse
+
                   return (
                     <div
                       key={verse}
                       id={`v${verse}`}
                       style={{
                         ...r.verseOuter,
-                        ...(isHighlighted ? r.verseHighlighted : {}),
+                        ...(hlColorId ? {
+                          background: hlStyle.rowBg,
+                          borderLeftColor: hlStyle.border,
+                        } : {}),
+                        ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
+                        ...(isSearchMatch && !isFocusMatch ? { background:'rgba(254,240,138,0.25)' } : {}),
                       }}
                     >
                       {/* ── main verse row ── */}
                       <div style={r.verseRow}>
-                        {/* Verse number — click to highlight */}
+                        {/* Verse number — click to open colour picker */}
                         <button
                           style={{
                             ...r.verseNum,
-                            ...(isHighlighted ? r.verseNumHL : {}),
+                            ...(hlColorId ? {
+                              color: hlStyle.numClr,
+                              background: hlStyle.numBg,
+                            } : {}),
                           }}
-                          onClick={() => toggleHighlight(verseKey)}
-                          title={isHighlighted ? 'Remove highlight' : 'Highlight verse'}
+                          onClick={() => {
+                            setColorPicker(prev => prev === verseKey ? null : verseKey)
+                            setEditingNote(null)
+                          }}
+                          title="Highlight verse"
                         >
                           {verse}
                         </button>
 
                         <span style={r.verseBody}>
-                          <span style={{ ...r.verseText, fontSize }}>{text}</span>
+                          <span style={{ ...r.verseText, fontSize }}>{highlightSearchInText(text)}</span>
 
                           {/* Confession cross-ref chips */}
                           {verseRefs.length > 0 && (
@@ -588,7 +803,7 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
 
                           {/* Note icon button */}
                           <button
-                            onClick={() => openNoteEditor(verseKey)}
+                            onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
                             style={{
                               ...r.noteIconBtn,
                               ...(note ? r.noteIconBtnActive : {}),
@@ -603,18 +818,41 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
                         </span>
                       </div>
 
-                      {/* ── Saved note display (click to edit) ── */}
+                      {/* Colour picker */}
+                      {showPicker && (
+                        <div style={{ marginLeft:34, marginBottom:4 }}>
+                          <ColorPicker
+                            currentColor={hlColorId}
+                            onSelect={colorId => handleHighlight(verseKey, colorId)}
+                            onClose={() => setColorPicker(null)}
+                          />
+                        </div>
+                      )}
+
+                      {/* Saved note display */}
                       {note && !isEditing && (
                         <div style={r.noteDisplay} onClick={() => openNoteEditor(verseKey)}>
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                             <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                             <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
                           </svg>
-                          <span>{note}</span>
+                          <span style={{flex:1}}>{note}</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }}
+                            style={r.noteShareBtn}
+                            title="Share note"
+                          >
+                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                              <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                              <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                              <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                              <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                            </svg>
+                          </button>
                         </div>
                       )}
 
-                      {/* ── Inline note editor ── */}
+                      {/* Inline note editor */}
                       {isEditing && (
                         <div style={r.noteEditorWrap}>
                           <textarea
@@ -626,10 +864,10 @@ export default function KjvReader({ todayChapter, initialBook, initialChapter })
                             rows={3}
                           />
                           <div style={r.noteEditorActions}>
-                            <button onClick={() => saveVerseNote(verseKey)} style={r.noteSaveBtn}>Save</button>
+                            <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
                             <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
                             {note && (
-                              <button onClick={() => deleteVerseNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>
+                              <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>
                             )}
                           </div>
                         </div>
@@ -805,6 +1043,65 @@ const r = {
     transition:'all 0.12s',
   },
 
+  /* Search bar */
+  searchBar: {
+    background:'var(--surface)', borderBottom:'1px solid var(--border)',
+    padding:'8px 16px', display:'flex', flexDirection:'column', gap:6,
+    position:'sticky', top:49, zIndex:9,
+  },
+  searchInputWrap: {
+    display:'flex', alignItems:'center', gap:6,
+    border:'1.5px solid var(--teal)', borderRadius:'var(--radius)',
+    padding:'0 10px', background:'var(--parchment)',
+  },
+  searchInput: {
+    flex:1, border:'none', background:'transparent', outline:'none',
+    fontSize:13, color:'var(--ink)', padding:'7px 0',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  searchClear: {
+    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
+    fontSize:16, lineHeight:1, padding:'0 2px', flexShrink:0,
+  },
+  searchResults: {
+    display:'flex', alignItems:'center', gap:6,
+  },
+  searchNavBtn: {
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:4, padding:'3px 7px', cursor:'pointer', fontSize:12,
+    color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
+  },
+  searchSaveBtn: {
+    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
+    display:'flex', alignItems:'center', padding:4, marginLeft:'auto',
+    title: 'Save to history',
+  },
+
+  /* History dropdown */
+  histDropdown: {
+    position:'absolute', top:0, left:0, right:0, zIndex:20,
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+    overflow:'hidden', fontFamily:"'DM Sans',sans-serif",
+  },
+  histHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'8px 12px', borderBottom:'1px solid var(--border)',
+  },
+  histTitle: { fontSize:10, fontWeight:700, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.06em' },
+  histClearAll: { fontSize:11, fontWeight:600, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0 },
+  histRow: { display:'flex', alignItems:'center' },
+  histItem: {
+    display:'flex', alignItems:'center', gap:8, flex:1,
+    padding:'8px 12px', background:'none', border:'none', cursor:'pointer',
+    textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+  },
+  histItemText: { fontSize:13, color:'var(--ink)', flex:1 },
+  histRemove: {
+    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
+    fontSize:16, padding:'0 12px', flexShrink:0,
+  },
+
   /* Selection hint */
   selectionBar: {
     display:'flex', alignItems:'center', gap:8,
@@ -834,34 +1131,27 @@ const r = {
   },
   verseList: { display:'flex', flexDirection:'column', gap:0 },
 
-  /* ── Verse outer wrapper (handles highlight + note stacking) ── */
+  /* ── Verse outer wrapper ── */
   verseOuter: {
     display:'flex', flexDirection:'column',
     borderRadius:6, marginLeft:-8, paddingLeft:8,
     borderLeft:'3px solid transparent',
     transition:'background 0.15s, border-color 0.15s',
   },
-  verseHighlighted: {
-    background:'rgba(210,160,0,0.10)',
-    borderLeftColor:'rgba(200,150,0,0.55)',
-  },
 
-  /* ── Inner flex row (verse number + body) ── */
+  /* ── Inner flex row ── */
   verseRow: {
     display:'flex', gap:12, padding:'4px 0', lineHeight:1.8, alignItems:'flex-start',
   },
   verseNum: {
     fontSize:10, fontWeight:700, color:'var(--teal)',
-    minWidth:22, paddingTop:6, flexShrink:0,
+    minWidth:22, flexShrink:0,
     fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
     fontFamily:"'DM Sans',sans-serif",
     background:'none', border:'none', cursor:'pointer',
     borderRadius:4, padding:'4px 2px',
     transition:'background 0.12s, color 0.12s',
-  },
-  verseNumHL: {
-    color:'rgba(160,120,0,0.9)',
-    background:'rgba(210,160,0,0.18)',
+    paddingTop:4,
   },
   verseBody: {
     flex:1, minWidth:0,
@@ -871,7 +1161,16 @@ const r = {
     fontFamily:"'Georgia', 'Times New Roman', serif",
   },
 
-  /* ── Note icon button (inline after verse text) ── */
+  /* ── Colour picker ── */
+  colorPicker: {
+    display:'flex', alignItems:'center', gap:6,
+    padding:'6px 10px',
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', boxShadow:'0 2px 12px rgba(0,0,0,0.12)',
+    width:'fit-content',
+  },
+
+  /* ── Note icon button ── */
   noteIconBtn: {
     display:'inline-flex', alignItems:'center', justifyContent:'center',
     width:18, height:18, background:'none',
@@ -897,6 +1196,12 @@ const r = {
     fontSize:12, color:'var(--ink-muted)', lineHeight:1.6,
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'background 0.12s',
+  },
+  noteShareBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', display:'flex', alignItems:'center',
+    padding:'2px 4px', borderRadius:4, flexShrink:0,
+    transition:'color 0.12s',
   },
 
   /* ── Inline note editor ── */
@@ -933,7 +1238,7 @@ const r = {
     marginLeft:'auto',
   },
 
-  /* Inline confession cross-reference chips — appear after verse text */
+  /* Inline confession cross-reference chips */
   inlineCrossRefs: {
     display:'inline-flex', flexWrap:'wrap', gap:4,
     marginLeft:6, verticalAlign:'middle',
