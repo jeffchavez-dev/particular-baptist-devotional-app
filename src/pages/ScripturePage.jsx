@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../App'
 import KjvReader from '../components/KjvReader'
 import { buildSchedule, getBibleProgress, setBibleChapter, getTodayDayNum } from '../lib/supabase'
@@ -292,12 +292,13 @@ function TestamentSection({ testament, categories, planByBook, bibBooks, progres
 /* ══════════════════════════════════════════════════════════════════ */
 export default function ScripturePage() {
   const navigate = useNavigate()
+  const { state: locationState } = useLocation()
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
-  /* Restore saved state */
+  /* Restore saved state — but if coming from Settings deep-link, force 'read' mode */
   const _saved = loadState('scripture', { mode: 'read' })
-  const [mode,    setMode]    = useState(_saved.mode)
+  const [mode,    setMode]    = useState(locationState?.book ? 'read' : _saved.mode)
   const [progress, setProgress] = useState(() => getBibleProgress())
   /* Open/closed category boxes */
   const [openCats, setOpenCats] = useState(new Set())
@@ -381,6 +382,19 @@ export default function ScripturePage() {
   const [readSearch, setReadSearch] = useState('')
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  /* Deep-link from Settings: navigate to specific book/chapter/verse */
+  const pendingDeepLinkRef = useRef(locationState?.book ? locationState : null)
+  useEffect(() => {
+    if (!pendingDeepLinkRef.current) return
+    const { book: b, chapter: ch, verse: v } = pendingDeepLinkRef.current
+    pendingDeepLinkRef.current = null
+    /* KjvReader may not have mounted yet — give it one frame then call navigateTo */
+    const timer = setTimeout(() => {
+      kjvRef.current?.navigateTo(b, ch, v)
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [mode]) // fires when mode becomes 'read'
 
   /* Close sidebar on Escape */
   useEffect(() => {

@@ -481,11 +481,9 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
 
-  /* Annotations — version counter drives fresh localStorage reads on every change */
-  const [annotationVer,  setAnnotationVer]  = useState(0)
-  const bumpAnnotations = useCallback(() => setAnnotationVer(v => v + 1), [])
-  const highlights = useMemo(() => loadHighlights(), [annotationVer])
-  const itemNotes  = useMemo(() => loadItemNotes(),  [annotationVer])
+  /* Annotations — plain state, always written by reading fresh from localStorage */
+  const [highlights, setHighlights] = useState(() => loadHighlights())
+  const [itemNotes,  setItemNotes]  = useState(() => loadItemNotes())
 
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
@@ -515,11 +513,18 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
+  /* Pending verse scroll after navigateTo() call from outside */
+  const pendingVerseRef = useRef(null)
+
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
     submitSearch:   (q) => submitSearch(q),
     clearSearch:    () => closeSearch(),
+    navigateTo:     (newBook, newChapter, verse) => {
+      navigate(newBook, newChapter)
+      if (verse) pendingVerseRef.current = { book: newBook, chapter: newChapter, verse }
+    },
   }))
 
   useEffect(() => {
@@ -535,9 +540,13 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   /* Refresh highlights + notes when a cross-device sync completes */
   useEffect(() => {
-    window.addEventListener('pb-annotations-updated', bumpAnnotations)
-    return () => window.removeEventListener('pb-annotations-updated', bumpAnnotations)
-  }, [bumpAnnotations])
+    function onSync() {
+      setHighlights(loadHighlights())
+      setItemNotes(loadItemNotes())
+    }
+    window.addEventListener('pb-annotations-updated', onSync)
+    return () => window.removeEventListener('pb-annotations-updated', onSync)
+  }, [])
 
   /* Persist position */
   useEffect(() => {
@@ -600,6 +609,18 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [searchFocus, chapterMatches, book, chapter])
 
+  /* Scroll to a specific verse after navigateTo() from Settings deep-link */
+  useEffect(() => {
+    if (!pendingVerseRef.current) return
+    const { book: b, chapter: ch, verse: v } = pendingVerseRef.current
+    if (b !== book || ch !== chapter) return   // wait for the right chapter to be active
+    pendingVerseRef.current = null
+    setTimeout(() => {
+      const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 250)
+  }, [book, chapter])
+
   /* First-mount: load KJV bundle */
   useEffect(() => {
     let cancelled = false
@@ -652,11 +673,11 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     return () => obs.disconnect()
   }, [dataReady, segments])
 
-  /* ── Highlight handler (used by single-verse path if ever needed) ── */
+  /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
     setHighlight(verseKey, colorId, userId)
-    bumpAnnotations()
-  }, [userId, bumpAnnotations])
+    setHighlights(loadHighlights())
+  }, [userId])
 
   /* ── Note handlers ── */
   function openNoteEditor(verseKey) {
@@ -667,13 +688,13 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   function saveNote(verseKey) {
     setItemNote(verseKey, noteDraft.trim(), userId)
-    bumpAnnotations()
+    setItemNotes(loadItemNotes())
     setEditingNote(null)
   }
 
   function deleteNote(verseKey) {
     setItemNote(verseKey, '', userId)
-    bumpAnnotations()
+    setItemNotes(loadItemNotes())
     setEditingNote(null)
   }
 
@@ -696,7 +717,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   function applyHighlightToSelection(colorId) {
     selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
-    bumpAnnotations()          // re-read localStorage → shows all highlights immediately
+    setHighlights(loadHighlights())   // explicit fresh read → all selected verses highlighted
     setColorBarOpen(false)
     setSelectedVerses(new Set())
   }

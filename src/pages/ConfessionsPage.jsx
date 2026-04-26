@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs, useAuth } from '../App'
 import CopyBtn from '../components/CopyBtn'
@@ -466,6 +466,7 @@ const ia = {
 /* ══════════════════════════════════════════════════════════════ */
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { state: locationState } = useLocation()
   const { prefs, updatePrefs } = usePrefs()
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
@@ -484,39 +485,68 @@ export default function ConfessionsPage() {
   const contentRef = useRef(null)
   const searchWrapRef = useRef(null)
 
+  /* Deep-link from Settings: scroll to specific paragraph/Q&A/article */
+  const deepLinkRef = useRef(
+    locationState?.itemKey && locationState?.source ? locationState : null
+  )
+
   /* Search history */
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('conf'))
   const [showHistDrop,  setShowHistDrop]  = useState(false)
 
-  /* Annotations — version counter drives fresh localStorage reads on every change */
-  const [annotationVer,  setAnnotationVer]  = useState(0)
-  const bumpAnnotations = useCallback(() => setAnnotationVer(v => v + 1), [])
-  const hlData   = useMemo(() => loadHighlights(), [annotationVer])
-  const noteData = useMemo(() => loadItemNotes(),  [annotationVer])
+  /* Annotations — plain state, always written by reading fresh from localStorage */
+  const [hlData,   setHlData]   = useState(() => loadHighlights())
+  const [noteData, setNoteData] = useState(() => loadItemNotes())
 
   const [activeItemKey, setActiveItemKey] = useState(null) // tap-to-show actions
 
   const handleHighlight = useCallback((key, colorId) => {
     setHighlight(key, colorId, userId)
-    bumpAnnotations()
-  }, [userId, bumpAnnotations])
+    setHlData(loadHighlights())
+  }, [userId])
 
   const handleNote = useCallback((key, text) => {
     setItemNote(key, text, userId)
-    bumpAnnotations()
-  }, [userId, bumpAnnotations])
+    setNoteData(loadItemNotes())
+  }, [userId])
 
   /* Refresh annotations when a cross-device sync completes */
   useEffect(() => {
-    window.addEventListener('pb-annotations-updated', bumpAnnotations)
-    return () => window.removeEventListener('pb-annotations-updated', bumpAnnotations)
-  }, [bumpAnnotations])
+    function onSync() {
+      setHlData(loadHighlights())
+      setNoteData(loadItemNotes())
+    }
+    window.addEventListener('pb-annotations-updated', onSync)
+    return () => window.removeEventListener('pb-annotations-updated', onSync)
+  }, [])
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
     restoreScroll('conf')
     return () => saveScroll('conf')
   }, [])
+
+  /* Deep-link scroll: fires once after the tab content renders */
+  useEffect(() => {
+    if (!deepLinkRef.current) return
+    const { itemKey, source } = deepLinkRef.current
+    deepLinkRef.current = null
+    let domId
+    if (source === '2lbcf')     domId = `p-${itemKey}`
+    else if (source === 'catechism') domId = `qa-${itemKey}`
+    else if (source === '1lbcf')    domId = `art-${itemKey}`
+    if (!domId) return
+    const timer = setTimeout(() => {
+      const el = document.getElementById(domId)
+      if (el) {
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
+        /* Highlight the chapter in the sidebar nav */
+        if (source === '2lbcf') setActiveChapter(`ch-${itemKey.split('.')[0]}`)
+        else if (source === '1lbcf') setActiveChapter(`art-${itemKey}`)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [tab]) // re-fire if tab changes (URL param arrives after mount)
 
   useEffect(() => {
     const handler = () => {

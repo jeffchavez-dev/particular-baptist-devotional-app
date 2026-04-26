@@ -298,7 +298,7 @@ function AnnotationsPanel({ session, navigate }) {
                   <button
                     key={h.key}
                     style={{ ...ap.hlChip, background: c.rowBg, borderColor: c.border, color: c.numClr }}
-                    onClick={() => navigate('/scripture')}
+                    onClick={() => navigate('/scripture', { state: { book: h.book, chapter: h.chapter, verse: h.verse } })}
                     title={`${h.book} ${h.chapter}:${h.verse}`}
                   >
                     <HlDot colorId={h.colorId} size={8} />
@@ -332,7 +332,7 @@ function AnnotationsPanel({ session, navigate }) {
           <>
             <div style={ap.cardList}>
               {(showAllKjvNt ? kjvNotes : kjvNotes.slice(0, PREVIEW)).map(n => (
-                <div key={n.key} style={ap.card} onClick={() => navigate('/scripture')}>
+                <div key={n.key} style={ap.card} onClick={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}>
                   <div style={ap.cardHead}>
                     <span style={ap.refBadge}>{n.book} {n.chapter}:{n.verse}</span>
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:'auto',opacity:.35}}>
@@ -373,7 +373,7 @@ function AnnotationsPanel({ session, navigate }) {
                   <button
                     key={h.key}
                     style={{ ...ap.hlChip, background: c.rowBg, borderColor: c.border, color: c.numClr }}
-                    onClick={() => navigate('/confessions')}
+                    onClick={() => navigate(`/confessions?t=${h.source}`, { state: { itemKey: h.itemKey, source: h.source } })}
                     title={`${srcLabel} ${h.itemKey}`}
                   >
                     <HlDot colorId={h.colorId} size={8} />
@@ -409,7 +409,7 @@ function AnnotationsPanel({ session, navigate }) {
               {(showAllCNt ? confNotes : confNotes.slice(0, PREVIEW)).map(n => {
                 const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
                 return (
-                  <div key={n.key} style={ap.card} onClick={() => navigate('/confessions')}>
+                  <div key={n.key} style={ap.card} onClick={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}>
                     <div style={ap.cardHead}>
                       <span style={ap.refBadge}>{srcLabel} {n.itemKey}</span>
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:'auto',opacity:.35}}>
