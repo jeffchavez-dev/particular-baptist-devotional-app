@@ -258,6 +258,7 @@ function ItemActions({
   itemKey, label, copyText, shareTitle, shareSource,
   onOpenKjv, refs,
   highlights, itemNotes, onHighlight, onNote, onShare,
+  isActive,
 }) {
   const [showPicker, setShowPicker] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
@@ -313,8 +314,8 @@ function ItemActions({
         }} />
       )}
 
-      {/* Action row */}
-      <div style={ia.row}>
+      {/* Action row — only shown when this item is tapped/active */}
+      {isActive && <div style={ia.row}>
         {/* Highlight button */}
         <div style={{position:'relative'}}>
           <button
@@ -367,7 +368,7 @@ function ItemActions({
 
         {/* Copy button */}
         <CopyBtn getText={() => copyText} label="" />
-      </div>
+      </div>}
 
       {/* Saved note display */}
       {note && !editingNote && (
@@ -488,17 +489,29 @@ export default function ConfessionsPage() {
   const [showHistDrop,  setShowHistDrop]  = useState(false)
 
   /* Annotations */
-  const [hlData,    setHlData]    = useState(() => loadHighlights())
-  const [noteData,  setNoteData]  = useState(() => loadItemNotes())
+  const [hlData,       setHlData]       = useState(() => loadHighlights())
+  const [noteData,     setNoteData]     = useState(() => loadItemNotes())
+  const [activeItemKey, setActiveItemKey] = useState(null) // tap-to-show actions
 
   const handleHighlight = useCallback((key, colorId) => {
-    const next = setHighlight(key, colorId, userId)
-    setHlData({ ...next })
+    setHighlight(key, colorId, userId)
+    setHlData(prev => {
+      const next = { ...prev }
+      if (colorId == null) delete next[key]
+      else next[key] = colorId
+      return next
+    })
   }, [userId])
 
   const handleNote = useCallback((key, text) => {
-    const next = setItemNote(key, text, userId)
-    setNoteData({ ...next })
+    setItemNote(key, text, userId)
+    setNoteData(prev => {
+      const next = { ...prev }
+      const trimmed = text.trim()
+      if (trimmed) next[key] = trimmed
+      else delete next[key]
+      return next
+    })
   }, [userId])
 
   /* Refresh annotations when a cross-device sync completes */
@@ -845,30 +858,35 @@ export default function ConfessionsPage() {
                           style={{
                             ...s.paragraph,
                             ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                            cursor:'pointer',
                           }}
                           id={`p-${p.key}`}
+                          onClick={() => setActiveItemKey(prev => prev === itemKey ? null : itemKey)}
                         >
                           <div style={s.paraNum}>§{p.para}</div>
                           <div style={s.paraBody}>
                             <p style={{...s.paraText, ...textStyle}}>{highlight(p.text, q)}</p>
-                            {p.refs && (
-                              <div style={s.refs}>
-                                <span style={s.refsLabel}>Proof texts: </span>
-                                <RefChips refs={p.refs} onOpen={setKjvModal} />
-                              </div>
-                            )}
-                            <ItemActions
-                              itemKey={itemKey}
-                              label="2LBCF"
-                              copyText={p.text + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
-                              shareTitle={`2LBCF ${p.key}`}
-                              shareSource="2LBCF"
-                              highlights={hlData}
-                              itemNotes={noteData}
-                              onHighlight={handleHighlight}
-                              onNote={handleNote}
-                              onShare={setShareCard}
-                            />
+                            <div onClick={e => e.stopPropagation()}>
+                              {p.refs && (
+                                <div style={s.refs}>
+                                  <span style={s.refsLabel}>Proof texts: </span>
+                                  <RefChips refs={p.refs} onOpen={setKjvModal} />
+                                </div>
+                              )}
+                              <ItemActions
+                                itemKey={itemKey}
+                                label="2LBCF"
+                                copyText={p.text + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
+                                shareTitle={`2LBCF ${p.key}`}
+                                shareSource="2LBCF"
+                                highlights={hlData}
+                                itemNotes={noteData}
+                                onHighlight={handleHighlight}
+                                onNote={handleNote}
+                                onShare={setShareCard}
+                                isActive={activeItemKey === itemKey}
+                              />
+                            </div>
                           </div>
                         </div>
                       )
@@ -893,31 +911,36 @@ export default function ConfessionsPage() {
                     style={{
                       ...s.qaBlock,
                       ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                      cursor:'pointer',
                     }}
                     id={`qa-${num}`}
+                    onClick={() => setActiveItemKey(prev => prev === itemKey ? null : itemKey)}
                   >
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
                       <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
                       <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(item.a, q)}</p>
-                      {item.refs && (
-                        <div style={s.refs}>
-                          <span style={s.refsLabel}>Proof texts: </span>
-                          <RefChips refs={item.refs} onOpen={setKjvModal} />
-                        </div>
-                      )}
-                      <ItemActions
-                        itemKey={itemKey}
-                        label="Catechism"
-                        copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
-                        shareTitle={`Catechism Q.${num}`}
-                        shareSource="Catechism"
-                        highlights={hlData}
-                        itemNotes={noteData}
-                        onHighlight={handleHighlight}
-                        onNote={handleNote}
-                        onShare={setShareCard}
-                      />
+                      <div onClick={e => e.stopPropagation()}>
+                        {item.refs && (
+                          <div style={s.refs}>
+                            <span style={s.refsLabel}>Proof texts: </span>
+                            <RefChips refs={item.refs} onOpen={setKjvModal} />
+                          </div>
+                        )}
+                        <ItemActions
+                          itemKey={itemKey}
+                          label="Catechism"
+                          copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          shareTitle={`Catechism Q.${num}`}
+                          shareSource="Catechism"
+                          highlights={hlData}
+                          itemNotes={noteData}
+                          onHighlight={handleHighlight}
+                          onNote={handleNote}
+                          onShare={setShareCard}
+                          isActive={activeItemKey === itemKey}
+                        />
+                      </div>
                     </div>
                   </div>
                 )
@@ -942,7 +965,9 @@ export default function ConfessionsPage() {
                     style={{
                       ...s.article,
                       ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                      cursor:'pointer',
                     }}
+                    onClick={() => setActiveItemKey(prev => prev === itemKey ? null : itemKey)}
                   >
                     <div style={{...s.articleHeader, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8}}>
                       <div>
@@ -956,24 +981,27 @@ export default function ConfessionsPage() {
                         if (!clean) return null
                         return <p key={i} style={{...s.articleLine, ...textStyle}}>{highlight(clean, q)}</p>
                       })}
-                      {item.refs && (
-                        <div style={s.refs}>
-                          <span style={s.refsLabel}>Proof texts: </span>
-                          <RefChips refs={item.refs} onOpen={setKjvModal} />
-                        </div>
-                      )}
-                      <ItemActions
-                        itemKey={itemKey}
-                        label="1LBCF"
-                        copyText={`${item.title}\n\n${item.text}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
-                        shareTitle={`1LBCF Art. ${num}`}
-                        shareSource="1LBCF"
-                        highlights={hlData}
-                        itemNotes={noteData}
-                        onHighlight={handleHighlight}
-                        onNote={handleNote}
-                        onShare={setShareCard}
-                      />
+                      <div onClick={e => e.stopPropagation()}>
+                        {item.refs && (
+                          <div style={s.refs}>
+                            <span style={s.refsLabel}>Proof texts: </span>
+                            <RefChips refs={item.refs} onOpen={setKjvModal} />
+                          </div>
+                        )}
+                        <ItemActions
+                          itemKey={itemKey}
+                          label="1LBCF"
+                          copyText={`${item.title}\n\n${item.text}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          shareTitle={`1LBCF Art. ${num}`}
+                          shareSource="1LBCF"
+                          highlights={hlData}
+                          itemNotes={noteData}
+                          onHighlight={handleHighlight}
+                          onNote={handleNote}
+                          onShare={setShareCard}
+                          isActive={activeItemKey === itemKey}
+                        />
+                      </div>
                     </div>
                   </section>
                 )

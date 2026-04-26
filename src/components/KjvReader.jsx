@@ -486,7 +486,8 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const [itemNotes,   setItemNotesState]  = useState(() => loadItemNotes())
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
-  const [colorPicker, setColorPicker]     = useState(null) // verseKey
+  const [selectedVerses, setSelectedVerses] = useState(() => new Set())
+  const [colorBarOpen,   setColorBarOpen]   = useState(false)
 
   /* Search — full-Bible mode (inline in toolbar, always visible) */
   const [searchQuery,  setSearchQuery]  = useState('')
@@ -551,7 +552,8 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   useEffect(() => {
     setSelection('')
     setEditingNote(null)
-    setColorPicker(null)
+    setSelectedVerses(new Set())
+    setColorBarOpen(false)
     setSearchFocus(0)
     setBibleResults(null)  // close search results when navigating
     try { window.getSelection()?.removeAllRanges() } catch {}
@@ -653,8 +655,13 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
-    const next = setHighlight(verseKey, colorId, userId)
-    setHighlightsState({ ...next })
+    setHighlight(verseKey, colorId, userId)
+    setHighlightsState(prev => {
+      const next = { ...prev }
+      if (colorId == null) delete next[verseKey]
+      else next[verseKey] = colorId
+      return next
+    })
   }, [userId])
 
   /* ── Note handlers ── */
@@ -662,19 +669,101 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     if (editingNote === verseKey) { setEditingNote(null); return }
     setNoteDraft(itemNotes[verseKey] || '')
     setEditingNote(verseKey)
-    setColorPicker(null)
   }
 
   function saveNote(verseKey) {
-    const next = setItemNote(verseKey, noteDraft, userId)
-    setItemNotesState({ ...next })
+    const trimmed = noteDraft.trim()
+    setItemNote(verseKey, trimmed, userId)
+    setItemNotesState(prev => {
+      const next = { ...prev }
+      if (trimmed) next[verseKey] = trimmed
+      else delete next[verseKey]
+      return next
+    })
     setEditingNote(null)
   }
 
   function deleteNote(verseKey) {
-    const next = setItemNote(verseKey, '', userId)
-    setItemNotesState({ ...next })
+    setItemNote(verseKey, '', userId)
+    setItemNotesState(prev => {
+      const next = { ...prev }
+      delete next[verseKey]
+      return next
+    })
     setEditingNote(null)
+  }
+
+  /* ── Verse tap-to-select ── */
+  function toggleVerse(verseKey) {
+    setSelectedVerses(prev => {
+      const next = new Set(prev)
+      if (next.has(verseKey)) next.delete(verseKey)
+      else next.add(verseKey)
+      if (next.size === 0) setColorBarOpen(false)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedVerses(new Set())
+    setColorBarOpen(false)
+    setEditingNote(null)
+  }
+
+  function applyHighlightToSelection(colorId) {
+    selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
+    setHighlightsState(prev => {
+      const next = { ...prev }
+      selectedVerses.forEach(vk => {
+        if (colorId == null) delete next[vk]
+        else next[vk] = colorId
+      })
+      return next
+    })
+    setColorBarOpen(false)
+    setSelectedVerses(new Set())
+  }
+
+  function openNoteForSelection() {
+    if (selectedVerses.size !== 1) return
+    const [verseKey] = [...selectedVerses]
+    setNoteDraft(itemNotes[verseKey] || '')
+    setEditingNote(verseKey)
+    setColorBarOpen(false)
+    setSelectedVerses(new Set())
+  }
+
+  function shareSelection() {
+    const lines = []
+    selectedVerses.forEach(vk => {
+      const parts = vk.split('|')
+      const b = parts[1], ch = parts[2], v = parts[3]
+      for (const seg of segments) {
+        if (seg.book === b && String(seg.chapter) === ch) {
+          const vObj = seg.verses.find(ve => String(ve.verse) === v)
+          if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
+        }
+      }
+    })
+    setShareCard({ type:'reading', title:`${book} ${chapter}`, subtitle:'King James Version', source:'KJV', text:lines.join('\n\n'), label:'' })
+    setSelectedVerses(new Set())
+  }
+
+  function copySelection() {
+    const lines = []
+    selectedVerses.forEach(vk => {
+      const parts = vk.split('|')
+      const b = parts[1], ch = parts[2], v = parts[3]
+      for (const seg of segments) {
+        if (seg.book === b && String(seg.chapter) === ch) {
+          const vObj = seg.verses.find(ve => String(ve.verse) === v)
+          if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
+        }
+      }
+    })
+    navigator.clipboard.writeText(lines.join('\n\n')).catch(() => {})
+    setCopiedKey('selection')
+    setTimeout(() => { setCopiedKey(null); setSelectedVerses(new Set()) }, 1500)
   }
 
   /* ── Share helpers ── */
@@ -899,7 +988,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
                     const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
                     const note          = itemNotes[verseKey]
                     const isEditing     = editingNote === verseKey
-                    const showPicker    = colorPicker === verseKey
+                    const isSelected    = selectedVerses.has(verseKey)
                     const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
                     /* Search highlights only on first segment */
                     const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
@@ -911,20 +1000,19 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
                         id={verseId(seg.book, seg.chapter, verse)}
                         style={{
                           ...r.verseOuter,
-                          ...(hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
+                          ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
+                              hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
                           ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
-                          ...(isSearchMatch && !isFocusMatch ? { background:'rgba(254,240,138,0.25)' } : {}),
+                          ...(isSearchMatch && !isFocusMatch && !isSelected ? { background:'rgba(254,240,138,0.25)' } : {}),
                         }}
                       >
-                        {/* ── main verse row ── */}
-                        <div style={r.verseRow}>
-                          <button
+                        {/* ── main verse row — tap to select ── */}
+                        <div style={r.verseRow} onClick={() => toggleVerse(verseKey)}>
+                          <span
                             style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
-                            onClick={() => { setColorPicker(prev => prev === verseKey ? null : verseKey); setEditingNote(null) }}
-                            title="Highlight verse"
                           >
                             {verse}
-                          </button>
+                          </span>
 
                           <span style={r.verseBody}>
                             <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
@@ -937,7 +1025,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
                                     <button
                                       key={ref.key}
                                       style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
-                                      onClick={() => setConfessionModal(ref)}
+                                      onClick={(e) => { e.stopPropagation(); setConfessionModal(ref) }}
                                     >
                                       <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
                                       <span style={r.inlineChipLabel}>{ref.label}</span>
@@ -950,78 +1038,8 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
                           </span>
                         </div>
 
-                        {/* ── 4 icon-only verse actions ── */}
-                        <div style={r.verseActions}>
-                          {/* Highlight */}
-                          <button
-                            style={{ ...r.verseActionBtn, ...(hlColorId ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
-                            onClick={() => { setColorPicker(prev => prev === verseKey ? null : verseKey); setEditingNote(null) }}
-                            title="Highlight"
-                          >
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                              <path d="M2 11h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                              <path d="M4 8.5L8.5 4 10 5.5 5.5 10 3.5 10.5 4 8.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill={hlColorId ? 'currentColor' : 'none'} fillOpacity="0.25"/>
-                            </svg>
-                          </button>
-                          {/* Note */}
-                          <button
-                            style={{ ...r.verseActionBtn, ...(note ? { color:'rgba(150,110,0,0.9)', borderColor:'rgba(200,150,0,0.35)', background:'rgba(210,160,0,0.12)' } : {}) }}
-                            onClick={() => { openNoteEditor(verseKey); setColorPicker(null) }}
-                            title={note ? 'View / edit note' : 'Add note'}
-                          >
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                              <path d="M2 11l.6-2.4L8 3l2 2-5.4 5.6L2 11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
-                              <line x1="7" y1="3.5" x2="9" y2="5.5" stroke="currentColor" strokeWidth="1.2"/>
-                            </svg>
-                          </button>
-                          {/* Share */}
-                          <button
-                            style={r.verseActionBtn}
-                            onClick={() => setShareCard({ type:'reading', title:`${seg.book} ${seg.chapter}:${verse}`, subtitle:'King James Version', source:'KJV', text, label:'' })}
-                            title="Share verse"
-                          >
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                              <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
-                              <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
-                              <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                            </svg>
-                          </button>
-                          {/* Copy */}
-                          <button
-                            style={{ ...r.verseActionBtn, ...(copiedKey === verseKey ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${seg.book} ${seg.chapter}:${verse} — ${text}`)
-                                .then(() => {
-                                  setCopiedKey(verseKey)
-                                  setTimeout(() => setCopiedKey(null), 1500)
-                                })
-                                .catch(() => {})
-                            }}
-                            title={copiedKey === verseKey ? 'Copied!' : 'Copy verse'}
-                          >
-                            {copiedKey === verseKey ? (
-                              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                                <polyline points="2,7 5,10 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            ) : (
-                              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                                <rect x="4.5" y="4.5" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                                <path d="M4.5 4V3a1 1 0 011-1h4a1 1 0 011 1v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                                <rect x="1.5" y="2" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-
-                        {showPicker && (
-                          <div style={{ marginLeft:34, marginBottom:4 }}>
-                            <ColorPicker currentColor={hlColorId} onSelect={colorId => handleHighlight(verseKey, colorId)} onClose={() => setColorPicker(null)} />
-                          </div>
-                        )}
-
                         {note && !isEditing && (
-                          <div style={r.noteDisplay} onClick={() => openNoteEditor(verseKey)}>
+                          <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                             <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                               <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                               <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
@@ -1039,7 +1057,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
                         )}
 
                         {isEditing && (
-                          <div style={r.noteEditorWrap}>
+                          <div style={r.noteEditorWrap} onClick={(e) => e.stopPropagation()}>
                             <textarea
                               value={noteDraft}
                               onChange={e => setNoteDraft(e.target.value)}
@@ -1066,6 +1084,100 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
           </div>
         </div>
       </div>
+
+      {/* ── Floating action bar — tap to select verses, then act ── */}
+      {selectedVerses.size > 0 && (
+        <div style={r.floatingBar}>
+          <div style={r.floatingBarMain}>
+            {/* Deselect */}
+            <button style={r.floatingDeselect} onClick={clearSelection} title="Deselect all">
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <span style={r.floatingCount}>{selectedVerses.size} verse{selectedVerses.size !== 1 ? 's' : ''}</span>
+
+            {/* Highlight */}
+            <button
+              style={{ ...r.floatingBtn, ...(colorBarOpen ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+              onClick={() => setColorBarOpen(o => !o)}
+              title="Highlight"
+            >
+              <svg width="15" height="15" viewBox="0 0 13 13" fill="none">
+                <path d="M2 11h9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M4 8.5L8.5 4 10 5.5 5.5 10 3.5 10.5 4 8.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              </svg>
+            </button>
+
+            {/* Note — single verse only */}
+            <button
+              style={{ ...r.floatingBtn, ...(selectedVerses.size !== 1 ? { opacity:0.35, cursor:'default' } : {}) }}
+              onClick={openNoteForSelection}
+              title={selectedVerses.size !== 1 ? 'Select a single verse to add a note' : 'Add / edit note'}
+            >
+              <svg width="15" height="15" viewBox="0 0 13 13" fill="none">
+                <path d="M2 11l.6-2.4L8 3l2 2-5.4 5.6L2 11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                <line x1="7" y1="3.5" x2="9" y2="5.5" stroke="currentColor" strokeWidth="1.2"/>
+              </svg>
+            </button>
+
+            {/* Share */}
+            <button style={r.floatingBtn} onClick={shareSelection} title="Share selected">
+              <svg width="15" height="15" viewBox="0 0 13 13" fill="none">
+                <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+              </svg>
+            </button>
+
+            {/* Copy */}
+            <button
+              style={{ ...r.floatingBtn, ...(copiedKey === 'selection' ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+              onClick={copySelection}
+              title={copiedKey === 'selection' ? 'Copied!' : 'Copy selected'}
+            >
+              {copiedKey === 'selection' ? (
+                <svg width="15" height="15" viewBox="0 0 13 13" fill="none">
+                  <polyline points="2,7 5,10 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 13 13" fill="none">
+                  <rect x="4.5" y="4.5" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                  <rect x="1.5" y="2" width="7" height="7.5" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Color picker row — shown when highlight is tapped */}
+          {colorBarOpen && (
+            <div style={r.floatingColorRow}>
+              {HIGHLIGHT_COLORS.map(c => (
+                <button
+                  key={c.id}
+                  title={c.label}
+                  onClick={() => applyHighlightToSelection(c.id)}
+                  style={{
+                    width:26, height:26, borderRadius:'50%',
+                    background:c.dot, border:'none', cursor:'pointer', padding:0,
+                    transition:'transform 0.1s', flexShrink:0,
+                  }}
+                />
+              ))}
+              <button
+                title="Remove highlight"
+                onClick={() => applyHighlightToSelection(null)}
+                style={{
+                  width:26, height:26, borderRadius:'50%', background:'var(--border-strong)',
+                  border:'none', cursor:'pointer', fontSize:15, color:'var(--ink-muted)',
+                  display:'flex', alignItems:'center', justifyContent:'center', padding:0, flexShrink:0,
+                }}
+              >×</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Share card modal */}
       <ShareCardModal
@@ -1302,16 +1414,16 @@ const r = {
   /* ── Inner flex row ── */
   verseRow: {
     display:'flex', gap:12, padding:'4px 0', lineHeight:1.8, alignItems:'flex-start',
+    cursor:'pointer', userSelect:'none',
   },
   verseNum: {
     fontSize:10, fontWeight:700, color:'var(--teal)',
     minWidth:22, flexShrink:0,
     fontVariantNumeric:'tabular-nums', letterSpacing:'0.02em',
     fontFamily:"'DM Sans',sans-serif",
-    background:'none', border:'none', cursor:'pointer',
     borderRadius:4, padding:'4px 2px',
     transition:'background 0.12s, color 0.12s',
-    paddingTop:4,
+    paddingTop:4, userSelect:'none',
   },
   verseBody: {
     flex:1, minWidth:0,
@@ -1345,17 +1457,46 @@ const r = {
     background:'rgba(210,160,0,0.14)',
   },
 
-  /* ── 4 icon-only verse action buttons ── */
-  verseActions: {
-    display:'flex', gap:4, alignItems:'center',
-    marginLeft:34, marginBottom:6, marginTop:2,
+  /* ── Floating selection action bar ── */
+  floatingBar: {
+    position:'fixed',
+    bottom:'calc(64px + env(safe-area-inset-bottom, 0px))',
+    left:'50%', transform:'translateX(-50%)',
+    zIndex:300,
+    display:'flex', flexDirection:'column', alignItems:'center', gap:8,
+    padding:'10px 16px',
+    background:'var(--surface)',
+    border:'1px solid var(--border)',
+    borderRadius:20,
+    boxShadow:'0 4px 24px rgba(0,0,0,0.18)',
+    fontFamily:"'DM Sans',sans-serif",
+    maxWidth:'calc(100vw - 32px)',
+    minWidth:240,
   },
-  verseActionBtn: {
-    display:'inline-flex', alignItems:'center', justifyContent:'center',
-    width:26, height:26, background:'none',
-    border:'1px solid var(--border)', borderRadius:5,
-    cursor:'pointer', color:'var(--ink-faint)',
-    transition:'all 0.12s', padding:0, flexShrink:0,
+  floatingBarMain: {
+    display:'flex', alignItems:'center', gap:8, width:'100%', justifyContent:'center',
+  },
+  floatingDeselect: {
+    background:'none', border:'1px solid var(--border)', borderRadius:'50%',
+    width:28, height:28, cursor:'pointer', color:'var(--ink-muted)',
+    display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+    flexShrink:0,
+  },
+  floatingCount: {
+    fontSize:12, fontWeight:700, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:99, padding:'3px 10px',
+    whiteSpace:'nowrap', flexShrink:0,
+  },
+  floatingBtn: {
+    background:'none', border:'1px solid var(--border)', borderRadius:8,
+    width:36, height:36, cursor:'pointer', color:'var(--ink-muted)',
+    display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+    flexShrink:0, transition:'all 0.12s',
+  },
+  floatingColorRow: {
+    display:'flex', alignItems:'center', gap:8,
+    paddingTop:6, borderTop:'1px solid var(--border)',
+    width:'100%', justifyContent:'center',
   },
 
   /* ── Saved note display bar ── */
