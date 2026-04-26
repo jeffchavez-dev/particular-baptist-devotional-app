@@ -481,9 +481,12 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
 
-  /* Annotations */
-  const [highlights,  setHighlightsState] = useState(() => loadHighlights())
-  const [itemNotes,   setItemNotesState]  = useState(() => loadItemNotes())
+  /* Annotations — version counter drives fresh localStorage reads on every change */
+  const [annotationVer,  setAnnotationVer]  = useState(0)
+  const bumpAnnotations = useCallback(() => setAnnotationVer(v => v + 1), [])
+  const highlights = useMemo(() => loadHighlights(), [annotationVer])
+  const itemNotes  = useMemo(() => loadItemNotes(),  [annotationVer])
+
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
@@ -532,13 +535,9 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   /* Refresh highlights + notes when a cross-device sync completes */
   useEffect(() => {
-    function onSync(e) {
-      setHighlightsState({ ...e.detail.highlights })
-      setItemNotesState({ ...e.detail.notes })
-    }
-    window.addEventListener('pb-annotations-updated', onSync)
-    return () => window.removeEventListener('pb-annotations-updated', onSync)
-  }, [])
+    window.addEventListener('pb-annotations-updated', bumpAnnotations)
+    return () => window.removeEventListener('pb-annotations-updated', bumpAnnotations)
+  }, [bumpAnnotations])
 
   /* Persist position */
   useEffect(() => {
@@ -653,16 +652,11 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     return () => obs.disconnect()
   }, [dataReady, segments])
 
-  /* ── Highlight handler ── */
+  /* ── Highlight handler (used by single-verse path if ever needed) ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
     setHighlight(verseKey, colorId, userId)
-    setHighlightsState(prev => {
-      const next = { ...prev }
-      if (colorId == null) delete next[verseKey]
-      else next[verseKey] = colorId
-      return next
-    })
-  }, [userId])
+    bumpAnnotations()
+  }, [userId, bumpAnnotations])
 
   /* ── Note handlers ── */
   function openNoteEditor(verseKey) {
@@ -672,24 +666,14 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   }
 
   function saveNote(verseKey) {
-    const trimmed = noteDraft.trim()
-    setItemNote(verseKey, trimmed, userId)
-    setItemNotesState(prev => {
-      const next = { ...prev }
-      if (trimmed) next[verseKey] = trimmed
-      else delete next[verseKey]
-      return next
-    })
+    setItemNote(verseKey, noteDraft.trim(), userId)
+    bumpAnnotations()
     setEditingNote(null)
   }
 
   function deleteNote(verseKey) {
     setItemNote(verseKey, '', userId)
-    setItemNotesState(prev => {
-      const next = { ...prev }
-      delete next[verseKey]
-      return next
-    })
+    bumpAnnotations()
     setEditingNote(null)
   }
 
@@ -712,14 +696,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
 
   function applyHighlightToSelection(colorId) {
     selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
-    setHighlightsState(prev => {
-      const next = { ...prev }
-      selectedVerses.forEach(vk => {
-        if (colorId == null) delete next[vk]
-        else next[vk] = colorId
-      })
-      return next
-    })
+    bumpAnnotations()          // re-read localStorage → shows all highlights immediately
     setColorBarOpen(false)
     setSelectedVerses(new Set())
   }

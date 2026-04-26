@@ -488,41 +488,29 @@ export default function ConfessionsPage() {
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('conf'))
   const [showHistDrop,  setShowHistDrop]  = useState(false)
 
-  /* Annotations */
-  const [hlData,       setHlData]       = useState(() => loadHighlights())
-  const [noteData,     setNoteData]     = useState(() => loadItemNotes())
+  /* Annotations — version counter drives fresh localStorage reads on every change */
+  const [annotationVer,  setAnnotationVer]  = useState(0)
+  const bumpAnnotations = useCallback(() => setAnnotationVer(v => v + 1), [])
+  const hlData   = useMemo(() => loadHighlights(), [annotationVer])
+  const noteData = useMemo(() => loadItemNotes(),  [annotationVer])
+
   const [activeItemKey, setActiveItemKey] = useState(null) // tap-to-show actions
 
   const handleHighlight = useCallback((key, colorId) => {
     setHighlight(key, colorId, userId)
-    setHlData(prev => {
-      const next = { ...prev }
-      if (colorId == null) delete next[key]
-      else next[key] = colorId
-      return next
-    })
-  }, [userId])
+    bumpAnnotations()
+  }, [userId, bumpAnnotations])
 
   const handleNote = useCallback((key, text) => {
     setItemNote(key, text, userId)
-    setNoteData(prev => {
-      const next = { ...prev }
-      const trimmed = text.trim()
-      if (trimmed) next[key] = trimmed
-      else delete next[key]
-      return next
-    })
-  }, [userId])
+    bumpAnnotations()
+  }, [userId, bumpAnnotations])
 
   /* Refresh annotations when a cross-device sync completes */
   useEffect(() => {
-    function onSync(e) {
-      setHlData({ ...e.detail.highlights })
-      setNoteData({ ...e.detail.notes })
-    }
-    window.addEventListener('pb-annotations-updated', onSync)
-    return () => window.removeEventListener('pb-annotations-updated', onSync)
-  }, [])
+    window.addEventListener('pb-annotations-updated', bumpAnnotations)
+    return () => window.removeEventListener('pb-annotations-updated', bumpAnnotations)
+  }, [bumpAnnotations])
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
