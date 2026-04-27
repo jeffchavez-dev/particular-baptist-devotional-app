@@ -630,6 +630,26 @@ export default function ReadingPage() {
         {/* Author's note */}
         <DevNote day={day} session={session} />
 
+        {/* Navigation (top) */}
+        <div style={s.nav}>
+          <div>
+            {prev && (
+              <button onClick={()=>navigate(`/day/${prev.day}`)} className="btn btn-outline" style={{flexDirection:'column',alignItems:'flex-start',gap:2,padding:'10px 14px'}}>
+                <span style={{fontSize:11,color:'var(--ink-faint)'}}>← Previous</span>
+                <span style={{fontSize:13}}>Day {prev.day} · {prev.reading}</span>
+              </button>
+            )}
+          </div>
+          <div>
+            {next && (
+              <button onClick={()=>navigate(`/day/${next.day}`)} className="btn btn-outline" style={{flexDirection:'column',alignItems:'flex-end',gap:2,padding:'10px 14px'}}>
+                <span style={{fontSize:11,color:'var(--ink-faint)'}}>Next →</span>
+                <span style={{fontSize:13}}>Day {next.day} · {next.reading}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Complete toggle */}
         <div className="card" style={s.completeCard} onClick={toggleComplete}>
           <div style={{...s.cb, ...(completed ? s.cbDone : {})}}>

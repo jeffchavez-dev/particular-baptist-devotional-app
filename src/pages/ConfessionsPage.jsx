@@ -19,6 +19,7 @@ import {
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
+  0: 'Preface',
   1: 'Of the Holy Scriptures',
   2: 'Of God and of the Holy Trinity',
   3: "Of God's Decree",
