@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
+import { loadBibleVersion, getVersionMetadata, searchBibleVersion } from '../lib/bibleVersions'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import { usePrefs, useAuth } from '../App'
@@ -12,33 +13,27 @@ import {
   addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
 } from '../lib/annotations'
 
-/* ── Module-level KJV data singleton — loaded once, all chapters in memory ── */
-let _kjvData = null
-let _kjvPromise = null
+/* ── Module-level version data cache — per version ── */
+const _versionDataCache = {}
 
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 }
 
-async function loadKjv() {
-  if (_kjvData) return _kjvData
-  if (!_kjvPromise) {
-    _kjvPromise = fetch('/kjv.json')
-      .then(r => { if (!r.ok) throw new Error('KJV data unavailable'); return r.json() })
-      .then(d => { _kjvData = d; return d })
-      .catch(e => { _kjvPromise = null; throw e })
-  }
-  return _kjvPromise
+async function loadBibleData(version = 'kjv') {
+  return await loadBibleVersion(version)
 }
 
-function stripFootnotes(text, chapter) {
+function stripFootnotes(text, chapter, version = 'kjv') {
+  // Only KJV has footnotes in this format
+  if (version !== 'kjv') return text
   return text.replace(new RegExp(`\\.${chapter}\\.\\d+[\\s\\S]*$`), '.').trim()
 }
 
-function getChapterVerses(bookName, ch) {
-  if (!_kjvData) return null
+function getChapterVerses(versionData, bookName, ch, version = 'kjv') {
+  if (!versionData) return null
   const slug = bookSlug(bookName)
-  const raw = _kjvData[slug]?.[ch]
+  const raw = versionData[slug]?.[ch]
   if (!raw) return null
   const seen = new Set()
   return raw
@@ -47,13 +42,13 @@ function getChapterVerses(bookName, ch) {
       seen.add(v.v)
       return true
     })
-    .map(v => ({ verse: v.v, text: stripFootnotes(v.t, ch) }))
+    .map(v => ({ verse: v.v, text: stripFootnotes(v.t, ch, version) }))
 }
 
-export async function fetchKjvChapter(bookName, ch) {
-  await loadKjv()
-  const verses = getChapterVerses(bookName, ch)
-  if (!verses) throw new Error(`${bookName} ${ch} not found in KJV data`)
+export async function fetchKjvChapter(bookName, ch, version = 'kjv') {
+  const versionData = await loadBibleData(version)
+  const verses = getChapterVerses(versionData, bookName, ch, version)
+  if (!verses) throw new Error(`${bookName} ${ch} not found in ${version} data`)
   return verses
 }
 
@@ -62,14 +57,14 @@ const SLUG_TO_BOOK = Object.fromEntries(
   BIBLE_BOOKS.map(b => [b.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''), b.name])
 )
 
-/** Search the full KJV — returns up to maxResults matches in canonical order */
-function searchBible(query, maxResults = 200) {
-  if (!_kjvData || !query.trim()) return []
+/** Search a specific Bible version — returns up to maxResults matches in canonical order */
+function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 200) {
+  if (!versionData || !query.trim()) return []
   const q = query.trim().toLowerCase()
   const hits = []
   for (const book of BIBLE_BOOKS) {
     const slug = book.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
-    const bookData = _kjvData[slug]
+    const bookData = versionData[slug]
     if (!bookData) continue
     const chapterNums = Object.keys(bookData).map(Number).sort((a, b) => a - b)
     for (const ch of chapterNums) {
@@ -77,7 +72,7 @@ function searchBible(query, maxResults = 200) {
       if (!verses) continue
       for (const v of verses) {
         if (v.t && v.t.toLowerCase().includes(q)) {
-          hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch) })
+          hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch, version) })
           if (hits.length >= maxResults) return hits
         }
       }
@@ -458,24 +453,25 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
   )
 }
 
-/* ── Main KJV Reader ── */
-const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChange, onSearchChange }, ref) {
+/* ── Main Bible Reader (KJV, ABAB, etc.) ── */
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayChapter, onNavChange, onSearchChange }, ref) {
   const { prefs } = usePrefs()
 
   const [book, setBook] = useState(() => {
-    try { return sessionStorage.getItem('kjv-book') || 'Genesis' } catch { return 'Genesis' }
+    try { return sessionStorage.getItem(`bible-book-${version}`) || 'Genesis' } catch { return 'Genesis' }
   })
   const [chapter, setChapter] = useState(() => {
-    try { return parseInt(sessionStorage.getItem('kjv-chapter') || '1') } catch { return 1 }
+    try { return parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1') } catch { return 1 }
   })
 
   /* segments = [{book, chapter, verses[]}] — first entry is navigated chapter, rest are auto-loaded */
-  const [segments,    setSegments]    = useState([])
-  const [loading,     setLoading]     = useState(!_kjvData)
-  const [dataReady,   setDataReady]   = useState(!!_kjvData)
-  const [error,       setError]       = useState(null)
-  const [sideOpen,    setSideOpen]    = useState(false)
-  const sentinelRef   = useRef(null)
+  const [segments,      setSegments]      = useState([])
+  const [versionData,   setVersionData]   = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [dataReady,     setDataReady]     = useState(false)
+  const [error,         setError]         = useState(null)
+  const [sideOpen,      setSideOpen]      = useState(false)
+  const sentinelRef     = useRef(null)
 
   /* Share + confession modals */
   const [shareCard,       setShareCard]       = useState(null)
@@ -495,7 +491,7 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
   const [searchFocus,  setSearchFocus]  = useState(0)   // index within chapter matches (when results=null)
   const [bibleResults, setBibleResults] = useState(null) // null = no search; [] = no matches; [{book,ch,verse,text}] = matches
   const [searching,    setSearching]    = useState(false)
-  const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('kjv'))
+  const [searchHistory, setSearchHistory] = useState(() => getSearchHistory(`bible-${version}`))
   const [showHistDrop,  setShowHistDrop]  = useState(false)
   const searchInputRef = useRef(null)
   const searchWrapRef  = useRef(null)
@@ -563,13 +559,13 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     }
   }, [])
 
-  /* Persist position */
+  /* Persist position per version */
   useEffect(() => {
     try {
-      sessionStorage.setItem('kjv-book', book)
-      sessionStorage.setItem('kjv-chapter', String(chapter))
+      sessionStorage.setItem(`bible-book-${version}`, book)
+      sessionStorage.setItem(`bible-chapter-${version}`, String(chapter))
     } catch {}
-  }, [book, chapter])
+  }, [book, chapter, version])
 
   /* Clear state when chapter changes */
   useEffect(() => {
@@ -636,23 +632,24 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
     }, 250)
   }, [book, chapter])
 
-  /* First-mount: load KJV bundle */
+  /* First-mount: load Bible version */
   useEffect(() => {
     let cancelled = false
-    if (!_kjvData) {
+    if (!versionData) {
       setLoading(true)
-      loadKjv()
-        .then(() => {
+      loadBibleData(version)
+        .then(data => {
           if (cancelled) return
+          setVersionData(data)
           setDataReady(true)
           setLoading(false)
-          const v = getChapterVerses(book, chapter)
+          const v = getChapterVerses(data, book, chapter, version)
           if (v) setSegments([{ book, chapter, verses: v }])
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     }
     return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Chapter navigation — reset to single segment, scroll to top */
   useEffect(() => {
