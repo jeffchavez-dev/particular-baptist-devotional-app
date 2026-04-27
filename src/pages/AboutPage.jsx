@@ -13,6 +13,7 @@ import {
   getAllConfHighlights, getAllConfNotes,
   HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
+  clearAllHighlights, clearAllNotes,
 } from '../lib/annotations'
 
 const SCHEDULE = buildSchedule()
@@ -484,6 +485,12 @@ export default function AboutPage() {
   const [resetDone,    setResetDone]    = useState(false)
   const [resetting,    setResetting]    = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [clearHlDone,  setClearHlDone]  = useState(false)
+  const [clearingHl,   setClearingHl]   = useState(false)
+  const [confirmClearHl, setConfirmClearHl] = useState(false)
+  const [clearNotesDone, setClearNotesDone] = useState(false)
+  const [clearingNotes, setClearingNotes] = useState(false)
+  const [confirmClearNotes, setConfirmClearNotes] = useState(false)
   const [progressData, setProgressData] = useState(null)
   const [syncMessage, setSyncMessage] = useState(null)
   const [syncing, setSyncing] = useState(false)
@@ -537,6 +544,30 @@ export default function AboutPage() {
       setSyncMessage({ type: 'error', text: e?.message || 'Sync failed' })
     } finally {
       setSyncing(false)
+    }
+  }, [session?.user?.id])
+
+  const handleClearHighlights = useCallback(async () => {
+    setClearingHl(true)
+    try {
+      await clearAllHighlights(session?.user?.id)
+      setClearHlDone(true)
+      setConfirmClearHl(false)
+      setTimeout(() => setClearHlDone(false), 3500)
+    } finally {
+      setClearingHl(false)
+    }
+  }, [session?.user?.id])
+
+  const handleClearNotes = useCallback(async () => {
+    setClearingNotes(true)
+    try {
+      await clearAllNotes(session?.user?.id)
+      setClearNotesDone(true)
+      setConfirmClearNotes(false)
+      setTimeout(() => setClearNotesDone(false), 3500)
+    } finally {
+      setClearingNotes(false)
     }
   }, [session?.user?.id])
 
@@ -770,6 +801,58 @@ export default function AboutPage() {
                 </div>
               )}
               {resetDone && <span style={{fontSize:12, color:'var(--teal)', fontWeight:600, marginLeft:8}}>✓ Progress cleared</span>}
+            </div>
+
+            {/* Clear Highlights */}
+            <div style={{...s.settingRow, borderBottom:'none', paddingBottom:0}}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Clear All Highlights</span>
+                <span style={s.settingHint}>Removes all color highlights from scripture &amp; confessions</span>
+              </div>
+              {!confirmClearHl ? (
+                <button onClick={() => setConfirmClearHl(true)} className="btn btn-outline"
+                  style={{fontSize:13, color:'#b33', borderColor:'rgba(180,50,50,0.3)', flexShrink:0}}>
+                  Clear Highlights
+                </button>
+              ) : (
+                <div style={{display:'flex', gap:8, alignItems:'center', flexShrink:0, flexWrap:'wrap'}}>
+                  <span style={{fontSize:12, color:'var(--ink-muted)'}}>Are you sure?</span>
+                  <button onClick={handleClearHighlights} disabled={clearingHl} className="btn btn-outline"
+                    style={{fontSize:12, color:'#b33', borderColor:'rgba(180,50,50,0.4)', padding:'5px 12px'}}>
+                    {clearingHl ? 'Clearing…' : 'Yes, clear'}
+                  </button>
+                  <button onClick={() => setConfirmClearHl(false)} className="btn btn-ghost" style={{fontSize:12, padding:'5px 10px'}}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {clearHlDone && <span style={{fontSize:12, color:'var(--teal)', fontWeight:600, marginLeft:8}}>✓ Highlights cleared</span>}
+            </div>
+
+            {/* Clear Notes */}
+            <div style={{...s.settingRow, borderBottom:'none', paddingBottom:0}}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Clear All Notes</span>
+                <span style={s.settingHint}>Removes all text notes from scripture, confessions &amp; devotional</span>
+              </div>
+              {!confirmClearNotes ? (
+                <button onClick={() => setConfirmClearNotes(true)} className="btn btn-outline"
+                  style={{fontSize:13, color:'#b33', borderColor:'rgba(180,50,50,0.3)', flexShrink:0}}>
+                  Clear Notes
+                </button>
+              ) : (
+                <div style={{display:'flex', gap:8, alignItems:'center', flexShrink:0, flexWrap:'wrap'}}>
+                  <span style={{fontSize:12, color:'var(--ink-muted)'}}>Are you sure?</span>
+                  <button onClick={handleClearNotes} disabled={clearingNotes} className="btn btn-outline"
+                    style={{fontSize:12, color:'#b33', borderColor:'rgba(180,50,50,0.4)', padding:'5px 12px'}}>
+                    {clearingNotes ? 'Clearing…' : 'Yes, clear'}
+                  </button>
+                  <button onClick={() => setConfirmClearNotes(false)} className="btn btn-ghost" style={{fontSize:12, padding:'5px 10px'}}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+              {clearNotesDone && <span style={{fontSize:12, color:'var(--teal)', fontWeight:600, marginLeft:8}}>✓ Notes cleared</span>}
             </div>
           </div>
         </CollapseSection>

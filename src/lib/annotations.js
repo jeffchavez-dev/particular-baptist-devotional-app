@@ -367,3 +367,51 @@ export function getAllConfNotes() {
       return { key: k, note, source, itemKey }
     })
 }
+
+// ── Clear all highlights and notes ───────────────────────────────────────────
+
+/** Clear all highlights from localStorage and Supabase (if userId provided) */
+export async function clearAllHighlights(userId) {
+  try {
+    _persist(HL_KEY, {})
+    
+    // Dispatch event for immediate UI update
+    window.dispatchEvent(new CustomEvent('pb-highlight-changed', {
+      detail: { key: null, colorId: null, highlights: {} },
+    }))
+    
+    if (userId) {
+      await _retrySupabaseOp(
+        () => supabase.from('pb_highlights').delete().eq('user_id', userId)
+      ).catch(e => console.warn('[clearAllHighlights] failed:', e?.message))
+    }
+    
+    return { success: true }
+  } catch (e) {
+    console.error('[clearAllHighlights]', e?.message)
+    throw e
+  }
+}
+
+/** Clear all notes from localStorage and Supabase (if userId provided) */
+export async function clearAllNotes(userId) {
+  try {
+    _persist(NOTE_KEY, {})
+    
+    // Dispatch event for immediate UI update
+    window.dispatchEvent(new CustomEvent('pb-note-changed', {
+      detail: { key: null, text: null, notes: {} },
+    }))
+    
+    if (userId) {
+      await _retrySupabaseOp(
+        () => supabase.from('pb_item_notes').delete().eq('user_id', userId)
+      ).catch(e => console.warn('[clearAllNotes] failed:', e?.message))
+    }
+    
+    return { success: true }
+  } catch (e) {
+    console.error('[clearAllNotes]', e?.message)
+    throw e
+  }
+}
