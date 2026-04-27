@@ -43,6 +43,24 @@ const HL_KEY   = 'pb-highlights'      // { key: colorId }
 const NOTE_KEY = 'pb-item-notes'      // { key: note_text }
 const HIST_KEY = 'pb-search-history'  // { page: [query, ...] }
 
+// ── Retry helper for Supabase operations ─────────────────────────────────────
+async function _retrySupabaseOp(fn, maxAttempts = 3) {
+  let lastError
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt < maxAttempts) {
+        const backoff = 500 * Math.pow(2, attempt - 1) // exponential: 500ms, 1000ms, 2000ms
+        await new Promise(r => setTimeout(r, backoff))
+      }
+    }
+  }
+  console.error('[annotations] Supabase operation failed after', maxAttempts, 'attempts:', lastError?.message)
+  throw lastError
+}
+
 // ── Highlight colour palette ─────────────────────────────────────────────────
 export const HIGHLIGHT_COLORS = [
   {
@@ -148,14 +166,25 @@ export function setHighlight(key, colorId, userId) {
   if (colorId === null || colorId === undefined) delete all[key]
   else all[key] = colorId
   _persist(HL_KEY, all)
+  
+  // Dispatch event for immediate UI updates
+  window.dispatchEvent(new CustomEvent('pb-highlight-changed', {
+    detail: { key, colorId, highlights: all },
+  }))
+  
+  // Async Supabase sync with retry (fire-and-forget, but with proper error handling)
   if (userId) {
     if (colorId === null || colorId === undefined) {
-      supabase.from('pb_highlights').delete().match({ user_id: userId, item_key: key }).catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_highlights').delete().match({ user_id: userId, item_key: key })
+      ).catch(e => console.warn('[setHighlight] delete failed:', e?.message))
     } else {
-      supabase.from('pb_highlights').upsert(
-        { user_id: userId, item_key: key, color: colorId, updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,item_key' }
-      ).catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_highlights').upsert(
+          { user_id: userId, item_key: key, color: colorId, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,item_key' }
+        )
+      ).catch(e => console.warn('[setHighlight] upsert failed:', e?.message))
     }
   }
   return all
@@ -172,14 +201,25 @@ export function setItemNote(key, text, userId) {
   if (text && text.trim()) all[key] = text.trim()
   else delete all[key]
   _persist(NOTE_KEY, all)
+  
+  // Dispatch event for immediate UI updates
+  window.dispatchEvent(new CustomEvent('pb-note-changed', {
+    detail: { key, text: text?.trim() || null, notes: all },
+  }))
+  
+  // Async Supabase sync with retry (fire-and-forget, but with proper error handling)
   if (userId) {
     if (!text || !text.trim()) {
-      supabase.from('pb_item_notes').delete().match({ user_id: userId, item_key: key }).catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_item_notes').delete().match({ user_id: userId, item_key: key })
+      ).catch(e => console.warn('[setItemNote] delete failed:', e?.message))
     } else {
-      supabase.from('pb_item_notes').upsert(
-        { user_id: userId, item_key: key, note_text: text.trim(), updated_at: new Date().toISOString() },
-        { onConflict: 'user_id,item_key' }
-      ).catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_item_notes').upsert(
+          { user_id: userId, item_key: key, note_text: text.trim(), updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,item_key' }
+        )
+      ).catch(e => console.warn('[setItemNote] upsert failed:', e?.message))
     }
   }
   return all

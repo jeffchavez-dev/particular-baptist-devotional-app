@@ -516,8 +516,23 @@ export default function ConfessionsPage() {
       setHlData(loadHighlights())
       setNoteData(loadItemNotes())
     }
+    
+    function onHighlightChanged(evt) {
+      setHlData(evt.detail.highlights)
+    }
+    
+    function onNoteChanged(evt) {
+      setNoteData(evt.detail.notes)
+    }
+    
     window.addEventListener('pb-annotations-updated', onSync)
-    return () => window.removeEventListener('pb-annotations-updated', onSync)
+    window.addEventListener('pb-highlight-changed', onHighlightChanged)
+    window.addEventListener('pb-note-changed', onNoteChanged)
+    return () => {
+      window.removeEventListener('pb-annotations-updated', onSync)
+      window.removeEventListener('pb-highlight-changed', onHighlightChanged)
+      window.removeEventListener('pb-note-changed', onNoteChanged)
+    }
   }, [])
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])

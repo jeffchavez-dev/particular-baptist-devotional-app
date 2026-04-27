@@ -6,6 +6,24 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// ── Retry helper for Supabase operations ─────────────────────────────────────
+async function _retrySupabaseOp(fn, maxAttempts = 3) {
+  let lastError
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastError = err
+      if (attempt < maxAttempts) {
+        const backoff = 500 * Math.pow(2, attempt - 1) // exponential: 500ms, 1000ms, 2000ms
+        await new Promise(r => setTimeout(r, backoff))
+      }
+    }
+  }
+  console.error('[supabase] Supabase operation failed after', maxAttempts, 'attempts:', lastError?.message)
+  throw lastError
+}
+
 // ── Guest progress (localStorage) ────────────────────────────────────
 const LOCAL_KEY = 'devotional_guest_progress'
 
@@ -59,16 +77,22 @@ export function setBibleChapter(chapter, done, userId) {
   if (done) all[chapter] = true
   else delete all[chapter]
   try { localStorage.setItem(BIBLE_KEY, JSON.stringify(all)) } catch {}
-  // Fire-and-forget Supabase sync when logged in
+  
+  // Dispatch event for immediate UI updates
+  window.dispatchEvent(new StorageEvent('storage', { key: BIBLE_KEY }))
+  
+  // Async Supabase sync with retry (fire-and-forget, but with proper error handling)
   if (userId) {
     if (done) {
-      supabase.from('pb_bible_progress')
-        .upsert({ user_id: userId, chapter, done: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,chapter' })
-        .catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_bible_progress')
+          .upsert({ user_id: userId, chapter, done: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,chapter' })
+      ).catch(e => console.warn('[setBibleChapter] upsert failed:', e?.message))
     } else {
-      supabase.from('pb_bible_progress')
-        .delete().match({ user_id: userId, chapter })
-        .catch(() => {})
+      _retrySupabaseOp(
+        () => supabase.from('pb_bible_progress')
+          .delete().match({ user_id: userId, chapter })
+      ).catch(e => console.warn('[setBibleChapter] delete failed:', e?.message))
     }
   }
 }

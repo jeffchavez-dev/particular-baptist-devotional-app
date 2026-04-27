@@ -544,8 +544,23 @@ const KjvReader = React.forwardRef(function KjvReader({ todayChapter, onNavChang
       setHighlights(loadHighlights())
       setItemNotes(loadItemNotes())
     }
+    
+    function onHighlightChanged(evt) {
+      setHighlights(evt.detail.highlights)
+    }
+    
+    function onNoteChanged(evt) {
+      setItemNotes(evt.detail.notes)
+    }
+    
     window.addEventListener('pb-annotations-updated', onSync)
-    return () => window.removeEventListener('pb-annotations-updated', onSync)
+    window.addEventListener('pb-highlight-changed', onHighlightChanged)
+    window.addEventListener('pb-note-changed', onNoteChanged)
+    return () => {
+      window.removeEventListener('pb-annotations-updated', onSync)
+      window.removeEventListener('pb-highlight-changed', onHighlightChanged)
+      window.removeEventListener('pb-note-changed', onNoteChanged)
+    }
   }, [])
 
   /* Persist position */

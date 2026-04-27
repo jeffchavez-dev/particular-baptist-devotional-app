@@ -76,9 +76,13 @@ export default function App() {
       if (s?.user && !prevUser.current) {
         migrateLocalToSupabase(s.user.id)
         /* Sync annotations: push local data up, then pull server data down */
-        syncAnnotationsUp(s.user.id).then(() => syncAnnotationsDown(s.user.id))
+        syncAnnotationsUp(s.user.id)
+          .then(() => syncAnnotationsDown(s.user.id))
+          .catch(e => console.warn('[auth-sync-annotations] error:', e?.message))
         /* Sync Bible chapter progress: same pattern */
-        syncBibleProgressUp(s.user.id).then(() => syncBibleProgressDown(s.user.id))
+        syncBibleProgressUp(s.user.id)
+          .then(() => syncBibleProgressDown(s.user.id))
+          .catch(e => console.warn('[auth-sync-bible] error:', e?.message))
       }
       prevUser.current = s?.user ?? null
       setSession(s)
