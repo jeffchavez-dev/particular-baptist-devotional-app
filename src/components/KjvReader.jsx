@@ -654,11 +654,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
   /* Chapter navigation — reset to single segment, scroll to top */
   useEffect(() => {
     if (!dataReady) return
-    const v = getChapterVerses(book, chapter)
+    const v = getChapterVerses(versionData, book, chapter, version)
     if (v) { setSegments([{ book, chapter, verses: v }]); setError(null) }
     else    { setError('Chapter not found') }
     if (readerRef.current) readerRef.current.scrollTop = 0
-  }, [book, chapter, dataReady])
+  }, [book, chapter, dataReady, versionData, version])
 
   /* Append next chapter when sentinel becomes visible */
   useEffect(() => {
@@ -674,7 +674,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
           // Avoid double-loading
           const alreadyLoaded = prev.some(s => s.book === next.book && s.chapter === next.chapter)
           if (alreadyLoaded) return prev
-          const v = getChapterVerses(next.book, next.chapter)
+          const v = getChapterVerses(versionData, next.book, next.chapter, version)
           if (!v) return prev
           return [...prev, { book: next.book, chapter: next.chapter, verses: v }]
         })
@@ -683,7 +683,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
     )
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
-  }, [dataReady, segments])
+  }, [dataReady, segments, versionData, version])
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
