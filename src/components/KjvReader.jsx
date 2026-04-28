@@ -855,32 +855,35 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function buildSelectionLines() {
     const lines = []
-    const isGreek = version === 'greek'
-    const pool = isGreek ? morphSegments : segments
-    const versionLabel = isGreek ? 'GNT (TAGNT)' : (BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || 'KJV')
+    const isMorphVers = version === 'greek' || version === 'hebrew'
+    const isGreek  = version === 'greek'
+    const isHebrew = version === 'hebrew'
+    const pool = isMorphVers ? morphSegments : segments
+    const versionLabel = isGreek  ? 'GNT (TAGNT)'
+                       : isHebrew ? 'HOT (TAHOT)'
+                       : (BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || 'KJV')
     selectedVerses.forEach(vk => {
       const [, b, ch, v] = vk.split('|')
       for (const seg of pool) {
         if (seg.book === b && String(seg.chapter) === ch) {
-          if (isGreek) {
-            const vObj = seg.verses.find(ve => String(ve.verse) === v)
-            if (vObj) {
-              // Build text: Greek words separated by spaces
-              const gkText = vObj.words.map(w => w.w).join(' ')
-              lines.push(`${b} ${ch}:${v} — ${gkText}`)
+          const vObj = seg.verses.find(ve => String(ve.verse) === v)
+          if (vObj) {
+            if (isMorphVers) {
+              // Join word tokens (orig script)
+              const scriptText = vObj.words.map(w => w.w).join(' ')
+              lines.push(`${b} ${ch}:${v} — ${scriptText}`)
+            } else {
+              lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
             }
-          } else {
-            const vObj = seg.verses.find(ve => String(ve.verse) === v)
-            if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
           }
         }
       }
     })
-    return { lines, versionLabel }
+    return { lines, versionLabel, script: isHebrew ? 'hebrew' : isGreek ? 'greek' : null }
   }
 
   function shareSelection() {
-    const { lines, versionLabel } = buildSelectionLines()
+    const { lines, versionLabel, script } = buildSelectionLines()
     const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
     setShareCard({
       type:'reading',
@@ -889,6 +892,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       source: versMeta?.abbreviation || 'KJV',
       text: lines.join('\n\n'),
       label: '',
+      script,
     })
     setSelectedVerses(new Set())
   }
@@ -1116,6 +1120,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               displayMode === 'orig'    ? wd.w
               : displayMode === 'translit' ? wd.t
               : wd.g
+
+            // Font preferences applied to script chips
+            const origScriptFont = isHeb
+              ? "'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif"
+              : "'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif"
+            const chipFontFamily = displayMode === 'orig' ? origScriptFont : getFontCss(prefs.fontId)
+            const chipFontSize   = displayMode === 'orig'
+              ? prefs.sizePx * (isHeb ? 1.3 : 1.15)
+              : prefs.sizePx
+
             return (
             <>
               {morphLoading && (
@@ -1205,6 +1219,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                             ...r.greekToken,
                                             ...(displayMode === 'orig' ? (isHeb ? r.hebrewTokenOrig : r.greekTokenGk) : {}),
                                             ...(isSel ? r.greekTokenSel : {}),
+                                            fontSize: chipFontSize,
+                                            fontFamily: chipFontFamily,
                                           }}
                                           onClick={e => { e.stopPropagation(); handleWordTap(verseKey, wi) }}
                                           title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s}`}
@@ -1237,7 +1253,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   return (
                                     <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
                                       <div style={r.wordInfoRow}>
-                                        <span style={isHeb ? r.hebrewInfoWord : r.wordInfoGreek}>{wd.w}</span>
+                                        <span style={{
+                                          ...(isHeb ? r.hebrewInfoWord : r.wordInfoGreek),
+                                          fontSize: prefs.sizePx * (isHeb ? 1.55 : 1.4),
+                                          fontFamily: origScriptFont,
+                                        }}>{wd.w}</span>
                                         <span style={r.wordInfoTranslit}>{wd.t}</span>
                                         <span style={r.wordInfoStrong}>{wd.s}</span>
                                       </div>

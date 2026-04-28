@@ -8,13 +8,18 @@ export const FONT_OPTIONS = [
   { id:'sans',      label:'Sans-serif', css:"'DM Sans', 'Helvetica Neue', Arial, sans-serif",    sample:'The fear of the Lord' },
 ]
 
-/* ── Size steps: [label, px] ── */
+/* ── Size steps (kept for reference) ── */
 export const FONT_SIZES = [
   { id:'s',  label:'S', px:14 },
   { id:'m',  label:'M', px:16 },
   { id:'l',  label:'L', px:19 },
   { id:'xl', label:'XL', px:23 },
 ]
+
+/* ── A−/A+ step controls ── */
+export const FONT_SIZE_MIN  = 12
+export const FONT_SIZE_MAX  = 28
+export const FONT_SIZE_STEP = 2
 
 const PREFS_KEY = 'pb-reading-prefs'
 export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant' }
@@ -52,7 +57,6 @@ export default function FontPrefsPanel({ prefs, onUpdate }) {
   }, [open])
 
   const activeFont = FONT_OPTIONS.find(f => f.id === prefs.fontId) || FONT_OPTIONS[0]
-  const activeSz   = FONT_SIZES.find(f => f.px === prefs.sizePx) || FONT_SIZES[1]
 
   function set(patch) { onUpdate({ ...prefs, ...patch }) }
 
@@ -77,29 +81,23 @@ export default function FontPrefsPanel({ prefs, onUpdate }) {
       {open && (
         <div style={p.panel} role="dialog" aria-label="Reading preferences">
 
-          {/* Size row */}
+          {/* Size row — A− / current / A+ */}
           <div style={p.row}>
             <span style={p.rowLabel}>Size</span>
             <div style={p.sizeRow}>
-              {FONT_SIZES.map(sz => {
-                const active = prefs.sizePx === sz.px
-                return (
-                  <button
-                    key={sz.id}
-                    onClick={() => set({ sizePx: sz.px })}
-                    title={`Font size ${sz.label}`}
-                    style={{
-                      ...p.sizeBtn,
-                      fontSize: sz.px * 0.82,
-                      fontFamily: activeFont.css,
-                      color: active ? 'var(--teal)' : 'var(--ink-muted)',
-                      borderColor: active ? 'var(--teal)' : 'var(--border)',
-                      background: active ? 'var(--teal-light)' : 'white',
-                      fontWeight: active ? 700 : 400,
-                    }}
-                  >A</button>
-                )
-              })}
+              <button
+                onClick={() => set({ sizePx: Math.max(FONT_SIZE_MIN, prefs.sizePx - FONT_SIZE_STEP) })}
+                disabled={prefs.sizePx <= FONT_SIZE_MIN}
+                title="Decrease font size"
+                style={{ ...p.sizeStepBtn, opacity: prefs.sizePx <= FONT_SIZE_MIN ? 0.35 : 1 }}
+              >A<sup style={{fontSize:'0.6em',lineHeight:1}}>−</sup></button>
+              <span style={p.sizeCurrent}>{prefs.sizePx}px</span>
+              <button
+                onClick={() => set({ sizePx: Math.min(FONT_SIZE_MAX, prefs.sizePx + FONT_SIZE_STEP) })}
+                disabled={prefs.sizePx >= FONT_SIZE_MAX}
+                title="Increase font size"
+                style={{ ...p.sizeStepBtn, fontSize: prefs.sizePx * 0.82, fontFamily: activeFont.css, opacity: prefs.sizePx >= FONT_SIZE_MAX ? 0.35 : 1 }}
+              >A<sup style={{fontSize:'0.6em',lineHeight:1}}>+</sup></button>
             </div>
           </div>
 
@@ -163,12 +161,18 @@ const p = {
     fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em',
     color:'var(--ink-faint)', paddingTop:6, width:30, flexShrink:0,
   },
-  sizeRow: { display:'flex', gap:5, flex:1 },
-  sizeBtn: {
-    flex:1, padding:'5px 4px', border:'1.5px solid',
+  sizeRow: { display:'flex', gap:6, flex:1, alignItems:'center' },
+  sizeStepBtn: {
+    width:36, height:32, border:'1.5px solid var(--border)',
     borderRadius:'var(--radius)', cursor:'pointer',
-    fontFamily:"'Cormorant Garamond', serif", transition:'all 0.12s',
-    lineHeight:1.2,
+    background:'var(--parchment)', color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond', serif", fontSize:14,
+    transition:'all 0.12s', display:'flex', alignItems:'center',
+    justifyContent:'center', lineHeight:1, flexShrink:0,
+  },
+  sizeCurrent: {
+    flex:1, textAlign:'center', fontSize:11, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", fontWeight:600,
   },
   fontBtn: {
     display:'flex', alignItems:'baseline', gap:8, padding:'6px 10px',

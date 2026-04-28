@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
-import { FONT_OPTIONS, FONT_SIZES } from '../components/FontPrefsPanel'
+import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
@@ -672,23 +672,19 @@ export default function AboutPage() {
                 <span style={s.settingHint}>Applies to confession &amp; reading text</span>
               </div>
               <div style={s.sizeRow}>
-                {FONT_SIZES.map(sz => {
-                  const active = prefs.sizePx === sz.px
-                  return (
-                    <button
-                      key={sz.id}
-                      onClick={() => updatePrefs({ ...prefs, sizePx: sz.px })}
-                      style={{
-                        ...s.sizeBtn,
-                        fontSize: sz.px * 0.8, fontFamily: activeFont.css,
-                        color: active ? 'var(--teal)' : 'var(--ink-muted)',
-                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
-                        background: active ? 'var(--teal-light)' : 'var(--surface)',
-                        fontWeight: active ? 700 : 400,
-                      }}
-                    >A</button>
-                  )
-                })}
+                <button
+                  onClick={() => updatePrefs({ ...prefs, sizePx: Math.max(FONT_SIZE_MIN, prefs.sizePx - FONT_SIZE_STEP) })}
+                  disabled={prefs.sizePx <= FONT_SIZE_MIN}
+                  title="Decrease font size"
+                  style={{ ...s.sizeStepBtn, opacity: prefs.sizePx <= FONT_SIZE_MIN ? 0.35 : 1 }}
+                >A<sup style={{fontSize:'0.6em',lineHeight:1}}>−</sup></button>
+                <span style={s.sizeCurrent}>{prefs.sizePx}px</span>
+                <button
+                  onClick={() => updatePrefs({ ...prefs, sizePx: Math.min(FONT_SIZE_MAX, prefs.sizePx + FONT_SIZE_STEP) })}
+                  disabled={prefs.sizePx >= FONT_SIZE_MAX}
+                  title="Increase font size"
+                  style={{ ...s.sizeStepBtn, fontSize: prefs.sizePx * 0.8, fontFamily: activeFont.css, opacity: prefs.sizePx >= FONT_SIZE_MAX ? 0.35 : 1 }}
+                >A<sup style={{fontSize:'0.6em',lineHeight:1}}>+</sup></button>
               </div>
             </div>
 
@@ -1025,8 +1021,18 @@ const s = {
     boxShadow:'0 1px 4px rgba(0,0,0,0.2)',
   },
 
-  sizeRow: { display:'flex', gap:6, flexShrink:0 },
-  sizeBtn: {
+  sizeRow: { display:'flex', gap:6, flexShrink:0, alignItems:'center' },
+  sizeStepBtn: {
+    width:40, height:36, borderRadius:'var(--radius)', border:'1.5px solid var(--border-strong)',
+    cursor:'pointer', transition:'all 0.12s', display:'flex', alignItems:'center',
+    justifyContent:'center', background:'var(--surface)', color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", fontSize:14, lineHeight:1, flexShrink:0,
+  },
+  sizeCurrent: {
+    width:38, textAlign:'center', fontSize:12, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", fontWeight:600,
+  },
+  sizeBtnLEGACY: {
     width:36, height:36, borderRadius:'var(--radius)', border:'1.5px solid',
     cursor:'pointer', transition:'all 0.12s', display:'flex', alignItems:'center',
     justifyContent:'center', fontFamily:"'Cormorant Garamond',serif",

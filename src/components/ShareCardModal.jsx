@@ -11,14 +11,11 @@ const PRESETS = [
   { id:'custom',    label:'Custom',      type:'solid',    bg:'#ffffff',              textColor:'#1a1410', accentColor:'#8a6d2e' },
 ]
 
-/* Card text-size scales */
-const CARD_SCALES = [
-  { id:'xs', label:'XS', scale:0.58, hint:'Very small — fits the most text' },
-  { id:'s',  label:'S',  scale:0.74 },
-  { id:'m',  label:'M',  scale:1.0,  hint:'Default' },
-  { id:'l',  label:'L',  scale:1.2  },
-  { id:'xl', label:'XL', scale:1.4,  hint:'Large — best for short quotes' },
-]
+/* Card text-size — A−/A+ continuous control */
+const CARD_SCALE_MIN  = 0.5
+const CARD_SCALE_MAX  = 1.8
+const CARD_SCALE_STEP = 0.1
+const CARD_SCALE_DEFAULT = 1.0
 
 /* Formats — standard social media dimensions */
 const FORMATS = [
@@ -33,7 +30,17 @@ const SRC_COLORS = {
   '1LBCF':    { bg:'#4a2e0a', text:'#d4a84c' },
   'Review':   { bg:'#2a2a2a', text:'#aaaaaa' },
   'KJV':      { bg:'#1e3a5f', text:'#a8c5e8' },
+  'GNT':      { bg:'#1a2e5f', text:'#a8b8e8' },
+  'HOT':      { bg:'#5f2b1a', text:'#e8c4a8' },
+  'ABAB':     { bg:'#1a3a2a', text:'#a8e8c5' },
 }
+
+/* ── Script detection ── */
+const HEBREW_RE = /[֐-׿יִ-ﭏ]/
+function hasHebrew(str) { return HEBREW_RE.test(str || '') }
+
+const GREEK_FONT  = "'Palatino Linotype','Palatino','Georgia','Times New Roman',serif"
+const HEBREW_FONT = "'Arial Hebrew','David','SBL Hebrew','Times New Roman',serif"
 
 /* ── Canvas helpers ── */
 function roundRect(ctx, x, y, w, h, r) {
@@ -50,25 +57,28 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99) {
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, rtl = false) {
   if (!text) return y
   const paragraphs = text.split(/\n+/)
   let currentY = y
   let linesDrawn = 0
+  const drawX = rtl ? x + maxWidth : x
   for (const para of paragraphs) {
     const words = para.split(' ').filter(Boolean)
+    // For RTL, process words in reverse so they wrap naturally
+    if (rtl) words.reverse()
     let line = ''
     for (let i = 0; i < words.length; i++) {
       const testLine = line ? line + ' ' + words[i] : words[i]
       if (ctx.measureText(testLine).width > maxWidth && line) {
-        if (linesDrawn >= maxLines - 1) { ctx.fillText(line + '\u2026', x, currentY); return currentY }
-        ctx.fillText(line, x, currentY)
+        if (linesDrawn >= maxLines - 1) { ctx.fillText(line + '\u2026', drawX, currentY); return currentY }
+        ctx.fillText(line, drawX, currentY)
         line = words[i]; currentY += lineHeight; linesDrawn++
       } else { line = testLine }
     }
     if (line) {
-      if (linesDrawn >= maxLines) { ctx.fillText(line + '\u2026', x, currentY); return currentY }
-      ctx.fillText(line, x, currentY)
+      if (linesDrawn >= maxLines) { ctx.fillText(line + '\u2026', drawX, currentY); return currentY }
+      ctx.fillText(line, drawX, currentY)
       currentY += lineHeight; linesDrawn++
     }
   }
@@ -134,6 +144,10 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
 
+  // Detect script for font selection and text direction
+  const isHeb    = card.script === 'hebrew' || hasHebrew(card.text || '')
+  const bodyFont = isHeb ? HEBREW_FONT : "'Georgia','Times New Roman',serif"
+
   /* Subtitle - removed */
   // const subSz = Math.round(w * 0.022)
   // ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
@@ -163,19 +177,36 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
     contentY += w * 0.05
   }
 
-  /* Decorative open-quote */
+  /* Decorative quote mark — mirrored for Hebrew RTL */
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.22
   ctx.font = `${Math.round(w * 0.13)}px 'Georgia',serif`
-  ctx.fillText('\u201C', PAD - w * 0.008, contentY + w * 0.045)
+  if (isHeb) {
+    ctx.textAlign = 'right'; ctx.direction = 'rtl'
+    ctx.fillText('\u201D', w - PAD + w * 0.008, contentY + w * 0.045)
+    ctx.textAlign = 'left'; ctx.direction = 'ltr'
+  } else {
+    ctx.fillText('\u201C', PAD - w * 0.008, contentY + w * 0.045)
+  }
   ctx.globalAlpha = 1
 
-  /* Content body — font scaled by user preference */
-  const cSz = Math.round(w * 0.031 * scale), cLineH = cSz * 1.75
+  /* Content body — Hebrew RTL or LTR, font scaled by user preference */
+  const cSz = Math.round(w * 0.031 * scale)
+  const cLineH = cSz * (isHeb ? 2.1 : 1.75)
   const refsPresent = !!(card.refs && card.refs.trim())
   const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.52)) / cLineH))
   ctx.fillStyle = textColor
-  ctx.font = `italic ${cSz}px 'Georgia','Times New Roman',serif`
-  const contentBottom = wrapText(ctx, card.text || '', PAD + w * 0.04, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines)
+  let contentBottom
+  if (isHeb) {
+    const hebSz = Math.round(cSz * 1.3)
+    ctx.font = `${hebSz}px ${bodyFont}`
+    ctx.direction = 'rtl'; ctx.textAlign = 'right'
+    contentBottom = wrapText(ctx, card.text || '', PAD, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines, true)
+    ctx.direction = 'ltr'; ctx.textAlign = 'left'
+  } else {
+    ctx.font = `italic ${cSz}px ${bodyFont}`
+    ctx.direction = 'ltr'; ctx.textAlign = 'left'
+    contentBottom = wrapText(ctx, card.text || '', PAD + w * 0.04, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines)
+  }
 
   /* Scripture references — smaller, muted, below content */
   if (refsPresent) {
@@ -284,7 +315,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   const [format,    setFormat]  = useState(FORMATS[0])
   const [customBg,  setCustomBg]  = useState('#f5f0e8')
   const [customText,setCustomText]= useState('#1a1410')
-  const [cardScale, setCardScale] = useState(CARD_SCALES[2]) // default 'M' (1.0)
+  const [cardScale, setCardScale] = useState(CARD_SCALE_DEFAULT)
 
   /* Redraw whenever inputs change */
   useEffect(() => {
@@ -294,7 +325,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
       const canvas = canvasRef.current
       if (!canvas) return
       try {
-        drawCard(canvas, card, preset, format, customBg, customText, cardScale.scale)
+        drawCard(canvas, card, preset, format, customBg, customText, cardScale)
       } catch (err) {
         console.error('[ShareCard] draw error:', err)
       }
@@ -413,30 +444,24 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             <div style={m.hint}>{format.hint}</div>
           </div>
 
-          {/* Text size */}
+          {/* Text size — A−/A+ continuous */}
           <div style={m.section}>
             <div style={m.label}>Text Size <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— smaller fits more text</span></div>
-            <div style={m.row}>
-              {CARD_SCALES.map(s => {
-                const active = cardScale.id === s.id
-                return (
-                  <button
-                    key={s.id}
-                    title={s.hint || s.label}
-                    onClick={() => setCardScale(s)}
-                    style={{
-                      ...m.scaleBtn,
-                      fontSize: 11 + CARD_SCALES.indexOf(s) * 2,
-                      borderColor: active ? 'var(--teal)' : 'var(--border)',
-                      background:  active ? 'var(--teal-light)' : 'var(--parchment)',
-                      color:       active ? 'var(--teal)' : 'var(--ink)',
-                      fontWeight:  active ? 700 : 400,
-                    }}
-                  >A</button>
-                )
-              })}
+            <div style={{...m.row, alignItems:'center'}}>
+              <button
+                onClick={() => setCardScale(s => Math.max(CARD_SCALE_MIN, +(s - CARD_SCALE_STEP).toFixed(2)))}
+                disabled={cardScale <= CARD_SCALE_MIN}
+                title="Smaller text"
+                style={{ ...m.scaleBtn, fontSize:13, opacity: cardScale <= CARD_SCALE_MIN ? 0.35 : 1 }}
+              >A<sup style={{fontSize:'0.55em',lineHeight:1}}>−</sup></button>
+              <span style={m.scaleCurrent}>{Math.round(cardScale * 100)}%</span>
+              <button
+                onClick={() => setCardScale(s => Math.min(CARD_SCALE_MAX, +(s + CARD_SCALE_STEP).toFixed(2)))}
+                disabled={cardScale >= CARD_SCALE_MAX}
+                title="Larger text"
+                style={{ ...m.scaleBtn, fontSize:16, opacity: cardScale >= CARD_SCALE_MAX ? 0.35 : 1 }}
+              >A<sup style={{fontSize:'0.55em',lineHeight:1}}>+</sup></button>
             </div>
-            {cardScale.hint && <div style={m.hint}>{cardScale.hint}</div>}
           </div>
 
           {/* Background */}
@@ -561,9 +586,14 @@ const m = {
     fontFamily:"'DM Sans',sans-serif", color:'var(--ink)', transition:'all 0.15s',
   },
   scaleBtn: {
-    width:40, height:40, borderRadius:'var(--radius)', border:'1.5px solid',
+    width:40, height:40, borderRadius:'var(--radius)', border:'1.5px solid var(--border)',
     cursor:'pointer', fontFamily:"'Georgia',serif", transition:'all 0.12s',
     display:'flex', alignItems:'center', justifyContent:'center', lineHeight:1,
+    background:'var(--parchment)', color:'var(--ink)',
+  },
+  scaleCurrent: {
+    flex:1, textAlign:'center', fontSize:12, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", fontWeight:600,
   },
   chipActive: { borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)' },
   swatch: {
