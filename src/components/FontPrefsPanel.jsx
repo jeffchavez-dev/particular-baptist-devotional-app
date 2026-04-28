@@ -21,8 +21,59 @@ export const FONT_SIZE_MIN  = 12
 export const FONT_SIZE_MAX  = 28
 export const FONT_SIZE_STEP = 2
 
+/* ── Script-specific font options ── */
+export const GREEK_FONTS = [
+  {
+    id: 'palatino',
+    label: 'Palatino',
+    css: "'Palatino Linotype','Palatino','Book Antiqua',serif",
+    hint: 'Classic scholarly serif — system font, no download',
+  },
+  {
+    id: 'gentium',
+    label: 'Gentium',
+    css: "'Gentium Plus','Gentium',serif",
+    hint: 'Designed for biblical & linguistic texts',
+  },
+  {
+    id: 'garamond',
+    label: 'Garamond',
+    css: "'EB Garamond','Garamond',serif",
+    hint: 'Elegant humanist serif with polytonic Greek',
+  },
+]
+
+export const HEBREW_FONTS = [
+  {
+    id: 'sbl',
+    label: 'SBL',
+    css: "'SBL Hebrew','David','Arial Hebrew',serif",
+    hint: 'Society of Biblical Literature academic font',
+  },
+  {
+    id: 'frankruhl',
+    label: 'Frank Ruhl',
+    css: "'Frank Ruhl Libre','FrankRuehl','David',serif",
+    hint: 'Classic Hebrew newspaper / print style',
+  },
+  {
+    id: 'noto',
+    label: 'Noto',
+    css: "'Noto Serif Hebrew',serif",
+    hint: "Google Noto — universal Unicode coverage",
+  },
+]
+
+export function getGreekFontCss(fontId) {
+  return GREEK_FONTS.find(f => f.id === fontId)?.css || GREEK_FONTS[0].css
+}
+
+export function getHebrewFontCss(fontId) {
+  return HEBREW_FONTS.find(f => f.id === fontId)?.css || HEBREW_FONTS[0].css
+}
+
 const PREFS_KEY = 'pb-reading-prefs'
-export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant' }
+export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'palatino', hebrewFontId: 'sbl' }
 
 export function loadPrefs() {
   try {

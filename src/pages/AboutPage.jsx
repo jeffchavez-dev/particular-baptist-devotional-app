@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
-import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP } from '../components/FontPrefsPanel'
+import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
@@ -710,6 +710,68 @@ export default function AboutPage() {
                     >
                       <span style={{fontSize:14, lineHeight:1.2}}>The fear of the Lord</span>
                       <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)'}}>
+                        {f.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Greek Script Font */}
+            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Greek NT Font</span>
+                <span style={s.settingHint}>Typeface for Greek New Testament text</span>
+              </div>
+              <div style={s.fontGrid}>
+                {GREEK_FONTS.map(f => {
+                  const active = prefs.greekFontId === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      title={f.hint}
+                      onClick={() => updatePrefs({ ...prefs, greekFontId: f.id })}
+                      style={{
+                        ...s.fontBtn, fontFamily: f.css,
+                        background: active ? 'var(--teal-light)' : 'var(--surface)',
+                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
+                        color: active ? 'var(--teal)' : 'var(--ink)',
+                      }}
+                    >
+                      <span style={{fontSize:14, lineHeight:1.3}}>λόγος ζωῆς</span>
+                      <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)'}}>
+                        {f.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Hebrew Script Font */}
+            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Hebrew OT Font</span>
+                <span style={s.settingHint}>Typeface for Hebrew Old Testament text</span>
+              </div>
+              <div style={s.fontGrid}>
+                {HEBREW_FONTS.map(f => {
+                  const active = prefs.hebrewFontId === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      title={f.hint}
+                      onClick={() => updatePrefs({ ...prefs, hebrewFontId: f.id })}
+                      style={{
+                        ...s.fontBtn, fontFamily: f.css, direction:'rtl',
+                        background: active ? 'var(--teal-light)' : 'var(--surface)',
+                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
+                        color: active ? 'var(--teal)' : 'var(--ink)',
+                      }}
+                    >
+                      <span style={{fontSize:16, lineHeight:1.4}}>בְּרֵאשִׁית</span>
+                      <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)', direction:'ltr'}}>
                         {f.label}
                       </span>
                     </button>

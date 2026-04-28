@@ -39,8 +39,8 @@ const SRC_COLORS = {
 const HEBREW_RE = /[֐-׿יִ-ﭏ]/
 function hasHebrew(str) { return HEBREW_RE.test(str || '') }
 
-const GREEK_FONT  = "'Palatino Linotype','Palatino','Georgia','Times New Roman',serif"
-const HEBREW_FONT = "'Arial Hebrew','David','SBL Hebrew','Times New Roman',serif"
+const GREEK_FONT  = "'Gentium Plus','Palatino Linotype','Palatino','Georgia',serif"
+const HEBREW_FONT = "'Noto Serif Hebrew','Frank Ruhl Libre','Arial Hebrew','David','SBL Hebrew',serif"
 
 /* ── Canvas helpers ── */
 function roundRect(ctx, x, y, w, h, r) {

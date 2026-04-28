@@ -7,7 +7,7 @@ import { loadHebrew, getHebrewChapter, parseHebrewMorph, getHebMsMarker, OT_BOOK
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import { usePrefs, useAuth } from '../App'
-import { getFontCss } from './FontPrefsPanel'
+import { getFontCss, GREEK_FONTS, HEBREW_FONTS, getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import {
   HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
@@ -457,7 +457,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
 const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange }, ref) {
-  const { prefs } = usePrefs()
+  const { prefs, updatePrefs } = usePrefs()
 
   const [book, setBook] = useState(() => {
     try { return sessionStorage.getItem(`bible-book-${version}`) || 'Genesis' } catch { return 'Genesis' }
@@ -1123,12 +1123,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
             // Font preferences applied to script chips
             const origScriptFont = isHeb
-              ? "'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif"
-              : "'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif"
+              ? getHebrewFontCss(prefs.hebrewFontId)
+              : getGreekFontCss(prefs.greekFontId)
             const chipFontFamily = displayMode === 'orig' ? origScriptFont : getFontCss(prefs.fontId)
             const chipFontSize   = displayMode === 'orig'
               ? prefs.sizePx * (isHeb ? 1.3 : 1.15)
               : prefs.sizePx
+            const scriptFonts    = isHeb ? HEBREW_FONTS : GREEK_FONTS
+            const activeFontId   = isHeb ? prefs.hebrewFontId : prefs.greekFontId
 
             return (
             <>
@@ -1168,6 +1170,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       {datasetLabel}
                     </span>
                   </div>
+
+                  {/* Script font picker — only in orig mode */}
+                  {displayMode === 'orig' && (
+                    <div style={r.displayModeBar}>
+                      <span style={r.displayModeLabel}>Font</span>
+                      {scriptFonts.map(f => {
+                        const isActive = activeFontId === f.id
+                        return (
+                          <button
+                            key={f.id}
+                            title={f.hint}
+                            style={{
+                              ...r.displayModeBtn,
+                              ...(isActive ? r.displayModeBtnActive : {}),
+                              fontFamily: f.css,
+                              fontSize: isHeb ? 13 : 12,
+                            }}
+                            onClick={() => updatePrefs({
+                              ...prefs,
+                              [isHeb ? 'hebrewFontId' : 'greekFontId']: f.id,
+                            })}
+                          >
+                            {f.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Greek chapter segments */}
                   <div ref={verseListRef}>
