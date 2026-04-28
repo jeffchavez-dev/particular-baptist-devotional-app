@@ -68,15 +68,15 @@ const POS = {
   ADV:'Adverb', CONJ:'Conj', COND:'Cond', PRT:'Particle',
   PREP:'Prep', INJ:'Interj', ARAM:'Aramaic', HEB:'Hebrew',
 }
-const CASE  = { N:'Nom', G:'Gen', D:'Dat', A:'Acc', V:'Voc', L:'Loc' }
-const NUM   = { S:'Sg', P:'Pl' }
-const GEN   = { M:'Masc', F:'Fem', N:'Neut' }
+const CASE  = { N:'Nominative', G:'Genitive', D:'Dative', A:'Accusative', V:'Vocative', L:'Locative' }
+const NUM   = { S:'Singular', P:'Plural' }
+const GEN   = { M:'Masculine', F:'Feminine', N:'Neuter' }
 const TENSE = {
-  P:'Pres', I:'Imperf', F:'Fut', A:'Aor', '2A':'2nd Aor',
-  R:'Perf', '2R':'2nd Perf', L:'Plpf', FP:'Fut Perf',
+  P:'Present', I:'Imperfect', F:'Future', A:'Aorist', '2A':'2nd Aorist',
+  R:'Perfect', '2R':'2nd Perfect', L:'Pluperfect', FP:'Future Perfect',
 }
-const VOICE = { A:'Act', M:'Mid', P:'Pass', E:'Mid/Pass', D:'Dep', O:'—' }
-const MOOD  = { I:'Ind', S:'Subj', O:'Opt', N:'Inf', P:'Part', M:'Imper' }
+const VOICE = { A:'Active', M:'Middle', P:'Passive', E:'Middle/Passive', D:'Deponent', O:'—' }
+const MOOD  = { I:'Indicative', S:'Subjunctive', O:'Optative', N:'Infinitive', P:'Participle', M:'Imperative' }
 const PERS  = { '1':'1st', '2':'2nd', '3':'3rd' }
 
 const SIMPLE = {
@@ -85,55 +85,141 @@ const SIMPLE = {
   ARAM:'Aramaic word', HEB:'Hebrew word',
 }
 
+// Short forms for the compact inline label (word chip title, etc.)
+const CASE_S  = { N:'Nom', G:'Gen', D:'Dat', A:'Acc', V:'Voc', L:'Loc' }
+const NUM_S   = { S:'Sg',  P:'Pl'  }
+const GEN_S   = { M:'Masc', F:'Fem', N:'Neut' }
+const TENSE_S = {
+  P:'Pres', I:'Imperf', F:'Fut', A:'Aor', '2A':'2nd Aor',
+  R:'Perf', '2R':'2nd Perf', L:'Plpf', FP:'Fut Perf',
+}
+const VOICE_S = { A:'Act', M:'Mid', P:'Pass', E:'Mid/Pass', D:'Dep', O:'—' }
+const MOOD_S  = { I:'Ind', S:'Subj', O:'Opt', N:'Inf', P:'Part', M:'Imper' }
+
 /**
- * Convert a Robinson morphology code to a readable label.
+ * Parse the Tense+Voice+Mood segment of a Robinson verb code.
+ * Handles both 1-char tenses (A, P, F…) and 2-char tenses (2A, 2R, FP).
+ * Returns { tense, voice, mood, moodChar } using either full or short labels.
+ */
+function parseTVM(tvm, short = false) {
+  if (!tvm) return { tense:'', voice:'', mood:'', moodChar:'' }
+  const T = short ? TENSE_S : TENSE
+  const V = short ? VOICE_S : VOICE
+  const M = short ? MOOD_S  : MOOD
+  let tense, voice, mood, moodChar
+  // 2-char tense prefix check: '2A', '2R', 'FP'
+  const t2 = T[tvm.slice(0, 2)]
+  if (t2 !== undefined) {
+    tense    = t2
+    voice    = V[tvm[2]] || tvm[2] || ''
+    mood     = M[tvm[3]] || tvm[3] || ''
+    moodChar = tvm[3] || ''
+  } else {
+    tense    = T[tvm[0]] || tvm[0] || ''
+    voice    = V[tvm[1]] || tvm[1] || ''
+    mood     = M[tvm[2]] || tvm[2] || ''
+    moodChar = tvm[2] || ''
+  }
+  return { tense, voice, mood, moodChar }
+}
+
+/**
+ * Parse Case+Number+Gender segment (e.g. "NSM", "GPF").
+ */
+function parseCNG(cgn, short = false) {
+  const C = short ? CASE_S : CASE
+  const N = short ? NUM_S  : NUM
+  const G = short ? GEN_S  : GEN
+  return {
+    c: C[cgn?.[0]] || '',
+    n: N[cgn?.[1]] || '',
+    g: G[cgn?.[2]] || '',
+  }
+}
+
+/**
+ * Convert a Robinson morphology code to a compact readable label.
  * Examples:
  *   "N-NSF"    → "Noun · Nom Sg Fem"
  *   "V-AAI-3S" → "Verb · Aor Act Ind · 3rd Sg"
+ *   "V-PAP-NSM"→ "Verb · Pres Act Part · Nom Sg Masc"
  *   "ADV"      → "Adverb"
  */
 export function parseGrammar(code) {
   if (!code) return ''
-  // Strip proper-noun / title / Attic markers at end
   const clean = code.replace(/-(P|T|C|ATT|S)$/g, '')
-
   if (SIMPLE[clean]) return SIMPLE[clean]
 
-  const parts = clean.split('-')
+  const parts   = clean.split('-')
   const posCode = parts[0]
-  const pos = POS[posCode] || posCode
+  const pos     = POS[posCode] || posCode
 
   if (posCode === 'V') {
-    const tense  = TENSE[parts[1]] || parts[1] || ''
-    const voice  = VOICE[parts[2]] || parts[2] || ''
-    const mood   = MOOD[parts[3]]  || parts[3] || ''
-    const tvmStr = [tense, voice, mood].filter(Boolean).join(' ')
+    const { tense, voice, mood, moodChar } = parseTVM(parts[1], true)
+    const tvmStr = [tense, voice, mood].filter(v => v && v !== '—').join(' ')
 
-    // Participle: may have case/number/gender
-    if (parts[3] === 'P' && parts[4]) {
-      const c = CASE[parts[4]] || parts[4]
-      const n = NUM[parts[5]]  || parts[5] || ''
-      const g = GEN[parts[6]]  || parts[6] || ''
+    if (moodChar === 'P' && parts[2]) {
+      // Participle: Case+Number+Gender follows
+      const { c, n, g } = parseCNG(parts[2], true)
       return `Verb · ${tvmStr} · ${[c, n, g].filter(Boolean).join(' ')}`
     }
-    // Finite: person + number
-    if (parts[4]) {
-      const p = PERS[parts[4]] || parts[4]
-      const n = NUM[parts[5]]  || parts[5] || ''
-      return `Verb · ${tvmStr} · ${p} ${n}`.trimEnd()
+    if (moodChar !== 'N' && parts[2]) {
+      // Finite verb: Person+Number (e.g. "3S")
+      const p = PERS[parts[2][0]] || parts[2][0]
+      const n = NUM_S[parts[2][1]] || parts[2][1] || ''
+      return `Verb · ${tvmStr} · ${[p, n].filter(Boolean).join(' ')}`.trimEnd()
     }
     return `Verb · ${tvmStr}`.trimEnd()
   }
 
-  // Noun / pronoun / article / adjective: POS-CASE-NUM[-GEN]
+  // Noun / pronoun / article / adjective: CGN packed in parts[1]
   if (parts[1]) {
-    const c = CASE[parts[1]] || parts[1]
-    const n = NUM[parts[2]]  || parts[2] || ''
-    const g = GEN[parts[3]]  || parts[3] || ''
+    const { c, n, g } = parseCNG(parts[1], true)
     return `${pos} · ${[c, n, g].filter(Boolean).join(' ')}`
   }
 
   return pos
+}
+
+/**
+ * Parse a Robinson code into a structured label list for detailed display.
+ * Returns { pos: string, items: [{label, value}] } or null.
+ */
+export function parseMorphDetails(code) {
+  if (!code) return null
+  const clean = code.replace(/-(P|T|C|ATT|S)$/g, '')
+  if (SIMPLE[clean]) return { pos: SIMPLE[clean], items: [] }
+
+  const parts   = clean.split('-')
+  const posCode = parts[0]
+  const pos     = POS[posCode] || posCode
+  const items   = []
+
+  if (posCode === 'V') {
+    const { tense, voice, mood, moodChar } = parseTVM(parts[1], false)
+    if (tense) items.push({ label:'Tense', value: tense })
+    if (voice && voice !== '—') items.push({ label:'Voice', value: voice })
+    if (mood)  items.push({ label:'Mood',  value: mood  })
+
+    if (moodChar === 'P' && parts[2]) {
+      const { c, n, g } = parseCNG(parts[2], false)
+      if (c) items.push({ label:'Case',   value: c })
+      if (n) items.push({ label:'Number', value: n })
+      if (g) items.push({ label:'Gender', value: g })
+    } else if (moodChar !== 'N' && parts[2]) {
+      const p = PERS[parts[2][0]]
+      const n = NUM[parts[2][1]]
+      if (p) items.push({ label:'Person', value: p })
+      if (n) items.push({ label:'Number', value: n })
+    }
+  } else if (parts[1]) {
+    const { c, n, g } = parseCNG(parts[1], false)
+    if (c) items.push({ label:'Case',   value: c })
+    if (n) items.push({ label:'Number', value: n })
+    if (g) items.push({ label:'Gender', value: g })
+  }
+
+  return { pos, items }
 }
 
 /**

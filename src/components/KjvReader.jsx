@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, useImperative
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
-import { loadGreek, getGreekChapter, parseGrammar, getMsMarker, NT_BOOKS } from '../lib/greek'
-import { loadHebrew, getHebrewChapter, parseHebrewMorph, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
+import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
+import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import { usePrefs, useAuth } from '../App'
@@ -1114,8 +1114,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             const langLabel    = isHeb ? 'Hebrew' : 'Greek'
             const scriptLabel  = isHeb ? 'HOT' : 'GNT'
             const datasetLabel = isHeb ? 'TAHOT · STEPBible CC BY 4.0' : 'TAGNT · STEPBible CC BY 4.0'
-            const parseMarker  = isHeb ? getHebMsMarker : getMsMarker
-            const parseMorph   = isHeb ? parseHebrewMorph : parseGrammar
+            const parseMarker      = isHeb ? getHebMsMarker : getMsMarker
+            const parseMorph       = isHeb ? parseHebrewMorph : parseGrammar
+            const parseMorphDetail = isHeb ? parseHebrewMorphDetails : parseMorphDetails
+
+            // Strong's → BibleHub URL (strips G/H prefix + leading zeros)
+            function strongsUrl(s) {
+              if (!s) return null
+              const lang = s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'
+              const num  = parseInt(s.slice(1), 10)
+              return num ? `https://biblehub.com/${lang}/${num}.htm` : null
+            }
             const getWordLabel = (wd) =>
               displayMode === 'orig'    ? wd.w
               : displayMode === 'translit' ? wd.t
@@ -1276,28 +1285,71 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 {isWordVerse && selectedWord && (() => {
                                   const wd = words[selectedWord.wordIdx]
                                   if (!wd) return null
-                                  const msMarker = parseMarker(wd.ms)
+                                  const msMarker  = parseMarker(wd.ms)
+                                  const msColor   = isHeb
+                                    ? (msMarker === 'Q' ? '#5a3e8c' : '#1d6b5a')
+                                    : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c')
                                   const msDesc = isHeb
-                                    ? { Q:'† Qere — scribal correction (spoken text)', R:'† Restored — from parallel passage', X:'† Extra — preserved in LXX' }[msMarker]
-                                    : { TR:'† TR only — Textus Receptus / KJV tradition', NA:'† NA only — modern critical text' }[msMarker]
+                                    ? { Q:'Qere — scribal correction (the spoken text)', R:'Restored — reconstructed from a parallel passage', X:'Extra — word preserved in the Septuagint (LXX)' }[msMarker]
+                                    : { TR:'Textus Receptus only — present in the KJV tradition but absent from modern critical texts', NA:'Modern critical text only — absent from the Textus Receptus / KJV tradition' }[msMarker]
+                                  const detail   = parseMorphDetail(wd.r)
+                                  const lexUrl   = strongsUrl(wd.s)
                                   return (
                                     <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
-                                      <div style={r.wordInfoRow}>
+
+                                      {/* ① Script word + transliteration */}
+                                      <div style={r.wiScriptRow}>
                                         <span style={{
                                           ...(isHeb ? r.hebrewInfoWord : r.wordInfoGreek),
                                           fontSize: prefs.sizePx * (isHeb ? 1.55 : 1.4),
                                           fontFamily: origScriptFont,
                                         }}>{wd.w}</span>
-                                        <span style={r.wordInfoTranslit}>{wd.t}</span>
-                                        <span style={r.wordInfoStrong}>{wd.s}</span>
+                                        <span style={r.wiTranslit}>{wd.t}</span>
                                       </div>
-                                      <div style={r.wordInfoGloss}>"{wd.g}"</div>
-                                      {wd.r && <div style={r.wordInfoGrammar}>{parseMorph(wd.r)}</div>}
+
+                                      {/* ② Gloss */}
+                                      <div style={r.wiGloss}>"{wd.g}"</div>
+
+                                      {/* ③ Strong's row */}
+                                      <div style={r.wiStrongsRow}>
+                                        <span style={r.wiStrongsLabel}>Strong's</span>
+                                        {lexUrl ? (
+                                          <a href={lexUrl} target="_blank" rel="noopener noreferrer" style={r.wiStrongsLink}>
+                                            {wd.s}
+                                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:3,flexShrink:0}}>
+                                              <path d="M4 2H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V6M6 1h3m0 0v3M9 1L5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                          </a>
+                                        ) : (
+                                          <span style={r.wiStrongsNum}>{wd.s}</span>
+                                        )}
+                                        <span style={r.wiStrongsHint}>BibleHub lexicon</span>
+                                      </div>
+
+                                      {/* ④ Morphology breakdown table */}
+                                      {detail && (
+                                        <div style={r.wiMorphBlock}>
+                                          <div style={r.wiMorphRow}>
+                                            <span style={r.wiMorphLabel}>Part of Speech</span>
+                                            <span style={r.wiMorphValue}>{detail.pos}</span>
+                                          </div>
+                                          {detail.items.map(it => (
+                                            <div key={it.label} style={r.wiMorphRow}>
+                                              <span style={r.wiMorphLabel}>{it.label}</span>
+                                              <span style={r.wiMorphValue}>{it.value}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {/* ⑤ Manuscript note */}
                                       {msDesc && (
-                                        <div style={{ ...r.wordInfoMs, color: isHeb ? '#5a3e8c' : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c') }}>
+                                        <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
+                                          <span style={{ fontWeight:700, marginRight:4 }}>{msMarker}</span>
                                           {msDesc}
                                         </div>
                                       )}
+
                                     </div>
                                   )
                                 })()}
@@ -2113,49 +2165,88 @@ const r = {
     outline:'1.5px solid var(--teal)', outlineOffset:0,
   },
 
-  /* Word info strip */
+  /* ── Word info strip ── */
   wordInfoStrip: {
     marginLeft:34, marginTop:2, marginBottom:8,
-    padding:'9px 12px',
-    background:'rgba(29,107,90,0.06)',
-    border:'1px solid rgba(29,107,90,0.18)',
+    padding:'10px 14px',
+    background:'rgba(29,107,90,0.05)',
+    border:'1px solid rgba(29,107,90,0.16)',
     borderRadius:'var(--radius)',
     fontFamily:"'DM Sans',sans-serif",
-    display:'flex', flexDirection:'column', gap:5,
+    display:'flex', flexDirection:'column', gap:8,
   },
-  wordInfoRow: {
+
+  /* ① Script word row */
+  wiScriptRow: {
     display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap',
   },
-  wordInfoGreek: {
+  wordInfoGreek: {          // reused for both Greek and Hebrew sizing anchor
     fontSize:20, fontWeight:500,
     fontFamily:"'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif",
     color:'var(--ink)',
   },
-  wordInfoTranslit: {
-    fontSize:13, color:'var(--ink-muted)', fontStyle:'italic',
+
+  /* ② Gloss */
+  wiGloss: {
+    fontSize:14, fontWeight:600, color:'var(--ink)',
+    fontStyle:'italic', lineHeight:1.3,
   },
-  wordInfoStrong: {
-    fontSize:10, fontWeight:700, letterSpacing:'0.05em',
+
+  /* ③ Transliteration (within script row) */
+  wiTranslit: {
+    fontSize:13, color:'var(--ink-muted)', fontStyle:'italic', letterSpacing:'0.01em',
+  },
+
+  /* ③ Strong's row */
+  wiStrongsRow: {
+    display:'flex', alignItems:'center', gap:7, flexWrap:'wrap',
+  },
+  wiStrongsLabel: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em',
+    color:'var(--ink-faint)',
+  },
+  wiStrongsLink: {
+    display:'inline-flex', alignItems:'center',
+    fontSize:12, fontWeight:700, letterSpacing:'0.04em',
     color:'var(--teal)', background:'var(--teal-light)',
-    borderRadius:99, padding:'1px 8px',
-    fontFamily:"'DM Sans',sans-serif",
+    borderRadius:99, padding:'2px 9px',
+    textDecoration:'none',
   },
-  wordInfoGloss: {
-    fontSize:13, fontWeight:600, color:'var(--ink)',
-    fontStyle:'italic',
+  wiStrongsNum: {
+    fontSize:12, fontWeight:700, letterSpacing:'0.04em',
+    color:'var(--teal)', background:'var(--teal-light)',
+    borderRadius:99, padding:'2px 9px',
   },
-  wordInfoGrammar: {
-    fontSize:11, color:'var(--ink-muted)',
-    fontFamily:"'DM Sans',sans-serif",
+  wiStrongsHint: {
+    fontSize:10, color:'var(--ink-faint)', fontStyle:'italic',
   },
-  wordInfoMs: {
-    fontSize:10, fontWeight:600,
+
+  /* ④ Morphology breakdown table */
+  wiMorphBlock: {
+    display:'flex', flexDirection:'column', gap:3,
+    paddingTop:6,
+    borderTop:'1px solid rgba(29,107,90,0.12)',
+  },
+  wiMorphRow: {
+    display:'flex', alignItems:'baseline', gap:8,
+  },
+  wiMorphLabel: {
+    fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em',
+    color:'var(--ink-faint)', width:90, flexShrink:0,
+  },
+  wiMorphValue: {
+    fontSize:13, color:'var(--ink)', fontWeight:500,
+  },
+
+  /* ⑤ Manuscript note */
+  wiMsNote: {
+    fontSize:11, lineHeight:1.5,
+    borderLeft:'2px solid', paddingLeft:8,
     fontFamily:"'DM Sans',sans-serif",
   },
 
   /* ── Hebrew-specific overrides ── */
   hebrewTokenOrig: {
-    // Hebrew text is larger and needs a serif Hebrew font
     fontSize:'1.25em',
     fontFamily:"'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif",
     letterSpacing:'0.02em',
