@@ -854,23 +854,28 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function buildSelectionLines() {
-    const lines = []
+    const lines     = []   // full text lines for copy
+    const hebrewRefs = [] // verse refs kept separate so share card body stays pure RTL
     const isMorphVers = version === 'greek' || version === 'hebrew'
-    const isGreek  = version === 'greek'
-    const isHebrew = version === 'hebrew'
+    const isGreek   = version === 'greek'
+    const isHebrew  = version === 'hebrew'
     const pool = isMorphVers ? morphSegments : segments
     const versionLabel = isGreek  ? 'GNT (TAGNT)'
                        : isHebrew ? 'HOT (TAHOT)'
                        : (BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || 'KJV')
+
     selectedVerses.forEach(vk => {
       const [, b, ch, v] = vk.split('|')
       for (const seg of pool) {
         if (seg.book === b && String(seg.chapter) === ch) {
           const vObj = seg.verses.find(ve => String(ve.verse) === v)
           if (vObj) {
-            if (isMorphVers) {
-              // Join word tokens (orig script)
-              const scriptText = vObj.words.map(w => w.w).join(' ')
+            const scriptText = isMorphVers ? vObj.words.map(w => w.w).join(' ') : null
+            if (isHebrew) {
+              // Keep the verse ref separate: body will be pure RTL script text
+              hebrewRefs.push(`${b} ${ch}:${v}`)
+              lines.push(`${b} ${ch}:${v} — ${scriptText}`)   // for copy
+            } else if (isGreek) {
               lines.push(`${b} ${ch}:${v} — ${scriptText}`)
             } else {
               lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
@@ -879,19 +884,36 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         }
       }
     })
-    return { lines, versionLabel, script: isHebrew ? 'hebrew' : isGreek ? 'greek' : null }
+    return {
+      lines,
+      hebrewRefs,
+      versionLabel,
+      script: isHebrew ? 'hebrew' : isGreek ? 'greek' : null,
+    }
   }
 
   function shareSelection() {
-    const { lines, versionLabel, script } = buildSelectionLines()
+    const { lines, hebrewRefs, script } = buildSelectionLines()
     const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
+    const isHebrew = script === 'hebrew'
+
+    // For Hebrew: body = pure script text (no mixed LTR ref), refs go into label
+    // This lets the canvas render the body cleanly RTL without bidi fighting
+    const shareText = isHebrew
+      ? lines.map(l => {
+          // Strip the "Book Ch:V — " prefix that was added for copy; keep only script
+          const dashIdx = l.indexOf(' — ')
+          return dashIdx >= 0 ? l.slice(dashIdx + 3) : l
+        }).join('\n')
+      : lines.join('\n\n')
+
     setShareCard({
-      type:'reading',
-      title:`${book} ${chapter}`,
+      type:     'reading',
+      title:    `${book} ${chapter}`,
       subtitle: versMeta?.label || 'King James Version',
-      source: versMeta?.abbreviation || 'KJV',
-      text: lines.join('\n\n'),
-      label: '',
+      source:   versMeta?.abbreviation || 'KJV',
+      text:     shareText,
+      label:    isHebrew ? hebrewRefs.join('  ·  ') : '',
       script,
     })
     setSelectedVerses(new Set())

@@ -65,8 +65,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, rtl = fa
   const drawX = rtl ? x + maxWidth : x
   for (const para of paragraphs) {
     const words = para.split(' ').filter(Boolean)
-    // For RTL, process words in reverse so they wrap naturally
-    if (rtl) words.reverse()
+    // RTL word order is handled by ctx.direction — do NOT reverse words
     let line = ''
     for (let i = 0; i < words.length; i++) {
       const testLine = line ? line + ' ' + words[i] : words[i]
