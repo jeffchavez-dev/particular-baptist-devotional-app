@@ -3,6 +3,7 @@ import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { loadGreek, getGreekChapter, parseGrammar, getMsMarker, NT_BOOKS } from '../lib/greek'
+import { loadHebrew, getHebrewChapter, parseHebrewMorph, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import { usePrefs, useAuth } from '../App'
@@ -345,7 +346,7 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
 }
 
 /* ── Sidebar ── */
-function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile, ntOnly }) {
+function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile, ntOnly, otOnly }) {
   const [openCats, setOpenCats] = useState(() => new Set())
   const [expandedBook, setExpandedBook] = useState(selectedBook)
 
@@ -449,7 +450,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
     <div style={sb.sidebar}>
       <div style={sb.sidebarTitle}>Books</div>
       {!ntOnly && renderTestament('Old Testament', OT_CATS, 'var(--amber-soft)', 'var(--amber-ink)', 'OT')}
-      {renderTestament('New Testament', NT_CATS, 'var(--purple-soft)', 'var(--purple-ink)', 'NT')}
+      {!otOnly && renderTestament('New Testament', NT_CATS, 'var(--purple-soft)', 'var(--purple-ink)', 'NT')}
     </div>
   )
 }
@@ -513,13 +514,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Pending verse scroll after navigateTo() call from outside */
   const pendingVerseRef = useRef(null)
 
-  /* ── Greek NT state ── */
-  const [greekLoading,  setGreekLoading]  = useState(false)
-  const [greekError,    setGreekError]    = useState(null)
-  const [greekReady,    setGreekReady]    = useState(false)
-  const [greekSegments, setGreekSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
+  /* ── Morphological reader state (Greek NT + Hebrew OT) ── */
+  const [morphLoading,  setMorphLoading]  = useState(false)
+  const [morphError,    setMorphError]    = useState(null)
+  const [morphReady,    setMorphReady]    = useState(false)
+  const [morphSegments, setMorphSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
   const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
-  const [displayMode,   setDisplayMode]   = useState('greek') // 'greek'|'translit'|'gloss'
+  const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -641,36 +642,40 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }, 250)
   }, [book, chapter])
 
-  /* Load Bible version or Greek NT whenever the version prop changes */
+  /* Load Bible version / Greek NT / Hebrew OT whenever the version prop changes */
   useEffect(() => {
     let cancelled = false
+    const isMorph = version === 'greek' || version === 'hebrew'
 
-    if (version === 'greek') {
-      // ── Greek mode ──
+    if (isMorph) {
+      // ── Morphological mode (Greek NT or Hebrew OT) ──
       setLoading(false)
       setError(null)
       setDataReady(false)
       setVersionData(null)
       setSegments([])
-      setGreekLoading(true)
-      setGreekError(null)
-      setGreekReady(false)
-      setGreekSegments([])
+      setMorphLoading(true)
+      setMorphError(null)
+      setMorphReady(false)
+      setMorphSegments([])
       setSelectedWord(null)
+      setDisplayMode('orig')
 
-      loadGreek()
+      const loader = version === 'greek' ? loadGreek() : loadHebrew()
+      loader
         .then(() => {
           if (cancelled) return
-          setGreekReady(true)
-          setGreekLoading(false)
-          // If currently on an OT book, jump to Matthew
-          if (!NT_BOOKS.has(book)) {
-            setBook('Matthew')
-            setChapter(1)
+          setMorphReady(true)
+          setMorphLoading(false)
+          // Navigate to correct testament if needed
+          if (version === 'greek' && !NT_BOOKS.has(book)) {
+            setBook('Matthew'); setChapter(1)
+          } else if (version === 'hebrew' && !OT_BOOKS.has(book)) {
+            setBook('Genesis'); setChapter(1)
           }
         })
         .catch(e => {
-          if (!cancelled) { setGreekError(e.message); setGreekLoading(false) }
+          if (!cancelled) { setMorphError(e.message); setMorphLoading(false) }
         })
     } else {
       // ── Text version (KJV, ABAB, …) ──
@@ -678,9 +683,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       setDataReady(false)
       setLoading(true)
       setError(null)
-      setGreekReady(false)
-      setGreekLoading(false)
-      setGreekSegments([])
+      setMorphReady(false)
+      setMorphLoading(false)
+      setMorphSegments([])
       setSelectedWord(null)
 
       loadBibleData(version)
@@ -730,33 +735,39 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     return () => obs.disconnect()
   }, [dataReady, segments, versionData, version])
 
-  /* Load a Greek chapter whenever book / chapter changes while in Greek mode */
+  /* Load a morph chapter whenever book / chapter changes in Greek or Hebrew mode */
   useEffect(() => {
-    if (version !== 'greek' || !greekReady) return
-    const chData = getGreekChapter(book, chapter)
+    const isMorph = version === 'greek' || version === 'hebrew'
+    if (!isMorph || !morphReady) return
+    const chData = version === 'greek'
+      ? getGreekChapter(book, chapter)
+      : getHebrewChapter(book, chapter)
     if (chData) {
-      setGreekSegments([{ book, chapter, verses: chData }])
-      setGreekError(null)
+      setMorphSegments([{ book, chapter, verses: chData }])
+      setMorphError(null)
     } else {
-      setGreekError('Chapter not found in Greek NT')
+      setMorphError(`Chapter not found in ${version === 'greek' ? 'Greek NT' : 'Hebrew OT'}`)
     }
     if (readerRef.current) readerRef.current.scrollTop = 0
     setSelectedWord(null)
-  }, [book, chapter, version, greekReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [book, chapter, version, morphReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Greek infinite-scroll — append next NT chapter when sentinel becomes visible */
+  /* Morph infinite-scroll — append next chapter when sentinel becomes visible */
   useEffect(() => {
-    if (version !== 'greek' || !greekReady || !sentinelRef.current) return
+    const isMorph = version === 'greek' || version === 'hebrew'
+    if (!isMorph || !morphReady || !sentinelRef.current) return
+    const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
+    const getChFn     = version === 'greek' ? getGreekChapter : getHebrewChapter
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return
-        setGreekSegments(prev => {
+        setMorphSegments(prev => {
           if (!prev.length) return prev
           const last = prev[prev.length - 1]
           const next = getNextChapter(last.book, last.chapter)
-          if (!next || !NT_BOOKS.has(next.book)) return prev
+          if (!next || !allowedBooks.has(next.book)) return prev
           if (prev.some(s => s.book === next.book && s.chapter === next.chapter)) return prev
-          const chData = getGreekChapter(next.book, next.chapter)
+          const chData = getChFn(next.book, next.chapter)
           if (!chData) return prev
           return [...prev, { book: next.book, chapter: next.chapter, verses: chData }]
         })
@@ -765,7 +776,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     )
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
-  }, [version, greekReady, greekSegments]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
@@ -845,7 +856,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function buildSelectionLines() {
     const lines = []
     const isGreek = version === 'greek'
-    const pool = isGreek ? greekSegments : segments
+    const pool = isGreek ? morphSegments : segments
     const versionLabel = isGreek ? 'GNT (TAGNT)' : (BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || 'KJV')
     selectedVerses.forEach(vk => {
       const [, b, ch, v] = vk.split('|')
@@ -1034,15 +1045,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           selectedBook={book}
           selectedChapter={chapter}
           onNavigate={(b, ch) => {
-            if (version === 'greek' && !NT_BOOKS.has(b)) {
-              navigate('Matthew', 1)
-            } else {
-              navigate(b, ch)
-            }
+            if (version === 'greek'  && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
+            if (version === 'hebrew' && !OT_BOOKS.has(b)) { navigate('Genesis',  1); return }
+            navigate(b, ch)
           }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
           ntOnly={version === 'greek'}
+          otOnly={version === 'hebrew'}
         />
       </aside>
 
@@ -1051,7 +1061,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
         <div style={r.content}>
           {/* ── Search status bar (text versions only) ── */}
-          {version !== 'greek' && searchQuery.trim() && (
+          {version !== 'greek' && version !== 'hebrew' && searchQuery.trim() && (
             <div style={r.searchStatusBar}>
               {searching ? (
                 <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Searching…</span>
@@ -1093,29 +1103,42 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           )}
 
           {/* ══════════════════════════════════════════════
-              GREEK NT MODE
+              MORPHOLOGICAL MODE (GREEK NT / HEBREW OT)
               ══════════════════════════════════════════════ */}
-          {version === 'greek' && (
+          {(version === 'greek' || version === 'hebrew') && (() => {
+            const isHeb        = version === 'hebrew'
+            const langLabel    = isHeb ? 'Hebrew' : 'Greek'
+            const scriptLabel  = isHeb ? 'HOT' : 'GNT'
+            const datasetLabel = isHeb ? 'TAHOT · STEPBible CC BY 4.0' : 'TAGNT · STEPBible CC BY 4.0'
+            const parseMarker  = isHeb ? getHebMsMarker : getMsMarker
+            const parseMorph   = isHeb ? parseHebrewMorph : parseGrammar
+            const getWordLabel = (wd) =>
+              displayMode === 'orig'    ? wd.w
+              : displayMode === 'translit' ? wd.t
+              : wd.g
+            return (
             <>
-              {greekLoading && (
+              {morphLoading && (
                 <div style={r.loadingState}>
                   <div className="spinner" />
-                  <p style={{ color:'var(--ink-muted)', fontSize:14, marginTop:12 }}>Loading Greek New Testament…</p>
+                  <p style={{ color:'var(--ink-muted)', fontSize:14, marginTop:12 }}>Loading {langLabel} {isHeb ? 'Old' : 'New'} Testament…</p>
                 </div>
               )}
-              {greekError && !greekLoading && (
+              {morphError && !morphLoading && (
                 <div style={r.errorState}>
-                  <p style={{ color:'var(--ink-muted)', fontSize:14 }}>{greekError}</p>
-                  <p style={{ color:'var(--ink-faint)', fontSize:12, marginTop:8 }}>Run: <code>npm run process:greek</code></p>
+                  <p style={{ color:'var(--ink-muted)', fontSize:14 }}>{morphError}</p>
+                  <p style={{ color:'var(--ink-faint)', fontSize:12, marginTop:8 }}>
+                    Run: <code>npm run process:{isHeb ? 'hebrew' : 'greek'}</code>
+                  </p>
                 </div>
               )}
-              {greekReady && !greekLoading && (
+              {morphReady && !morphLoading && (
                 <>
                   {/* Display-mode toggle bar */}
                   <div style={r.displayModeBar}>
                     <span style={r.displayModeLabel}>Display</span>
                     {[
-                      { id:'greek',   label:'Greek' },
+                      { id:'orig',    label: isHeb ? 'Hebrew' : 'Greek' },
                       { id:'translit',label:'Translit.' },
                       { id:'gloss',   label:'Gloss' },
                     ].map(m => (
@@ -1128,13 +1151,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       </button>
                     ))}
                     <span style={{ marginLeft:'auto', fontSize:10, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" }}>
-                      TAGNT · STEPBible CC BY 4.0
+                      {datasetLabel}
                     </span>
                   </div>
 
                   {/* Greek chapter segments */}
                   <div ref={verseListRef}>
-                    {greekSegments.map((seg, segIdx) => (
+                    {morphSegments.map((seg, segIdx) => (
                       <div key={`${seg.book}|${seg.chapter}`}>
                         {segIdx === 0
                           ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
@@ -1170,19 +1193,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   <span style={{ ...r.verseNum, ...(hlColorId ? { color: hlSt.numClr, background: hlSt.numBg } : {}) }}>
                                     {verse}
                                   </span>
-                                  <div style={r.greekWordWrap}>
+                                  <div style={{ ...r.greekWordWrap, ...(isHeb ? { direction:'rtl' } : {}) }}>
                                     {words.map((wd, wi) => {
-                                      const msMarker = getMsMarker(wd.ms)
+                                      const msMarker = parseMarker(wd.ms)
                                       const isSel    = isWordVerse && selectedWord?.wordIdx === wi
-                                      const lbl      = displayMode === 'greek'   ? wd.w
-                                                     : displayMode === 'translit' ? wd.t
-                                                     : wd.g
+                                      const lbl      = getWordLabel(wd)
                                       return (
                                         <span
                                           key={wi}
                                           style={{
                                             ...r.greekToken,
-                                            ...(displayMode === 'greek' ? r.greekTokenGk : {}),
+                                            ...(displayMode === 'orig' ? (isHeb ? r.hebrewTokenOrig : r.greekTokenGk) : {}),
                                             ...(isSel ? r.greekTokenSel : {}),
                                           }}
                                           onClick={e => { e.stopPropagation(); handleWordTap(verseKey, wi) }}
@@ -1191,8 +1212,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           {lbl}
                                           {msMarker && (
                                             <sup style={{
-                                              fontSize:'0.58em', marginLeft:1, fontFamily:"'DM Sans',sans-serif",
-                                              color: msMarker === 'TR' ? '#7c5230' : '#3e5a8c',
+                                              fontSize:'0.55em', marginLeft:1, fontFamily:"'DM Sans',sans-serif",
+                                              color: isHeb
+                                                ? (msMarker === 'Q' ? '#5a3e8c' : '#1d6b5a')
+                                                : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c'),
                                             }}>
                                               {msMarker}
                                             </sup>
@@ -1203,25 +1226,26 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   </div>
                                 </div>
 
-                                {/* ── Word info strip (appears when a word in this verse is selected) ── */}
+                                {/* ── Word info strip ── */}
                                 {isWordVerse && selectedWord && (() => {
                                   const wd = words[selectedWord.wordIdx]
                                   if (!wd) return null
-                                  const msMarker = getMsMarker(wd.ms)
+                                  const msMarker = parseMarker(wd.ms)
+                                  const msDesc = isHeb
+                                    ? { Q:'† Qere — scribal correction (spoken text)', R:'† Restored — from parallel passage', X:'† Extra — preserved in LXX' }[msMarker]
+                                    : { TR:'† TR only — Textus Receptus / KJV tradition', NA:'† NA only — modern critical text' }[msMarker]
                                   return (
                                     <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
                                       <div style={r.wordInfoRow}>
-                                        <span style={r.wordInfoGreek}>{wd.w}</span>
+                                        <span style={isHeb ? r.hebrewInfoWord : r.wordInfoGreek}>{wd.w}</span>
                                         <span style={r.wordInfoTranslit}>{wd.t}</span>
                                         <span style={r.wordInfoStrong}>{wd.s}</span>
                                       </div>
                                       <div style={r.wordInfoGloss}>"{wd.g}"</div>
-                                      {wd.r && <div style={r.wordInfoGrammar}>{parseGrammar(wd.r)}</div>}
-                                      {msMarker && (
-                                        <div style={{ ...r.wordInfoMs, color: msMarker === 'TR' ? '#7c5230' : '#3e5a8c' }}>
-                                          {msMarker === 'TR'
-                                            ? '† TR only — Textus Receptus / KJV tradition'
-                                            : '† NA only — modern critical text'}
+                                      {wd.r && <div style={r.wordInfoGrammar}>{parseMorph(wd.r)}</div>}
+                                      {msDesc && (
+                                        <div style={{ ...r.wordInfoMs, color: isHeb ? '#5a3e8c' : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c') }}>
+                                          {msDesc}
                                         </div>
                                       )}
                                     </div>
@@ -1263,18 +1287,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       </div>
                     ))}
 
-                    {/* Sentinel for Greek infinite scroll */}
-                    {!greekLoading && <div ref={sentinelRef} style={{ height:40 }} />}
+                    {/* Sentinel for morph infinite scroll */}
+                    {!morphLoading && <div ref={sentinelRef} style={{ height:40 }} />}
                   </div>
                 </>
               )}
             </>
-          )}
+            )
+          })()}
 
           {/* ══════════════════════════════════════════════
               TEXT VERSION MODE (KJV, ABAB, …)
               ══════════════════════════════════════════════ */}
-          {version !== 'greek' && (
+          {version !== 'greek' && version !== 'hebrew' && (
             <>
               {loading && (
                 <div style={r.loadingState}>
@@ -2076,5 +2101,20 @@ const r = {
   wordInfoMs: {
     fontSize:10, fontWeight:600,
     fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* ── Hebrew-specific overrides ── */
+  hebrewTokenOrig: {
+    // Hebrew text is larger and needs a serif Hebrew font
+    fontSize:'1.25em',
+    fontFamily:"'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif",
+    letterSpacing:'0.02em',
+    direction:'rtl',
+  },
+  hebrewInfoWord: {
+    fontSize:24, fontWeight:400,
+    fontFamily:"'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif",
+    color:'var(--ink)', direction:'rtl',
+    letterSpacing:'0.02em',
   },
 }

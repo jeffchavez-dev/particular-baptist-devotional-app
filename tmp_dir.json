@@ -1,0 +1,114 @@
+[
+  {
+    "name": "OLD format TOTHT",
+    "path": "Translators Amalgamated OT+NT/OLD format TOTHT",
+    "sha": "3c817841b58b42d706cea7a39b74b1700104bfc1",
+    "size": 0,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/OLD%20format%20TOTHT?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/tree/master/Translators%20Amalgamated%20OT%2BNT/OLD%20format%20TOTHT",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/trees/3c817841b58b42d706cea7a39b74b1700104bfc1",
+    "download_url": null,
+    "type": "dir",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/OLD%20format%20TOTHT?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/trees/3c817841b58b42d706cea7a39b74b1700104bfc1",
+      "html": "https://github.com/STEPBible/STEPBible-Data/tree/master/Translators%20Amalgamated%20OT%2BNT/OLD%20format%20TOTHT"
+    }
+  },
+  {
+    "name": "TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAGNT Act-Rev - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+    "sha": "4bbea2c14681b01eb889d5a2d1dc0856858a32de",
+    "size": 15939932,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/4bbea2c14681b01eb889d5a2d1dc0856858a32de",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/4bbea2c14681b01eb889d5a2d1dc0856858a32de",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Act-Rev%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt"
+    }
+  },
+  {
+    "name": "TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAGNT Mat-Jhn - Translators Amalgamated Greek NT - STEPBible.org CC-BY.txt",
+    "sha": "705c1bc1cf752e013efcef99b8d9a3b7853bf843",
+    "size": 14189032,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/705c1bc1cf752e013efcef99b8d9a3b7853bf843",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/705c1bc1cf752e013efcef99b8d9a3b7853bf843",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt"
+    }
+  },
+  {
+    "name": "TAHOT Gen-Deu - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAHOT Gen-Deu - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "sha": "eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5",
+    "size": 18190455,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/eb051292f8cee648c4f3eaf1b48cd0f1f30dc1d5",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt"
+    }
+  },
+  {
+    "name": "TAHOT Isa-Mal - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAHOT Isa-Mal - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "sha": "1cfe6718a1dae0d5d45a57a942d3f7f716ac6342",
+    "size": 17977518,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/1cfe6718a1dae0d5d45a57a942d3f7f716ac6342",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/1cfe6718a1dae0d5d45a57a942d3f7f716ac6342",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Isa-Mal%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt"
+    }
+  },
+  {
+    "name": "TAHOT Job-Sng - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAHOT Job-Sng - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "sha": "3d7af689417b54ebc468700b2bd86a8ba5377530",
+    "size": 9540133,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/3d7af689417b54ebc468700b2bd86a8ba5377530",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/3d7af689417b54ebc468700b2bd86a8ba5377530",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Job-Sng%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt"
+    }
+  },
+  {
+    "name": "TAHOT Jos-Est - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "path": "Translators Amalgamated OT+NT/TAHOT Jos-Est - Translators Amalgamated Hebrew OT - STEPBible.org CC BY.txt",
+    "sha": "e3824344f6dea1a3f51932d1b0a53537c3c2023e",
+    "size": 24500317,
+    "url": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+    "html_url": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "git_url": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/e3824344f6dea1a3f51932d1b0a53537c3c2023e",
+    "download_url": "https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators Amalgamated OT+NT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt?ref=master",
+      "git": "https://api.github.com/repos/STEPBible/STEPBible-Data/git/blobs/e3824344f6dea1a3f51932d1b0a53537c3c2023e",
+      "html": "https://github.com/STEPBible/STEPBible-Data/blob/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Jos-Est%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt"
+    }
+  }
+]

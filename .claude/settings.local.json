@@ -62,7 +62,15 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
-      "Bash(curl -s \"https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAGNT%20Mat-Jhn%20-%20Translators%20Amalgamated%20Greek%20NT%20-%20STEPBible.org%20CC-BY.txt\")",
+      "Bash(node -e \"import\\('./src/data/lbcf2.js'\\).then\\(m => { const keys = Object.keys\\(m.LBCF2\\).filter\\(k => k.startsWith\\('0.'\\)\\); console.log\\('Preface keys:', keys\\); console.log\\('Total keys:', Object.keys\\(m.LBCF2\\).length\\); console.log\\('First 5 keys:', Object.keys\\(m.LBCF2\\).slice\\(0,5\\)\\); }\\)\")",
+      "Bash(node -e \"import\\('./src/data/orthodoxCatechism.js'\\).then\\(m => { const keys = Object.keys\\(m.ORTHODOX_CATECHISM\\); console.log\\('Total Q&As:', keys.length\\); console.log\\('First 3 keys:', keys.slice\\(0,3\\)\\); console.log\\('First entry:', JSON.stringify\\(m.ORTHODOX_CATECHISM[keys[0]]\\).slice\\(0,200\\)\\); }\\)\")",
+      "Bash(curl -s \"https://api.github.com/repos/STEPBible/STEPBible-Data/contents/Translators%20Amalgamated%20OT%2BNT\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const j=JSON.parse\\(d\\); j.forEach\\(f=>console.log\\(f.name\\)\\)\")",
+      "Bash(node -e \"const j=JSON.parse\\(require\\('fs'\\).readFileSync\\('tmp_dir.json','utf8'\\)\\); j.forEach\\(f=>console.log\\(f.name\\)\\)\")",
+      "Bash(del tmp_dir.json)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt\")",
+      "Bash(grep -v \"^$\")"
     ]
   }
 }

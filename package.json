@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "gen:icons": "node scripts/gen-icons.mjs",
-    "process:greek": "node scripts/processTagnt.mjs"
+    "process:greek": "node scripts/processTagnt.mjs",
+    "process:hebrew": "node scripts/processTaght.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

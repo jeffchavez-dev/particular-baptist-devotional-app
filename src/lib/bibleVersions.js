@@ -42,8 +42,18 @@ export const BIBLE_VERSIONS = [
     scope: 'NT',        // NT books only
     source: 'STEPBible.org CC BY 4.0',
   },
-  // Future versions:
-  // { id: 'hebrew', label: 'Hebrew Old Testament', abbreviation: 'WTT', type:'hebrew', scope:'OT' },
+  {
+    id: 'hebrew',
+    label: 'Hebrew Old Testament',
+    abbreviation: 'HOT',
+    language: 'Hebrew',
+    year: 'BHS/WLC',
+    description: 'Translators Amalgamated Hebrew OT (TAHOT) — Leningrad Codex with full Masoretic pointing and morphology',
+    type: 'hebrew',     // special: word-level RTL rendering
+    dataFile: '/tahot.json',
+    scope: 'OT',        // OT books only
+    source: 'STEPBible.org CC BY 4.0',
+  },
   // { id: 'esv',    label: 'English Standard Version', abbreviation: 'ESV', ... },
   // { id: 'nasb',   label: 'New American Standard Bible', abbreviation: 'NASB', ... },
 ]

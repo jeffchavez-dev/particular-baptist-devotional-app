@@ -697,7 +697,7 @@ export default function ConfessionsPage() {
             <span style={{...s.confBadgeDot, background: sidebarConf === key ? info.color : 'var(--border-strong)'}} />
             <span style={{flex:1, textAlign:'left'}}>{info.label}</span>
             <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>
-              {key === '2lbcf' ? '1689' : key === 'catechism' ? '1693' : '1644'}
+              {key === '2lbcf' ? '1689' : key === 'catechism' ? '1693' : key === 'orthodox' ? '1680' : '1644'}
             </span>
           </button>
         ))}
