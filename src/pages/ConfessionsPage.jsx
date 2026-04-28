@@ -885,7 +885,7 @@ export default function ConfessionsPage() {
                   <section key={chNum} id={chId} style={s.chapter}>
                     <div style={s.chapterHeader}>
                       {chNum !== '0' && <span style={s.chapterNum}>Chapter {chNum}</span>}
-                      <h2 style={s.chapterTitle}}>{chNum === '0' ? 'Preface' : chTitle}</h2>
+                      <h2 style={s.chapterTitle}>{chNum === '0' ? 'Preface' : chTitle}</h2>
                     </div>
                     {paras.map(p => {
                       const paraMatches = !q || chTitleMatches ||

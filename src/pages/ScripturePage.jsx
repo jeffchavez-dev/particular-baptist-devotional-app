@@ -380,6 +380,9 @@ export default function ScripturePage() {
   const [readBook, setReadBook] = useState('Genesis')
   const [readChapter, setReadChapter] = useState(1)
   const [readSearch, setReadSearch] = useState('')
+  const [readVersion, setReadVersion] = useState(() => {
+    try { return sessionStorage.getItem('reader-version') || 'kjv' } catch { return 'kjv' }
+  })
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -537,6 +540,11 @@ export default function ScripturePage() {
       {mode === 'read' && (
         <KjvReader
           ref={kjvRef}
+          version={readVersion}
+          onVersionChange={v => {
+            setReadVersion(v)
+            try { sessionStorage.setItem('reader-version', v) } catch {}
+          }}
           todayChapter={todayBibleChapter}
           onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
           onSearchChange={q => setReadSearch(q)}

@@ -30,11 +30,22 @@ export const BIBLE_VERSIONS = [
     description: 'Tagalog Bible translation',
     dataFile: '/abab.json',
   },
+  {
+    id: 'greek',
+    label: 'Greek New Testament',
+    abbreviation: 'GNT',
+    language: 'Greek',
+    year: 'NA28/TR',
+    description: 'Translators Amalgamated Greek NT (TAGNT) — all major manuscript traditions with morphology',
+    type: 'greek',      // special: word-level rendering, not sentence-level text
+    dataFile: '/tagnt.json',
+    scope: 'NT',        // NT books only
+    source: 'STEPBible.org CC BY 4.0',
+  },
   // Future versions:
-  // { id: 'esv', label: 'English Standard Version', abbreviation: 'ESV', ... },
-  // { id: 'nasb', label: 'New American Standard Bible', abbreviation: 'NASB', ... },
-  // { id: 'gnt', label: 'Greek New Testament', abbreviation: 'GNT', ... },
-  // { id: 'hebrew', label: 'Hebrew Old Testament', abbreviation: 'WTT', ... },
+  // { id: 'hebrew', label: 'Hebrew Old Testament', abbreviation: 'WTT', type:'hebrew', scope:'OT' },
+  // { id: 'esv',    label: 'English Standard Version', abbreviation: 'ESV', ... },
+  // { id: 'nasb',   label: 'New American Standard Bible', abbreviation: 'NASB', ... },
 ]
 
 // ── Version Data Cache ────────────────────────────────────────────────────

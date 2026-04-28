@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
-import { loadBibleVersion, getVersionMetadata, searchBibleVersion } from '../lib/bibleVersions'
+import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
+import { loadGreek, getGreekChapter, parseGrammar, getMsMarker, NT_BOOKS } from '../lib/greek'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import { usePrefs, useAuth } from '../App'
@@ -344,7 +345,7 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
 }
 
 /* ── Sidebar ── */
-function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile }) {
+function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile, ntOnly }) {
   const [openCats, setOpenCats] = useState(() => new Set())
   const [expandedBook, setExpandedBook] = useState(selectedBook)
 
@@ -447,14 +448,14 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
   return (
     <div style={sb.sidebar}>
       <div style={sb.sidebarTitle}>Books</div>
-      {renderTestament('Old Testament', OT_CATS, 'var(--amber-soft)', 'var(--amber-ink)', 'OT')}
+      {!ntOnly && renderTestament('Old Testament', OT_CATS, 'var(--amber-soft)', 'var(--amber-ink)', 'OT')}
       {renderTestament('New Testament', NT_CATS, 'var(--purple-soft)', 'var(--purple-ink)', 'NT')}
     </div>
   )
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayChapter, onNavChange, onSearchChange }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange }, ref) {
   const { prefs } = usePrefs()
 
   const [book, setBook] = useState(() => {
@@ -511,6 +512,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
 
   /* Pending verse scroll after navigateTo() call from outside */
   const pendingVerseRef = useRef(null)
+
+  /* ── Greek NT state ── */
+  const [greekLoading,  setGreekLoading]  = useState(false)
+  const [greekError,    setGreekError]    = useState(null)
+  const [greekReady,    setGreekReady]    = useState(false)
+  const [greekSegments, setGreekSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
+  const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
+  const [displayMode,   setDisplayMode]   = useState('greek') // 'greek'|'translit'|'gloss'
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -632,22 +641,58 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
     }, 250)
   }, [book, chapter])
 
-  /* First-mount: load Bible version */
+  /* Load Bible version or Greek NT whenever the version prop changes */
   useEffect(() => {
     let cancelled = false
-    if (!versionData) {
+
+    if (version === 'greek') {
+      // ── Greek mode ──
+      setLoading(false)
+      setError(null)
+      setDataReady(false)
+      setVersionData(null)
+      setSegments([])
+      setGreekLoading(true)
+      setGreekError(null)
+      setGreekReady(false)
+      setGreekSegments([])
+      setSelectedWord(null)
+
+      loadGreek()
+        .then(() => {
+          if (cancelled) return
+          setGreekReady(true)
+          setGreekLoading(false)
+          // If currently on an OT book, jump to Matthew
+          if (!NT_BOOKS.has(book)) {
+            setBook('Matthew')
+            setChapter(1)
+          }
+        })
+        .catch(e => {
+          if (!cancelled) { setGreekError(e.message); setGreekLoading(false) }
+        })
+    } else {
+      // ── Text version (KJV, ABAB, …) ──
+      setVersionData(null)
+      setDataReady(false)
       setLoading(true)
+      setError(null)
+      setGreekReady(false)
+      setGreekLoading(false)
+      setGreekSegments([])
+      setSelectedWord(null)
+
       loadBibleData(version)
         .then(data => {
           if (cancelled) return
           setVersionData(data)
           setDataReady(true)
           setLoading(false)
-          const v = getChapterVerses(data, book, chapter, version)
-          if (v) setSegments([{ book, chapter, verses: v }])
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     }
+
     return () => { cancelled = true }
   }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -684,6 +729,43 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
   }, [dataReady, segments, versionData, version])
+
+  /* Load a Greek chapter whenever book / chapter changes while in Greek mode */
+  useEffect(() => {
+    if (version !== 'greek' || !greekReady) return
+    const chData = getGreekChapter(book, chapter)
+    if (chData) {
+      setGreekSegments([{ book, chapter, verses: chData }])
+      setGreekError(null)
+    } else {
+      setGreekError('Chapter not found in Greek NT')
+    }
+    if (readerRef.current) readerRef.current.scrollTop = 0
+    setSelectedWord(null)
+  }, [book, chapter, version, greekReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Greek infinite-scroll — append next NT chapter when sentinel becomes visible */
+  useEffect(() => {
+    if (version !== 'greek' || !greekReady || !sentinelRef.current) return
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        setGreekSegments(prev => {
+          if (!prev.length) return prev
+          const last = prev[prev.length - 1]
+          const next = getNextChapter(last.book, last.chapter)
+          if (!next || !NT_BOOKS.has(next.book)) return prev
+          if (prev.some(s => s.book === next.book && s.chapter === next.chapter)) return prev
+          const chData = getGreekChapter(next.book, next.chapter)
+          if (!chData) return prev
+          return [...prev, { book: next.book, chapter: next.chapter, verses: chData }]
+        })
+      },
+      { rootMargin: '300px' }
+    )
+    obs.observe(sentinelRef.current)
+    return () => obs.disconnect()
+  }, [version, greekReady, greekSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
@@ -725,6 +807,23 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
     setSelectedVerses(new Set())
     setColorBarOpen(false)
     setEditingNote(null)
+    setSelectedWord(null)
+  }
+
+  /* ── Greek word tap ── */
+  function handleWordTap(verseKey, wordIdx) {
+    const isSame = selectedWord?.verseKey === verseKey && selectedWord?.wordIdx === wordIdx
+    if (isSame) {
+      setSelectedWord(null)   // tap same word → hide info strip (verse stays selected)
+    } else {
+      setSelectedWord({ verseKey, wordIdx })
+      // Ensure the verse is in selectedVerses so the floating bar appears
+      setSelectedVerses(prev => {
+        const next = new Set(prev)
+        next.add(verseKey)
+        return next
+      })
+    }
   }
 
   function applyHighlightToSelection(colorId) {
@@ -743,34 +842,48 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
     setSelectedVerses(new Set())
   }
 
-  function shareSelection() {
+  function buildSelectionLines() {
     const lines = []
+    const isGreek = version === 'greek'
+    const pool = isGreek ? greekSegments : segments
+    const versionLabel = isGreek ? 'GNT (TAGNT)' : (BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || 'KJV')
     selectedVerses.forEach(vk => {
-      const parts = vk.split('|')
-      const b = parts[1], ch = parts[2], v = parts[3]
-      for (const seg of segments) {
+      const [, b, ch, v] = vk.split('|')
+      for (const seg of pool) {
         if (seg.book === b && String(seg.chapter) === ch) {
-          const vObj = seg.verses.find(ve => String(ve.verse) === v)
-          if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
+          if (isGreek) {
+            const vObj = seg.verses.find(ve => String(ve.verse) === v)
+            if (vObj) {
+              // Build text: Greek words separated by spaces
+              const gkText = vObj.words.map(w => w.w).join(' ')
+              lines.push(`${b} ${ch}:${v} — ${gkText}`)
+            }
+          } else {
+            const vObj = seg.verses.find(ve => String(ve.verse) === v)
+            if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
+          }
         }
       }
     })
-    setShareCard({ type:'reading', title:`${book} ${chapter}`, subtitle:'King James Version', source:'KJV', text:lines.join('\n\n'), label:'' })
+    return { lines, versionLabel }
+  }
+
+  function shareSelection() {
+    const { lines, versionLabel } = buildSelectionLines()
+    const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
+    setShareCard({
+      type:'reading',
+      title:`${book} ${chapter}`,
+      subtitle: versMeta?.label || 'King James Version',
+      source: versMeta?.abbreviation || 'KJV',
+      text: lines.join('\n\n'),
+      label: '',
+    })
     setSelectedVerses(new Set())
   }
 
   function copySelection() {
-    const lines = []
-    selectedVerses.forEach(vk => {
-      const parts = vk.split('|')
-      const b = parts[1], ch = parts[2], v = parts[3]
-      for (const seg of segments) {
-        if (seg.book === b && String(seg.chapter) === ch) {
-          const vObj = seg.verses.find(ve => String(ve.verse) === v)
-          if (vObj) lines.push(`${b} ${ch}:${v} — ${vObj.text}`)
-        }
-      }
-    })
+    const { lines } = buildSelectionLines()
     navigator.clipboard.writeText(lines.join('\n\n')).catch(() => {})
     setCopiedKey('selection')
     setTimeout(() => { setCopiedKey(null); setSelectedVerses(new Set()) }, 1500)
@@ -828,7 +941,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
       setSearching(true)
       // Run in a microtask so the UI updates first
       setTimeout(() => {
-        const hits = searchBible(trimmed)
+        const hits = searchBibleVersion(versionData, trimmed, version)
         setBibleResults(hits)
         setSearching(false)
       }, 0)
@@ -893,12 +1006,43 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
             </button>
           </div>
         )}
+
+        {/* ── Version picker ── */}
+        <div style={sb.versionSection}>
+          <div style={sb.versionSectionTitle}>Translation</div>
+          <div style={sb.versionList}>
+            {BIBLE_VERSIONS.map(v2 => {
+              const isActive = version === v2.id
+              return (
+                <button
+                  key={v2.id}
+                  style={{ ...sb.versionBtn, ...(isActive ? sb.versionBtnActive : {}) }}
+                  onClick={() => onVersionChange?.(v2.id)}
+                  title={v2.description}
+                >
+                  <span style={{ ...sb.versionAbbr, ...(isActive ? { color:'white' } : {}) }}>{v2.abbreviation}</span>
+                  <span style={{ ...sb.versionLang, ...(isActive ? { color:'rgba(255,255,255,0.75)' } : {}) }}>
+                    {v2.language}{v2.scope ? ` · ${v2.scope}` : ''}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         <BookSidebar
           selectedBook={book}
           selectedChapter={chapter}
-          onNavigate={navigate}
+          onNavigate={(b, ch) => {
+            if (version === 'greek' && !NT_BOOKS.has(b)) {
+              navigate('Matthew', 1)
+            } else {
+              navigate(b, ch)
+            }
+          }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
+          ntOnly={version === 'greek'}
         />
       </aside>
 
@@ -906,8 +1050,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
       <div style={r.readerWrap} ref={readerRef}>
 
         <div style={r.content}>
-          {/* ── Search status bar — sticky just below the page header ── */}
-          {searchQuery.trim() && (
+          {/* ── Search status bar (text versions only) ── */}
+          {version !== 'greek' && searchQuery.trim() && (
             <div style={r.searchStatusBar}>
               {searching ? (
                 <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Searching…</span>
@@ -948,150 +1092,327 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', todayCh
             </div>
           )}
 
-          {/* Chapter content */}
-          {loading && (
-            <div style={r.loadingState}>
-              <div className="spinner" />
-              <p style={{ color:'var(--ink-muted)', fontSize:14, marginTop:12 }}>Loading {book} {chapter}…</p>
-            </div>
-          )}
-          {error && !loading && (
-            <div style={r.errorState}>
-              <p style={{ color:'var(--ink-muted)', fontSize:14 }}>Could not load chapter. Check your connection and try again.</p>
-              <button style={{ ...r.navBtn, marginTop:12 }} onClick={() => {
-                setLoading(true)
-                fetchKjvChapter(book, chapter)
-                  .then(v => { setVerses(v); setLoading(false) })
-                  .catch(e => { setError(e.message); setLoading(false) })
-              }}>Retry</button>
-            </div>
-          )}
-          {/* ── Bible-wide search results — grouped by book ── */}
-          {bibleResults !== null && (
-            <BibleResultsPanel
-              bibleResults={bibleResults}
-              searchQuery={searchQuery}
-              onNavigate={navigate}
-              onClose={() => { setBibleResults(null); setSearchQuery('') }}
-              readerRef={readerRef}
-            />
-          )}
-
-          {/* ── Continuous chapter segments ── */}
-          <div ref={verseListRef}>
-            {!loading && !error && segments.length > 0 && bibleResults === null && segments.map((seg, segIdx) => (
-              <div key={`${seg.book}|${seg.chapter}`}>
-                {/* Chapter heading — first one is an <h2>, subsequent are dividers */}
-                {segIdx === 0
-                  ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
-                  : <div style={r.chapterDivider}>
-                      <span style={r.chapterDividerLine} />
-                      <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
-                      <span style={r.chapterDividerLine} />
-                    </div>
-                }
-
-                <div style={r.verseList}>
-                  {seg.verses.map(({ verse, text }) => {
-                    const verseKey      = `kjv|${seg.book}|${seg.chapter}|${verse}`
-                    const hlColorId     = highlights[verseKey] || null
-                    const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
-                    const note          = itemNotes[verseKey]
-                    const isEditing     = editingNote === verseKey
-                    const isSelected    = selectedVerses.has(verseKey)
-                    const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
-                    /* Search highlights only on first segment */
-                    const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
-                    const isFocusMatch  = segIdx === 0 && !bibleResults && chapterMatches[searchFocus]?.verse === verse
-
-                    return (
-                      <div
-                        key={verse}
-                        id={verseId(seg.book, seg.chapter, verse)}
-                        style={{
-                          ...r.verseOuter,
-                          ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
-                              hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
-                          ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
-                          ...(isSearchMatch && !isFocusMatch && !isSelected ? { background:'rgba(254,240,138,0.25)' } : {}),
-                        }}
+          {/* ══════════════════════════════════════════════
+              GREEK NT MODE
+              ══════════════════════════════════════════════ */}
+          {version === 'greek' && (
+            <>
+              {greekLoading && (
+                <div style={r.loadingState}>
+                  <div className="spinner" />
+                  <p style={{ color:'var(--ink-muted)', fontSize:14, marginTop:12 }}>Loading Greek New Testament…</p>
+                </div>
+              )}
+              {greekError && !greekLoading && (
+                <div style={r.errorState}>
+                  <p style={{ color:'var(--ink-muted)', fontSize:14 }}>{greekError}</p>
+                  <p style={{ color:'var(--ink-faint)', fontSize:12, marginTop:8 }}>Run: <code>npm run process:greek</code></p>
+                </div>
+              )}
+              {greekReady && !greekLoading && (
+                <>
+                  {/* Display-mode toggle bar */}
+                  <div style={r.displayModeBar}>
+                    <span style={r.displayModeLabel}>Display</span>
+                    {[
+                      { id:'greek',   label:'Greek' },
+                      { id:'translit',label:'Translit.' },
+                      { id:'gloss',   label:'Gloss' },
+                    ].map(m => (
+                      <button
+                        key={m.id}
+                        style={{ ...r.displayModeBtn, ...(displayMode === m.id ? r.displayModeBtnActive : {}) }}
+                        onClick={() => setDisplayMode(m.id)}
                       >
-                        {/* ── main verse row — tap to select ── */}
-                        <div style={r.verseRow} onClick={() => toggleVerse(verseKey)}>
-                          <span
-                            style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
-                          >
-                            {verse}
-                          </span>
+                        {m.label}
+                      </button>
+                    ))}
+                    <span style={{ marginLeft:'auto', fontSize:10, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" }}>
+                      TAGNT · STEPBible CC BY 4.0
+                    </span>
+                  </div>
 
-                          <span style={r.verseBody}>
-                            <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
+                  {/* Greek chapter segments */}
+                  <div ref={verseListRef}>
+                    {greekSegments.map((seg, segIdx) => (
+                      <div key={`${seg.book}|${seg.chapter}`}>
+                        {segIdx === 0
+                          ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
+                          : <div style={r.chapterDivider}>
+                              <span style={r.chapterDividerLine} />
+                              <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
+                              <span style={r.chapterDividerLine} />
+                            </div>
+                        }
 
-                            {verseRefs.length > 0 && (
-                              <span style={r.inlineCrossRefs}>
-                                {verseRefs.map(ref => {
-                                  const chip = SRC_CHIP[ref.src] || {}
+                        <div style={r.verseList}>
+                          {seg.verses.map(({ verse, words }) => {
+                            const verseKey    = `kjv|${seg.book}|${seg.chapter}|${verse}`
+                            const hlColorId   = highlights[verseKey] || null
+                            const hlSt        = hlColorId ? getHlStyle(hlColorId) : null
+                            const note        = itemNotes[verseKey]
+                            const isEditing   = editingNote === verseKey
+                            const isSelected  = selectedVerses.has(verseKey)
+                            const isWordVerse = selectedWord?.verseKey === verseKey
+
+                            return (
+                              <div
+                                key={verse}
+                                id={verseId(seg.book, seg.chapter, verse)}
+                                style={{
+                                  ...r.verseOuter,
+                                  ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
+                                      hlColorId  ? { background: hlSt.rowBg, borderLeftColor: hlSt.border } : {}),
+                                }}
+                              >
+                                {/* ── Verse number + word chips ── */}
+                                <div style={r.greekVerseRow} onClick={() => toggleVerse(verseKey)}>
+                                  <span style={{ ...r.verseNum, ...(hlColorId ? { color: hlSt.numClr, background: hlSt.numBg } : {}) }}>
+                                    {verse}
+                                  </span>
+                                  <div style={r.greekWordWrap}>
+                                    {words.map((wd, wi) => {
+                                      const msMarker = getMsMarker(wd.ms)
+                                      const isSel    = isWordVerse && selectedWord?.wordIdx === wi
+                                      const lbl      = displayMode === 'greek'   ? wd.w
+                                                     : displayMode === 'translit' ? wd.t
+                                                     : wd.g
+                                      return (
+                                        <span
+                                          key={wi}
+                                          style={{
+                                            ...r.greekToken,
+                                            ...(displayMode === 'greek' ? r.greekTokenGk : {}),
+                                            ...(isSel ? r.greekTokenSel : {}),
+                                          }}
+                                          onClick={e => { e.stopPropagation(); handleWordTap(verseKey, wi) }}
+                                          title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s}`}
+                                        >
+                                          {lbl}
+                                          {msMarker && (
+                                            <sup style={{
+                                              fontSize:'0.58em', marginLeft:1, fontFamily:"'DM Sans',sans-serif",
+                                              color: msMarker === 'TR' ? '#7c5230' : '#3e5a8c',
+                                            }}>
+                                              {msMarker}
+                                            </sup>
+                                          )}
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* ── Word info strip (appears when a word in this verse is selected) ── */}
+                                {isWordVerse && selectedWord && (() => {
+                                  const wd = words[selectedWord.wordIdx]
+                                  if (!wd) return null
+                                  const msMarker = getMsMarker(wd.ms)
                                   return (
-                                    <button
-                                      key={ref.key}
-                                      style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
-                                      onClick={(e) => { e.stopPropagation(); setConfessionModal(ref) }}
-                                    >
-                                      <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
-                                      <span style={r.inlineChipLabel}>{ref.label}</span>
-                                    </button>
+                                    <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
+                                      <div style={r.wordInfoRow}>
+                                        <span style={r.wordInfoGreek}>{wd.w}</span>
+                                        <span style={r.wordInfoTranslit}>{wd.t}</span>
+                                        <span style={r.wordInfoStrong}>{wd.s}</span>
+                                      </div>
+                                      <div style={r.wordInfoGloss}>"{wd.g}"</div>
+                                      {wd.r && <div style={r.wordInfoGrammar}>{parseGrammar(wd.r)}</div>}
+                                      {msMarker && (
+                                        <div style={{ ...r.wordInfoMs, color: msMarker === 'TR' ? '#7c5230' : '#3e5a8c' }}>
+                                          {msMarker === 'TR'
+                                            ? '† TR only — Textus Receptus / KJV tradition'
+                                            : '† NA only — modern critical text'}
+                                        </div>
+                                      )}
+                                    </div>
                                   )
-                                })}
+                                })()}
+
+                                {/* ── Note display ── */}
+                                {note && !isEditing && (
+                                  <div style={r.noteDisplay} onClick={e => { e.stopPropagation(); openNoteEditor(verseKey) }}>
+                                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                                      <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                      <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                                    </svg>
+                                    <span style={{flex:1}}>{note}</span>
+                                  </div>
+                                )}
+
+                                {/* ── Note editor ── */}
+                                {isEditing && (
+                                  <div style={r.noteEditorWrap} onClick={e => e.stopPropagation()}>
+                                    <textarea
+                                      value={noteDraft}
+                                      onChange={e => setNoteDraft(e.target.value)}
+                                      placeholder={`Note on ${seg.book} ${seg.chapter}:${verse}…`}
+                                      style={r.noteTextarea}
+                                      autoFocus rows={3}
+                                    />
+                                    <div style={r.noteEditorActions}>
+                                      <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
+                                      <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                                      {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Sentinel for Greek infinite scroll */}
+                    {!greekLoading && <div ref={sentinelRef} style={{ height:40 }} />}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              TEXT VERSION MODE (KJV, ABAB, …)
+              ══════════════════════════════════════════════ */}
+          {version !== 'greek' && (
+            <>
+              {loading && (
+                <div style={r.loadingState}>
+                  <div className="spinner" />
+                  <p style={{ color:'var(--ink-muted)', fontSize:14, marginTop:12 }}>Loading {book} {chapter}…</p>
+                </div>
+              )}
+              {error && !loading && (
+                <div style={r.errorState}>
+                  <p style={{ color:'var(--ink-muted)', fontSize:14 }}>Could not load chapter. Check your connection and try again.</p>
+                </div>
+              )}
+              {/* ── Bible-wide search results ── */}
+              {bibleResults !== null && (
+                <BibleResultsPanel
+                  bibleResults={bibleResults}
+                  searchQuery={searchQuery}
+                  onNavigate={navigate}
+                  onClose={() => { setBibleResults(null); setSearchQuery('') }}
+                  readerRef={readerRef}
+                />
+              )}
+
+              {/* ── Continuous chapter segments ── */}
+              <div ref={verseListRef}>
+                {!loading && !error && segments.length > 0 && bibleResults === null && segments.map((seg, segIdx) => (
+                  <div key={`${seg.book}|${seg.chapter}`}>
+                    {segIdx === 0
+                      ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
+                      : <div style={r.chapterDivider}>
+                          <span style={r.chapterDividerLine} />
+                          <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
+                          <span style={r.chapterDividerLine} />
+                        </div>
+                    }
+
+                    <div style={r.verseList}>
+                      {seg.verses.map(({ verse, text }) => {
+                        const verseKey      = `kjv|${seg.book}|${seg.chapter}|${verse}`
+                        const hlColorId     = highlights[verseKey] || null
+                        const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
+                        const note          = itemNotes[verseKey]
+                        const isEditing     = editingNote === verseKey
+                        const isSelected    = selectedVerses.has(verseKey)
+                        const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
+                        const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
+                        const isFocusMatch  = segIdx === 0 && !bibleResults && chapterMatches[searchFocus]?.verse === verse
+
+                        return (
+                          <div
+                            key={verse}
+                            id={verseId(seg.book, seg.chapter, verse)}
+                            style={{
+                              ...r.verseOuter,
+                              ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
+                                  hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
+                              ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
+                              ...(isSearchMatch && !isFocusMatch && !isSelected ? { background:'rgba(254,240,138,0.25)' } : {}),
+                            }}
+                          >
+                            {/* ── main verse row — tap to select ── */}
+                            <div style={r.verseRow} onClick={() => toggleVerse(verseKey)}>
+                              <span
+                                style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
+                              >
+                                {verse}
                               </span>
+
+                              <span style={r.verseBody}>
+                                <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
+
+                                {verseRefs.length > 0 && (
+                                  <span style={r.inlineCrossRefs}>
+                                    {verseRefs.map(ref => {
+                                      const chip = SRC_CHIP[ref.src] || {}
+                                      return (
+                                        <button
+                                          key={ref.key}
+                                          style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
+                                          onClick={(e) => { e.stopPropagation(); setConfessionModal(ref) }}
+                                        >
+                                          <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
+                                          <span style={r.inlineChipLabel}>{ref.label}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </span>
+                                )}
+
+                              </span>
+                            </div>
+
+                            {note && !isEditing && (
+                              <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                                  <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                  <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                                </svg>
+                                <span style={{flex:1}}>{note}</span>
+                                <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }} style={r.noteShareBtn} title="Share note">
+                                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                    <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                    <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                    <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                    <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                                  </svg>
+                                </button>
+                              </div>
                             )}
 
-                          </span>
-                        </div>
-
-                        {note && !isEditing && (
-                          <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
-                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
-                              <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                              <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
-                            </svg>
-                            <span style={{flex:1}}>{note}</span>
-                            <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }} style={r.noteShareBtn} title="Share note">
-                              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-                              </svg>
-                            </button>
+                            {isEditing && (
+                              <div style={r.noteEditorWrap} onClick={(e) => e.stopPropagation()}>
+                                <textarea
+                                  value={noteDraft}
+                                  onChange={e => setNoteDraft(e.target.value)}
+                                  placeholder={`Note on ${seg.book} ${seg.chapter}:${verse}…`}
+                                  style={r.noteTextarea}
+                                  autoFocus rows={3}
+                                />
+                                <div style={r.noteEditorActions}>
+                                  <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
+                                  <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                                  {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
 
-                        {isEditing && (
-                          <div style={r.noteEditorWrap} onClick={(e) => e.stopPropagation()}>
-                            <textarea
-                              value={noteDraft}
-                              onChange={e => setNoteDraft(e.target.value)}
-                              placeholder={`Note on ${seg.book} ${seg.chapter}:${verse}…`}
-                              style={r.noteTextarea}
-                              autoFocus rows={3}
-                            />
-                            <div style={r.noteEditorActions}>
-                              <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
-                              <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
-                              {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                {/* Sentinel — IntersectionObserver triggers next chapter load here */}
+                {!loading && !bibleResults && <div ref={sentinelRef} style={{ height:40 }} />}
               </div>
-            ))}
-
-            {/* Sentinel — IntersectionObserver triggers next chapter load here */}
-            {!loading && !bibleResults && <div ref={sentinelRef} style={{ height:40 }} />}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1245,6 +1566,37 @@ const sb = {
     transition:'all 0.12s', textAlign:'left',
   },
   bookMeta: { display:'flex', alignItems:'center', fontSize:10, color:'var(--ink-faint)', marginLeft:4, flexShrink:0 },
+
+  /* ── Version picker ── */
+  versionSection: {
+    padding:'8px 14px 10px',
+    borderBottom:'1px solid var(--border)',
+    marginBottom:4,
+  },
+  versionSectionTitle: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+    color:'var(--ink-faint)', marginBottom:6,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  versionList: {
+    display:'flex', flexDirection:'column', gap:4,
+  },
+  versionBtn: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'6px 10px', border:'1px solid var(--border)',
+    borderRadius:'var(--radius)', cursor:'pointer',
+    background:'none', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.12s', textAlign:'left', width:'100%',
+  },
+  versionBtnActive: {
+    background:'var(--teal)', borderColor:'var(--teal)',
+  },
+  versionAbbr: {
+    fontSize:12, fontWeight:700, color:'var(--ink)',
+  },
+  versionLang: {
+    fontSize:10, color:'var(--ink-faint)',
+  },
   chapterGrid: {
     display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4,
     padding:'8px 14px 4px 22px', background:'rgba(0,0,0,0.02)',
@@ -1643,5 +1995,86 @@ const r = {
   srText: {
     fontSize:13, color:'var(--ink)', lineHeight:1.65,
     fontFamily:"'Georgia','Times New Roman',serif",
+  },
+
+  /* ── Greek NT reader ── */
+  displayModeBar: {
+    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
+    padding:'6px 0 12px', fontFamily:"'DM Sans',sans-serif",
+  },
+  displayModeLabel: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em',
+    color:'var(--ink-faint)', marginRight:2,
+  },
+  displayModeBtn: {
+    fontSize:11, fontWeight:600, padding:'3px 11px',
+    border:'1px solid var(--border)', borderRadius:99,
+    background:'none', color:'var(--ink-muted)', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
+  },
+  displayModeBtnActive: {
+    background:'var(--teal)', color:'white', borderColor:'var(--teal)',
+  },
+  greekVerseRow: {
+    display:'flex', gap:8, padding:'5px 0', alignItems:'flex-start', cursor:'pointer',
+  },
+  greekWordWrap: {
+    flex:1, display:'flex', flexWrap:'wrap', gap:'3px 2px',
+    lineHeight:2, alignItems:'baseline',
+  },
+  greekToken: {
+    display:'inline-flex', alignItems:'baseline',
+    padding:'2px 5px 2px 4px', borderRadius:5,
+    cursor:'pointer', userSelect:'none',
+    transition:'background 0.1s, color 0.1s, outline 0.1s',
+    fontFamily:"'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif",
+    fontSize:'1em', color:'var(--ink)',
+  },
+  greekTokenGk: {
+    fontSize:'1.1em', letterSpacing:'0.01em',
+  },
+  greekTokenSel: {
+    background:'var(--teal-light)', color:'var(--teal)',
+    outline:'1.5px solid var(--teal)', outlineOffset:0,
+  },
+
+  /* Word info strip */
+  wordInfoStrip: {
+    marginLeft:34, marginTop:2, marginBottom:8,
+    padding:'9px 12px',
+    background:'rgba(29,107,90,0.06)',
+    border:'1px solid rgba(29,107,90,0.18)',
+    borderRadius:'var(--radius)',
+    fontFamily:"'DM Sans',sans-serif",
+    display:'flex', flexDirection:'column', gap:5,
+  },
+  wordInfoRow: {
+    display:'flex', alignItems:'baseline', gap:10, flexWrap:'wrap',
+  },
+  wordInfoGreek: {
+    fontSize:20, fontWeight:500,
+    fontFamily:"'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif",
+    color:'var(--ink)',
+  },
+  wordInfoTranslit: {
+    fontSize:13, color:'var(--ink-muted)', fontStyle:'italic',
+  },
+  wordInfoStrong: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.05em',
+    color:'var(--teal)', background:'var(--teal-light)',
+    borderRadius:99, padding:'1px 8px',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  wordInfoGloss: {
+    fontSize:13, fontWeight:600, color:'var(--ink)',
+    fontStyle:'italic',
+  },
+  wordInfoGrammar: {
+    fontSize:11, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  wordInfoMs: {
+    fontSize:10, fontWeight:600,
+    fontFamily:"'DM Sans',sans-serif",
   },
 }

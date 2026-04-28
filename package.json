@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "gen:icons": "node scripts/gen-icons.mjs"
+    "gen:icons": "node scripts/gen-icons.mjs",
+    "process:greek": "node scripts/processTagnt.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
