@@ -634,7 +634,7 @@ export default function ConfessionsPage() {
   const chapterNav = useMemo(() => {
     if (sidebarConf === '2lbcf') {
       return Object.keys(LBCF2_CHAPTERS).map(ch => ({
-        id: `ch-${ch}`, label: `Ch. ${ch}`, title: CHAPTER_TITLES[parseInt(ch)],
+        id: `ch-${ch}`, label: ch === '0' ? 'Preface' : `Ch. ${ch}`, title: CHAPTER_TITLES[parseInt(ch)],
       }))
     }
     if (sidebarConf === '1lbcf') {
@@ -876,8 +876,8 @@ export default function ConfessionsPage() {
                 return (
                   <section key={chNum} id={chId} style={s.chapter}>
                     <div style={s.chapterHeader}>
-                      <span style={s.chapterNum}>Chapter {chNum}</span>
-                      <h2 style={s.chapterTitle}>{chTitle}</h2>
+                      {chNum !== '0' && <span style={s.chapterNum}>Chapter {chNum}</span>}
+                      <h2 style={s.chapterTitle}}>{chNum === '0' ? 'Preface' : chTitle}</h2>
                     </div>
                     {paras.map(p => {
                       const paraMatches = !q || chTitleMatches ||
