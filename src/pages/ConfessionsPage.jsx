@@ -3,9 +3,10 @@ import { useSearchParams, useLocation } from 'react-router-dom'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs, useAuth } from '../App'
 import CopyBtn from '../components/CopyBtn'
-import { LBCF2 }     from '../data/lbcf2'
-import { CATECHISM } from '../data/catechism'
-import { LBCF1 }     from '../data/lbcf1'
+import { LBCF2 }              from '../data/lbcf2'
+import { CATECHISM }          from '../data/catechism'
+import { LBCF1 }              from '../data/lbcf1'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 import { parseRefs } from '../lib/parseRefs'
 import KjvModal from '../components/KjvModal'
@@ -84,7 +85,7 @@ function makeSearchable(text) {
 }
 
 function buildSearchIndex() {
-  const idx = { lbcf2: {}, catechism: {}, lbcf1: {} }
+  const idx = { lbcf2: {}, catechism: {}, lbcf1: {}, orthodox: {} }
   Object.entries(LBCF2).forEach(([key, item]) => {
     idx.lbcf2[key] = makeSearchable((item.text || '') + ' ' + (item.refs || ''))
   })
@@ -93,6 +94,9 @@ function buildSearchIndex() {
   })
   Object.entries(LBCF1).forEach(([num, item]) => {
     idx.lbcf1[num] = makeSearchable((item.title || '') + ' ' + (item.text || '') + ' ' + (item.refs || ''))
+  })
+  Object.entries(ORTHODOX_CATECHISM).forEach(([num, item]) => {
+    idx.orthodox[num] = makeSearchable((item.q || '') + ' ' + (item.a || '') + ' ' + (item.refs || ''))
   })
   return idx
 }
@@ -123,6 +127,7 @@ const SOURCES = {
   '2lbcf':     { label: '2LBCF',     name: 'Second London Baptist Confession (1677/1689)', color: 'var(--purple-ink)', bg: 'var(--purple-soft)', href: 'https://www.the1689confession.com/' },
   'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",            color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
   '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',       color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
+  'orthodox':  { label: 'Orthodox',  name: 'An Orthodox Catechism (1680)',                 color: 'var(--sky)',       bg: 'var(--sky-light)',  href: 'https://1689.com/an-orthodox-catechism/' },
 }
 
 /* ── Clickable scripture-proof chips ── */
@@ -649,7 +654,7 @@ export default function ConfessionsPage() {
 
   const resultCounts = useMemo(() => {
     if (!q) return null
-    let lbcf2Count = 0, catCount = 0, lbcf1Count = 0
+    let lbcf2Count = 0, catCount = 0, lbcf1Count = 0, orthodoxCount = 0
     Object.entries(LBCF2_CHAPTERS).forEach(([chNum, paras]) => {
       const chTitle = (CHAPTER_TITLES[parseInt(chNum)] || '').toLowerCase()
       const chMatch = chTitle.includes(q)
@@ -663,7 +668,10 @@ export default function ConfessionsPage() {
     Object.entries(LBCF1).forEach(([num, item]) => {
       if (textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) lbcf1Count++
     })
-    return { lbcf2: lbcf2Count, catechism: catCount, lbcf1: lbcf1Count }
+    Object.entries(ORTHODOX_CATECHISM).forEach(([num, item]) => {
+      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.orthodox[num] || '', q)) orthodoxCount++
+    })
+    return { lbcf2: lbcf2Count, catechism: catCount, lbcf1: lbcf1Count, orthodox: orthodoxCount }
   }, [q])
 
   /* ── Sidebar content ── */
@@ -683,7 +691,7 @@ export default function ConfessionsPage() {
             }}
             onClick={() => {
               setSidebarConf(key)
-              if (key === 'catechism') setTab(key)
+              if (key === 'catechism' || key === 'orthodox') setTab(key)
             }}
           >
             <span style={{...s.confBadgeDot, background: sidebarConf === key ? info.color : 'var(--border-strong)'}} />
@@ -1038,6 +1046,57 @@ export default function ConfessionsPage() {
                       </div>
                     </div>
                   </section>
+                )
+              })}
+            </div>
+          )}
+
+          {/* ── Orthodox Catechism ── */}
+          {tab === 'orthodox' && (
+            <div style={s.catechismList}>
+              {Object.entries(ORTHODOX_CATECHISM).map(([num, item]) => {
+                if (q && !textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.orthodox?.[num] || '', q)) return null
+                const itemKey = `conf|orthodox|${num}`
+                const hlColor = hlData[itemKey] || null
+                const hlStyle = hlColor ? getHlStyle(hlColor) : null
+                return (
+                  <div
+                    key={num}
+                    style={{
+                      ...s.qaBlock,
+                      ...(hlColor ? { background: hlStyle.rowBg, borderLeft: `3px solid ${hlStyle.border}`, marginLeft:-8, paddingLeft:8, borderRadius:6 } : {}),
+                      cursor:'pointer',
+                    }}
+                    id={`qa-${num}`}
+                    onClick={() => setActiveItemKey(prev => prev === itemKey ? null : itemKey)}
+                  >
+                    <div style={s.qaNum}>Q.{num}</div>
+                    <div style={s.qaBody}>
+                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
+                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(item.a, q)}</p>
+                      <div onClick={e => e.stopPropagation()}>
+                        {item.refs && (
+                          <div style={s.refs}>
+                            <span style={s.refsLabel}>Proof texts: </span>
+                            <RefChips refs={item.refs} onOpen={setKjvModal} />
+                          </div>
+                        )}
+                        <ItemActions
+                          itemKey={itemKey}
+                          label="Orthodox Catechism"
+                          copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          shareTitle={`Orthodox Catechism Q.${num}`}
+                          shareSource="Orthodox"
+                          highlights={hlData}
+                          itemNotes={noteData}
+                          onHighlight={handleHighlight}
+                          onNote={handleNote}
+                          onShare={setShareCard}
+                          isActive={activeItemKey === itemKey}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )
               })}
             </div>
