@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
 import { searchGreekByStrongs } from '../lib/greek'
 import { searchHebrewByStrongs } from '../lib/hebrew'
+import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
@@ -11,7 +12,7 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture }) {
+function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture, onFindInLxx }) {
   const prefix = lang === 'greek' ? 'G' : 'H'
   const num    = strongsNum(id)
   const bhUrl  = bibleHubUrl(lang, id)
@@ -65,6 +66,12 @@ function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture 
           <SearchAllIcon />
           Find in {lang === 'greek' ? 'GNT' : 'HOT'}
         </button>
+        {lang === 'greek' && onFindInLxx && (
+          <button style={m.findLxxBtn} onClick={onFindInLxx}>
+            <SearchAllIcon />
+            Find in LXX
+          </button>
+        )}
         {bhUrl && (
           <a href={bhUrl} target="_blank" rel="noopener noreferrer" style={m.bhLink}>
             BibleHub
@@ -290,18 +297,141 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
   )
 }
 
+/* ── LXX Scripture search results view ─────────────────────────────── */
+function LxxScriptureResultsView({ id, scriptFont, onNavigate }) {
+  const [loading,   setLoading]   = useState(true)
+  const [results,   setResults]   = useState([])
+  const [total,     setTotal]     = useState(0)
+  const [capped,    setCapped]    = useState(false)
+  const [openBooks, setOpenBooks] = useState(new Set())
+
+  useEffect(() => {
+    setLoading(true)
+    // Ensure LXX data is loaded, then run the search
+    loadLxxWords().then(() => {
+      const out = searchLxxByStrongs(id)
+      setResults(out.results)
+      setTotal(out.total)
+      setCapped(out.capped)
+      if (out.results.length > 0) {
+        setOpenBooks(new Set([out.results[0].book]))
+      }
+      setLoading(false)
+    }).catch(() => {
+      setResults([])
+      setTotal(0)
+      setCapped(false)
+      setLoading(false)
+    })
+  }, [id])
+
+  // Group results by book
+  const grouped = useMemo(() => {
+    const map = new Map()
+    for (const r of results) {
+      if (!map.has(r.book)) map.set(r.book, [])
+      map.get(r.book).push(r)
+    }
+    return Array.from(map.entries())
+  }, [results])
+
+  const allBooks = grouped.map(([b]) => b)
+  const allOpen  = openBooks.size === allBooks.length
+  const toggleBook = (book) => setOpenBooks(prev => {
+    const next = new Set(prev)
+    next.has(book) ? next.delete(book) : next.add(book)
+    return next
+  })
+
+  return (
+    <div style={m.browseWrap}>
+      {/* Count bar */}
+      <div style={m.browseCount}>
+        {loading
+          ? 'Searching LXX…'
+          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · LXX`
+        }
+        {!loading && grouped.length > 1 && (
+          <button
+            style={m.srExpandBtn}
+            onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
+          >
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        )}
+      </div>
+
+      {loading && (
+        <div style={m.loadingWrap}>
+          <div className="spinner" />
+          <span style={m.loadingText}>Loading LXX data…</span>
+        </div>
+      )}
+
+      {!loading && results.length === 0 && (
+        <div style={m.browseEmpty}>No occurrences found in LXX.</div>
+      )}
+
+      {!loading && grouped.length > 0 && (
+        <div style={m.browseList}>
+          {grouped.map(([book, rows]) => {
+            const isOpen = openBooks.has(book)
+            return (
+              <div key={book} style={m.srBookGroup}>
+                <button style={m.srBookHeader} onClick={() => toggleBook(book)}>
+                  <svg
+                    width="10" height="10" viewBox="0 0 10 10"
+                    style={{ flexShrink:0, transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition:'transform 0.15s', color:'var(--ink-faint)' }}
+                  >
+                    <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                  <span style={m.srBookName}>{book}</span>
+                  <span style={{ ...m.srBookCount, background:'#0c4a6e' }}>{rows.length}</span>
+                </button>
+                {isOpen && (
+                  <div style={m.srBookRows}>
+                    {rows.map((r, i) => (
+                      <button
+                        key={i}
+                        style={m.srRow}
+                        onClick={() => onNavigate(r.book, r.chapter, r.verse)}
+                      >
+                        <span style={m.srRef}>{r.chapter}:{r.verse}</span>
+                        <span style={{ ...m.srWord, fontFamily: scriptFont }}>
+                          {r.w}
+                        </span>
+                        <span style={m.srGloss}>LXX Septuagint</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {capped && (
+            <div style={m.browseEmpty}>
+              Showing first {results.length} of {total.toLocaleString()} occurrences.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Main modal ─────────────────────────────────────────────────────── */
 /**
  * Props:
- *   strongsId    — e.g. "G1161" or "H7225G"
- *   lang         — 'greek' | 'hebrew'
- *   greekFontId  — from prefs
- *   hebrewFontId — from prefs
- *   onClose      — () => void
- *   onNavigate   — (book, chapter, verse) => void  called when user taps a scripture result
+ *   strongsId      — e.g. "G1161" or "H7225G"
+ *   lang           — 'greek' | 'hebrew'
+ *   greekFontId    — from prefs
+ *   hebrewFontId   — from prefs
+ *   onClose        — () => void
+ *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
+ *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, initialView = 'detail' }) {
-  const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture'
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail' }) {
+  const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
   const [error,   setError]   = useState(null)
@@ -351,12 +481,15 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
             {view !== 'detail' ? (
               <button style={m.backBtn} onClick={() => setView('detail')}>
                 <BackIcon />
-                {view === 'scripture' ? 'Back to entry' : 'Back'}
+                {view === 'scripture' || view === 'scripture-lxx' ? 'Back to entry' : 'Back'}
               </button>
             ) : (
               <span style={m.headerTitle}>Strong's Lexicon</span>
             )}
             <span style={m.headerLang}>{langLabel}</span>
+            {view === 'scripture-lxx' && (
+              <span style={{ ...m.headerLang, background:'rgba(12,74,110,0.12)', color:'#0c4a6e', border:'1px solid rgba(12,74,110,0.2)' }}>LXX</span>
+            )}
           </div>
           <button style={m.closeBtn} onClick={onClose} aria-label="Close">×</button>
         </div>
@@ -385,6 +518,7 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               scriptFont={scriptFont}
               onBrowse={() => setView('browse')}
               onFindInScripture={() => setView('scripture')}
+              onFindInLxx={lang === 'greek' ? () => setView('scripture-lxx') : undefined}
             />
           )}
 
@@ -406,6 +540,22 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               onNavigate={(book, chapter, verse) => {
                 onClose()
                 onNavigate?.(book, chapter, verse)
+              }}
+            />
+          )}
+
+          {view === 'scripture-lxx' && (
+            <LxxScriptureResultsView
+              id={activeId}
+              scriptFont={scriptFont}
+              onNavigate={(book, chapter, verse) => {
+                onClose()
+                // Use dedicated LXX navigation callback if provided, else fall back to onNavigate
+                if (onNavigateLxx) {
+                  onNavigateLxx(book, chapter, verse)
+                } else {
+                  onNavigate?.(book, chapter, verse)
+                }
               }}
             />
           )}
@@ -604,6 +754,14 @@ const m = {
     display:'inline-flex', alignItems:'center', gap:6,
     fontSize:11, fontWeight:600, color:'var(--purple-ink)',
     background:'var(--purple-soft)', border:'1px solid transparent',
+    borderRadius:'var(--radius)', padding:'5px 12px',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.12s',
+  },
+  findLxxBtn: {
+    display:'inline-flex', alignItems:'center', gap:6,
+    fontSize:11, fontWeight:600, color:'#0c4a6e',
+    background:'rgba(12,74,110,0.10)', border:'1px solid rgba(12,74,110,0.2)',
     borderRadius:'var(--radius)', padding:'5px 12px',
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'all 0.12s',

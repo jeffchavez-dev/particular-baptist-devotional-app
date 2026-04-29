@@ -11,13 +11,14 @@ const SRC_META = {
  * ConfessionModal — bottom-sheet popup showing a confession/catechism paragraph.
  *
  * Props:
- *   src    — '2LBCF' | '1LBCF' | 'Catechism'
- *   label  — section label, e.g. "Ch. 1 §3" or "Q&A #7"
- *   text   — body text
- *   refs   — proof text string (raw)
- *   onClose — fn called to dismiss
+ *   src      — '2LBCF' | '1LBCF' | 'Catechism' | 'Orthodox'
+ *   label    — section label, e.g. "Ch. 1 §3" or "Q&A #7"
+ *   text     — body text
+ *   refs     — proof text string (raw)
+ *   onClose  — fn called to dismiss
+ *   onGoTo   — optional fn called to navigate to this item in ConfessionsPage
  */
-export default function ConfessionModal({ src, label, text, refs, onClose }) {
+export default function ConfessionModal({ src, label, text, refs, onClose, onGoTo }) {
   const meta = SRC_META[src] || { badge:'#333', badgeText:'#fff', fullName: src }
 
   /* Escape key */
@@ -49,11 +50,27 @@ export default function ConfessionModal({ src, label, text, refs, onClose }) {
               <span style={m.srcName}>{meta.fullName}</span>
             </div>
           </div>
-          <button style={m.closeBtn} onClick={onClose} aria-label="Close">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-            </svg>
-          </button>
+          <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+            {onGoTo && (
+              <button
+                style={m.goToBtn}
+                onClick={() => { onGoTo(); onClose() }}
+                title="View in Confessions page"
+                aria-label="View in Confessions page"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
+                  <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M3 4h6M3 6.5h4M3 9h5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                View in Confessions
+              </button>
+            )}
+            <button style={m.closeBtn} onClick={onClose} aria-label="Close">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -112,6 +129,14 @@ const m = {
   },
   srcName: {
     fontSize:11, color:'var(--ink-faint)',
+  },
+  goToBtn: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:11, fontWeight:600, padding:'5px 10px',
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius)', cursor:'pointer', color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
+    transition:'background 0.12s',
   },
   closeBtn: {
     background:'none', border:'none', cursor:'pointer',

@@ -135,10 +135,27 @@ function normaliseBook(raw) {
   return raw.replace(/\./g, '').replace(/[ab]$/, '').trim()
 }
 
+/**
+ * Slug → BOOK_MAP entry, built from full canonical names.
+ * Handles "1 Corinthians" → slug "1corinthians" → bookInfo.
+ */
+const FULL_SLUG_MAP = (() => {
+  const m = {}
+  Object.values(BOOK_MAP).forEach(info => {
+    const slug = info.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+    if (!m[slug]) m[slug] = info
+  })
+  return m
+})()
+
 /** Resolve a raw book token to its BOOK_MAP entry, or null */
 function resolveBook(raw) {
   const key = normaliseBook(raw)
-  return BOOK_MAP[key] || null
+  // Direct abbreviation lookup (fast path for normal refs like "1Cor", "Rom")
+  if (BOOK_MAP[key]) return BOOK_MAP[key]
+  // Full-name slug lookup (handles "1 Corinthians", "Romans", "Psalms" etc.)
+  const slug = key.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+  return FULL_SLUG_MAP[slug] || null
 }
 
 /**
@@ -168,8 +185,9 @@ export function parseRefs(refsStr) {
     const cleaned = seg.replace(/^[a-z](?=[A-Z0-9])/, '').trim()
 
     // Pattern A: "BookToken Chapter:VerseSpec[,VerseSpec...]"
-    //   BookToken = optional digit prefix + letters + optional period
-    const bookChapterRx = /^([1-3]?[A-Za-z][a-zA-Z]*\.?)\s+(\d+):([^\s]+(?:,\s*[^\s]+)*)/
+    //   BookToken = optional digit prefix (possibly space-separated) + letters + optional period
+    //   Handles "1Cor 15:45" AND "1 Corinthians 6:19" (Orthodox-style full names)
+    const bookChapterRx = /^((?:[1-3]\s*)?[A-Za-z][a-zA-Z]*\.?)\s+(\d+):([^\s]+(?:,\s*[^\s]+)*)/
 
     const mBC = cleaned.match(bookChapterRx)
     if (mBC) {

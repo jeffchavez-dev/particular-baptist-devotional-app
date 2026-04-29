@@ -186,10 +186,11 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
   display: inline-block; font-size: 10px; font-weight: 500;
   padding: 2px 8px; border-radius: 99px; letter-spacing: 0.04em;
 }
-.badge-2lbcf  { background: var(--purple-soft); color: var(--purple-ink); }
-.badge-cat    { background: var(--teal-light);   color: var(--teal); }
-.badge-1lbcf  { background: var(--amber-soft);   color: var(--amber-ink); }
-.badge-review { background: var(--gray-soft);    color: var(--gray-ink); }
+.badge-2lbcf   { background: var(--purple-soft); color: var(--purple-ink); }
+.badge-cat     { background: var(--teal-light);   color: var(--teal); }
+.badge-1lbcf   { background: var(--amber-soft);   color: var(--amber-ink); }
+.badge-orthodox{ background: rgba(12,74,110,0.12); color: #0c4a6e; }
+.badge-review  { background: var(--gray-soft);    color: var(--gray-ink); }
 
 .card {
   background: white; border-radius: var(--radius-lg);

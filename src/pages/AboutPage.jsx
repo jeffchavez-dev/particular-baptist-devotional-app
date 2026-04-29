@@ -842,6 +842,32 @@ export default function AboutPage() {
               </div>
             </div>
 
+            {/* Orthodox Catechism in Daily Reading */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Include Orthodox Catechism</span>
+                <span style={s.settingHint}>Add "An Orthodox Catechism" (1680) to your daily devotional alongside the 2LBCF, Keach, and 1LBCF readings</span>
+              </div>
+              <button
+                onClick={() => updatePrefs({ ...prefs, includeOrthodox: !prefs.includeOrthodox })}
+                style={{
+                  position:'relative', width:44, height:24, borderRadius:12, flexShrink:0,
+                  background: prefs.includeOrthodox ? '#0c4a6e' : 'var(--border-strong)',
+                  border:'none', cursor:'pointer', padding:0, transition:'background 0.2s',
+                }}
+                role="switch"
+                aria-checked={prefs.includeOrthodox}
+                title={prefs.includeOrthodox ? 'Disable Orthodox Catechism' : 'Enable Orthodox Catechism'}
+              >
+                <span style={{
+                  position:'absolute', top:3, left: prefs.includeOrthodox ? 23 : 3,
+                  width:18, height:18, borderRadius:'50%',
+                  background:'white', boxShadow:'0 1px 4px rgba(0,0,0,0.25)',
+                  transition:'left 0.2s',
+                }} />
+              </button>
+            </div>
+
             {/* Backup */}
             <div style={s.settingRow}>
               <div style={s.settingLabel}>

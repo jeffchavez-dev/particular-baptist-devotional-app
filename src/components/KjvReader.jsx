@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
+import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
 import StrongsModal from './StrongsModal'
@@ -18,10 +20,6 @@ import {
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
-
-/* ── LXX word+Strongs lazy cache (for parallel mode) ── */
-let _lxxWordsCache   = null
-let _lxxWordsPromise = null
 
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
@@ -467,6 +465,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
 const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, parallelMode = false }, ref) {
   const { prefs, updatePrefs } = usePrefs()
+  const routerNavigate = useNavigate()
 
   const [book, setBook] = useState(() => {
     try { return sessionStorage.getItem(`bible-book-${version}`) || 'Genesis' } catch { return 'Genesis' }
@@ -564,6 +563,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Which word is selected/expanded inside the parallel section */
   const [parallelWord, setParallelWord] = useState(null) // {verseKey, lang, wordIdx} | null
 
+  /* ── LXX reader mode word data (version === 'lxx') ── */
+  const [lxxReaderWords,   setLxxReaderWords]   = useState({}) // 'Book:ch' → [{v, words:[{w,s}]}]
+  const [lxxReaderWord,    setLxxReaderWord]     = useState(null) // {verseKey, wordIdx} | null
+  const lxxReaderLoadedRef = useRef(new Set())
+
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
@@ -644,21 +648,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       if (parallelLxxLoadedRef.current.has(key)) continue
       parallelLxxLoadedRef.current.add(key)
 
-      // Lazy-load the entire lxx-words.json the first time, cache it
-      _lxxWordsPromise = _lxxWordsPromise || fetch('/lxx-words.json').then(r => r.json()).then(d => { _lxxWordsCache = d; return d })
       const bookKey = seg.book
       const chKey   = seg.chapter
-      _lxxWordsPromise.then(data => {
-        // KJV name → LXX slug (handles mismatches like "Song of Solomon" vs "Song of Songs")
-        const LXX_SLUG_OVERRIDES = { 'songofsolomon': 'songofsongs' }
-        const rawSlug = bookKey.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')
-        const bs = LXX_SLUG_OVERRIDES[rawSlug] || rawSlug
+      loadLxxWords().then(data => {
+        const bs     = bookToLxxSlug(bookKey)
         const chData = data[bs]?.[String(chKey)]
         if (!chData) return
         setParallelLxxData(prev => ({ ...prev, [`${bookKey}:${chKey}`]: chData }))
       }).catch(() => { parallelLxxLoadedRef.current.delete(key) })
     }
   }, [parallelMode, segments, version]) // eslint-disable-line
+
+  /* Load LXX word+Strongs data in reader mode (version === 'lxx') */
+  useEffect(() => {
+    if (version !== 'lxx' || !segments.length) return
+    for (const seg of segments) {
+      const key = `${seg.book}:${seg.chapter}`
+      if (lxxReaderLoadedRef.current.has(key)) continue
+      lxxReaderLoadedRef.current.add(key)
+      const bookKey = seg.book
+      const chKey   = seg.chapter
+      loadLxxWords().then(data => {
+        const bs     = bookToLxxSlug(bookKey)
+        const chData = data[bs]?.[String(chKey)]
+        if (!chData) return
+        setLxxReaderWords(prev => ({ ...prev, [key]: chData }))
+      }).catch(() => { lxxReaderLoadedRef.current.delete(key) })
+    }
+  }, [version, segments]) // eslint-disable-line
 
   /* Scroll-spy: update visBook/visChapter as chapter headings enter the top zone */
   useEffect(() => {
@@ -721,6 +738,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setSearchFocus(0)
     setBibleResults(null)  // close search results when navigating
     setParallelWord(null)  // dismiss open parallel word card
+    setLxxReaderWord(null) // dismiss open LXX word info strip
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -784,6 +802,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     // Clear lexicon back-navigation context when version switches
     setLexReturn(null)
     pendingLexHighlightRef.current = null
+    // Clear LXX reader state when switching versions
+    setLxxReaderWords({})
+    setLxxReaderWord(null)
+    lxxReaderLoadedRef.current = new Set()
     const isMorph = version === 'greek' || version === 'hebrew'
 
     if (isMorph) {
@@ -1665,6 +1687,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
                         const isFocusMatch  = segIdx === 0 && !bibleResults && chapterMatches[searchFocus]?.verse === verse
 
+                        // LXX word chips
+                        const lxxPKey       = `${seg.book}:${seg.chapter}`
+                        const lxxVerseWords = version === 'lxx'
+                          ? lxxReaderWords[lxxPKey]?.find(pv => (pv.v ?? pv.verse) === verse)?.words
+                          : null
+                        const isLxxWordVerse = lxxReaderWord?.verseKey === verseKey
+
                         return (
                           <div
                             key={verse}
@@ -1686,30 +1715,67 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </span>
 
                               <span style={r.verseBody}>
-                                <span
-                                  style={{
-                                    ...r.verseText,
-                                    fontSize: prefs.sizePx,
-                                    fontFamily: version === 'lxx'
-                                      ? getGreekFontCss(prefs.greekFontId)
-                                      : getFontCss(prefs.fontId),
-                                  }}
-                                  onClick={e => {
-                                    // Detect the tapped word using caret position
-                                    e.stopPropagation()
-                                    try {
-                                      let range = null
-                                      if (document.caretRangeFromPoint) {
-                                        range = document.caretRangeFromPoint(e.clientX, e.clientY)
-                                      }
-                                      if (range) {
-                                        range.expand('word')
-                                        const word = range.toString().trim().replace(/[^a-zA-ZͰ-Ͽἀ-῿'-]/g, '')
-                                        if (word.length >= 2) setWordSearchModal({ word })
-                                      }
-                                    } catch {}
-                                  }}
-                                >{highlightSearchInText(text)}</span>
+                                {version === 'lxx' && lxxVerseWords ? (
+                                  /* ── LXX clickable word chips ── */
+                                  <span style={{ display:'inline-flex', flexWrap:'wrap', gap:'2px 4px', alignItems:'baseline' }}>
+                                    {lxxVerseWords.map((wd, wi) => {
+                                      const isSel = isLxxWordVerse && lxxReaderWord?.wordIdx === wi
+                                      return (
+                                        <span
+                                          key={wi}
+                                          style={{
+                                            ...r.greekToken,
+                                            ...r.greekTokenGk,
+                                            ...(isSel ? r.greekTokenSel : {}),
+                                            fontSize: prefs.sizePx * 1.15,
+                                            fontFamily: getGreekFontCss(prefs.greekFontId),
+                                            cursor: wd.s ? 'pointer' : 'default',
+                                          }}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            const same = lxxReaderWord?.verseKey === verseKey && lxxReaderWord?.wordIdx === wi
+                                            if (same) {
+                                              setLxxReaderWord(null)
+                                            } else {
+                                              setLxxReaderWord({ verseKey, wordIdx: wi })
+                                              setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
+                                            }
+                                          }}
+                                          title={wd.s || ''}
+                                        >
+                                          {wd.w}
+                                        </span>
+                                      )
+                                    })}
+                                  </span>
+                                ) : (
+                                  /* ── Plain text (all non-LXX versions, and LXX fallback while loading) ── */
+                                  <span
+                                    style={{
+                                      ...r.verseText,
+                                      fontSize: prefs.sizePx,
+                                      fontFamily: version === 'lxx'
+                                        ? getGreekFontCss(prefs.greekFontId)
+                                        : getFontCss(prefs.fontId),
+                                    }}
+                                    onClick={e => {
+                                      // Only enable KJV word-tap search for non-LXX text versions
+                                      if (version === 'lxx') return
+                                      e.stopPropagation()
+                                      try {
+                                        let range = null
+                                        if (document.caretRangeFromPoint) {
+                                          range = document.caretRangeFromPoint(e.clientX, e.clientY)
+                                        }
+                                        if (range) {
+                                          range.expand('word')
+                                          const word = range.toString().trim().replace(/[^a-zA-ZͰ-Ͽἀ-῿'-]/g, '')
+                                          if (word.length >= 2) setWordSearchModal({ word })
+                                        }
+                                      } catch {}
+                                    }}
+                                  >{highlightSearchInText(text)}</span>
+                                )}
 
                                 {verseRefs.length > 0 && (
                                   <span style={r.inlineCrossRefs}>
@@ -1731,6 +1797,44 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                               </span>
                             </div>
+
+                            {/* ── LXX reader word info strip ── */}
+                            {version === 'lxx' && isLxxWordVerse && lxxReaderWord && (() => {
+                              const wd = lxxVerseWords?.[lxxReaderWord.wordIdx]
+                              if (!wd) return null
+                              const grFont = getGreekFontCss(prefs.greekFontId)
+                              return (
+                                <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
+                                  <div style={r.wiScriptRow}>
+                                    <span style={{ ...r.wordInfoGreek, fontSize: prefs.sizePx * 1.4, fontFamily: grFont }}>{wd.w}</span>
+                                    <span style={{ fontSize:11, color:'#0c4a6e', fontStyle:'italic', marginLeft:6, fontFamily:"'DM Sans',sans-serif" }}>LXX Septuagint</span>
+                                  </div>
+                                  <div style={r.wiStrongsRow}>
+                                    <span style={r.wiStrongsLabel}>Strong's</span>
+                                    {wd.s ? (
+                                      <button
+                                        style={r.wiStrongsBtn}
+                                        onClick={e => {
+                                          e.stopPropagation()
+                                          setStrongsModal({ strongsId: wd.s, lang: 'greek' })
+                                        }}
+                                        title="Open in-app lexicon"
+                                      >
+                                        {wd.s}
+                                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3,flexShrink:0}}>
+                                          <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                                          <path d="M4.5 3v2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                          <circle cx="4.5" cy="6.8" r="0.5" fill="currentColor"/>
+                                        </svg>
+                                      </button>
+                                    ) : (
+                                      <span style={r.wiStrongsNum}>—</span>
+                                    )}
+                                    <span style={r.wiStrongsHint}>tap to open lexicon</span>
+                                  </div>
+                                </div>
+                              )
+                            })()}
 
                             {/* ── Parallel original-language section ── */}
                             {parallelMode && (() => {
@@ -2100,6 +2204,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           text={confessionModal.text}
           refs={confessionModal.refs}
           onClose={() => setConfessionModal(null)}
+          onGoTo={() => {
+            // Compute target tab + itemKey for deep-linking into ConfessionsPage
+            const { src, key } = confessionModal
+            let tab = '2lbcf', itemKey = key, source = '2lbcf'
+            if (src === 'Catechism') {
+              tab = 'catechism'; source = 'catechism'
+              itemKey = key.replace(/^cat\./, '')
+            } else if (src === '1LBCF') {
+              tab = '1lbcf'; source = '1lbcf'
+              itemKey = key.replace(/^lbcf1\./, '')
+            } else if (src === 'Orthodox') {
+              tab = 'orthodox'; source = 'orthodox'
+              itemKey = key.replace(/^orthodox\./, '')
+            }
+            routerNavigate(`/confessions?t=${tab}`, { state: { itemKey, source } })
+          }}
         />
       )}
 
@@ -2126,6 +2246,24 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
               }, 350)
+            }
+          }}
+          onNavigateLxx={(b, ch, v) => {
+            // Navigate to a verse in LXX reader mode
+            const { strongsId: sid } = strongsModal
+            setLexReturn({ strongsId: sid, lang: 'greek' })
+            setStrongsModal(null)
+            navigate(b, ch)
+            // Switch to LXX version if not already
+            if (version !== 'lxx') {
+              onVersionChange?.('lxx')
+            }
+            // Scroll to verse after data loads
+            if (v) {
+              setTimeout(() => {
+                const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }, 500)
             }
           }}
         />

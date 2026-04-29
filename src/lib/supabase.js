@@ -64,6 +64,13 @@ export function buildSchedule() {
   return SCHEDULE
 }
 
+// Orthodox Catechism has 148 questions; cycle through them across 365 days.
+export const ORTHODOX_Q_COUNT = 148
+export function getOrthodoxForDay(day) {
+  const num = ((day - 1) % ORTHODOX_Q_COUNT) + 1
+  return num
+}
+
 // ── Bible chapter progress (localStorage) ────────────────────────────────
 const BIBLE_KEY = 'pb-bible-progress'
 

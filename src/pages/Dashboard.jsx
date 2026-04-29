@@ -20,6 +20,8 @@ import { QUOTES } from '../data/quotes'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
+import { getOrthodoxForDay } from '../lib/supabase'
 
 const SCHEDULE  = buildSchedule()
 const TODAY_DAY = Math.min(getTodayDayNum(), 365)
@@ -66,6 +68,7 @@ function badgeClass(src) {
   if (src === '2LBCF')     return 'badge badge-2lbcf'
   if (src === 'Catechism')  return 'badge badge-cat'
   if (src === '1LBCF')     return 'badge badge-1lbcf'
+  if (src === 'Orthodox')   return 'badge badge-orthodox'
   return 'badge badge-review'
 }
 
@@ -88,6 +91,9 @@ const SOURCES = [
   { label:'1LBCF',    name:'First London Baptist Confession',   year:'1644',
     internalHref:'/confessions?t=1lbcf',
     href:'https://london1644.info/en/fulltext.html', color:'var(--amber-ink)', bg:'var(--amber-soft)' },
+  { label:'Orthodox', name:'An Orthodox Catechism',             year:'1680',
+    internalHref:'/confessions?t=orthodox',
+    href:'https://1689.com/an-orthodox-catechism/', color:'#0c4a6e', bg:'rgba(12,74,110,0.12)' },
 ]
 
 /* ─────────────────────────────────────────────────────────── */
@@ -344,6 +350,16 @@ export default function Dashboard() {
                   <span className={badgeClass(todayEntry.src)}>{todayEntry.src}</span>
                   <span style={s.todayReadingText}>{todayEntry.reading}</span>
                 </div>
+                {prefs.includeOrthodox && (() => {
+                  const qNum = getOrthodoxForDay(TODAY_DAY)
+                  const item = ORTHODOX_CATECHISM[qNum]
+                  return item ? (
+                    <div style={{...s.todayReading, marginTop:4}}>
+                      <span className="badge badge-orthodox">Orthodox</span>
+                      <span style={{...s.todayReadingText, fontSize:13}}>Q&A #{qNum}</span>
+                    </div>
+                  ) : null
+                })()}
                 <div style={s.todayDetail}>{todayEntry.detail}</div>
               </div>
               <div style={s.todayArrow}>
@@ -505,6 +521,12 @@ export default function Dashboard() {
                     <span className={badgeClass(r.src)}>{r.src}</span>
                     <span style={done ? {textDecoration:'line-through', opacity:.45} : {}}>{highlight(r.reading, search)}</span>
                   </div>
+                  {prefs.includeOrthodox && (
+                    <div style={{...s.rowReading, marginTop:2}}>
+                      <span className="badge badge-orthodox">Orthodox</span>
+                      <span style={{fontSize:11, color:'var(--ink-faint)'}}>Q&A #{getOrthodoxForDay(r.day)}</span>
+                    </div>
+                  )}
                   <div style={s.rowDetail}>
                     {highlight(r.detail, search)}
                     {hasNote && (

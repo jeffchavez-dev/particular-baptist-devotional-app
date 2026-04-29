@@ -73,7 +73,7 @@ export function getHebrewFontCss(fontId) {
 }
 
 const PREFS_KEY = 'pb-reading-prefs'
-export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl' }
+export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl', includeOrthodox: false }
 
 export function loadPrefs() {
   try {

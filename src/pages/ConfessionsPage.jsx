@@ -745,9 +745,10 @@ export default function ConfessionsPage() {
     const { itemKey, source } = deepLinkRef.current
     deepLinkRef.current = null
     let domId
-    if (source === '2lbcf')     domId = `p-${itemKey}`
+    if (source === '2lbcf')          domId = `p-${itemKey}`
     else if (source === 'catechism') domId = `qa-${itemKey}`
-    else if (source === '1lbcf')    domId = `art-${itemKey}`
+    else if (source === '1lbcf')     domId = `art-${itemKey}`
+    else if (source === 'orthodox')  domId = `qa-${itemKey}`
     if (!domId) return
     const timer = setTimeout(() => {
       const el = document.getElementById(domId)

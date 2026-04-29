@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked } from '../lib/supabase'
-import { useAuth } from '../App'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked, getOrthodoxForDay } from '../lib/supabase'
+import { useAuth, usePrefs } from '../App'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
 import { LBCF1 } from '../data/lbcf1'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { QUOTES } from '../data/quotes'
 import ShareCardModal from '../components/ShareCardModal'
 import { getFontCss } from '../components/FontPrefsPanel'
-import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { parseRefs } from '../lib/parseRefs'
 import KjvModal from '../components/KjvModal'
@@ -20,6 +20,7 @@ function badgeClass(src) {
   if (src === '2LBCF')    return 'badge badge-2lbcf'
   if (src === 'Catechism') return 'badge badge-cat'
   if (src === '1LBCF')    return 'badge badge-1lbcf'
+  if (src === 'Orthodox')  return 'badge badge-orthodox'
   return 'badge badge-review'
 }
 
@@ -57,6 +58,13 @@ function getContent(entry) {
     return { type: '1lbcf', title: item.title, text: item.text, refs: item.refs, quoteKey: `lbcf1.${num}` }
   }
   return null
+}
+
+function getOrthodoxContent(day) {
+  const num = getOrthodoxForDay(day)
+  const item = ORTHODOX_CATECHISM[num]
+  if (!item) return null
+  return { type: 'catechism', q: item.q, a: item.a, refs: item.refs, _orthodoxNum: num }
 }
 
 /** Parse "1 Corinthians 8" or "Isaiah 44" → { book, chapter, refDisplay } */
@@ -286,7 +294,7 @@ function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, o
         </div>
       </div>
 
-      {content.type === 'catechism' && (
+      {(content.type === 'catechism' || content.type === 'orthodox') && (
         <div style={s.catWrap}>
           <p style={{...s.catQ, ...textStyle}}><em>Q.</em> {content.q}</p>
           <p style={{...s.catA, ...textStyle}}><em>A.</em> {content.a}</p>
@@ -465,6 +473,7 @@ export default function ReadingPage() {
   const [shareCard, setShareCard] = useState(null)
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
   const { prefs, updatePrefs } = usePrefs()
+  const orthodoxContent = prefs.includeOrthodox ? getOrthodoxContent(day) : null
   const bibleChapter = entry?.bibleChapter || null
   const parsedBibleChapter = parseBibleChapterRef(bibleChapter)
   const [bibleChapterDone, setBibleChapterDone] = useState(() =>
@@ -633,6 +642,22 @@ export default function ReadingPage() {
             subtitle2: q.work,
           })}
         />
+
+        {/* Orthodox Catechism (optional) */}
+        {orthodoxContent && (
+          <div className="card" style={{...s.contentCard, borderLeft:'3px solid #0c4a6e'}}>
+            <div style={s.contentHeader}>
+              <div style={{display:'flex', alignItems:'center', gap:8}}>
+                <span style={{...s.contentLabel, background:'rgba(12,74,110,0.12)', color:'#0c4a6e'}}>Orthodox Catechism</span>
+                <span style={{fontSize:11, color:'var(--ink-faint)'}}>Q. {orthodoxContent._orthodoxNum}</span>
+              </div>
+            </div>
+            <div style={s.catWrap}>
+              <p style={{...s.catQ, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId)}}><em>Q.</em> {orthodoxContent.q}</p>
+              <p style={{...s.catA, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId)}}><em>A.</em> {orthodoxContent.a}</p>
+            </div>
+          </div>
+        )}
 
         {/* Author's note */}
         <DevNote day={day} session={session} />
