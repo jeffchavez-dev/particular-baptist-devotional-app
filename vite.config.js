@@ -101,13 +101,15 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // Bundled KJV Bible (public/kjv.json) — cache forever after first load
+          // All large JSON data files — cache on first fetch, serve offline thereafter
+          // Covers: kjv.json, tagnt.json, tahot.json, strongs-greek.json, strongs-hebrew.json
+          // (and any future abab.json or other Bible version files)
           {
-            urlPattern: ({ url }) => url.pathname === '/kjv.json',
+            urlPattern: ({ url }) => url.pathname.endsWith('.json') && url.origin === self.location.origin,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'kjv-bible-data',
-              expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheName: 'app-json-data',
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
