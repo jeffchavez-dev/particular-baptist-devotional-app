@@ -233,11 +233,11 @@ function parseVerseSpec(spec) {
  *
  * Duplicate passage keys are merged so one row can list multiple citations.
  */
-export function buildScriptureIndex(LBCF2, CATECHISM, LBCF1, SCHEDULE) {
+export function buildScriptureIndex(LBCF2, CATECHISM, LBCF1, SCHEDULE, ORTHODOX_CATECHISM = null) {
   // Map: passageKey → { bookInfo, chapter, verseStart, verseEnd, refStr, citations[] }
   const map = new Map()
 
-  function addRefs(refsStr, label, day, src) {
+  function addRefs(refsStr, label, day, src, refKey = null) {
     const parsed = parseRefs(refsStr)
     parsed.forEach(ref => {
       const key = `${ref.bookInfo.order}|${ref.chapter}|${ref.verseStart}`
@@ -247,7 +247,7 @@ export function buildScriptureIndex(LBCF2, CATECHISM, LBCF1, SCHEDULE) {
       // Avoid duplicate citations for the same label+day
       const entry = map.get(key)
       if (!entry.citations.find(c => c.label === label && c.day === day)) {
-        entry.citations.push({ label, day, src })
+        entry.citations.push({ label, day, src, refKey })
       }
     })
   }
@@ -276,6 +276,14 @@ export function buildScriptureIndex(LBCF2, CATECHISM, LBCF1, SCHEDULE) {
       addRefs(item.refs, `1LBCF Art. ${m[1]}`, r.day, '1LBCF')
     }
   })
+
+  // ── Orthodox Catechism (all entries — not schedule-linked) ──
+  if (ORTHODOX_CATECHISM) {
+    Object.entries(ORTHODOX_CATECHISM).forEach(([num, item]) => {
+      if (!item.refs) return
+      addRefs(item.refs, `Orthodox Q.${num}`, null, 'Orthodox', num)
+    })
+  }
 
   // Sort canonically: book order → chapter → verse
   return Array.from(map.values()).sort((a, b) => {

@@ -7,10 +7,11 @@
  * verse = 0 means the ref cited the whole chapter without a specific verse.
  * Built once lazily on first call; all subsequent lookups are O(1).
  */
-import { LBCF2 }     from '../data/lbcf2'
-import { LBCF1 }     from '../data/lbcf1'
-import { CATECHISM } from '../data/catechism'
-import { parseRefs } from './parseRefs'
+import { LBCF2 }              from '../data/lbcf2'
+import { LBCF1 }              from '../data/lbcf1'
+import { CATECHISM }          from '../data/catechism'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
+import { parseRefs }          from './parseRefs'
 
 let _idx = null
 
@@ -61,6 +62,21 @@ function buildIndex() {
     const entry = {
       src: 'Catechism', key: `cat.${num}`,
       label: `Q&A #${num}`,
+      detail: item.q?.slice(0, 60) + '…',
+      text: `Q. ${item.q}\n\nA. ${item.a}`,
+      refs: item.refs,
+    }
+    for (const { book, chapter, verse } of parseRefs(item.refs)) {
+      add(book, chapter, verse, entry)
+    }
+  }
+
+  /* ── Orthodox Catechism (1680) ── */
+  for (const [num, item] of Object.entries(ORTHODOX_CATECHISM)) {
+    if (!item.refs) continue
+    const entry = {
+      src: 'Orthodox', key: `orthodox.${num}`,
+      label: `Q. ${num}`,
       detail: item.q?.slice(0, 60) + '…',
       text: `Q. ${item.q}\n\nA. ${item.a}`,
       refs: item.refs,

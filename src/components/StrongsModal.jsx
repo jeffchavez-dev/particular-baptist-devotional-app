@@ -164,14 +164,14 @@ function BrowseView({ lang, data, currentId, scriptFont, onSelect }) {
 
 /* ── Scripture search results view ─────────────────────────────────── */
 function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
-  const [loading,  setLoading]  = useState(true)
-  const [results,  setResults]  = useState([])
-  const [total,    setTotal]    = useState(0)
-  const [capped,   setCapped]   = useState(false)
+  const [loading,   setLoading]   = useState(true)
+  const [results,   setResults]   = useState([])
+  const [total,     setTotal]     = useState(0)
+  const [capped,    setCapped]    = useState(false)
+  const [openBooks, setOpenBooks] = useState(new Set())
 
   useEffect(() => {
     setLoading(true)
-    // Run in a microtask so the loading indicator renders first
     const t = setTimeout(() => {
       const out = lang === 'greek'
         ? searchGreekByStrongs(id)
@@ -179,6 +179,10 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
       setResults(out.results)
       setTotal(out.total)
       setCapped(out.capped)
+      // Auto-expand first book
+      if (out.results.length > 0) {
+        setOpenBooks(new Set([out.results[0].book]))
+      }
       setLoading(false)
     }, 0)
     return () => clearTimeout(t)
@@ -187,14 +191,40 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
   const langLabel = lang === 'greek' ? 'GNT' : 'HOT'
   const isHeb     = lang === 'hebrew'
 
+  // Group results by book, preserving canonical order
+  const grouped = useMemo(() => {
+    const map = new Map()
+    for (const r of results) {
+      if (!map.has(r.book)) map.set(r.book, [])
+      map.get(r.book).push(r)
+    }
+    return Array.from(map.entries()) // [[bookName, [rows]], ...]
+  }, [results])
+
+  const allBooks   = grouped.map(([b]) => b)
+  const allOpen    = openBooks.size === allBooks.length
+  const toggleBook = (book) => setOpenBooks(prev => {
+    const next = new Set(prev)
+    next.has(book) ? next.delete(book) : next.add(book)
+    return next
+  })
+
   return (
     <div style={m.browseWrap}>
       {/* Count bar */}
       <div style={m.browseCount}>
         {loading
           ? 'Searching…'
-          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} · ${langLabel}`
+          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · ${langLabel}`
         }
+        {!loading && grouped.length > 1 && (
+          <button
+            style={m.srExpandBtn}
+            onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
+          >
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        )}
       </div>
 
       {loading && (
@@ -208,26 +238,47 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
         <div style={m.browseEmpty}>No occurrences found in {langLabel}.</div>
       )}
 
-      {/* Results list */}
-      {!loading && results.length > 0 && (
+      {/* Results grouped by book */}
+      {!loading && grouped.length > 0 && (
         <div style={m.browseList}>
-          {results.map((r, i) => (
-            <button
-              key={i}
-              style={m.srRow}
-              onClick={() => onNavigate(r.book, r.chapter, r.verse)}
-            >
-              {/* Reference */}
-              <span style={m.srRef}>{r.book} {r.chapter}:{r.verse}</span>
-              {/* Word in original script + transliteration */}
-              <span style={{ ...m.srWord, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
-                {r.w}
-              </span>
-              <span style={m.srTranslit}>{r.t}</span>
-              {/* Gloss */}
-              <span style={m.srGloss}>"{r.g}"</span>
-            </button>
-          ))}
+          {grouped.map(([book, rows]) => {
+            const isOpen = openBooks.has(book)
+            return (
+              <div key={book} style={m.srBookGroup}>
+                {/* Book header / toggle */}
+                <button style={m.srBookHeader} onClick={() => toggleBook(book)}>
+                  <svg
+                    width="10" height="10" viewBox="0 0 10 10"
+                    style={{ flexShrink:0, transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition:'transform 0.15s', color:'var(--ink-faint)' }}
+                  >
+                    <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                  <span style={m.srBookName}>{book}</span>
+                  <span style={m.srBookCount}>{rows.length}</span>
+                </button>
+
+                {/* Verse rows */}
+                {isOpen && (
+                  <div style={m.srBookRows}>
+                    {rows.map((r, i) => (
+                      <button
+                        key={i}
+                        style={m.srRow}
+                        onClick={() => onNavigate(r.book, r.chapter, r.verse)}
+                      >
+                        <span style={m.srRef}>{r.chapter}:{r.verse}</span>
+                        <span style={{ ...m.srWord, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
+                          {r.w}
+                        </span>
+                        <span style={m.srTranslit}>{r.t}</span>
+                        <span style={m.srGloss}>"{r.g}"</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {capped && (
             <div style={m.browseEmpty}>
               Showing first {results.length} of {total.toLocaleString()} occurrences.
@@ -561,10 +612,10 @@ const m = {
   /* Scripture results */
   srRow: {
     display:'grid',
-    gridTemplateColumns:'110px 1fr',
+    gridTemplateColumns:'56px 1fr',
     gridTemplateRows:'auto auto',
     columnGap:10,
-    width:'100%', padding:'8px 16px',
+    width:'100%', padding:'7px 16px 7px 28px',
     border:'none', borderBottom:'1px solid var(--border)',
     background:'none', cursor:'pointer',
     textAlign:'left', fontFamily:"'DM Sans',sans-serif",
@@ -588,6 +639,37 @@ const m = {
     gridColumn:'2', gridRow:'2',
     fontSize:11, color:'var(--ink-faint)', lineHeight:1.3,
     fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* Scripture results — book grouping */
+  srExpandBtn: {
+    marginLeft:'auto', background:'none', border:'none', cursor:'pointer',
+    fontSize:10, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase',
+    color:'var(--teal)', fontFamily:"'DM Sans',sans-serif", padding:'0 2px',
+  },
+  srBookGroup: {
+    borderBottom:'1px solid var(--border)',
+  },
+  srBookHeader: {
+    display:'flex', alignItems:'center', gap:7,
+    width:'100%', padding:'8px 16px',
+    border:'none', borderBottom:'none',
+    background:'var(--parchment)', cursor:'pointer',
+    textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.1s',
+  },
+  srBookName: {
+    flex:1, fontSize:12, fontWeight:700, color:'var(--ink)',
+    letterSpacing:'0.01em',
+  },
+  srBookCount: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.04em',
+    color:'white', background:'var(--teal)',
+    borderRadius:20, padding:'1px 7px',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  srBookRows: {
+    background:'var(--surface)',
   },
 
   /* No-entry state */
@@ -628,6 +710,7 @@ const m = {
     color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
     borderBottom:'1px solid var(--border)',
     flexShrink:0,
+    display:'flex', alignItems:'center', gap:8,
   },
   browseList: {
     overflowY:'auto',

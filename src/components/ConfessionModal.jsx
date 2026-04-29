@@ -4,6 +4,7 @@ const SRC_META = {
   '2LBCF':    { badge:'#3d2b6b', badgeText:'#c4a8ff', fullName:'2nd London Baptist Confession (1689)' },
   'Catechism':{ badge:'#1a3a38', badgeText:'#7ecfc8', fullName:"Keach's Catechism (1693)" },
   '1LBCF':    { badge:'#4a2e0a', badgeText:'#d4a84c', fullName:'1st London Baptist Confession (1644)' },
+  'Orthodox': { badge:'#0c4a6e', badgeText:'#bae6fd', fullName:'An Orthodox Catechism (1680)' },
 }
 
 /**

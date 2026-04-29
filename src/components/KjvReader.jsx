@@ -121,9 +121,10 @@ function verseId(bookName, ch, verse) {
 
 /* ── Source chip colours for cross-references ── */
 const SRC_CHIP = {
-  '2LBCF':    { bg:'rgba(61,43,107,0.10)', color:'#3d2b6b', border:'rgba(61,43,107,0.2)' },
-  'Catechism':{ bg:'rgba(29,107,90,0.10)', color:'#1d6b5a', border:'rgba(29,107,90,0.2)' },
+  '2LBCF':    { bg:'rgba(61,43,107,0.10)',  color:'#3d2b6b', border:'rgba(61,43,107,0.2)'  },
+  'Catechism':{ bg:'rgba(29,107,90,0.10)',  color:'#1d6b5a', border:'rgba(29,107,90,0.2)'  },
   '1LBCF':    { bg:'rgba(124,82,48,0.10)', color:'#7c5230', border:'rgba(124,82,48,0.2)' },
+  'Orthodox': { bg:'rgba(12,74,110,0.10)', color:'#0c4a6e', border:'rgba(12,74,110,0.2)' },
 }
 
 /* ── Highlight colour picker popup ── */
@@ -460,7 +461,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, parallelMode = false }, ref) {
   const { prefs, updatePrefs } = usePrefs()
 
   const [book, setBook] = useState(() => {
@@ -469,6 +470,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [chapter, setChapter] = useState(() => {
     try { return parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1') } catch { return 1 }
   })
+
+  /* ── Passage history (back / forward navigation) ── */
+  const navHistoryRef = useRef(null)
+  if (!navHistoryRef.current) {
+    // Lazy-init: seed history with whatever the reader opens to (matches book/chapter init)
+    try {
+      const initBook = sessionStorage.getItem(`bible-book-${version}`) || 'Genesis'
+      const initCh   = parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1')
+      navHistoryRef.current = [{ book: initBook, chapter: initCh }]
+    } catch {
+      navHistoryRef.current = [{ book: 'Genesis', chapter: 1 }]
+    }
+  }
+  const [histIdx, setHistIdx] = useState(0)
 
   /* segments = [{book, chapter, verses[]}] — first entry is navigated chapter, rest are auto-loaded */
   const [segments,      setSegments]      = useState([])
@@ -533,6 +548,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Pending word highlight after navigating from lexicon results */
   const pendingLexHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
 
+  /* Parallel original-language overlay (GNT for NT, HOT for OT) */
+  const [parallelData,   setParallelData]   = useState({}) // { 'Book:ch': [{verse, text}] }
+  const parallelLoadedRef = useRef(new Set()) // prevents duplicate fetches
+
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
@@ -542,7 +561,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       navigate(newBook, newChapter)
       if (verse) pendingVerseRef.current = { book: newBook, chapter: newChapter, verse }
     },
-  }))
+    goBack:         () => goBack(),
+    goForward:      () => goForward(),
+    canGoBack:      histIdx > 0,
+    canGoForward:   histIdx < navHistoryRef.current.length - 1,
+  }), [histIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -559,6 +582,38 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => { onNavChange?.(visBook, visChapter) }, [visBook, visChapter]) // eslint-disable-line
   /* Notify parent of search query changes */
   useEffect(() => { onSearchChange?.(searchQuery) }, [searchQuery]) // eslint-disable-line
+  /* Notify parent of history state changes so it can enable/disable back/forward buttons */
+  useEffect(() => {
+    onHistoryChange?.({
+      canGoBack:    histIdx > 0,
+      canGoForward: histIdx < navHistoryRef.current.length - 1,
+    })
+  }, [histIdx]) // eslint-disable-line
+
+  /* Load original-language parallel text for each visible segment */
+  useEffect(() => {
+    // Only runs in text mode (KJV etc.) with parallel toggled on
+    if (!parallelMode || version === 'greek' || version === 'hebrew') return
+    for (const seg of segments) {
+      const key   = `${seg.book}:${seg.chapter}`
+      if (parallelLoadedRef.current.has(key)) continue
+      parallelLoadedRef.current.add(key)
+
+      const isNT   = NT_BOOKS.has(seg.book)
+      const loader = isNT ? loadGreek() : loadHebrew()
+      const getter = isNT ? getGreekChapter : getHebrewChapter
+
+      loader.then(() => {
+        const chData = getter(seg.book, seg.chapter)
+        if (!chData) return
+        const verseTexts = chData.map(v => ({
+          verse: v.verse,
+          text:  v.words.map(w => w.w).join(' '),
+        }))
+        setParallelData(prev => ({ ...prev, [key]: verseTexts }))
+      }).catch(() => { parallelLoadedRef.current.delete(key) }) // allow retry
+    }
+  }, [parallelMode, segments, version]) // eslint-disable-line
 
   /* Scroll-spy: update visBook/visChapter as chapter headings enter the top zone */
   useEffect(() => {
@@ -1051,10 +1106,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function navigate(newBook, newChapter) {
+    // Push to history (truncate any forward entries first)
+    const current = navHistoryRef.current[histIdx]
+    if (!current || current.book !== newBook || current.chapter !== newChapter) {
+      navHistoryRef.current = [...navHistoryRef.current.slice(0, histIdx + 1), { book: newBook, chapter: newChapter }]
+      setHistIdx(navHistoryRef.current.length - 1)
+    }
     setBook(newBook)
     setChapter(newChapter)
     setVisBook(newBook)
     setVisChapter(newChapter)
+  }
+
+  function goBack() {
+    if (histIdx <= 0) return
+    const newIdx = histIdx - 1
+    const { book: b, chapter: ch } = navHistoryRef.current[newIdx]
+    setHistIdx(newIdx)
+    setBook(b); setChapter(ch)
+    setVisBook(b); setVisChapter(ch)
+  }
+
+  function goForward() {
+    if (histIdx >= navHistoryRef.current.length - 1) return
+    const newIdx = histIdx + 1
+    const { book: b, chapter: ch } = navHistoryRef.current[newIdx]
+    setHistIdx(newIdx)
+    setBook(b); setChapter(ch)
+    setVisBook(b); setVisChapter(ch)
   }
 
   const isTodayChapter = todayChapter && todayChapter === `${book} ${chapter}`
@@ -1109,7 +1188,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <div style={sb.versionSection}>
           <div style={sb.versionSectionTitle}>Translation</div>
           <div style={sb.versionList}>
-            {BIBLE_VERSIONS.map(v2 => {
+            {BIBLE_VERSIONS.filter(v2 => !v2.hidden).map(v2 => {
               const isActive = version === v2.id
               return (
                 <button
@@ -1584,6 +1663,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </span>
                             </div>
 
+                            {/* ── Parallel original-language line ── */}
+                            {parallelMode && (() => {
+                              const pKey   = `${seg.book}:${seg.chapter}`
+                              const pCh    = parallelData[pKey]
+                              const pVerse = pCh?.find(pv => pv.verse === verse)
+                              if (!pVerse) return null
+                              const isNT   = NT_BOOKS.has(seg.book)
+                              const lang   = isNT ? 'GNT' : 'HOT'
+                              const fam    = isNT
+                                ? getGreekFontCss(prefs.greekFontId)
+                                : getHebrewFontCss(prefs.hebrewFontId)
+                              return (
+                                <div style={r.parallelLine}>
+                                  <span style={r.parallelBadge}>{lang}</span>
+                                  <span style={{ ...r.parallelText, fontFamily: fam, direction: isNT ? 'ltr' : 'rtl' }}>
+                                    {pVerse.text}
+                                  </span>
+                                </div>
+                              )
+                            })()}
+
                             {note && !isEditing && (
                               <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
@@ -1904,7 +2004,8 @@ const r = {
   wrap: {
     display:'flex',
     flexDirection:'column',
-    height:'100%',
+    flex:1,
+    minHeight:0,
     overflow:'hidden', position:'relative',
   },
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:199 },
@@ -2083,6 +2184,26 @@ const r = {
   verseText: {
     color:'var(--ink)', lineHeight:1.85,
     fontFamily:"'Georgia', 'Times New Roman', serif",
+  },
+
+  /* ── Parallel original-language overlay ── */
+  parallelLine: {
+    display:'flex', alignItems:'baseline', gap:8,
+    padding:'5px 0 5px 28px',   // indent to align with verse text (past the verse number)
+    borderTop:'1px solid var(--border)',
+    marginTop:2,
+  },
+  parallelBadge: {
+    flexShrink:0,
+    fontSize:8, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
+    color:'var(--teal)', background:'var(--teal-light)',
+    borderRadius:3, padding:'2px 4px',
+    fontFamily:"'DM Sans',sans-serif",
+    alignSelf:'flex-start', marginTop:2,
+  },
+  parallelText: {
+    flex:1, fontSize:14, color:'var(--ink-muted)', lineHeight:1.7,
+    fontFamily:"'Palatino Linotype','Palatino',serif",
   },
 
   /* ── Colour picker ── */

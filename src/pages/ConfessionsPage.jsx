@@ -134,7 +134,7 @@ const SOURCES = {
 
 /* ── Proof-text helpers (sidebar panel) ── */
 const _SCHEDULE = buildSchedule()
-const PT_INDEX  = buildScriptureIndex(LBCF2, CATECHISM, LBCF1, _SCHEDULE)
+const PT_INDEX  = buildScriptureIndex(LBCF2, CATECHISM, LBCF1, _SCHEDULE, ORTHODOX_CATECHISM)
 
 const BOOK_NAMES_ORDERED = Array.from(
   new Map(Object.values(BOOK_MAP).map(b => [b.order, b])).values()
@@ -143,11 +143,12 @@ const BOOK_NAMES_ORDERED = Array.from(
 function ptSrcBadge(src) {
   if (src === '2LBCF')     return { bg:'var(--purple-soft)', color:'var(--purple-ink)' }
   if (src === 'Catechism') return { bg:'var(--teal-light)',  color:'var(--teal)' }
+  if (src === 'Orthodox')  return { bg:'rgba(12,74,110,0.12)', color:'#0c4a6e' }
   return                          { bg:'var(--amber-soft)',  color:'var(--amber-ink)' }
 }
 
 /* Sidebar proof-text panel */
-function ProofTextPanel({ onDayNav }) {
+function ProofTextPanel({ onDayNav, onOrthodoxNav }) {
   const [ptSearch,   setPtSearch]   = useState('')
   const [expanded,   setExpanded]   = useState(null)
   const [filterSrc,  setFilterSrc]  = useState('')
@@ -197,6 +198,7 @@ function ProofTextPanel({ onDayNav }) {
           <option value="2LBCF">2LBCF</option>
           <option value="Catechism">Catechism</option>
           <option value="1LBCF">1LBCF</option>
+          <option value="Orthodox">Orthodox</option>
         </select>
       </div>
 
@@ -235,15 +237,27 @@ function ProofTextPanel({ onDayNav }) {
                       <div style={pt.citeRow}>
                         {entry.citations.map((c, i) => {
                           const badge = ptSrcBadge(c.src)
+                          const isOrthodox = c.src === 'Orthodox'
+                          const shortLabel = c.src === '2LBCF'
+                            ? c.label.replace('2LBCF ', '')
+                            : c.label.replace(/^(Catechism|1LBCF|Orthodox) /, '')
                           return (
                             <button
                               key={i}
                               style={{...pt.citeBtn, background: badge.bg, color: badge.color}}
-                              onClick={() => onDayNav(c.day)}
-                              title={`${c.label} · Day ${c.day}`}
+                              onClick={() => isOrthodox
+                                ? onOrthodoxNav?.(c.refKey)
+                                : onDayNav(c.day)
+                              }
+                              title={isOrthodox
+                                ? `${c.label} — Open Orthodox Catechism`
+                                : `${c.label} · Day ${c.day}`
+                              }
                             >
-                              {c.src === '2LBCF' ? c.label.replace('2LBCF ', '') : c.label.replace(/^(Catechism|1LBCF) /, '')}
-                              <span style={{fontWeight:400,opacity:0.65,marginLeft:3}}>·{c.day}</span>
+                              {shortLabel}
+                              {!isOrthodox && (
+                                <span style={{fontWeight:400,opacity:0.65,marginLeft:3}}>·{c.day}</span>
+                              )}
                             </button>
                           )
                         })}
@@ -931,7 +945,19 @@ export default function ConfessionsPage() {
       {sidebarConf === 'prooftexts' && (
         <>
           <div style={s.sidebarDivider} />
-          <ProofTextPanel onDayNav={d => { routerNavigate(`/day/${d}`); setNavOpen(false) }} />
+          <ProofTextPanel
+            onDayNav={d => { routerNavigate(`/day/${d}`); setNavOpen(false) }}
+            onOrthodoxNav={qNum => {
+              setSidebarConf('orthodox')
+              setTab('orthodox')
+              setNavOpen(false)
+              // Scroll to the specific question after the tab renders
+              setTimeout(() => {
+                const el = document.getElementById(`qa-${qNum}`)
+                if (el) el.scrollIntoView({ behavior:'smooth', block:'center' })
+              }, 250)
+            }}
+          />
         </>
       )}
     </div>
