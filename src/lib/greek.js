@@ -59,6 +59,60 @@ export const NT_BOOKS = new Set([
   '1 Peter', '2 Peter', '1 John', '2 John', '3 John', 'Jude', 'Revelation',
 ])
 
+/* Canonical NT order for search results */
+const NT_BOOK_ORDER = [
+  'Matthew','Mark','Luke','John','Acts','Romans',
+  '1 Corinthians','2 Corinthians','Galatians','Ephesians',
+  'Philippians','Colossians','1 Thessalonians','2 Thessalonians',
+  '1 Timothy','2 Timothy','Titus','Philemon','Hebrews','James',
+  '1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation',
+]
+
+/**
+ * Search all GNT words for a given Strong's ID.
+ * Returns { results:[{book,chapter,verse,w,t,g}], total, capped }
+ * One result per verse (first matching word), canonical order, capped at maxResults.
+ */
+export function searchGreekByStrongs(strongsId, maxResults = 300) {
+  if (!_greekData || !strongsId) return { results: [], total: 0, capped: false }
+  const targetNum = parseInt(
+    strongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''),
+    10
+  )
+  if (isNaN(targetNum)) return { results: [], total: 0, capped: false }
+
+  const results = []
+  let total = 0
+
+  for (const book of NT_BOOK_ORDER) {
+    const bookData = _greekData[book]
+    if (!bookData) continue
+    const chs = Object.keys(bookData).map(Number).sort((a, b) => a - b)
+    for (const ch of chs) {
+      const verses = bookData[String(ch)]
+      if (!verses) continue
+      const vs = Object.keys(verses).map(Number).sort((a, b) => a - b)
+      for (const v of vs) {
+        const words = verses[String(v)]
+        if (!words) continue
+        for (const wd of words) {
+          const n = parseInt(
+            (wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10
+          )
+          if (n === targetNum) {
+            total++
+            if (results.length < maxResults) {
+              results.push({ book, chapter: ch, verse: v, w: wd.w, t: wd.t, g: wd.g })
+            }
+            break // one entry per verse
+          }
+        }
+      }
+    }
+  }
+  return { results, total, capped: total > maxResults }
+}
+
 /* ── Grammar parser (Robinson morphology) ───────────────────────────────── */
 
 const POS = {

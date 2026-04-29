@@ -523,6 +523,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
   const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang } | null
+  const [wordSearchModal, setWordSearchModal] = useState(null) // { word } | null  (KJV word tap)
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -1468,7 +1469,24 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </span>
 
                               <span style={r.verseBody}>
-                                <span style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}>{highlightSearchInText(text)}</span>
+                                <span
+                                  style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}
+                                  onClick={e => {
+                                    // Detect the tapped word using caret position
+                                    e.stopPropagation()
+                                    try {
+                                      let range = null
+                                      if (document.caretRangeFromPoint) {
+                                        range = document.caretRangeFromPoint(e.clientX, e.clientY)
+                                      }
+                                      if (range) {
+                                        range.expand('word')
+                                        const word = range.toString().trim().replace(/[^a-zA-Z'-]/g, '')
+                                        if (word.length >= 2) setWordSearchModal({ word })
+                                      }
+                                    } catch {}
+                                  }}
+                                >{highlightSearchInText(text)}</span>
 
                                 {verseRefs.length > 0 && (
                                   <span style={r.inlineCrossRefs}>
@@ -1660,7 +1678,48 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           greekFontId={prefs.greekFontId}
           hebrewFontId={prefs.hebrewFontId}
           onClose={() => setStrongsModal(null)}
+          onNavigate={(b, ch, v) => {
+            setStrongsModal(null)
+            setBook(b)
+            setChapter(ch)
+            // Scroll to the target verse after re-render
+            if (v) {
+              setTimeout(() => {
+                const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
+                el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }, 350)
+            }
+          }}
         />
+      )}
+
+      {/* KJV word-tap search modal */}
+      {wordSearchModal && (
+        <div
+          style={r.wordSearchBackdrop}
+          onClick={() => setWordSearchModal(null)}
+        >
+          <div style={r.wordSearchCard} onClick={e => e.stopPropagation()}>
+            <div style={r.wordSearchWord}>"{wordSearchModal.word}"</div>
+            <div style={r.wordSearchActions}>
+              <button
+                style={r.wordSearchBtn}
+                onClick={() => {
+                  submitSearch(wordSearchModal.word)
+                  setWordSearchModal(null)
+                }}
+              >
+                Search in Bible
+              </button>
+              <button
+                style={r.wordSearchCancel}
+                onClick={() => setWordSearchModal(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -2259,6 +2318,46 @@ const r = {
   wiMsNote: {
     fontSize:11, lineHeight:1.5,
     borderLeft:'2px solid', paddingLeft:8,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* ── KJV word-tap search modal ── */
+  wordSearchBackdrop: {
+    position:'fixed', inset:0, zIndex:500,
+    background:'rgba(0,0,0,0.35)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    padding:24,
+  },
+  wordSearchCard: {
+    background:'var(--surface)',
+    borderRadius:'var(--radius-lg)',
+    boxShadow:'0 12px 40px rgba(0,0,0,0.2)',
+    padding:'20px 24px',
+    minWidth:220, maxWidth:340, width:'100%',
+    fontFamily:"'DM Sans',sans-serif",
+    display:'flex', flexDirection:'column', gap:14,
+  },
+  wordSearchWord: {
+    fontSize:20, fontWeight:700, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif",
+    textAlign:'center', letterSpacing:'0.01em',
+  },
+  wordSearchActions: {
+    display:'flex', flexDirection:'column', gap:8,
+  },
+  wordSearchBtn: {
+    width:'100%', padding:'10px 0',
+    background:'var(--teal)', color:'white',
+    border:'none', borderRadius:'var(--radius)',
+    fontSize:14, fontWeight:700, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+    transition:'opacity 0.12s',
+  },
+  wordSearchCancel: {
+    width:'100%', padding:'8px 0',
+    background:'none', color:'var(--ink-muted)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    fontSize:13, cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif",
   },
 

@@ -51,6 +51,17 @@ export function getHebrewChapter(book, chapter) {
 }
 
 /* ── OT book set ─────────────────────────────────────────────────────── */
+const OT_BOOK_ORDER = [
+  'Genesis','Exodus','Leviticus','Numbers','Deuteronomy',
+  'Joshua','Judges','Ruth','1 Samuel','2 Samuel',
+  '1 Kings','2 Kings','1 Chronicles','2 Chronicles',
+  'Ezra','Nehemiah','Esther','Job','Psalms','Proverbs',
+  'Ecclesiastes','Song of Solomon','Isaiah','Jeremiah',
+  'Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos',
+  'Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah',
+  'Haggai','Zechariah','Malachi',
+]
+
 export const OT_BOOKS = new Set([
   'Genesis', 'Exodus', 'Leviticus', 'Numbers', 'Deuteronomy',
   'Joshua', 'Judges', 'Ruth', '1 Samuel', '2 Samuel',
@@ -177,4 +188,49 @@ export function getHebMsMarker(msType) {
   if (msType === 'R') return 'R'
   if (msType === 'X') return 'X'
   return null
+}
+
+/**
+ * Search all Hebrew OT words for a given Strong's ID.
+ * Returns { results:[{book,chapter,verse,w,t,g}], total, capped }
+ * One result per verse (first matching word), canonical order, capped at maxResults.
+ */
+export function searchHebrewByStrongs(strongsId, maxResults = 300) {
+  if (!_hebrewData || !strongsId) return { results: [], total: 0, capped: false }
+  const targetNum = parseInt(
+    strongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''),
+    10
+  )
+  if (isNaN(targetNum)) return { results: [], total: 0, capped: false }
+
+  const results = []
+  let total = 0
+
+  for (const book of OT_BOOK_ORDER) {
+    const bookData = _hebrewData[book]
+    if (!bookData) continue
+    const chs = Object.keys(bookData).map(Number).sort((a, b) => a - b)
+    for (const ch of chs) {
+      const verses = bookData[String(ch)]
+      if (!verses) continue
+      const vs = Object.keys(verses).map(Number).sort((a, b) => a - b)
+      for (const v of vs) {
+        const words = verses[String(v)]
+        if (!words) continue
+        for (const wd of words) {
+          const n = parseInt(
+            (wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10
+          )
+          if (n === targetNum) {
+            total++
+            if (results.length < maxResults) {
+              results.push({ book, chapter: ch, verse: v, w: wd.w, t: wd.t, g: wd.g })
+            }
+            break // one entry per verse
+          }
+        }
+      }
+    }
+  }
+  return { results, total, capped: total > maxResults }
 }

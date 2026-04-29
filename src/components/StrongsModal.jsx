@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
+import { searchGreekByStrongs } from '../lib/greek'
+import { searchHebrewByStrongs } from '../lib/hebrew'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
@@ -9,7 +11,7 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, onBrowse }) {
+function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture }) {
   const prefix = lang === 'greek' ? 'G' : 'H'
   const num    = strongsNum(id)
   const bhUrl  = bibleHubUrl(lang, id)
@@ -58,6 +60,10 @@ function EntryDetail({ lang, id, entry, scriptFont, onBrowse }) {
         <button style={m.browseBtn} onClick={onBrowse}>
           <GridIcon />
           Browse lexicon
+        </button>
+        <button style={m.findBtn} onClick={onFindInScripture}>
+          <SearchAllIcon />
+          Find in {lang === 'greek' ? 'GNT' : 'HOT'}
         </button>
         {bhUrl && (
           <a href={bhUrl} target="_blank" rel="noopener noreferrer" style={m.bhLink}>
@@ -156,17 +162,95 @@ function BrowseView({ lang, data, currentId, scriptFont, onSelect }) {
   )
 }
 
+/* ── Scripture search results view ─────────────────────────────────── */
+function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
+  const [loading,  setLoading]  = useState(true)
+  const [results,  setResults]  = useState([])
+  const [total,    setTotal]    = useState(0)
+  const [capped,   setCapped]   = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    // Run in a microtask so the loading indicator renders first
+    const t = setTimeout(() => {
+      const out = lang === 'greek'
+        ? searchGreekByStrongs(id)
+        : searchHebrewByStrongs(id)
+      setResults(out.results)
+      setTotal(out.total)
+      setCapped(out.capped)
+      setLoading(false)
+    }, 0)
+    return () => clearTimeout(t)
+  }, [lang, id])
+
+  const langLabel = lang === 'greek' ? 'GNT' : 'HOT'
+  const isHeb     = lang === 'hebrew'
+
+  return (
+    <div style={m.browseWrap}>
+      {/* Count bar */}
+      <div style={m.browseCount}>
+        {loading
+          ? 'Searching…'
+          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} · ${langLabel}`
+        }
+      </div>
+
+      {loading && (
+        <div style={m.loadingWrap}>
+          <div className="spinner" />
+          <span style={m.loadingText}>Searching {langLabel}…</span>
+        </div>
+      )}
+
+      {!loading && results.length === 0 && (
+        <div style={m.browseEmpty}>No occurrences found in {langLabel}.</div>
+      )}
+
+      {/* Results list */}
+      {!loading && results.length > 0 && (
+        <div style={m.browseList}>
+          {results.map((r, i) => (
+            <button
+              key={i}
+              style={m.srRow}
+              onClick={() => onNavigate(r.book, r.chapter, r.verse)}
+            >
+              {/* Reference */}
+              <span style={m.srRef}>{r.book} {r.chapter}:{r.verse}</span>
+              {/* Word in original script + transliteration */}
+              <span style={{ ...m.srWord, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
+                {r.w}
+              </span>
+              <span style={m.srTranslit}>{r.t}</span>
+              {/* Gloss */}
+              <span style={m.srGloss}>"{r.g}"</span>
+            </button>
+          ))}
+          {capped && (
+            <div style={m.browseEmpty}>
+              Showing first {results.length} of {total.toLocaleString()} occurrences.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Main modal ─────────────────────────────────────────────────────── */
 /**
  * Props:
- *   strongsId  — e.g. "G1161" or "H7225G"
- *   lang       — 'greek' | 'hebrew'
+ *   strongsId    — e.g. "G1161" or "H7225G"
+ *   lang         — 'greek' | 'hebrew'
  *   greekFontId  — from prefs
  *   hebrewFontId — from prefs
- *   onClose    — () => void
+ *   onClose      — () => void
+ *   onNavigate   — (book, chapter, verse) => void  called when user taps a scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose }) {
-  const [view,    setView]    = useState('detail')  // 'detail' | 'browse'
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate }) {
+  const [view,    setView]    = useState('detail')  // 'detail' | 'browse' | 'scripture'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
   const [error,   setError]   = useState(null)
@@ -213,10 +297,10 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
         {/* ── Header ── */}
         <div style={m.header}>
           <div style={m.headerLeft}>
-            {view === 'browse' ? (
+            {view !== 'detail' ? (
               <button style={m.backBtn} onClick={() => setView('detail')}>
                 <BackIcon />
-                Back
+                {view === 'scripture' ? 'Back to entry' : 'Back'}
               </button>
             ) : (
               <span style={m.headerTitle}>Strong's Lexicon</span>
@@ -249,6 +333,7 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               entry={entry}
               scriptFont={scriptFont}
               onBrowse={() => setView('browse')}
+              onFindInScripture={() => setView('scripture')}
             />
           )}
 
@@ -259,6 +344,18 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               currentId={activeId}
               scriptFont={scriptFont}
               onSelect={handleSelectFromList}
+            />
+          )}
+
+          {view === 'scripture' && (
+            <ScriptureResultsView
+              lang={lang}
+              id={activeId}
+              scriptFont={scriptFont}
+              onNavigate={(book, chapter, verse) => {
+                onClose()
+                onNavigate?.(book, chapter, verse)
+              }}
             />
           )}
         </div>
@@ -303,6 +400,15 @@ function SearchIcon() {
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0, color:'var(--ink-faint)' }}>
       <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
       <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  )
+}
+function SearchAllIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
+      <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M1 8.5h4M1 10.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
     </svg>
   )
 }
@@ -442,6 +548,46 @@ const m = {
     background:'var(--teal-light)', border:'none',
     borderRadius:99, padding:'4px 10px',
     textDecoration:'none', fontFamily:"'DM Sans',sans-serif",
+  },
+  findBtn: {
+    display:'inline-flex', alignItems:'center', gap:6,
+    fontSize:11, fontWeight:600, color:'var(--purple-ink)',
+    background:'var(--purple-soft)', border:'1px solid transparent',
+    borderRadius:'var(--radius)', padding:'5px 12px',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.12s',
+  },
+
+  /* Scripture results */
+  srRow: {
+    display:'grid',
+    gridTemplateColumns:'110px 1fr',
+    gridTemplateRows:'auto auto',
+    columnGap:10,
+    width:'100%', padding:'8px 16px',
+    border:'none', borderBottom:'1px solid var(--border)',
+    background:'none', cursor:'pointer',
+    textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.1s',
+  },
+  srRef: {
+    gridColumn:'1', gridRow:'1 / 3', alignSelf:'center',
+    fontSize:11, fontWeight:700, color:'var(--teal)',
+    letterSpacing:'0.02em',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  srWord: {
+    gridColumn:'2', gridRow:'1',
+    fontSize:16, fontWeight:400, color:'var(--ink)', lineHeight:1.2,
+    fontFamily:"'Palatino Linotype','Palatino',serif",
+  },
+  srTranslit: {
+    display:'none',  // tucked into gloss line to save space
+  },
+  srGloss: {
+    gridColumn:'2', gridRow:'2',
+    fontSize:11, color:'var(--ink-faint)', lineHeight:1.3,
+    fontFamily:"'DM Sans',sans-serif",
   },
 
   /* No-entry state */
