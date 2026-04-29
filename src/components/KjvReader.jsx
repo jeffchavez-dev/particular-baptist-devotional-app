@@ -62,11 +62,16 @@ const SLUG_TO_BOOK = Object.fromEntries(
   BIBLE_BOOKS.map(b => [b.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, ''), b.name])
 )
 
-/** Search a specific Bible version — returns up to maxResults matches in canonical order */
+/**
+ * Search a specific Bible version — returns up to maxResults matches in canonical order.
+ * Returns { hits, total, capped } where total is the actual count across the whole Bible.
+ * Pass maxResults = Infinity to load everything.
+ */
 function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 200) {
-  if (!versionData || !query.trim()) return []
+  if (!versionData || !query.trim()) return { hits: [], total: 0, capped: false }
   const q = query.trim().toLowerCase()
   const hits = []
+  let total = 0
   for (const book of BIBLE_BOOKS) {
     const slug = book.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
     const bookData = versionData[slug]
@@ -80,13 +85,15 @@ function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 20
         if (seen.has(v.v)) continue
         seen.add(v.v)
         if (v.t && v.t.toLowerCase().includes(q)) {
-          hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch, version) })
-          if (hits.length >= maxResults) return hits
+          total++
+          if (hits.length < maxResults) {
+            hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch, version) })
+          }
         }
       }
     }
   }
-  return hits
+  return { hits, total, capped: total > maxResults }
 }
 
 /* ── Bible category structure ── */
@@ -207,7 +214,7 @@ function SearchHistoryDropdown({ history, onSelect, onRemove, onClear, onClose }
 }
 
 /* ── Bible search results panel — grouped by book, collapsible ── */
-function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, readerRef }) {
+function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, readerRef, total, capped, onLoadMore, searching }) {
   const [openBooks, setOpenBooks] = useState(() => new Set())
 
   function toggleBook(bookName) {
@@ -262,7 +269,9 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
           <span style={r.srTitle}>
             {bibleResults.length === 0
               ? `No results for "${q}"`
-              : `${bibleResults.length}${bibleResults.length === 200 ? '+' : ''} verse${bibleResults.length !== 1 ? 's' : ''} found`
+              : capped
+                ? `${bibleResults.length.toLocaleString()} of ${total.toLocaleString()} verse${total !== 1 ? 's' : ''} found`
+                : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''} found`
             }
           </span>
           {bibleResults.length > 0 && (
@@ -288,6 +297,22 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
           </button>
         </div>
       </div>
+
+      {/* Load-all banner — shown when results are capped */}
+      {capped && (
+        <div style={r.srLoadMoreBar}>
+          <span style={{ fontSize:12, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif" }}>
+            Showing first {bibleResults.length.toLocaleString()} of {total.toLocaleString()} matches
+          </span>
+          <button
+            style={r.srLoadMoreBtn}
+            onClick={onLoadMore}
+            disabled={searching}
+          >
+            {searching ? 'Loading…' : `Load all ${total.toLocaleString()} results`}
+          </button>
+        </div>
+      )}
 
       {bibleResults.length === 0 ? (
         <p style={{ fontSize:13, color:'var(--ink-faint)', textAlign:'center', padding:'2rem' }}>
@@ -341,9 +366,9 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
             )
           })}
 
-          {bibleResults.length === 200 && (
-            <p style={{ fontSize:11, color:'var(--ink-faint)', textAlign:'center', padding:'8px 0' }}>
-              Showing first 200 results — try a more specific phrase.
+          {capped && (
+            <p style={{ fontSize:11, color:'var(--ink-faint)', textAlign:'center', padding:'8px 0', fontFamily:"'DM Sans',sans-serif" }}>
+              Use the "Load all" button above to see all {total.toLocaleString()} results.
             </p>
           )}
         </div>
@@ -514,10 +539,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [colorBarOpen,   setColorBarOpen]   = useState(false)
 
   /* Search — full-Bible mode (inline in toolbar, always visible) */
-  const [searchQuery,  setSearchQuery]  = useState('')
-  const [searchFocus,  setSearchFocus]  = useState(0)   // index within chapter matches (when results=null)
-  const [bibleResults, setBibleResults] = useState(null) // null = no search; [] = no matches; [{book,ch,verse,text}] = matches
-  const [searching,    setSearching]    = useState(false)
+  const [searchQuery,       setSearchQuery]       = useState('')
+  const [searchFocus,       setSearchFocus]       = useState(0)   // index within chapter matches (when results=null)
+  const [bibleResults,      setBibleResults]      = useState(null) // null = no search; [] = no matches; [{book,ch,verse,text}] = matches
+  const [bibleResultsTotal, setBibleResultsTotal] = useState(0)   // true total (may exceed bibleResults.length)
+  const [bibleResultsCapped,setBibleResultsCapped]= useState(false)
+  const [searching,         setSearching]         = useState(false)
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory(`bible-${version}`))
   const [showHistDrop,  setShowHistDrop]  = useState(false)
   const searchInputRef = useRef(null)
@@ -555,6 +582,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const pendingLexHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
   /* Pending word highlight after navigating from LXX lexicon results (LXX reader mode) */
   const pendingLxxHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
+  /* Set to the target version when a lexicon result navigation triggers a version switch.
+     Prevents the version load effect from clearing lexReturn + pendingLexHighlightRef. */
+  const lexNavVersionRef = useRef(null)
 
   /* Parallel original-language overlay (GNT for NT, HOT+LXX for OT) */
   const [parallelData,    setParallelData]    = useState({}) // { 'Book:ch': [{verse, words:[{w,t,g,s,r,ms}]}] }
@@ -739,6 +769,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setColorBarOpen(false)
     setSearchFocus(0)
     setBibleResults(null)  // close search results when navigating
+    setBibleResultsTotal(0)
+    setBibleResultsCapped(false)
     setParallelWord(null)  // dismiss open parallel word card
     setLxxReaderWord(null) // dismiss open LXX word info strip
     try { window.getSelection()?.removeAllRanges() } catch {}
@@ -801,11 +833,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Load Bible version / Greek NT / Hebrew OT whenever the version prop changes */
   useEffect(() => {
     let cancelled = false
-    // Clear lexicon back-navigation context when version switches
-    setLexReturn(null)
-    pendingLexHighlightRef.current = null
-    // Clear LXX reader state when switching versions (pendingLxxHighlightRef is preserved
-    // intentionally: if we're switching TO 'lxx', the highlight needs to survive the reset)
+    // If this version change was triggered by a lexicon result navigation (e.g. LXX→GNT),
+    // preserve the back-pill and pending highlights so the user can return to results.
+    // For all other version switches (manual translation toggle), clear them.
+    const isLexNav = lexNavVersionRef.current === version
+    lexNavVersionRef.current = null  // consume the flag regardless
+    if (!isLexNav) {
+      setLexReturn(null)
+      pendingLexHighlightRef.current = null
+    }
+    // Always reset LXX reader per-chapter data on version change (pendingLxxHighlightRef is
+    // intentionally NOT cleared here — if switching TO 'lxx', the auto-highlight needs it)
     setLxxReaderWords({})
     setLxxReaderWord(null)
     lxxReaderLoadedRef.current = new Set()
@@ -1195,16 +1233,32 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       setSearching(true)
       // Run in a microtask so the UI updates first
       setTimeout(() => {
-        const hits = searchBibleVersion(versionData, trimmed, version)
+        const { hits, total, capped } = searchBibleVersion(versionData, trimmed, version)
         setBibleResults(hits)
+        setBibleResultsTotal(total)
+        setBibleResultsCapped(capped)
         setSearching(false)
       }, 0)
     }
   }
 
+  function loadAllSearchResults() {
+    if (!dataReady) return
+    setSearching(true)
+    setTimeout(() => {
+      const { hits, total } = searchBibleVersion(versionData, searchQuery.trim(), version, Infinity)
+      setBibleResults(hits)
+      setBibleResultsTotal(total)
+      setBibleResultsCapped(false)
+      setSearching(false)
+    }, 0)
+  }
+
   function closeSearch() {
     setSearchQuery('')
     setBibleResults(null)
+    setBibleResultsTotal(0)
+    setBibleResultsCapped(false)
     setSearchFocus(0)
   }
 
@@ -1680,8 +1734,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   bibleResults={bibleResults}
                   searchQuery={searchQuery}
                   onNavigate={navigate}
-                  onClose={() => { setBibleResults(null); setSearchQuery('') }}
+                  onClose={() => { setBibleResults(null); setSearchQuery(''); setBibleResultsTotal(0); setBibleResultsCapped(false) }}
                   readerRef={readerRef}
+                  total={bibleResultsTotal}
+                  capped={bibleResultsCapped}
+                  searching={searching}
+                  onLoadMore={loadAllSearchResults}
                 />
               )}
 
@@ -2272,9 +2330,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             setStrongsModal(null)
             // Switch to the correct morphological version matching the corpus:
             // GNT results require Greek mode; HOT results require Hebrew mode.
+            // Set lexNavVersionRef so the version load effect knows NOT to clear
+            // lexReturn / pendingLexHighlightRef (they must survive the version switch).
             if (slang === 'greek' && version !== 'greek') {
+              lexNavVersionRef.current = 'greek'
               onVersionChange?.('greek')
             } else if (slang === 'hebrew' && version !== 'hebrew') {
+              lexNavVersionRef.current = 'hebrew'
               onVersionChange?.('hebrew')
             }
             navigate(b, ch)
@@ -2293,8 +2355,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             if (v) pendingLxxHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
             setStrongsModal(null)
             navigate(b, ch)
-            // Switch to LXX version if not already
+            // Switch to LXX version if not already.
+            // Set lexNavVersionRef so the version load effect doesn't clear pendingLxxHighlightRef.
             if (version !== 'lxx') {
+              lexNavVersionRef.current = 'lxx'
               onVersionChange?.('lxx')
             }
           }}
@@ -2791,6 +2855,21 @@ const r = {
     background:'none', border:'1px solid var(--border)', borderRadius:'var(--radius)',
     padding:'5px 10px', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     whiteSpace:'nowrap',
+  },
+  /* Load-more banner */
+  srLoadMoreBar: {
+    display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8,
+    padding:'10px 16px',
+    background:'var(--amber-soft)', borderBottom:'1px solid var(--border)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  srLoadMoreBtn: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:12, fontWeight:700, color:'var(--amber-ink)',
+    background:'transparent', border:'1px solid var(--amber-ink)',
+    borderRadius:'var(--radius)', padding:'5px 12px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
+    transition:'background 0.15s',
   },
   /* Per-book collapsible group */
   srBookGroup: {
