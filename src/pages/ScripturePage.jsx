@@ -22,8 +22,8 @@ export default function ScripturePage() {
   const [canGoForward, setCanGoForward] = useState(false)
   const [parallelMode, setParallelMode] = useState(false)
 
-  // Parallel only makes sense on text versions; reset when switching to GNT/HOT
-  const isOriginalLang = readVersion === 'greek' || readVersion === 'hebrew'
+  // Parallel only makes sense on plain text versions; hide for GNT/HOT/LXX
+  const isOriginalLang = readVersion === 'greek' || readVersion === 'hebrew' || readVersion === 'lxx'
 
   /* Deep-link from devotional/settings: navigate to specific book/chapter/verse */
   const pendingDeepLinkRef = useRef(locationState?.book ? locationState : null)
@@ -163,7 +163,7 @@ export default function ScripturePage() {
         version={readVersion}
         onVersionChange={v => {
           setReadVersion(v)
-          if (v === 'greek' || v === 'hebrew') setParallelMode(false)
+          if (v === 'greek' || v === 'hebrew' || v === 'lxx') setParallelMode(false)
           try { sessionStorage.setItem('reader-version', v) } catch {}
         }}
         todayChapter={todayBibleChapter}

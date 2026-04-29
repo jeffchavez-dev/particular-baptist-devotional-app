@@ -787,6 +787,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           setVersionData(data)
           setDataReady(true)
           setLoading(false)
+          // LXX is OT-only — if currently on a NT book, jump to Genesis
+          if (version === 'lxx' && NT_BOOKS.has(book)) {
+            setBook('Genesis'); setChapter(1)
+          }
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     }
@@ -1212,13 +1216,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           selectedChapter={chapter}
           onNavigate={(b, ch) => {
             if (version === 'greek'  && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
-            if (version === 'hebrew' && !OT_BOOKS.has(b)) { navigate('Genesis',  1); return }
+            if ((version === 'hebrew' || version === 'lxx') && !OT_BOOKS.has(b)) { navigate('Genesis', 1); return }
             navigate(b, ch)
           }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
           ntOnly={version === 'greek'}
-          otOnly={version === 'hebrew'}
+          otOnly={version === 'hebrew' || version === 'lxx'}
         />
       </aside>
 
@@ -1624,7 +1628,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                               <span style={r.verseBody}>
                                 <span
-                                  style={{ ...r.verseText, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }}
+                                  style={{
+                                    ...r.verseText,
+                                    fontSize: prefs.sizePx,
+                                    fontFamily: version === 'lxx'
+                                      ? getGreekFontCss(prefs.greekFontId)
+                                      : getFontCss(prefs.fontId),
+                                  }}
                                   onClick={e => {
                                     // Detect the tapped word using caret position
                                     e.stopPropagation()
@@ -1635,7 +1645,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       }
                                       if (range) {
                                         range.expand('word')
-                                        const word = range.toString().trim().replace(/[^a-zA-Z'-]/g, '')
+                                        const word = range.toString().trim().replace(/[^a-zA-ZͰ-Ͽἀ-῿'-]/g, '')
                                         if (word.length >= 2) setWordSearchModal({ word })
                                       }
                                     } catch {}

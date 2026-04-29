@@ -9,6 +9,7 @@
     "gen:icons": "node scripts/gen-icons.mjs",
     "fetch:kjv": "node scripts/fetch-kjv.mjs",
     "fetch:lxx": "node scripts/fetch-lxx.mjs",
+    "build:lxx": "node scripts/build-lxx.mjs",
     "process:greek": "node scripts/processTagnt.mjs",
     "process:hebrew": "node scripts/processTaght.mjs",
     "process:strongs": "node scripts/processStrongs.mjs"
