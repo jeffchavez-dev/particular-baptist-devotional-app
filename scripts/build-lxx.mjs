@@ -138,7 +138,7 @@ async function main() {
     const wordObjs = verseWords
       .map((w, idx) => ({ w, s: verseStrongs[idx] || '' }))
       .filter(o => o.w)
-    wordy[bookSlug][ch].push({ v, words: wordObjs })
+    wordy[bookSlug][ch].push({ verse: v, words: wordObjs })
   }
 
   for (let i = 0; i < verses.length; i++) {

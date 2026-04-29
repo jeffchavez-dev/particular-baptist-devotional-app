@@ -482,12 +482,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     try {
       const initBook = sessionStorage.getItem(`bible-book-${version}`) || 'Genesis'
       const initCh   = parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1')
-      navHistoryRef.current = [{ book: initBook, chapter: initCh }]
+      navHistoryRef.current = [{ book: initBook, chapter: initCh, version }]
     } catch {
-      navHistoryRef.current = [{ book: 'Genesis', chapter: 1 }]
+      navHistoryRef.current = [{ book: 'Genesis', chapter: 1, version }]
     }
   }
   const [histIdx, setHistIdx] = useState(0)
+  // Ref used to suppress version-sync during history navigation (avoids the race where
+  // histIdx and version both change in the same flush and the effect mis-updates history)
+  const histNavVersionRef = useRef(null)
 
   /* segments = [{book, chapter, verses[]}] — first entry is navigated chapter, rest are auto-loaded */
   const [segments,      setSegments]      = useState([])
@@ -599,6 +602,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     })
   }, [histIdx]) // eslint-disable-line
 
+  /* Keep current history entry's version in sync when the user switches translation */
+  useEffect(() => {
+    // Skip if this version change was triggered by history navigation itself
+    if (histNavVersionRef.current === version) {
+      histNavVersionRef.current = null
+      return
+    }
+    if (navHistoryRef.current && histIdx >= 0) {
+      navHistoryRef.current[histIdx] = { ...navHistoryRef.current[histIdx], version }
+    }
+  }, [version]) // eslint-disable-line
+
   /* Load GNT/HOT parallel word data for each visible segment */
   useEffect(() => {
     if (!parallelMode || version === 'greek' || version === 'hebrew' || version === 'lxx') return
@@ -634,7 +649,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       const bookKey = seg.book
       const chKey   = seg.chapter
       _lxxWordsPromise.then(data => {
-        const bs   = bookKey.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')
+        // KJV name → LXX slug (handles mismatches like "Song of Solomon" vs "Song of Songs")
+        const LXX_SLUG_OVERRIDES = { 'songofsolomon': 'songofsongs' }
+        const rawSlug = bookKey.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')
+        const bs = LXX_SLUG_OVERRIDES[rawSlug] || rawSlug
         const chData = data[bs]?.[String(chKey)]
         if (!chData) return
         setParallelLxxData(prev => ({ ...prev, [`${bookKey}:${chKey}`]: chData }))
@@ -1138,10 +1156,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function navigate(newBook, newChapter) {
-    // Push to history (truncate any forward entries first)
+    // Push to history — include current version so back/forward can restore it
     const current = navHistoryRef.current[histIdx]
     if (!current || current.book !== newBook || current.chapter !== newChapter) {
-      navHistoryRef.current = [...navHistoryRef.current.slice(0, histIdx + 1), { book: newBook, chapter: newChapter }]
+      navHistoryRef.current = [
+        ...navHistoryRef.current.slice(0, histIdx + 1),
+        { book: newBook, chapter: newChapter, version },
+      ]
       setHistIdx(navHistoryRef.current.length - 1)
     }
     setBook(newBook)
@@ -1153,19 +1174,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function goBack() {
     if (histIdx <= 0) return
     const newIdx = histIdx - 1
-    const { book: b, chapter: ch } = navHistoryRef.current[newIdx]
+    const entry  = navHistoryRef.current[newIdx]
     setHistIdx(newIdx)
-    setBook(b); setChapter(ch)
-    setVisBook(b); setVisChapter(ch)
+    setBook(entry.book); setChapter(entry.chapter)
+    setVisBook(entry.book); setVisChapter(entry.chapter)
+    // Restore translation if it differs
+    if (entry.version && entry.version !== version) {
+      histNavVersionRef.current = entry.version  // suppress the version-sync effect
+      onVersionChange?.(entry.version)
+    }
   }
 
   function goForward() {
     if (histIdx >= navHistoryRef.current.length - 1) return
     const newIdx = histIdx + 1
-    const { book: b, chapter: ch } = navHistoryRef.current[newIdx]
+    const entry  = navHistoryRef.current[newIdx]
     setHistIdx(newIdx)
-    setBook(b); setChapter(ch)
-    setVisBook(b); setVisChapter(ch)
+    setBook(entry.book); setChapter(entry.chapter)
+    setVisBook(entry.book); setVisChapter(entry.chapter)
+    // Restore translation if it differs
+    if (entry.version && entry.version !== version) {
+      histNavVersionRef.current = entry.version  // suppress the version-sync effect
+      onVersionChange?.(entry.version)
+    }
   }
 
   const isTodayChapter = todayChapter && todayChapter === `${book} ${chapter}`
@@ -1712,9 +1743,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const morphCh   = parallelData[pKey]
                               const morphVerse = morphCh?.find(pv => pv.verse === verse)
 
-                              // LXX data (OT only)
+                              // LXX data (OT only) — lxx-words.json uses 'v' key (not 'verse')
                               const lxxCh    = isHeb ? parallelLxxData[pKey] : null
-                              const lxxVerse = lxxCh?.find(pv => pv.verse === verse)
+                              const lxxVerse = lxxCh?.find(pv => (pv.v ?? pv.verse) === verse)
 
                               if (!morphVerse && !lxxVerse) return null
 
@@ -2105,7 +2136,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <div style={r.lexBackPill}>
           <button
             style={r.lexBackBtn}
-            onClick={() => setStrongsModal({ strongsId: lexReturn.strongsId, lang: lexReturn.lang, initialView: 'scripture' })}
+            onClick={() => {
+              setStrongsModal({ strongsId: lexReturn.strongsId, lang: lexReturn.lang, initialView: 'scripture' })
+              setLexReturn(null) // pill is consumed — don't show again after modal closes
+            }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
               <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
