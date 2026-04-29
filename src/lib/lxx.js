@@ -59,6 +59,15 @@ export function getLxxChapter(bookName, chapter) {
  */
 export function searchLxxByStrongs(strongsId, maxResults = 300) {
   if (!_lxxWordsCache) return { results: [], total: 0, capped: false }
+  // Normalize the search ID to a plain integer so zero-padding differences
+  // ("G746" vs "G0746") and letter suffixes ("G746a") don't prevent matches.
+  // This mirrors the same normalization used by searchGreekByStrongs in greek.js.
+  const targetNum = parseInt(
+    strongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''),
+    10
+  )
+  if (isNaN(targetNum)) return { results: [], total: 0, capped: false }
+
   const results = []
   let total = 0
 
@@ -76,7 +85,11 @@ export function searchLxxByStrongs(strongsId, maxResults = 300) {
         const verseNum = vObj.v ?? vObj.verse
         const words    = vObj.words || []
         for (const wd of words) {
-          if (wd.s === strongsId) {
+          const n = parseInt(
+            (wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''),
+            10
+          )
+          if (n === targetNum) {
             total++
             if (results.length < maxResults) {
               results.push({ book: book.name, chapter: ch, verse: verseNum, w: wd.w })

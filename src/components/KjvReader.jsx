@@ -551,8 +551,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* Lexicon back-navigation: remember last scripture-results search so user can return */
   const [lexReturn, setLexReturn] = useState(null) // { strongsId, lang } | null
-  /* Pending word highlight after navigating from lexicon results */
+  /* Pending word highlight after navigating from lexicon results (morph mode) */
   const pendingLexHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
+  /* Pending word highlight after navigating from LXX lexicon results (LXX reader mode) */
+  const pendingLxxHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
 
   /* Parallel original-language overlay (GNT for NT, HOT+LXX for OT) */
   const [parallelData,    setParallelData]    = useState({}) // { 'Book:ch': [{verse, words:[{w,t,g,s,r,ms}]}] }
@@ -606,15 +608,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     })
   }, [histIdx]) // eslint-disable-line
 
-  /* Keep current history entry's version in sync when the user switches translation */
+  /* Clear the history-nav suppression flag once the version restored by goBack/goForward takes effect.
+     NOTE: We intentionally do NOT overwrite the history entry's version here. Each history entry
+     preserves the translation that was active when navigate() pushed it, so going back/forward
+     reliably restores both the passage AND the translation. Overwriting here caused the bug where
+     switching translations on Psalm 23 (HOT) would corrupt the entry to GNT, making it
+     impossible to return to HOT via history. */
   useEffect(() => {
-    // Skip if this version change was triggered by history navigation itself
     if (histNavVersionRef.current === version) {
       histNavVersionRef.current = null
-      return
-    }
-    if (navHistoryRef.current && histIdx >= 0) {
-      navHistoryRef.current[histIdx] = { ...navHistoryRef.current[histIdx], version }
     }
   }, [version]) // eslint-disable-line
 
@@ -802,7 +804,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     // Clear lexicon back-navigation context when version switches
     setLexReturn(null)
     pendingLexHighlightRef.current = null
-    // Clear LXX reader state when switching versions
+    // Clear LXX reader state when switching versions (pendingLxxHighlightRef is preserved
+    // intentionally: if we're switching TO 'lxx', the highlight needs to survive the reset)
     setLxxReaderWords({})
     setLxxReaderWord(null)
     lxxReaderLoadedRef.current = new Set()
@@ -943,7 +946,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     return () => obs.disconnect()
   }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Auto-select the matched word after navigating from lexicon scripture results */
+  /* Auto-select the matched word after navigating from lexicon scripture results (morph mode) */
   useEffect(() => {
     const p = pendingLexHighlightRef.current
     if (!p || !morphSegments.length) return
@@ -963,6 +966,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
     }
   }, [morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Auto-select the matched word after navigating from LXX lexicon results (LXX reader mode) */
+  useEffect(() => {
+    const p = pendingLxxHighlightRef.current
+    if (!p || !Object.keys(lxxReaderWords).length) return
+    const pKey = `${p.book}:${p.chapter}`
+    const chArr = lxxReaderWords[pKey]
+    if (!chArr) return
+    const vObj = chArr.find(pv => (pv.v ?? pv.verse) === p.verse)
+    if (!vObj?.words) return
+    pendingLxxHighlightRef.current = null
+    const targetNum = parseInt(
+      p.strongsId.replace(/^[GHgh]/, '').replace(/[A-Za-z]+$/, ''), 10
+    )
+    const wi = vObj.words.findIndex(wd => {
+      const n = parseInt((wd.s || '').replace(/^[GHgh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+      return n === targetNum
+    })
+    if (wi >= 0) {
+      const verseKey = `kjv|${p.book}|${p.chapter}|${p.verse}`
+      setLxxReaderWord({ verseKey, wordIdx: wi })
+      setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
+      setTimeout(() => {
+        const el = readerRef.current?.querySelector(`#${verseId(p.book, p.chapter, p.verse)}`)
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 150)
+    }
+  }, [lxxReaderWords]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
@@ -2239,31 +2270,32 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             // After morph chapter loads, auto-select the matched word
             if (v) pendingLexHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
             setStrongsModal(null)
-            navigate(b, ch)
-            // Scroll to the target verse after re-render
-            if (v) {
-              setTimeout(() => {
-                const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
-                el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }, 350)
+            // Switch to the correct morphological version matching the corpus:
+            // GNT results require Greek mode; HOT results require Hebrew mode.
+            if (slang === 'greek' && version !== 'greek') {
+              onVersionChange?.('greek')
+            } else if (slang === 'hebrew' && version !== 'hebrew') {
+              onVersionChange?.('hebrew')
             }
-          }}
-          onNavigateLxx={(b, ch, v) => {
-            // Navigate to a verse in LXX reader mode
-            const { strongsId: sid } = strongsModal
-            setLexReturn({ strongsId: sid, lang: 'greek' })
-            setStrongsModal(null)
             navigate(b, ch)
-            // Switch to LXX version if not already
-            if (version !== 'lxx') {
-              onVersionChange?.('lxx')
-            }
-            // Scroll to verse after data loads
+            // Scroll to the target verse after morph data loads (longer delay for version switch)
             if (v) {
               setTimeout(() => {
                 const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
               }, 500)
+            }
+          }}
+          onNavigateLxx={(b, ch, v) => {
+            // Navigate to a verse in LXX reader mode, then auto-highlight the matched word
+            const { strongsId: sid } = strongsModal
+            setLexReturn({ strongsId: sid, lang: 'greek' })
+            if (v) pendingLxxHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
+            setStrongsModal(null)
+            navigate(b, ch)
+            // Switch to LXX version if not already
+            if (version !== 'lxx') {
+              onVersionChange?.('lxx')
             }
           }}
         />
