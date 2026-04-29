@@ -19,12 +19,12 @@ import {
 
 const SCHEDULE = buildSchedule()
 
-const SOURCES = [
+const CONFESSIONS = [
   {
     label: '2LBCF', name: 'Second London Baptist Confession', year: '1689',
     color: 'var(--purple-ink)', bg: 'var(--purple-soft)',
     chapters: '32 chapters',
-    desc: 'The doctrinal standard of Particular Baptists — a thorough statement of Reformed theology grounded in Scripture, closely following the Westminster Confession with key Baptist modifications.',
+    desc: 'The doctrinal standard of Particular Baptists — a thorough statement of Reformed theology grounded in Scripture, closely following the Westminster Confession with key Baptist modifications on the church and ordinances.',
     route: '2lbcf',
     href: 'https://www.the1689confession.com/',
   },
@@ -32,7 +32,7 @@ const SOURCES = [
     label: 'Catechism', name: "Keach's Baptist Catechism", year: '1693',
     color: 'var(--teal)', bg: 'var(--teal-light)',
     chapters: '114 questions',
-    desc: 'One hundred and fourteen questions and answers teaching the essentials of Christian doctrine — designed by Benjamin Keach for instruction in faith and practice for all ages.',
+    desc: 'One hundred and fourteen questions and answers teaching the essentials of Christian doctrine — designed by Benjamin Keach for instruction in faith and practice for all ages, grounded in the 1689 Confession.',
     route: 'catechism',
     href: 'https://baptistcatechism.org/',
   },
@@ -40,19 +40,65 @@ const SOURCES = [
     label: '1LBCF', name: 'First London Baptist Confession', year: '1644',
     color: 'var(--amber-ink)', bg: 'var(--amber-soft)',
     chapters: '52 articles',
-    desc: 'The founding document of the Particular Baptist movement — fifty-two articles affirming biblical faith, distinguishing these congregations from General Baptists and Anabaptists.',
+    desc: 'The founding document of the Particular Baptist movement — fifty-two articles affirming biblical faith and believer\'s baptism, carefully distinguishing these congregations from General Baptists and Anabaptists.',
     route: '1lbcf',
     href: 'https://london1644.info/en/fulltext.html',
   },
+  {
+    label: 'Orthodox', name: 'An Orthodox Catechism', year: '1680',
+    color: 'var(--sky)', bg: 'var(--sky-light)',
+    chapters: '196 questions',
+    desc: 'Composed by Hercules Collins for Baptist congregations, this catechism follows the structure of the Heidelberg Catechism while affirming Particular Baptist distinctives — a devotional and doctrinal masterwork.',
+    route: 'orthodox',
+    href: 'https://1689.com/an-orthodox-catechism/',
+  },
 ]
 
-const FEATURES = [
-  { title: 'Full Confession Texts', body: 'Read each paragraph of the 2LBCF, Keach\'s Catechism, and the 1LBCF inline — no external sites required.' },
-  { title: 'Scripture Proof Texts', body: 'Every article is grounded in Scripture. See the proof texts that anchor each doctrinal statement to God\'s Word.' },
-  { title: 'Pastoral Quotes', body: 'Keach, Coxe, Knollys, Owen, Renihan — historical voices illuminate each reading with theological depth.' },
-  { title: 'Progress Tracking', body: 'Mark days complete, build streaks, and sync your progress across devices when you sign in.' },
-  { title: 'Personal Notes', body: 'Write reflections for any day. Your notes are saved privately and sync to your account.' },
-  { title: 'Quiz', body: '"How Particular Baptist are you?" — 37 questions covering Scripture, soteriology, covenant theology, and history.' },
+const DEVOTIONAL_FEATURES = [
+  { title: '365-Day Reading Plan', body: 'Walk through the 2LBCF, Keach\'s Catechism, and 1LBCF in one year — one chapter per day, with Scripture readings assigned for each day.' },
+  { title: 'Scripture Proof Texts', body: 'Every article is grounded in Scripture. Tap any proof-text reference to open it in an inline modal — then jump directly to the full reader.' },
+  { title: 'Pastoral Quotes', body: 'Keach, Coxe, Knollys, Owen, Renihan — historical voices illuminate each reading with theological depth alongside the primary confession text.' },
+  { title: 'Progress & Streaks', body: 'Mark days complete, build streaks, earn achievements, and sync your progress across devices when signed in.' },
+  { title: 'Personal Notes & Highlights', body: 'Write reflections for any devotional day or confession paragraph. Highlight in five colors. Everything syncs to your account.' },
+  { title: 'Quiz', body: '"How Particular Baptist are you?" — 37 questions covering Scripture, soteriology, covenant theology, and church history.' },
+]
+
+const SCRIPTURE_FEATURES = [
+  { title: 'King James Version', body: 'Full KJV Bible with continuous infinite-scroll reading. Tap any word to search it across the whole Bible instantly.' },
+  { title: 'Greek New Testament (GNT)', body: 'Read the Translators Amalgamated GNT (TAGNT) word-by-word. Tap any word to see its Robinson morphology, Strong\'s number, gloss, and transliteration.' },
+  { title: 'Hebrew Old Testament (HOT)', body: 'Read the TAHOT with full Masoretic pointing and cantillation. Each word displays ETCBC morphology — stem, aspect, person, gender, and number.' },
+  { title: 'In-App Strong\'s Lexicon', body: 'Tap a Strong\'s number to open a full lexicon entry — lemma, transliteration, pronunciation, and definition — without leaving the app. Browse all 8,600+ entries.' },
+  { title: 'Find in GNT / HOT', body: 'From any lexicon entry, search every occurrence of a word across the Greek NT or Hebrew OT. Results navigate to the exact verse with the matching word auto-highlighted.' },
+  { title: 'Scroll-Synced Navigation', body: 'The chapter indicator in the header always reflects which chapter you\'re currently reading as you scroll through continuous chapters.' },
+  { title: 'Verse Highlighting & Notes', body: 'Highlight individual verses in five colors and attach personal notes. Annotations are stored locally and sync to your account.' },
+  { title: 'Offline Ready (PWA)', body: 'Install as a Progressive Web App. All Bible data — KJV, GNT, HOT, and lexicons — caches on first load and reads fully offline thereafter.' },
+]
+
+const DATA_SOURCES = [
+  {
+    name: 'STEPBible (Tyndale House)',
+    href: 'https://stepbible.org/',
+    desc: 'Source for TAGNT (Greek NT) and TAHOT (Hebrew OT) morphological data, licensed CC BY 4.0.',
+    badge: 'CC BY 4.0',
+  },
+  {
+    name: 'Translators Amalgamated NT/OT — GitHub',
+    href: 'https://github.com/STEPBible/STEPBible-Data',
+    desc: 'Raw TAGNT and TAHOT data files from the STEPBible-Data repository used to build the in-app word-level Greek and Hebrew reader.',
+    badge: 'Open Data',
+  },
+  {
+    name: 'BibleHub Strong\'s Lexicon',
+    href: 'https://biblehub.com/',
+    desc: 'Strong\'s Exhaustive Concordance lexicon data (James Strong, 1890, Public Domain) referenced for lemma, transliteration, pronunciation, and definitions in the in-app lexicon.',
+    badge: 'Public Domain',
+  },
+  {
+    name: 'King James Version (KJV)',
+    href: 'https://github.com/christos-c/bible-corpus',
+    desc: 'Public domain KJV text used for the Scripture reader and all proof-text references throughout the devotional.',
+    badge: 'Public Domain',
+  },
 ]
 
 /* ── Collapsible section wrapper ── */
@@ -965,13 +1011,21 @@ export default function AboutPage() {
           title="About"
           defaultOpen={false}
         >
-          <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.7, marginBottom:20}}>
-            A year of daily reading through the foundational confessions and catechism of Particular Baptist theology.
-            Walk through Scripture doctrine with historical voices, pastoral quotes, and space for your own reflections.
+          {/* App intro */}
+          <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.8, marginBottom:4}}>
+            A <strong>Particular Baptist study companion</strong> — daily devotional readings through the foundational
+            confessions and catechisms, paired with a full Scripture study suite in KJV, Greek NT, and Hebrew OT.
+          </p>
+          <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.8, marginBottom:20}}>
+            Walk through Reformed doctrine with historical voices, pastoral quotes, and personal annotations.
+            Then open the same passage in the original languages, tap any word for morphology and lexicon data,
+            and trace every Strong's number across the whole Bible — all in one app, fully offline-capable.
           </p>
 
+          {/* ── Devotional features ── */}
+          <div style={{...s.sectionTitle, marginBottom:10}}>📖 Devotional</div>
           <div style={s.featureGrid}>
-            {FEATURES.map((f, i) => (
+            {DEVOTIONAL_FEATURES.map((f, i) => (
               <div key={i} style={s.featureItem}>
                 <span style={s.featureDot} />
                 <div>
@@ -982,10 +1036,25 @@ export default function AboutPage() {
             ))}
           </div>
 
+          {/* ── Scripture study features ── */}
+          <div style={{...s.sectionTitle, marginTop:22, marginBottom:10}}>🔍 Scripture Study Tools</div>
+          <div style={s.featureGrid}>
+            {SCRIPTURE_FEATURES.map((f, i) => (
+              <div key={i} style={s.featureItem}>
+                <span style={{...s.featureDot, background:'var(--purple-ink)'}} />
+                <div>
+                  <div style={s.featureName}>{f.title}</div>
+                  <div style={s.featureBody}>{f.body}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── The Confessions ── */}
           <div style={{marginTop:24}}>
-            <div style={{...s.sectionTitle, marginBottom:12}}>The Confessions</div>
+            <div style={{...s.sectionTitle, marginBottom:12}}>The Confessions &amp; Catechisms</div>
             <div style={s.sourceGrid}>
-              {SOURCES.map(src => (
+              {CONFESSIONS.map(src => (
                 <div key={src.label} style={{...s.sourceCard, borderColor: src.color, background: src.bg}}>
                   <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
                     <span style={{...s.sourceBadge, color: src.color}}>{src.label}</span>
@@ -995,7 +1064,7 @@ export default function AboutPage() {
                   <h4 style={{fontSize:14, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color: src.color, marginBottom:5}}>
                     {src.name}
                   </h4>
-                  <p style={{fontSize:11, color:'var(--ink-muted)', lineHeight:1.6, marginBottom:8}}>{src.desc}</p>
+                  <p style={{fontSize:11, color:'var(--ink-muted)', lineHeight:1.65, marginBottom:8}}>{src.desc}</p>
                   <div style={{display:'flex', gap:10, alignItems:'center'}}>
                     <button
                       onClick={() => navigate(`/confessions?t=${src.route}`)}
@@ -1013,6 +1082,36 @@ export default function AboutPage() {
             </div>
           </div>
 
+          {/* ── Data sources ── */}
+          <div style={{marginTop:24}}>
+            <div style={{...s.sectionTitle, marginBottom:10}}>Data Sources &amp; Licenses</div>
+            <p style={{fontSize:12, color:'var(--ink-muted)', lineHeight:1.7, marginBottom:12}}>
+              This app is built on open, high-quality biblical scholarship data. All sources are credited below.
+            </p>
+            <div style={{display:'flex', flexDirection:'column', gap:8}}>
+              {DATA_SOURCES.map((src, i) => (
+                <div key={i} style={s.dataSourceRow}>
+                  <div style={{display:'flex', alignItems:'flex-start', gap:8, flex:1, minWidth:0}}>
+                    <span style={s.dataBullet}>▸</span>
+                    <div style={{minWidth:0}}>
+                      <a
+                        href={src.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{fontSize:13, fontWeight:600, color:'var(--teal)', textDecoration:'none', fontFamily:"'DM Sans',sans-serif"}}
+                      >
+                        {src.name} ↗
+                      </a>
+                      <p style={{fontSize:11, color:'var(--ink-muted)', lineHeight:1.6, margin:'2px 0 0'}}>{src.desc}</p>
+                    </div>
+                  </div>
+                  <span style={s.dataBadge}>{src.badge}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Navigate ── */}
           <div style={{marginTop:24}}>
             <div style={{...s.sectionTitle, marginBottom:12}}>Navigate</div>
             <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
@@ -1140,6 +1239,19 @@ const s = {
     display:'flex', flexDirection:'column',
   },
   sourceBadge: { fontSize:11, fontWeight:700, letterSpacing:'0.05em' },
+
+  dataSourceRow: {
+    display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12,
+    padding:'10px 12px', background:'var(--parchment)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+  },
+  dataBullet: { color:'var(--teal)', fontSize:11, flexShrink:0, marginTop:2 },
+  dataBadge: {
+    fontSize:9, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
+    padding:'2px 7px', borderRadius:99,
+    background:'var(--teal-light)', color:'var(--teal)',
+    border:'1px solid rgba(29,107,90,0.2)', flexShrink:0, alignSelf:'flex-start', marginTop:1,
+  },
 
   footer: { borderTop:'1px solid var(--border)', background:'var(--surface)', marginTop:'2rem', padding:'16px 20px' },
   footerInner: { maxWidth:800, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'center', gap:10, flexWrap:'wrap' },
