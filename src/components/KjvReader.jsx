@@ -525,8 +525,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [morphSegments, setMorphSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
   const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
-  const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang } | null
+  const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang, initialView? } | null
   const [wordSearchModal, setWordSearchModal] = useState(null) // { word } | null  (KJV word tap)
+
+  /* Lexicon back-navigation: remember last scripture-results search so user can return */
+  const [lexReturn, setLexReturn] = useState(null) // { strongsId, lang } | null
+  /* Pending word highlight after navigating from lexicon results */
+  const pendingLexHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -545,10 +550,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     return () => window.removeEventListener('resize', h)
   }, [])
 
-  /* Notify parent of book/chapter changes */
-  useEffect(() => { onNavChange?.(book, chapter) }, [book, chapter]) // eslint-disable-line
+  /* Visible book/chapter — updated by explicit navigation AND by scroll-spy.
+     Kept separate from book/chapter so updating it never resets segments. */
+  const [visBook,    setVisBook]    = useState(book)
+  const [visChapter, setVisChapter] = useState(chapter)
+
+  /* Notify parent whenever the visible chapter changes (scroll or explicit nav) */
+  useEffect(() => { onNavChange?.(visBook, visChapter) }, [visBook, visChapter]) // eslint-disable-line
   /* Notify parent of search query changes */
   useEffect(() => { onSearchChange?.(searchQuery) }, [searchQuery]) // eslint-disable-line
+
+  /* Scroll-spy: update visBook/visChapter as chapter headings enter the top zone */
+  useEffect(() => {
+    const root = readerRef.current
+    if (!root) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const b  = entry.target.dataset.segBook
+          const ch = parseInt(entry.target.dataset.segChapter, 10)
+          if (b && ch) { setVisBook(b); setVisChapter(ch) }
+        }
+      },
+      { root, rootMargin: '0px 0px -60% 0px', threshold: 0 }
+    )
+    root.querySelectorAll('[data-seg-book]').forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [segments, morphSegments])
 
   /* Refresh highlights + notes when a cross-device sync completes */
   useEffect(() => {
@@ -651,6 +680,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Load Bible version / Greek NT / Hebrew OT whenever the version prop changes */
   useEffect(() => {
     let cancelled = false
+    // Clear lexicon back-navigation context when version switches
+    setLexReturn(null)
+    pendingLexHighlightRef.current = null
     const isMorph = version === 'greek' || version === 'hebrew'
 
     if (isMorph) {
@@ -783,6 +815,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
   }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Auto-select the matched word after navigating from lexicon scripture results */
+  useEffect(() => {
+    const p = pendingLexHighlightRef.current
+    if (!p || !morphSegments.length) return
+    const seg = morphSegments.find(s => s.book === p.book && s.chapter === p.chapter)
+    if (!seg) return
+    const vd = seg.verses.find(ve => ve.verse === p.verse)
+    if (!vd) return
+    pendingLexHighlightRef.current = null
+    const targetNum = parseInt(p.strongsId.replace(/^[GHgh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+    const wi = vd.words.findIndex(wd => {
+      const n = parseInt((wd.s || '').replace(/^[GHgh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+      return n === targetNum
+    })
+    if (wi >= 0) {
+      const verseKey = `kjv|${p.book}|${p.chapter}|${p.verse}`
+      setSelectedWord({ verseKey, wordIdx: wi })
+      setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
+    }
+  }, [morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Highlight handler ── */
   const handleHighlight = useCallback((verseKey, colorId) => {
@@ -1000,6 +1053,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function navigate(newBook, newChapter) {
     setBook(newBook)
     setChapter(newChapter)
+    setVisBook(newBook)
+    setVisChapter(newChapter)
   }
 
   const isTodayChapter = todayChapter && todayChapter === `${book} ${chapter}`
@@ -1205,8 +1260,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     {morphSegments.map((seg, segIdx) => (
                       <div key={`${seg.book}|${seg.chapter}`}>
                         {segIdx === 0
-                          ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
-                          : <div style={r.chapterDivider}>
+                          ? <h2
+                              data-seg-book={seg.book}
+                              data-seg-chapter={String(seg.chapter)}
+                              style={r.chapterHeading}
+                            >{seg.book} {seg.chapter}</h2>
+                          : <div
+                              data-seg-book={seg.book}
+                              data-seg-chapter={String(seg.chapter)}
+                              style={r.chapterDivider}
+                            >
                               <span style={r.chapterDividerLine} />
                               <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
                               <span style={r.chapterDividerLine} />
@@ -1310,6 +1373,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                             onClick={e => {
                                               e.stopPropagation()
                                               const sLang = wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'
+                                              setLexReturn(null)
                                               setStrongsModal({ strongsId: wd.s, lang: sLang })
                                             }}
                                             title="Open in-app lexicon"
@@ -1431,8 +1495,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 {!loading && !error && segments.length > 0 && bibleResults === null && segments.map((seg, segIdx) => (
                   <div key={`${seg.book}|${seg.chapter}`}>
                     {segIdx === 0
-                      ? <h2 style={r.chapterHeading}>{seg.book} {seg.chapter}</h2>
-                      : <div style={r.chapterDivider}>
+                      ? <h2
+                          data-seg-book={seg.book}
+                          data-seg-chapter={String(seg.chapter)}
+                          style={r.chapterHeading}
+                        >{seg.book} {seg.chapter}</h2>
+                      : <div
+                          data-seg-book={seg.book}
+                          data-seg-chapter={String(seg.chapter)}
+                          style={r.chapterDivider}
+                        >
                           <span style={r.chapterDividerLine} />
                           <span style={r.chapterDividerLabel}>{seg.book} {seg.chapter}</span>
                           <span style={r.chapterDividerLine} />
@@ -1678,13 +1750,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <StrongsModal
           strongsId={strongsModal.strongsId}
           lang={strongsModal.lang}
+          initialView={strongsModal.initialView || 'detail'}
           greekFontId={prefs.greekFontId}
           hebrewFontId={prefs.hebrewFontId}
           onClose={() => setStrongsModal(null)}
           onNavigate={(b, ch, v) => {
+            // Save return context so user can go back to results
+            const { strongsId: sid, lang: slang } = strongsModal
+            setLexReturn({ strongsId: sid, lang: slang })
+            // After morph chapter loads, auto-select the matched word
+            if (v) pendingLexHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
             setStrongsModal(null)
-            setBook(b)
-            setChapter(ch)
+            navigate(b, ch)
             // Scroll to the target verse after re-render
             if (v) {
               setTimeout(() => {
@@ -1694,6 +1771,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             }
           }}
         />
+      )}
+
+      {/* Floating "Back to Lexicon" pill — shown after navigating from scripture results */}
+      {lexReturn && !strongsModal && (
+        <div style={r.lexBackPill}>
+          <button
+            style={r.lexBackBtn}
+            onClick={() => setStrongsModal({ strongsId: lexReturn.strongsId, lang: lexReturn.lang, initialView: 'scripture' })}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
+              <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to lexicon results
+          </button>
+          <button style={r.lexBackDismiss} onClick={() => setLexReturn(null)} title="Dismiss">×</button>
+        </div>
       )}
 
       {/* KJV word-tap search modal */}
@@ -2362,6 +2455,30 @@ const r = {
     border:'1px solid var(--border)', borderRadius:'var(--radius)',
     fontSize:13, cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* ── Lexicon back pill ── */
+  lexBackPill: {
+    position:'fixed', bottom:76, left:'50%', transform:'translateX(-50%)',
+    zIndex:400,
+    display:'flex', alignItems:'center', gap:0,
+    background:'var(--ink)', borderRadius:99,
+    boxShadow:'0 4px 16px rgba(0,0,0,0.25)',
+    overflow:'hidden',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  lexBackBtn: {
+    display:'flex', alignItems:'center', gap:6,
+    padding:'9px 14px 9px 12px',
+    background:'none', border:'none', cursor:'pointer',
+    color:'white', fontSize:13, fontWeight:600,
+    whiteSpace:'nowrap',
+  },
+  lexBackDismiss: {
+    padding:'9px 12px 9px 4px',
+    background:'none', border:'none', cursor:'pointer',
+    color:'rgba(255,255,255,0.55)', fontSize:16, lineHeight:1,
+    transition:'color 0.1s',
   },
 
   /* ── Hebrew-specific overrides ── */

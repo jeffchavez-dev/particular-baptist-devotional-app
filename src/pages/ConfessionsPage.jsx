@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
-import { useSearchParams, useLocation } from 'react-router-dom'
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs, useAuth } from '../App'
 import CopyBtn from '../components/CopyBtn'
@@ -9,6 +9,8 @@ import { LBCF1 }              from '../data/lbcf1'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 import { parseRefs } from '../lib/parseRefs'
+import { buildScriptureIndex, BOOK_MAP } from '../lib/scriptureParser'
+import { buildSchedule } from '../lib/supabase'
 import KjvModal from '../components/KjvModal'
 import ShareCardModal from '../components/ShareCardModal'
 import {
@@ -128,6 +130,181 @@ const SOURCES = {
   'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",            color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
   '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',       color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
   'orthodox':  { label: 'Orthodox',  name: 'An Orthodox Catechism (1680)',                 color: 'var(--sky)',       bg: 'var(--sky-light)',  href: 'https://1689.com/an-orthodox-catechism/' },
+}
+
+/* ── Proof-text helpers (sidebar panel) ── */
+const _SCHEDULE = buildSchedule()
+const PT_INDEX  = buildScriptureIndex(LBCF2, CATECHISM, LBCF1, _SCHEDULE)
+
+const BOOK_NAMES_ORDERED = Array.from(
+  new Map(Object.values(BOOK_MAP).map(b => [b.order, b])).values()
+).sort((a, b) => a.order - b.order)
+
+function ptSrcBadge(src) {
+  if (src === '2LBCF')     return { bg:'var(--purple-soft)', color:'var(--purple-ink)' }
+  if (src === 'Catechism') return { bg:'var(--teal-light)',  color:'var(--teal)' }
+  return                          { bg:'var(--amber-soft)',  color:'var(--amber-ink)' }
+}
+
+/* Sidebar proof-text panel */
+function ProofTextPanel({ onDayNav }) {
+  const [ptSearch,   setPtSearch]   = useState('')
+  const [expanded,   setExpanded]   = useState(null)
+  const [filterSrc,  setFilterSrc]  = useState('')
+
+  const filtered = useMemo(() => {
+    const q = ptSearch.toLowerCase().trim()
+    return PT_INDEX.filter(entry => {
+      if (filterSrc && !entry.citations.some(c => c.src === filterSrc)) return false
+      if (!q) return true
+      return (
+        entry.refStr.toLowerCase().includes(q) ||
+        entry.bookInfo.name.toLowerCase().includes(q) ||
+        entry.citations.some(c => c.label.toLowerCase().includes(q))
+      )
+    })
+  }, [ptSearch, filterSrc])
+
+  const grouped = useMemo(() => {
+    const groups = new Map()
+    filtered.forEach(entry => {
+      const name = entry.bookInfo.name
+      if (!groups.has(name)) groups.set(name, { bookInfo: entry.bookInfo, entries: [] })
+      groups.get(name).entries.push(entry)
+    })
+    return Array.from(groups.values()).sort((a, b) => a.bookInfo.order - b.bookInfo.order)
+  }, [filtered])
+
+  return (
+    <div style={pt.wrap}>
+      {/* Search + filter */}
+      <div style={pt.searchRow}>
+        <div style={pt.searchBox}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
+            <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
+          <input
+            style={pt.searchInput}
+            value={ptSearch}
+            onChange={e => setPtSearch(e.target.value)}
+            placeholder="Search references…"
+          />
+          {ptSearch && <button style={pt.clearBtn} onClick={() => setPtSearch('')}>×</button>}
+        </div>
+        <select value={filterSrc} onChange={e => setFilterSrc(e.target.value)} style={pt.select}>
+          <option value="">All sources</option>
+          <option value="2LBCF">2LBCF</option>
+          <option value="Catechism">Catechism</option>
+          <option value="1LBCF">1LBCF</option>
+        </select>
+      </div>
+
+      <div style={pt.count}>
+        {grouped.length} book{grouped.length !== 1 ? 's' : ''} · {filtered.length} passage{filtered.length !== 1 ? 's' : ''}
+      </div>
+
+      {/* Results */}
+      <div style={pt.list}>
+        {grouped.map(({ bookInfo, entries }) => {
+          const isOpen = expanded === bookInfo.name || ptSearch.trim() !== ''
+          const isOT   = bookInfo.order <= 39
+          return (
+            <div key={bookInfo.name} style={pt.bookBlock}>
+              <button
+                style={pt.bookBtn}
+                onClick={() => setExpanded(e => e === bookInfo.name ? null : bookInfo.name)}
+              >
+                <span style={{
+                  ...pt.testBadge,
+                  background: isOT ? 'var(--amber-soft)' : 'var(--purple-soft)',
+                  color: isOT ? 'var(--amber-ink)' : 'var(--purple-ink)',
+                }}>{isOT ? 'OT' : 'NT'}</span>
+                <span style={pt.bookName}>{bookInfo.name}</span>
+                <span style={pt.bookCount}>{entries.length}</span>
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"
+                  style={{flexShrink:0, transition:'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)', color:'var(--ink-faint)'}}>
+                  <path d="M3.5 2l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+              </button>
+              {isOpen && (
+                <div style={pt.entryList}>
+                  {entries.map(entry => (
+                    <div key={entry.refStr} style={pt.entryRow}>
+                      <span style={pt.refStr}>{entry.refStr}</span>
+                      <div style={pt.citeRow}>
+                        {entry.citations.map((c, i) => {
+                          const badge = ptSrcBadge(c.src)
+                          return (
+                            <button
+                              key={i}
+                              style={{...pt.citeBtn, background: badge.bg, color: badge.color}}
+                              onClick={() => onDayNav(c.day)}
+                              title={`${c.label} · Day ${c.day}`}
+                            >
+                              {c.src === '2LBCF' ? c.label.replace('2LBCF ', '') : c.label.replace(/^(Catechism|1LBCF) /, '')}
+                              <span style={{fontWeight:400,opacity:0.65,marginLeft:3}}>·{c.day}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {grouped.length === 0 && (
+          <div style={{fontSize:12, color:'var(--ink-faint)', textAlign:'center', padding:'1.5rem 0'}}>No passages found.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const pt = {
+  wrap: { display:'flex', flexDirection:'column', gap:8, fontFamily:"'DM Sans',sans-serif" },
+  searchRow: { display:'flex', gap:6 },
+  searchBox: {
+    flex:1, display:'flex', alignItems:'center', gap:6,
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    padding:'0 8px', background:'var(--parchment)',
+  },
+  searchInput: {
+    flex:1, border:'none', background:'transparent', outline:'none',
+    fontSize:12, color:'var(--ink)', padding:'6px 0',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  clearBtn: { background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', fontSize:14, lineHeight:1, padding:0 },
+  select: {
+    fontSize:11, border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    background:'var(--surface)', color:'var(--ink)', cursor:'pointer', padding:'4px 6px',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  count: { fontSize:10, color:'var(--ink-faint)', padding:'0 2px' },
+  list: { display:'flex', flexDirection:'column', gap:3 },
+  bookBlock: { border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' },
+  bookBtn: {
+    display:'flex', alignItems:'center', gap:6, width:'100%', textAlign:'left',
+    padding:'7px 10px', background:'var(--surface)', border:'none', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.1s',
+  },
+  testBadge: { fontSize:8, fontWeight:700, padding:'1px 5px', borderRadius:99, letterSpacing:'0.05em', flexShrink:0 },
+  bookName: { fontSize:12, fontWeight:600, color:'var(--ink)', flex:1, fontFamily:"'Cormorant Garamond',serif" },
+  bookCount: { fontSize:10, color:'var(--ink-faint)', flexShrink:0 },
+  entryList: { borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column' },
+  entryRow: {
+    display:'flex', flexDirection:'column', gap:3,
+    padding:'6px 10px', borderBottom:'1px solid var(--border)',
+  },
+  refStr: { fontSize:11, fontWeight:600, color:'var(--ink)', fontVariantNumeric:'tabular-nums' },
+  citeRow: { display:'flex', flexWrap:'wrap', gap:3 },
+  citeBtn: {
+    display:'inline-flex', alignItems:'center', fontSize:10, fontWeight:600,
+    padding:'2px 7px', borderRadius:99, border:'none', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
+  },
 }
 
 /* ── Clickable scripture-proof chips ── */
@@ -473,6 +650,7 @@ const ia = {
 export default function ConfessionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { state: locationState } = useLocation()
+  const routerNavigate = useNavigate()
   const { prefs, updatePrefs } = usePrefs()
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
@@ -701,14 +879,32 @@ export default function ConfessionsPage() {
             </span>
           </button>
         ))}
-        {sidebarConf !== tab && sidebarConf !== 'catechism' && (
+
+        {/* Proof Texts entry */}
+        <button
+          style={{
+            ...s.confSelectorBtn,
+            ...(sidebarConf === 'prooftexts' ? {
+              background:'var(--parchment)', color:'var(--ink)',
+              borderColor:'var(--ink-muted)', fontWeight:700,
+            } : {}),
+          }}
+          onClick={() => setSidebarConf('prooftexts')}
+        >
+          <span style={{...s.confBadgeDot, background: sidebarConf === 'prooftexts' ? 'var(--ink-muted)' : 'var(--border-strong)'}} />
+          <span style={{flex:1, textAlign:'left'}}>Proof Texts</span>
+          <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>Index</span>
+        </button>
+
+        {sidebarConf !== tab && sidebarConf !== 'catechism' && sidebarConf !== 'prooftexts' && (
           <p style={{fontSize:10, color:'var(--ink-faint)', margin:'6px 4px 0', lineHeight:1.5}}>
             Select a chapter below to open it
           </p>
         )}
       </div>
 
-      {chapterNav.length > 0 && (
+      {/* Chapter nav (confessions) */}
+      {chapterNav.length > 0 && sidebarConf !== 'prooftexts' && (
         <>
           <div style={s.sidebarDivider} />
           <div style={s.chapterListLabel}>Chapters</div>
@@ -728,6 +924,14 @@ export default function ConfessionsPage() {
               </button>
             ))}
           </div>
+        </>
+      )}
+
+      {/* Proof Texts panel */}
+      {sidebarConf === 'prooftexts' && (
+        <>
+          <div style={s.sidebarDivider} />
+          <ProofTextPanel onDayNav={d => { routerNavigate(`/day/${d}`); setNavOpen(false) }} />
         </>
       )}
     </div>

@@ -8,6 +8,7 @@ import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
+import BibleTrackerSection from '../components/BibleTrackerSection'
 import {
   getAllKjvHighlights, getAllKjvNotes,
   getAllConfHighlights, getAllConfNotes,
@@ -601,6 +602,21 @@ export default function AboutPage() {
       </header>
 
       <main style={s.main}>
+
+        {/* ════ 0. BIBLE TRACKER ════ */}
+        <CollapseSection
+          id="bible-tracker"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="1.5" y="2" width="13" height="12" rx="1.5" stroke="var(--teal)" strokeWidth="1.3"/>
+              <path d="M5 2v12M1.5 6h13M1.5 10h13" stroke="var(--teal)" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          }
+          title="Bible Tracker"
+          defaultOpen={false}
+        >
+          <BibleTrackerSection />
+        </CollapseSection>
 
         {/* ════ 1. ACHIEVEMENTS ════ */}
         <CollapseSection

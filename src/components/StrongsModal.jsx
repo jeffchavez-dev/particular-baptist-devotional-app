@@ -249,8 +249,8 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
  *   onClose      — () => void
  *   onNavigate   — (book, chapter, verse) => void  called when user taps a scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate }) {
-  const [view,    setView]    = useState('detail')  // 'detail' | 'browse' | 'scripture'
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, initialView = 'detail' }) {
+  const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
   const [error,   setError]   = useState(null)
