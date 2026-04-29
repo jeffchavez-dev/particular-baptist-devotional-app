@@ -19,6 +19,10 @@ import {
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
 
+/* ── LXX word+Strongs lazy cache (for parallel mode) ── */
+let _lxxWordsCache   = null
+let _lxxWordsPromise = null
+
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
 }
@@ -548,9 +552,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Pending word highlight after navigating from lexicon results */
   const pendingLexHighlightRef = useRef(null) // { book, chapter, verse, strongsId } | null
 
-  /* Parallel original-language overlay (GNT for NT, HOT for OT) */
-  const [parallelData,   setParallelData]   = useState({}) // { 'Book:ch': [{verse, text}] }
-  const parallelLoadedRef = useRef(new Set()) // prevents duplicate fetches
+  /* Parallel original-language overlay (GNT for NT, HOT+LXX for OT) */
+  const [parallelData,    setParallelData]    = useState({}) // { 'Book:ch': [{verse, words:[{w,t,g,s,r,ms}]}] }
+  const [parallelLxxData, setParallelLxxData] = useState({}) // { 'Book:ch': [{verse, words:[{w,s}]}] }
+  const parallelLoadedRef    = useRef(new Set()) // GNT/HOT — prevents duplicate fetches
+  const parallelLxxLoadedRef = useRef(new Set()) // LXX — prevents duplicate fetches
+
+  /* Which word is selected/expanded inside the parallel section */
+  const [parallelWord, setParallelWord] = useState(null) // {verseKey, lang, wordIdx} | null
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -590,12 +599,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     })
   }, [histIdx]) // eslint-disable-line
 
-  /* Load original-language parallel text for each visible segment */
+  /* Load GNT/HOT parallel word data for each visible segment */
   useEffect(() => {
-    // Only runs in text mode (KJV etc.) with parallel toggled on
-    if (!parallelMode || version === 'greek' || version === 'hebrew') return
+    if (!parallelMode || version === 'greek' || version === 'hebrew' || version === 'lxx') return
     for (const seg of segments) {
-      const key   = `${seg.book}:${seg.chapter}`
+      const key = `${seg.book}:${seg.chapter}`
       if (parallelLoadedRef.current.has(key)) continue
       parallelLoadedRef.current.add(key)
 
@@ -606,12 +614,31 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       loader.then(() => {
         const chData = getter(seg.book, seg.chapter)
         if (!chData) return
-        const verseTexts = chData.map(v => ({
-          verse: v.verse,
-          text:  v.words.map(w => w.w).join(' '),
-        }))
-        setParallelData(prev => ({ ...prev, [key]: verseTexts }))
-      }).catch(() => { parallelLoadedRef.current.delete(key) }) // allow retry
+        // Store FULL word objects (not joined strings) so the parallel view can render chips
+        setParallelData(prev => ({ ...prev, [key]: chData }))
+      }).catch(() => { parallelLoadedRef.current.delete(key) })
+    }
+  }, [parallelMode, segments, version]) // eslint-disable-line
+
+  /* Load LXX parallel word+Strongs data for OT segments */
+  useEffect(() => {
+    if (!parallelMode || version === 'greek' || version === 'hebrew' || version === 'lxx') return
+    for (const seg of segments) {
+      if (NT_BOOKS.has(seg.book)) continue // LXX is OT only
+      const key = `lxx:${seg.book}:${seg.chapter}`
+      if (parallelLxxLoadedRef.current.has(key)) continue
+      parallelLxxLoadedRef.current.add(key)
+
+      // Lazy-load the entire lxx-words.json the first time, cache it
+      _lxxWordsPromise = _lxxWordsPromise || fetch('/lxx-words.json').then(r => r.json()).then(d => { _lxxWordsCache = d; return d })
+      const bookKey = seg.book
+      const chKey   = seg.chapter
+      _lxxWordsPromise.then(data => {
+        const bs   = bookKey.toLowerCase().replace(/\s+/g,'').replace(/[^a-z0-9]/g,'')
+        const chData = data[bs]?.[String(chKey)]
+        if (!chData) return
+        setParallelLxxData(prev => ({ ...prev, [`${bookKey}:${chKey}`]: chData }))
+      }).catch(() => { parallelLxxLoadedRef.current.delete(key) })
     }
   }, [parallelMode, segments, version]) // eslint-disable-line
 
@@ -675,6 +702,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setColorBarOpen(false)
     setSearchFocus(0)
     setBibleResults(null)  // close search results when navigating
+    setParallelWord(null)  // dismiss open parallel word card
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -1673,23 +1701,212 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </span>
                             </div>
 
-                            {/* ── Parallel original-language line ── */}
+                            {/* ── Parallel original-language section ── */}
                             {parallelMode && (() => {
-                              const pKey   = `${seg.book}:${seg.chapter}`
-                              const pCh    = parallelData[pKey]
-                              const pVerse = pCh?.find(pv => pv.verse === verse)
-                              if (!pVerse) return null
-                              const isNT   = NT_BOOKS.has(seg.book)
-                              const lang   = isNT ? 'GNT' : 'HOT'
-                              const fam    = isNT
-                                ? getGreekFontCss(prefs.greekFontId)
-                                : getHebrewFontCss(prefs.hebrewFontId)
+                              const pKey    = `${seg.book}:${seg.chapter}`
+                              const isNT    = NT_BOOKS.has(seg.book)
+                              const isHeb   = !isNT
+                              const lang    = isNT ? 'GNT' : 'HOT'
+
+                              // GNT/HOT data
+                              const morphCh   = parallelData[pKey]
+                              const morphVerse = morphCh?.find(pv => pv.verse === verse)
+
+                              // LXX data (OT only)
+                              const lxxCh    = isHeb ? parallelLxxData[pKey] : null
+                              const lxxVerse = lxxCh?.find(pv => pv.verse === verse)
+
+                              if (!morphVerse && !lxxVerse) return null
+
+                              const grFont  = getGreekFontCss(prefs.greekFontId)
+                              const hebFont = getHebrewFontCss(prefs.hebrewFontId)
+                              const grSize  = prefs.sizePx * 1.15
+                              const hebSize = prefs.sizePx * 1.3
+
+                              // Parallel word selection keys
+                              const morphVK = `par|${lang}|${seg.book}|${seg.chapter}|${verse}`
+                              const lxxVK   = `par|LXX|${seg.book}|${seg.chapter}|${verse}`
+                              const pW      = parallelWord
+                              const morphWordSel = pW?.verseKey === morphVK ? pW.wordIdx : -1
+                              const lxxWordSel   = pW?.verseKey === lxxVK   ? pW.wordIdx : -1
+
+                              // Shared morph helpers (mirrors full mode)
+                              const parseMarkerFn      = isHeb ? getHebMsMarker : getMsMarker
+                              const parseMorphDetailFn = isHeb ? parseHebrewMorphDetails : parseMorphDetails
+
                               return (
-                                <div style={r.parallelLine}>
-                                  <span style={r.parallelBadge}>{lang}</span>
-                                  <span style={{ ...r.parallelText, fontFamily: fam, direction: isNT ? 'ltr' : 'rtl' }}>
-                                    {pVerse.text}
-                                  </span>
+                                <div style={r.parallelBlock}>
+
+                                  {/* ── GNT / HOT word chips ── */}
+                                  {morphVerse && (
+                                    <>
+                                      <div style={r.parallelLine}>
+                                        <span style={{
+                                          ...r.parallelBadge,
+                                          background: isNT ? 'rgba(61,43,107,0.10)' : 'rgba(29,107,90,0.10)',
+                                          color:      isNT ? '#3d2b6b' : '#1d6b5a',
+                                        }}>{lang}</span>
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:'2px 4px', direction: isHeb ? 'rtl' : 'ltr', flex:1 }}>
+                                          {morphVerse.words.map((wd, wi) => {
+                                            const isSel = wi === morphWordSel
+                                            return (
+                                              <span
+                                                key={wi}
+                                                style={{
+                                                  ...r.greekToken,
+                                                  ...(isHeb ? r.hebrewTokenOrig : r.greekTokenGk),
+                                                  ...(isSel ? r.greekTokenSel : {}),
+                                                  fontSize: isHeb ? hebSize : grSize,
+                                                  fontFamily: isHeb ? hebFont : grFont,
+                                                  cursor:'pointer',
+                                                }}
+                                                onClick={e => {
+                                                  e.stopPropagation()
+                                                  setParallelWord(isSel ? null : { verseKey: morphVK, lang, wordIdx: wi })
+                                                }}
+                                                title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s || ''}`}
+                                              >
+                                                {wd.w}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* GNT/HOT word info strip */}
+                                      {morphWordSel >= 0 && (() => {
+                                        const wd = morphVerse.words[morphWordSel]
+                                        if (!wd) return null
+                                        const msMarker = parseMarkerFn(wd.ms)
+                                        const msColor  = isHeb
+                                          ? (msMarker === 'Q' ? '#5a3e8c' : '#1d6b5a')
+                                          : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c')
+                                        const msDesc = isHeb
+                                          ? { Q:'Qere — scribal correction', R:'Restored — reconstructed from parallel', X:'Extra — preserved in the LXX' }[msMarker]
+                                          : { TR:'Textus Receptus only', NA:'Modern critical text only' }[msMarker]
+                                        const detail = parseMorphDetailFn(wd.r)
+                                        return (
+                                          <div style={{ ...r.wordInfoStrip, marginLeft:28 }} onClick={e => e.stopPropagation()}>
+                                            <div style={r.wiScriptRow}>
+                                              <span style={{
+                                                ...(isHeb ? r.hebrewInfoWord : r.wordInfoGreek),
+                                                fontSize: prefs.sizePx * (isHeb ? 1.55 : 1.4),
+                                                fontFamily: isHeb ? hebFont : grFont,
+                                              }}>{wd.w}</span>
+                                              <span style={r.wiTranslit}>{wd.t}</span>
+                                            </div>
+                                            <div style={r.wiGloss}>"{wd.g}"</div>
+                                            <div style={r.wiStrongsRow}>
+                                              <span style={r.wiStrongsLabel}>Strong's</span>
+                                              {wd.s ? (
+                                                <button style={r.wiStrongsBtn} onClick={e => {
+                                                  e.stopPropagation()
+                                                  setStrongsModal({ strongsId: wd.s, lang: wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek' })
+                                                }}>
+                                                  {wd.s}
+                                                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3}}>
+                                                    <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                                                    <path d="M4.5 3v2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                                    <circle cx="4.5" cy="6.8" r="0.5" fill="currentColor"/>
+                                                  </svg>
+                                                </button>
+                                              ) : <span style={r.wiStrongsNum}>—</span>}
+                                              <span style={r.wiStrongsHint}>tap to open lexicon</span>
+                                            </div>
+                                            {detail && (
+                                              <div style={r.wiMorphBlock}>
+                                                <div style={r.wiMorphRow}>
+                                                  <span style={r.wiMorphLabel}>Part of Speech</span>
+                                                  <span style={r.wiMorphValue}>{detail.pos}</span>
+                                                </div>
+                                                {detail.items.map(it => (
+                                                  <div key={it.label} style={r.wiMorphRow}>
+                                                    <span style={r.wiMorphLabel}>{it.label}</span>
+                                                    <span style={r.wiMorphValue}>{it.value}</span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                            {msDesc && (
+                                              <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
+                                                <span style={{ fontWeight:700, marginRight:4 }}>{msMarker}</span>{msDesc}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })()}
+                                    </>
+                                  )}
+
+                                  {/* ── LXX word chips (OT only) ── */}
+                                  {isHeb && lxxVerse && (
+                                    <>
+                                      <div style={r.parallelLine}>
+                                        <span style={{
+                                          ...r.parallelBadge,
+                                          background: 'rgba(12,74,110,0.10)',
+                                          color: '#0c4a6e',
+                                        }}>LXX</span>
+                                        <div style={{ display:'flex', flexWrap:'wrap', gap:'2px 4px', flex:1 }}>
+                                          {lxxVerse.words.map((lw, wi) => {
+                                            const isSel = wi === lxxWordSel
+                                            return (
+                                              <span
+                                                key={wi}
+                                                style={{
+                                                  ...r.greekToken,
+                                                  ...r.greekTokenGk,
+                                                  ...(isSel ? r.greekTokenSel : {}),
+                                                  fontSize: grSize,
+                                                  fontFamily: grFont,
+                                                  cursor: lw.s ? 'pointer' : 'default',
+                                                }}
+                                                onClick={e => {
+                                                  e.stopPropagation()
+                                                  setParallelWord(isSel ? null : { verseKey: lxxVK, lang: 'LXX', wordIdx: wi })
+                                                }}
+                                                title={lw.s || ''}
+                                              >
+                                                {lw.w}
+                                              </span>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {/* LXX word Strongs info */}
+                                      {lxxWordSel >= 0 && (() => {
+                                        const lw = lxxVerse.words[lxxWordSel]
+                                        if (!lw) return null
+                                        return (
+                                          <div style={{ ...r.wordInfoStrip, marginLeft:28 }} onClick={e => e.stopPropagation()}>
+                                            <div style={r.wiScriptRow}>
+                                              <span style={{ ...r.wordInfoGreek, fontSize: prefs.sizePx * 1.4, fontFamily: grFont }}>{lw.w}</span>
+                                              <span style={{ fontSize:11, color:'var(--ink-faint)', fontStyle:'italic', marginLeft:6 }}>LXX Septuagint</span>
+                                            </div>
+                                            <div style={r.wiStrongsRow}>
+                                              <span style={r.wiStrongsLabel}>Strong's</span>
+                                              {lw.s ? (
+                                                <button style={r.wiStrongsBtn} onClick={e => {
+                                                  e.stopPropagation()
+                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek' })
+                                                }}>
+                                                  {lw.s}
+                                                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3}}>
+                                                    <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                                                    <path d="M4.5 3v2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                                    <circle cx="4.5" cy="6.8" r="0.5" fill="currentColor"/>
+                                                  </svg>
+                                                </button>
+                                              ) : <span style={r.wiStrongsNum}>—</span>}
+                                              <span style={r.wiStrongsHint}>tap to open lexicon</span>
+                                            </div>
+                                          </div>
+                                        )
+                                      })()}
+                                    </>
+                                  )}
+
                                 </div>
                               )
                             })()}
@@ -2197,23 +2414,20 @@ const r = {
   },
 
   /* ── Parallel original-language overlay ── */
-  parallelLine: {
-    display:'flex', alignItems:'baseline', gap:8,
-    padding:'5px 0 5px 28px',   // indent to align with verse text (past the verse number)
+  parallelBlock: {
     borderTop:'1px solid var(--border)',
-    marginTop:2,
+    marginTop:3,
+  },
+  parallelLine: {
+    display:'flex', alignItems:'flex-start', gap:8,
+    padding:'4px 0 4px 28px',  // indent past verse number
   },
   parallelBadge: {
     flexShrink:0,
     fontSize:8, fontWeight:700, letterSpacing:'0.08em', textTransform:'uppercase',
-    color:'var(--teal)', background:'var(--teal-light)',
     borderRadius:3, padding:'2px 4px',
     fontFamily:"'DM Sans',sans-serif",
-    alignSelf:'flex-start', marginTop:2,
-  },
-  parallelText: {
-    flex:1, fontSize:14, color:'var(--ink-muted)', lineHeight:1.7,
-    fontFamily:"'Palatino Linotype','Palatino',serif",
+    marginTop:5,
   },
 
   /* ── Colour picker ── */
