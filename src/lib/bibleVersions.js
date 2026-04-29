@@ -55,6 +55,17 @@ export const BIBLE_VERSIONS = [
     scope: 'OT',        // OT books only
     source: 'STEPBible.org CC BY 4.0',
   },
+  {
+    id: 'lxx',
+    label: 'Greek Septuagint',
+    abbreviation: 'LXX',
+    language: 'Greek',
+    year: 'Rahlfs 1935',
+    description: 'The Greek translation of the Hebrew scriptures used in early Christianity',
+    dataFile: '/lxx.json',
+    scope: 'OT',        // OT books; LXX includes additional deuterocanonical books
+    source: 'CCAT (Thesaurus Linguae Graecae / CATSS) CC BY 4.0',
+  },
   // { id: 'esv',    label: 'English Standard Version', abbreviation: 'ESV', ... },
   // { id: 'nasb',   label: 'New American Standard Bible', abbreviation: 'NASB', ... },
 ]

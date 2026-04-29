@@ -169,3 +169,46 @@ devotional-app/
 **Email confirmation not arriving** — Check spam. In Supabase → Authentication → Email Templates you can customise the email. For testing, you can disable email confirmation under Auth → Settings → "Enable email confirmations".
 
 **Row-level security error** — Make sure you ran the full SQL in Step 1, including both the `alter table` and `create policy` commands.
+
+---
+
+## Adding Bible Versions (Optional)
+
+The app supports multiple Bible translations. To add the **LXX (Greek Septuagint)**:
+
+### Get an API.Bible Key
+
+1. Go to https://api.bible.com/signin
+2. Sign up for a free account
+3. Create a new API key in your account settings
+4. Copy the key
+
+### Fetch the LXX Data
+
+In your terminal, run:
+
+```bash
+API_BIBLE_KEY=your_key_here npm run fetch:lxx
+```
+
+This will:
+- Fetch all 50+ LXX books including deuterocanonical books (Wisdom, Sirach, Maccabees, etc.)
+- Save them to `public/lxx.json` (usually 2-3 MB)
+- Make them available for offline reading in your app
+
+The LXX reader will automatically appear alongside KJV when you build the app.
+
+### Available Bible Versions
+
+Currently supported:
+- **KJV** — King James Version (English, 1611)
+- **LXX** — Greek Septuagint (Greek, Rahlfs 1935 versification) — *See "Adding Bible Versions" above*
+- **GNT** — Greek New Testament (Greek, morphological tagging) — *Requires TAGNT data*
+- **HOT** — Hebrew Old Testament (Hebrew, Masoretic) — *Requires TAHOT data*
+
+Future versions can be added by:
+1. Creating a new entry in `src/lib/bibleVersions.js`
+2. Creating a fetch script in `scripts/fetch-{version}.mjs`
+3. Running the script to generate the JSON file
+4. Adding it to `public/`
+
