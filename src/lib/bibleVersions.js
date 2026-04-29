@@ -29,6 +29,7 @@ export const BIBLE_VERSIONS = [
     year: '2000',
     description: 'Tagalog Bible translation',
     dataFile: '/abab.json',
+    hidden: true,   // work in progress — not shown in version picker yet
   },
   {
     id: 'greek',
