@@ -73,7 +73,10 @@ function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 20
     for (const ch of chapterNums) {
       const verses = bookData[ch]
       if (!verses) continue
+      const seen = new Set()
       for (const v of verses) {
+        if (seen.has(v.v)) continue
+        seen.add(v.v)
         if (v.t && v.t.toLowerCase().includes(q)) {
           hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch, version) })
           if (hits.length >= maxResults) return hits
