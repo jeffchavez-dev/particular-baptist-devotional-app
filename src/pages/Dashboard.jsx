@@ -3,6 +3,19 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum, getBookmarks, toggleBookmark } from '../lib/supabase'
 import { useAuth, usePrefs } from '../App'
 import { getFontCss } from '../components/FontPrefsPanel'
+import { saveScroll, restoreScroll } from '../lib/pageState'
+
+/* ── Progress sessionStorage cache ─────────────────────────────────── */
+const DASH_CACHE_KEY = 'pb-dash-progress'
+function saveDashProgress(map) {
+  try { sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(map)) } catch {}
+}
+function loadDashProgress() {
+  try {
+    const raw = sessionStorage.getItem(DASH_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
 import { QUOTES } from '../data/quotes'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -83,8 +96,10 @@ export default function Dashboard() {
   const { prefs }    = usePrefs()
   const navigate     = useNavigate()
 
-  const [progress,     setProgress]     = useState({})   // { day_number: completed, _notes_N: text }
-  const [loading,      setLoading]      = useState(true)
+  /* Use sessionStorage cache so returning to this page doesn't flash a spinner */
+  const _cached = loadDashProgress()
+  const [progress,     setProgress]     = useState(_cached || {})
+  const [loading,      setLoading]      = useState(!_cached)  // only show spinner on truly first visit
   const [search,       setSearch]       = useState('')
   const [filterSrc,    setFilterSrc]    = useState('')
   const [filterStatus, setFilterStatus] = useState(() => {
@@ -110,6 +125,17 @@ export default function Dashboard() {
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
+
+  /* ── Save scroll on unmount, restore on mount ── */
+  useEffect(() => {
+    restoreScroll('dashboard')
+    return () => saveScroll('dashboard')
+  }, [])
+
+  /* ── Keep sessionStorage cache in sync with progress state ── */
+  useEffect(() => {
+    saveDashProgress(progress)
+  }, [progress])
 
   /* ── load progress (includes user's personal notes) ── */
   useEffect(() => {

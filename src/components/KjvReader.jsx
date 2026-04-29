@@ -6,8 +6,9 @@ import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarke
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import ShareCardModal from './ShareCardModal'
 import ConfessionModal from './ConfessionModal'
+import StrongsModal from './StrongsModal'
 import { usePrefs, useAuth } from '../App'
-import { getFontCss, GREEK_FONTS, HEBREW_FONTS, getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
+import { getFontCss, getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import {
   HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
@@ -521,6 +522,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [morphSegments, setMorphSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
   const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
+  const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang } | null
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -1140,13 +1142,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             const parseMorph       = isHeb ? parseHebrewMorph : parseGrammar
             const parseMorphDetail = isHeb ? parseHebrewMorphDetails : parseMorphDetails
 
-            // Strong's → BibleHub URL (strips G/H prefix + leading zeros)
-            function strongsUrl(s) {
-              if (!s) return null
-              const lang = s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'
-              const num  = parseInt(s.slice(1), 10)
-              return num ? `https://biblehub.com/${lang}/${num}.htm` : null
-            }
             const getWordLabel = (wd) =>
               displayMode === 'orig'    ? wd.w
               : displayMode === 'translit' ? wd.t
@@ -1160,8 +1155,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             const chipFontSize   = displayMode === 'orig'
               ? prefs.sizePx * (isHeb ? 1.3 : 1.15)
               : prefs.sizePx
-            const scriptFonts    = isHeb ? HEBREW_FONTS : GREEK_FONTS
-            const activeFontId   = isHeb ? prefs.hebrewFontId : prefs.greekFontId
 
             return (
             <>
@@ -1202,33 +1195,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     </span>
                   </div>
 
-                  {/* Script font picker — only in orig mode */}
-                  {displayMode === 'orig' && (
-                    <div style={r.displayModeBar}>
-                      <span style={r.displayModeLabel}>Font</span>
-                      {scriptFonts.map(f => {
-                        const isActive = activeFontId === f.id
-                        return (
-                          <button
-                            key={f.id}
-                            title={f.hint}
-                            style={{
-                              ...r.displayModeBtn,
-                              ...(isActive ? r.displayModeBtnActive : {}),
-                              fontFamily: f.css,
-                              fontSize: isHeb ? 13 : 12,
-                            }}
-                            onClick={() => updatePrefs({
-                              ...prefs,
-                              [isHeb ? 'hebrewFontId' : 'greekFontId']: f.id,
-                            })}
-                          >
-                            {f.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
 
                   {/* Greek chapter segments */}
                   <div ref={verseListRef}>
@@ -1315,7 +1281,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     ? { Q:'Qere — scribal correction (the spoken text)', R:'Restored — reconstructed from a parallel passage', X:'Extra — word preserved in the Septuagint (LXX)' }[msMarker]
                                     : { TR:'Textus Receptus only — present in the KJV tradition but absent from modern critical texts', NA:'Modern critical text only — absent from the Textus Receptus / KJV tradition' }[msMarker]
                                   const detail   = parseMorphDetail(wd.r)
-                                  const lexUrl   = strongsUrl(wd.s)
                                   return (
                                     <div style={r.wordInfoStrip} onClick={e => e.stopPropagation()}>
 
@@ -1335,17 +1300,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       {/* ③ Strong's row */}
                                       <div style={r.wiStrongsRow}>
                                         <span style={r.wiStrongsLabel}>Strong's</span>
-                                        {lexUrl ? (
-                                          <a href={lexUrl} target="_blank" rel="noopener noreferrer" style={r.wiStrongsLink}>
+                                        {wd.s ? (
+                                          <button
+                                            style={r.wiStrongsBtn}
+                                            onClick={e => {
+                                              e.stopPropagation()
+                                              const sLang = wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'
+                                              setStrongsModal({ strongsId: wd.s, lang: sLang })
+                                            }}
+                                            title="Open in-app lexicon"
+                                          >
                                             {wd.s}
-                                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:3,flexShrink:0}}>
-                                              <path d="M4 2H2a1 1 0 00-1 1v5a1 1 0 001 1h5a1 1 0 001-1V6M6 1h3m0 0v3M9 1L5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3,flexShrink:0}}>
+                                              <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
+                                              <path d="M4.5 3v2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                              <circle cx="4.5" cy="6.8" r="0.5" fill="currentColor"/>
                                             </svg>
-                                          </a>
+                                          </button>
                                         ) : (
-                                          <span style={r.wiStrongsNum}>{wd.s}</span>
+                                          <span style={r.wiStrongsNum}>—</span>
                                         )}
-                                        <span style={r.wiStrongsHint}>BibleHub lexicon</span>
+                                        <span style={r.wiStrongsHint}>tap to open lexicon</span>
                                       </div>
 
                                       {/* ④ Morphology breakdown table */}
@@ -1674,6 +1649,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           text={confessionModal.text}
           refs={confessionModal.refs}
           onClose={() => setConfessionModal(null)}
+        />
+      )}
+
+      {/* Strong's lexicon modal */}
+      {strongsModal && (
+        <StrongsModal
+          strongsId={strongsModal.strongsId}
+          lang={strongsModal.lang}
+          greekFontId={prefs.greekFontId}
+          hebrewFontId={prefs.hebrewFontId}
+          onClose={() => setStrongsModal(null)}
         />
       )}
     </div>
@@ -2233,6 +2219,15 @@ const r = {
     color:'var(--teal)', background:'var(--teal-light)',
     borderRadius:99, padding:'2px 9px',
     textDecoration:'none',
+  },
+  wiStrongsBtn: {
+    display:'inline-flex', alignItems:'center',
+    fontSize:12, fontWeight:700, letterSpacing:'0.04em',
+    color:'var(--teal)', background:'var(--teal-light)',
+    borderRadius:99, padding:'2px 9px',
+    border:'none', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+    transition:'opacity 0.12s',
   },
   wiStrongsNum: {
     fontSize:12, fontWeight:700, letterSpacing:'0.04em',

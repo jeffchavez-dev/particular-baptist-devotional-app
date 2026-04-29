@@ -12,6 +12,7 @@ import { usePrefs } from '../App'
 import CopyBtn from '../components/CopyBtn'
 import { parseRefs } from '../lib/parseRefs'
 import KjvModal from '../components/KjvModal'
+import { saveScroll, restoreScroll } from '../lib/pageState'
 
 const SCHEDULE = buildSchedule()
 
@@ -471,6 +472,17 @@ export default function ReadingPage() {
   )
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(day))
 
+  /* Navigate directly to the KJV reader at a specific book/chapter/verse */
+  function openInScripture({ book: b, chapter: ch, verse: v }) {
+    navigate('/scripture', { state: { book: b, chapter: ch, verse: v ?? null, mode: 'read' } })
+  }
+
+  /* ── Save scroll on unmount, restore on mount ── */
+  useEffect(() => {
+    restoreScroll(`reading-${day}`)
+    return () => saveScroll(`reading-${day}`)
+  }, [day])
+
   useEffect(() => {
     if (!entry) return
     if (session) {
@@ -603,7 +615,7 @@ export default function ReadingPage() {
           session={session}
           entry={entry}
           prefs={prefs}
-          onScriptureRef={ref => setKjvModal(ref)}
+          onScriptureRef={ref => openInScripture(ref)}
           onShare={({ text }) => setShareCard({
             type: 'reading',
             day: day,
@@ -673,7 +685,7 @@ export default function ReadingPage() {
                 <span style={s.bibleLabel}>Scripture Reading</span>
                 <button
                   style={s.bibleChapterBtn}
-                  onClick={() => parsedBibleChapter && setKjvModal(parsedBibleChapter)}
+                  onClick={() => parsedBibleChapter && openInScripture(parsedBibleChapter)}
                   title="Read chapter in KJV"
                 >
                   {bibleChapter}
@@ -681,7 +693,7 @@ export default function ReadingPage() {
                     <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   </svg>
                 </button>
-                <span style={s.bibleHint}>Tap to read in KJV · check when done</span>
+                <span style={s.bibleHint}>Tap to open in KJV reader · check when done</span>
               </div>
               <button
                 onClick={toggleBibleChapter}

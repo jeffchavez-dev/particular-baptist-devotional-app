@@ -63,12 +63,10 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
   }, [])
 
   function goToScripture() {
-    try {
-      sessionStorage.setItem('kjv-book', book)
-      sessionStorage.setItem('kjv-chapter', String(chapter))
-    } catch {}
     onClose()
-    navigate('/scripture')
+    navigate('/scripture', {
+      state: { book, chapter, verse: verse ?? null, mode: 'read' },
+    })
   }
 
   return (
