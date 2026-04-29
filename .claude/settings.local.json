@@ -72,7 +72,19 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/STEPBible/STEPBible-Data/master/Translators%20Amalgamated%20OT%2BNT/TAHOT%20Gen-Deu%20-%20Translators%20Amalgamated%20Hebrew%20OT%20-%20STEPBible.org%20CC%20BY.txt\")",
       "Bash(grep -v \"^$\")",
       "Bash(node scripts/patchShareCard.mjs)",
-      "Bash(node scripts/processStrongs.mjs)"
+      "Bash(node scripts/processStrongs.mjs)",
+      "WebFetch(domain:ccat.sas.upenn.edu)",
+      "WebSearch",
+      "WebFetch(domain:get.bible)",
+      "WebFetch(domain:en.katabiblon.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/01_wordlist_unicode/text_accented.csv\")",
+      "Bash(curl -s \"https://api.github.com/repos/eliranwong/LXX-Rahlfs-1935/contents/08_versification\")",
+      "Bash(python3 -c \"import sys,json; [print\\(f['name'], f['size']\\) for f in json.load\\(sys.stdin\\) if isinstance\\(json.load\\(open\\('/dev/stdin', 'r'\\)\\), list\\) or True]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f['name'], f.get\\('size',0\\)\\) for f in data]\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/001_verse_c_modified_KEEP.csv\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/book_Rahlfs.csv\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/book_maps.csv\")",
+      "Bash(curl -s \"https://api.github.com/repos/eliranwong/LXX-Rahlfs-1935/contents/01_wordlist_unicode\")"
     ]
   }
 }
