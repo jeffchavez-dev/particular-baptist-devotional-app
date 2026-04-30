@@ -493,7 +493,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -654,6 +654,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
     submitSearch:   (q) => submitSearch(q),
     clearSearch:    () => closeSearch(),
+    loadAllResults: () => {
+      if (!dataReady) return
+      setSearching(true)
+      setTimeout(() => {
+        const { hits, total } = searchBibleVersion(versionData, searchQuery.trim(), version, Infinity)
+        setBibleResults(hits)
+        setBibleResultsTotal(total)
+        setBibleResultsCapped(false)
+        setSearching(false)
+        onSearchResults?.(hits, total, false, searchQuery.trim())
+      }, 0)
+    },
     navigateTo:     (newBook, newChapter, verse) => {
       navigate(newBook, newChapter)
       if (verse) pendingVerseRef.current = { book: newBook, chapter: newChapter, verse }
@@ -1429,6 +1441,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         setBibleResultsTotal(total)
         setBibleResultsCapped(capped)
         setSearching(false)
+        // If caller wants results in their own panel, notify them
+        onSearchResults?.(hits, total, capped, trimmed)
       }, 0)
     }
   }
@@ -1949,8 +1963,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   <p style={{ color:'var(--ink-muted)', fontSize:14 }}>Could not load chapter. Check your connection and try again.</p>
                 </div>
               )}
-              {/* ── Bible-wide search results ── */}
-              {bibleResults !== null && (
+              {/* ── Bible-wide search results (only when not delegated to external panel) ── */}
+              {bibleResults !== null && !onSearchResults && (
                 <BibleResultsPanel
                   bibleResults={bibleResults}
                   searchQuery={searchQuery}

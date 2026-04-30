@@ -8,6 +8,7 @@ import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion } from '../lib/readerPrefs'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
+import { addSearchHistory, getSearchHistory, clearSearchHistory } from '../lib/annotations'
 
 /* ══════════════════════════════════════════════════════════════════ */
 export default function ScripturePage() {
@@ -38,10 +39,14 @@ export default function ScripturePage() {
   const [showVersionPicker, setShowVersionPicker] = useState(() => {
     try { return !localStorage.getItem('pb-default-version') } catch { return false }
   })
-  // Search history: array of recent query strings
-  const [searchHistory, setSearchHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pb-search-hist') || '[]') } catch { return [] }
-  })
+  // Search history (shared key with KjvReader via annotations lib)
+  const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('kjv'))
+  // Search results shown in the side panel
+  const [searchResults,      setSearchResults]      = useState(null)   // null=no search, []|[…]=results
+  const [searchResultsTotal, setSearchResultsTotal] = useState(0)
+  const [searchResultsCapped,setSearchResultsCapped] = useState(false)
+  const [panelQuery,         setPanelQuery]         = useState('')
+  const [panelSearching,     setPanelSearching]     = useState(false)
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -78,9 +83,8 @@ export default function ScripturePage() {
 
   function saveSearchHistory(q) {
     if (!q.trim()) return
-    const next = [q, ...searchHistory.filter(h => h !== q)].slice(0, 20)
-    setSearchHistory(next)
-    try { localStorage.setItem('pb-search-hist', JSON.stringify(next)) } catch {}
+    addSearchHistory('kjv', q.trim())
+    setSearchHistory(getSearchHistory('kjv'))
   }
 
   /* Today's Bible chapter (for KJV reader "Today" badge) */
@@ -178,6 +182,8 @@ export default function ScripturePage() {
             </svg>
           </button>
         </div>
+
+        {/* Search input */}
         <div style={sp.searchRow}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
             <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
@@ -187,41 +193,133 @@ export default function ScripturePage() {
             autoFocus
             style={sp.searchInput}
             value={readSearch}
-            onChange={e => { setReadSearch(e.target.value); kjvRef.current?.setSearchQuery(e.target.value) }}
+            onChange={e => {
+              setReadSearch(e.target.value)
+              kjvRef.current?.setSearchQuery(e.target.value)
+              if (!e.target.value.trim()) { setSearchResults(null); setPanelQuery('') }
+            }}
             onKeyDown={e => {
-              if (e.key === 'Enter') { saveSearchHistory(readSearch); kjvRef.current?.submitSearch(readSearch); setSearchPanelOpen(false) }
+              if (e.key === 'Enter') {
+                const q = readSearch.trim()
+                if (!q) return
+                saveSearchHistory(q)
+                setPanelQuery(q)
+                setPanelSearching(true)
+                setSearchResults(null)
+                kjvRef.current?.submitSearch(q)
+              }
               if (e.key === 'Escape') { setSearchPanelOpen(false) }
             }}
             placeholder="Search all books…"
           />
           {readSearch && (
-            <button style={sp.clearBtn} onClick={() => { setReadSearch(''); kjvRef.current?.clearSearch() }}>×</button>
+            <button style={sp.clearBtn} onClick={() => {
+              setReadSearch('')
+              setSearchResults(null)
+              setPanelQuery('')
+              kjvRef.current?.clearSearch()
+            }}>×</button>
           )}
         </div>
 
-        {searchHistory.length > 0 && (
-          <div style={sp.section}>
-            <div style={sp.sectionLabel}>Recent searches</div>
-            {searchHistory.map(q => (
-              <button key={q} style={sp.histItem} onClick={() => {
-                setReadSearch(q)
-                kjvRef.current?.setSearchQuery(q)
-                saveSearchHistory(q)
-                kjvRef.current?.submitSearch(q)
-                setSearchPanelOpen(false)
-              }}>
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
-                  <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2"/>
-                  <path d="M5.5 3.5v2l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                </svg>
-                <span style={{ flex:1 }}>{q}</span>
-              </button>
-            ))}
-            <button style={sp.clearHistBtn} onClick={() => {
-              setSearchHistory([])
-              try { localStorage.removeItem('pb-search-hist') } catch {}
-            }}>Clear history</button>
+        {/* Results area */}
+        {searchResults !== null ? (
+          <div style={sp.resultsArea}>
+            {/* Results header */}
+            <div style={sp.resultsHeader}>
+              <div>
+                <span style={sp.resultsTitle}>
+                  {panelSearching ? 'Searching…'
+                    : searchResults.length === 0 ? `No results for "${panelQuery}"`
+                    : searchResultsCapped
+                      ? `${searchResults.length.toLocaleString()} of ${searchResultsTotal.toLocaleString()} verses`
+                      : `${searchResultsTotal.toLocaleString()} verse${searchResultsTotal !== 1 ? 's' : ''} found`}
+                </span>
+                {!panelSearching && searchResults.length > 0 && (
+                  <div style={sp.resultsSubtitle}>
+                    {(() => {
+                      const books = new Set(searchResults.map(r => r.book))
+                      return `${books.size} book${books.size !== 1 ? 's' : ''} — "${panelQuery}"`
+                    })()}
+                  </div>
+                )}
+              </div>
+              {searchResultsCapped && !panelSearching && (
+                <button style={sp.loadAllBtn} onClick={() => {
+                  setPanelSearching(true)
+                  kjvRef.current?.loadAllResults()
+                }}>
+                  Load all {searchResultsTotal.toLocaleString()}
+                </button>
+              )}
+            </div>
+
+            {/* Result rows */}
+            {!panelSearching && searchResults.length > 0 && (() => {
+              const q = panelQuery.toLowerCase()
+              const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              function hlText(text) {
+                try {
+                  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+                  if (parts.length === 1) return text
+                  return parts.map((p, i) =>
+                    p.toLowerCase() === q
+                      ? <mark key={i} style={{ background:'#fef08a', color:'inherit', borderRadius:2, padding:'0 1px' }}>{p}</mark>
+                      : p
+                  )
+                } catch { return text }
+              }
+              return (
+                <div style={sp.resultsList}>
+                  {searchResults.map((hit, i) => (
+                    <button
+                      key={i}
+                      style={sp.resultItem}
+                      onClick={() => {
+                        kjvRef.current?.navigateTo(hit.book, hit.chapter, hit.verse)
+                        setSearchPanelOpen(false)
+                      }}
+                    >
+                      <span style={sp.resultRef}>{hit.book} {hit.chapter}:{hit.verse}</span>
+                      <span style={sp.resultText}>{hlText(hit.text)}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            })()}
+
+            {!panelSearching && searchResults.length === 0 && (
+              <p style={sp.noResults}>Try a different word or phrase.</p>
+            )}
           </div>
+        ) : (
+          /* History (shown when no active search results) */
+          searchHistory.length > 0 && (
+            <div style={sp.section}>
+              <div style={sp.sectionLabel}>Recent searches</div>
+              {searchHistory.map(q => (
+                <button key={q} style={sp.histItem} onClick={() => {
+                  setReadSearch(q)
+                  kjvRef.current?.setSearchQuery(q)
+                  saveSearchHistory(q)
+                  setPanelQuery(q)
+                  setPanelSearching(true)
+                  setSearchResults(null)
+                  kjvRef.current?.submitSearch(q)
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+                    <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M5.5 3.5v2l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{ flex:1 }}>{q}</span>
+                </button>
+              ))}
+              <button style={sp.clearHistBtn} onClick={() => {
+                clearSearchHistory('kjv')
+                setSearchHistory([])
+              }}>Clear history</button>
+            </div>
+          )
         )}
       </div>
 
@@ -239,6 +337,13 @@ export default function ScripturePage() {
         onHistoryChange={({ canGoBack: b, canGoForward: f }) => {
           setCanGoBack(b)
           setCanGoForward(f)
+        }}
+        onSearchResults={(hits, total, capped, q) => {
+          setSearchResults(hits)
+          setSearchResultsTotal(total)
+          setSearchResultsCapped(capped)
+          setPanelQuery(q)
+          setPanelSearching(false)
         }}
       />
 
@@ -344,7 +449,7 @@ const sp = {
     boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
     display:'flex', flexDirection:'column',
     transition:'transform 0.25s', fontFamily:"'DM Sans',sans-serif",
-    overflowY:'auto',
+    overflow:'hidden',
   },
   panelHeader: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
@@ -386,6 +491,49 @@ const sp = {
     marginTop:8, padding:'5px 10px', borderRadius:99, border:'1px solid var(--border)',
     background:'none', cursor:'pointer', fontSize:11, color:'var(--ink-faint)',
     fontFamily:"'DM Sans',sans-serif",
+  },
+  // Results area
+  resultsArea: {
+    flex:1, display:'flex', flexDirection:'column', overflowY:'auto',
+  },
+  resultsHeader: {
+    display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+    padding:'12px 16px 8px', borderBottom:'1px solid var(--border)',
+    flexShrink:0, gap:8,
+  },
+  resultsTitle: {
+    fontSize:13, fontWeight:700, color:'var(--ink)',
+    display:'block', marginBottom:2,
+  },
+  resultsSubtitle: {
+    fontSize:11, color:'var(--ink-faint)', fontStyle:'italic',
+  },
+  loadAllBtn: {
+    fontSize:11, fontWeight:600, color:'var(--teal)',
+    background:'var(--teal-light)', border:'none', borderRadius:99,
+    padding:'4px 10px', cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  resultsList: {
+    display:'flex', flexDirection:'column', padding:'8px 0',
+    flex:1, overflowY:'auto',
+  },
+  resultItem: {
+    display:'flex', flexDirection:'column', gap:3, textAlign:'left',
+    padding:'9px 16px', border:'none', background:'none', cursor:'pointer',
+    borderBottom:'1px solid var(--border)', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.1s',
+  },
+  resultRef: {
+    fontSize:11, fontWeight:700, color:'var(--teal)', letterSpacing:'0.02em',
+  },
+  resultText: {
+    fontSize:13, color:'var(--ink)', lineHeight:1.6,
+    fontFamily:"'Georgia','Times New Roman',serif",
+  },
+  noResults: {
+    fontSize:13, color:'var(--ink-faint)', textAlign:'center',
+    padding:'3rem 1rem', margin:0, fontFamily:"'DM Sans',sans-serif",
   },
 }
 
