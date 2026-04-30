@@ -1427,70 +1427,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         {(version === 'kjv' || version === 'abab') && (
           <div style={sb.parallelSection}>
             <div style={sb.versionSectionTitle}>Parallel</div>
-
-            {/* Text parallel — the other text version */}
-            {(() => {
-              const altId    = version === 'kjv' ? 'abab' : 'kjv'
-              const altLabel = version === 'kjv' ? 'ABAB' : 'KJV'
-              const altFull  = version === 'kjv' ? 'Ang Bagong Ang Biblia' : 'King James Version'
-              const checked  = parallelVersions.has(altId)
-              return (
-                <label style={sb.parallelRow}>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleParallel(altId)}
-                    style={{ accentColor:'var(--teal)' }}
-                  />
-                  <span style={sb.parallelLabel}>
-                    <span style={sb.parallelAbbr}>{altLabel}</span>
-                    <span style={sb.parallelHint}>{altFull}</span>
-                  </span>
-                </label>
-              )
-            })()}
-
-            {/* GNT (NT only) */}
-            <label style={sb.parallelRow}>
-              <input
-                type="checkbox"
-                checked={parallelVersions.has('gnt')}
-                onChange={() => toggleParallel('gnt')}
-                style={{ accentColor:'var(--teal)' }}
-              />
-              <span style={sb.parallelLabel}>
-                <span style={sb.parallelAbbr}>GNT</span>
-                <span style={sb.parallelHint}>Greek NT · NT books</span>
-              </span>
-            </label>
-
-            {/* HOT (OT only) */}
-            <label style={sb.parallelRow}>
-              <input
-                type="checkbox"
-                checked={parallelVersions.has('hot')}
-                onChange={() => toggleParallel('hot')}
-                style={{ accentColor:'var(--teal)' }}
-              />
-              <span style={sb.parallelLabel}>
-                <span style={sb.parallelAbbr}>HOT</span>
-                <span style={sb.parallelHint}>Hebrew OT · OT books</span>
-              </span>
-            </label>
-
-            {/* LXX (OT only) */}
-            <label style={sb.parallelRow}>
-              <input
-                type="checkbox"
-                checked={parallelVersions.has('lxx')}
-                onChange={() => toggleParallel('lxx')}
-                style={{ accentColor:'var(--teal)' }}
-              />
-              <span style={sb.parallelLabel}>
-                <span style={sb.parallelAbbr}>LXX</span>
-                <span style={sb.parallelHint}>Greek Septuagint · OT</span>
-              </span>
-            </label>
+            <div style={sb.parallelPills}>
+              {[
+                { id: version === 'kjv' ? 'abab' : 'kjv', label: version === 'kjv' ? 'ABAB' : 'KJV', title: version === 'kjv' ? 'Ang Bagong Ang Biblia' : 'King James Version' },
+                { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
+                { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
+                { id: 'lxx', label: 'LXX', title: 'Greek Septuagint (OT books)' },
+              ].map(({ id, label, title }) => {
+                const active = parallelVersions.has(id)
+                return (
+                  <button
+                    key={id}
+                    title={title}
+                    onClick={() => toggleParallel(id)}
+                    style={{
+                      ...sb.parallelPill,
+                      ...(active ? sb.parallelPillActive : {}),
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -2634,17 +2593,21 @@ const sb = {
     transition:'all 0.1s',
   },
   parallelSection: {
-    padding:'14px 12px 10px',
+    padding:'12px 12px 10px',
     borderTop:'1px solid var(--border)',
   },
-  parallelRow: {
-    display:'flex', alignItems:'center', gap:8,
-    padding:'5px 4px', cursor:'pointer',
-    borderRadius:'var(--radius)', fontSize:13,
+  parallelPills: {
+    display:'flex', flexWrap:'wrap', gap:6, marginTop:8,
   },
-  parallelLabel: { display:'flex', flexDirection:'column', gap:1 },
-  parallelAbbr: { fontSize:12, fontWeight:700, color:'var(--ink)' },
-  parallelHint: { fontSize:10, color:'var(--ink-faint)' },
+  parallelPill: {
+    padding:'4px 11px', borderRadius:99, fontSize:11, fontWeight:700,
+    border:'1.5px solid var(--border-strong)', background:'var(--surface)',
+    color:'var(--ink-muted)', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.15s', letterSpacing:'0.02em',
+  },
+  parallelPillActive: {
+    background:'var(--teal-light)', borderColor:'var(--teal)', color:'var(--teal)',
+  },
 }
 
 /* ── Reader styles ── */
