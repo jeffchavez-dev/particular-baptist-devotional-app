@@ -7,14 +7,13 @@ import { BIBLE_BOOKS } from '../lib/bibleBooks'
 /**
  * KjvModal — inline popup for reading a Bible chapter directly from any page.
  *
- * The translation shown (and navigated to) honours the user's
- * "Default Bible Translation" preference (KJV · ABAB · Original).
+ * Respects the user's "Default Bible Translation" preference (KJV · ABAB · Original).
  *
- * When the preference is "Original":
- *   • The modal displays KJV text (original-language word-level rendering
- *     is only available in the full Scripture reader).
- *   • A "HOT" or "GNT" badge indicates the original that will open.
- *   • "Open in Scripture" navigates to HOT (OT) or GNT (NT).
+ * When "Original" is the preference:
+ *   • Loads GNT (for NT books) or HOT (for OT books)
+ *   • Reconstructs readable text by joining word `w` fields
+ *   • Renders Greek LTR / Hebrew RTL with an appropriate script font
+ *   • "Open in Scripture" navigates to the full morphological reader
  *
  * Props:
  *   book       string      — full book name, e.g. "Romans"
@@ -24,59 +23,84 @@ import { BIBLE_BOOKS } from '../lib/bibleBooks'
  *   onClose    fn          — called when user dismisses the modal
  */
 export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) {
-  const navigate   = useNavigate()
-  const [verses,   setVerses]   = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
-  const bodyRef    = useRef(null)
+  const navigate = useNavigate()
+  const [verses,  setVerses]  = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+  const bodyRef = useRef(null)
 
   // Resolve preference once — stable for this modal's lifetime.
   const pref = getDefaultReaderVersion()
 
-  // 'original' → resolve the correct original-language version for this book.
-  // For the in-modal text display we always fall back to 'kjv' (original-language
-  // data is morphological and requires the full reader to render).
+  // 'original' → resolve HOT (OT) or GNT (NT) from the book name
   const isOriginalPref  = pref === 'original'
   const resolvedVersion = isOriginalPref
     ? originalVersionForBook(book, BIBLE_BOOKS)   // 'hebrew' | 'greek'
     : pref                                         // 'kjv' | 'abab'
-  const textVersion     = isOriginalPref ? 'kjv' : pref  // version used for modal text
+
+  const isHebrew = resolvedVersion === 'hebrew'
+  const isGreek  = resolvedVersion === 'greek'
+  const isOrigLang = isHebrew || isGreek
 
   // Badge shown in the modal header
-  const badgeLabel = isOriginalPref
-    ? (resolvedVersion === 'greek' ? 'GNT' : 'HOT')
+  const badgeLabel = isOrigLang
+    ? (isGreek ? 'GNT' : 'HOT')
     : (DEFAULT_VERSION_OPTIONS.find(v => v.id === pref)?.label ?? 'KJV')
 
-  /* Load chapter text in the appropriate translation */
+  /**
+   * Reconstruct plain-text verses from GNT/HOT morph data.
+   * Data shape: { BookName: { chapter: { verse: [ {w, t, ...} ] } } }
+   */
+  function extractOrigLangVerses(data, bookName, ch) {
+    const bookData = data[bookName]
+    if (!bookData) return null
+    const chData = bookData[String(ch)]
+    if (!chData) return null
+
+    return Object.entries(chData)
+      .map(([vNum, words]) => ({
+        verse: parseInt(vNum, 10),
+        text:  Array.isArray(words) ? words.map(w => w.w).join(' ') : '',
+      }))
+      .filter(v => v.text)
+      .sort((a, b) => a.verse - b.verse)
+  }
+
+  /* Load chapter text */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    loadBibleVersion(textVersion)
+
+    loadBibleVersion(resolvedVersion)
       .then(data => {
         if (cancelled) return
-        const cv = getChapterVerses(data, book, chapter)
+        let cv
+        if (isOrigLang) {
+          // GNT/HOT: reconstruct from word arrays
+          cv = extractOrigLangVerses(data, book, chapter)
+        } else {
+          // KJV/ABAB: standard text lookup
+          cv = getChapterVerses(data, book, chapter)
+        }
         if (!cv || cv.length === 0) throw new Error(`${book} ${chapter} not found`)
         setVerses(cv)
         setLoading(false)
       })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     return () => { cancelled = true }
-  }, [book, chapter, textVersion]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [book, chapter, resolvedVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Scroll to target verse after verses load */
   useEffect(() => {
     if (loading || !verse || !bodyRef.current) return
-    // Delay slightly to let React finish painting the verse list
     const t = setTimeout(() => {
       const body = bodyRef.current
       if (!body) return
       const el = body.querySelector(`#mv${verse}`)
       if (!el) return
-      // Use viewport-relative rects so this works reliably inside a fixed modal
       const containerRect = body.getBoundingClientRect()
       const elementRect   = el.getBoundingClientRect()
-      // Scroll the modal body (not the window) so the verse lands near the top
       body.scrollTop += (elementRect.top - containerRect.top) - 16
     }, 80)
     return () => clearTimeout(t)
@@ -99,10 +123,20 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
   function goToScripture() {
     onClose()
     navigate('/scripture', {
-      // For 'original', pass the resolved HOT/GNT version so ScripturePage switches to it.
       state: { book, chapter, verse: verse ?? null, mode: 'read', version: resolvedVersion },
     })
   }
+
+  // Style overrides for original-language text
+  const scriptTextStyle = isHebrew
+    ? { ...m.verseText, fontFamily:"'SBL Hebrew','Ezra SIL','Times New Roman',serif", fontSize:18, direction:'rtl', textAlign:'right', lineHeight:2 }
+    : isGreek
+    ? { ...m.verseText, fontFamily:"'SBL Greek','GFS Didot','Times New Roman',serif", fontSize:16, lineHeight:2 }
+    : m.verseText
+
+  const verseRowStyle = isHebrew
+    ? { ...m.verseRow, flexDirection:'row-reverse' }
+    : m.verseRow
 
   return (
     <div style={m.backdrop} onClick={onClose}>
@@ -116,11 +150,6 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
               <span style={m.refLabel}>{refDisplay}</span>
             )}
             <span style={m.kjvBadge}>{badgeLabel}</span>
-            {/* When "Original" is the preference, show a KJV sub-label so the
-                user knows the modal text is KJV and the reader will open in original */}
-            {isOriginalPref && (
-              <span style={m.kjvSubBadge}>KJV preview</span>
-            )}
           </div>
           <div style={m.headerRight}>
             <button style={m.goBtn} onClick={goToScripture} title="Open in Scripture reader">
@@ -157,12 +186,12 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
                   key={v}
                   id={`mv${v}`}
                   style={{
-                    ...m.verseRow,
+                    ...verseRowStyle,
                     ...(verse && v === verse ? m.verseHighlight : {}),
                   }}
                 >
                   <span style={m.verseNum}>{v}</span>
-                  <span style={m.verseText}>{text}</span>
+                  <span style={scriptTextStyle}>{text}</span>
                 </div>
               ))}
             </div>
@@ -206,10 +235,6 @@ const m = {
     fontSize:9, fontWeight:700, letterSpacing:'0.08em',
     background:'var(--gold-faint)', color:'var(--gold)',
     padding:'2px 6px', borderRadius:99,
-  },
-  kjvSubBadge: {
-    fontSize:9, fontWeight:600, letterSpacing:'0.04em',
-    color:'var(--ink-faint)', padding:'2px 0',
   },
   goBtn: {
     display:'flex', alignItems:'center', gap:5,
