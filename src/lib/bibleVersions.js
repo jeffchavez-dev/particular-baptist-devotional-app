@@ -23,13 +23,12 @@ export const BIBLE_VERSIONS = [
   },
   {
     id: 'abab',
-    label: 'Ang Bagong Alay sa Bíblia',
+    label: 'Ang Bagong Ang Biblia',
     abbreviation: 'ABAB',
     language: 'Tagalog',
     year: '2000',
-    description: 'Tagalog Bible translation',
+    description: 'Tagalog Bible translation (Philippine Bible Society)',
     dataFile: '/abab.json',
-    hidden: true,   // work in progress — not shown in version picker yet
   },
   {
     id: 'greek',
