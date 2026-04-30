@@ -17,6 +17,11 @@ import {
   setHighlight, setItemNote,
   addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
 } from '../lib/annotations'
+import {
+  isAuthor,
+  fetchAuthorNotes, upsertAuthorNote, deleteAuthorNote,
+  fetchAuthorCrossRefs, upsertAuthorCrossRef, deleteAuthorCrossRef,
+} from '../lib/authorContent'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -608,6 +613,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [parallelTextData, setParallelTextData] = useState({}) // { 'Book:ch:version': [{verse,text}] }
   const parallelTextLoadedRef = useRef(new Set())
 
+  /* ── Author content (notes + cross-refs) ── */
+  const isAuthorUser = isAuthor(session)
+  // { 'Book:ch': { verseNum: { id, note } } }
+  const [authorNotes, setAuthorNotes] = useState({})
+  // { 'Book:ch': { verseNum: [{id, src_book, src_chapter, src_verse, tgt_book, tgt_chapter, tgt_verse, label}] } }
+  const [authorCrossRefs, setAuthorCrossRefs] = useState({})
+  const authorContentLoadedRef = useRef(new Set())
+  // Author note editing
+  const [editingAuthorNote, setEditingAuthorNote] = useState(null) // verseKey 'book:ch:v'
+  const [authorNoteDraft,   setAuthorNoteDraft]   = useState('')
+  // Author cross-ref adding
+  const [addingCrossRefTo, setAddingCrossRefTo] = useState(null)  // verseKey 'book:ch:v'
+  const [crossRefDraft, setCrossRefDraft] = useState({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+
   /* ── LXX reader mode word data (version === 'lxx') ── */
   const [lxxReaderWords,   setLxxReaderWords]   = useState({}) // 'Book:ch' → [{v, words:[{w,s}]}]
   const [lxxReaderWord,    setLxxReaderWord]     = useState(null) // {verseKey, wordIdx} | null
@@ -737,6 +756,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }, [textParallelVersion, segments]) // eslint-disable-line
 
+  /* Load author notes + cross-refs for each visible segment */
+  useEffect(() => {
+    for (const seg of segments) {
+      const key = `${seg.book}:${seg.chapter}`
+      if (authorContentLoadedRef.current.has(key)) continue
+      authorContentLoadedRef.current.add(key)
+      const { book: b, chapter: ch } = seg
+      Promise.all([fetchAuthorNotes(b, ch), fetchAuthorCrossRefs(b, ch)])
+        .then(([notes, refs]) => {
+          const noteMap = {}
+          notes.forEach(n => { noteMap[n.verse] = { id: n.id, note: n.note } })
+          setAuthorNotes(prev => ({ ...prev, [key]: noteMap }))
+          const refMap = {}
+          refs.forEach(r => {
+            if (!refMap[r.src_verse]) refMap[r.src_verse] = []
+            refMap[r.src_verse].push(r)
+          })
+          setAuthorCrossRefs(prev => ({ ...prev, [key]: refMap }))
+        })
+        .catch(() => { authorContentLoadedRef.current.delete(key) })
+    }
+  }, [segments]) // eslint-disable-line
+
   /* Load LXX word+Strongs data in reader mode (version === 'lxx') */
   useEffect(() => {
     if (version !== 'lxx' || !segments.length) return
@@ -819,6 +861,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setBibleResultsCapped(false)
     setParallelWord(null)  // dismiss open parallel word card
     setLxxReaderWord(null) // dismiss open LXX word info strip
+    setEditingAuthorNote(null) // dismiss author note editor
+    setAddingCrossRefTo(null)  // dismiss cross-ref form
     try { window.getSelection()?.removeAllRanges() } catch {}
   }, [book, chapter])
 
@@ -1102,6 +1146,107 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setItemNote(verseKey, '', userId)
     setItemNotes(loadItemNotes())
     setEditingNote(null)
+  }
+
+  /* ── Author note helpers ── */
+  function openAuthorNoteEditor(book, chapter, verse) {
+    const vk = `${book}:${chapter}:${verse}`
+    if (editingAuthorNote === vk) { setEditingAuthorNote(null); return }
+    const key = `${book}:${chapter}`
+    const existing = authorNotes[key]?.[verse]?.note || ''
+    setAuthorNoteDraft(existing)
+    setEditingAuthorNote(vk)
+    setAddingCrossRefTo(null)
+  }
+
+  async function saveAuthorNote(book, chapter, verse) {
+    const note = authorNoteDraft.trim()
+    const key  = `${book}:${chapter}`
+    try {
+      if (!note) {
+        // Delete if blank
+        const id = authorNotes[key]?.[verse]?.id
+        if (id) {
+          await deleteAuthorNote(id)
+          setAuthorNotes(prev => {
+            const chMap = { ...(prev[key] || {}) }
+            delete chMap[verse]
+            return { ...prev, [key]: chMap }
+          })
+        }
+      } else {
+        await upsertAuthorNote({ book, chapter, verse, note })
+        // Re-fetch to get the id
+        const fresh = await fetchAuthorNotes(book, chapter)
+        const noteMap = {}
+        fresh.forEach(n => { noteMap[n.verse] = { id: n.id, note: n.note } })
+        setAuthorNotes(prev => ({ ...prev, [key]: noteMap }))
+      }
+    } catch(e) {
+      console.error('[authorNote] save failed:', e?.message)
+    }
+    setEditingAuthorNote(null)
+  }
+
+  async function removeAuthorNote(book, chapter, verse) {
+    const key = `${book}:${chapter}`
+    const id  = authorNotes[key]?.[verse]?.id
+    if (!id) return
+    try {
+      await deleteAuthorNote(id)
+      setAuthorNotes(prev => {
+        const chMap = { ...(prev[key] || {}) }
+        delete chMap[verse]
+        return { ...prev, [key]: chMap }
+      })
+    } catch(e) {
+      console.error('[authorNote] delete failed:', e?.message)
+    }
+    setEditingAuthorNote(null)
+  }
+
+  /* ── Author cross-ref helpers ── */
+  async function saveAuthorCrossRef(src_book, src_chapter, src_verse) {
+    const { tgt_book, tgt_chapter, tgt_verse, label } = crossRefDraft
+    if (!tgt_book.trim() || !tgt_chapter.trim()) return
+    // Validate book name
+    const matched = BIBLE_BOOKS.find(b => b.name.toLowerCase() === tgt_book.trim().toLowerCase())
+    if (!matched) { alert(`Book not found: "${tgt_book}". Use the full book name (e.g. Numbers).`); return }
+    try {
+      await upsertAuthorCrossRef({
+        src_book, src_chapter, src_verse,
+        tgt_book: matched.name,
+        tgt_chapter: parseInt(tgt_chapter, 10),
+        tgt_verse: tgt_verse.trim() ? parseInt(tgt_verse, 10) : null,
+        label: label.trim() || null,
+      })
+      const fresh = await fetchAuthorCrossRefs(src_book, src_chapter)
+      const refMap = {}
+      fresh.forEach(r => {
+        if (!refMap[r.src_verse]) refMap[r.src_verse] = []
+        refMap[r.src_verse].push(r)
+      })
+      setAuthorCrossRefs(prev => ({ ...prev, [`${src_book}:${src_chapter}`]: refMap }))
+      setAddingCrossRefTo(null)
+      setCrossRefDraft({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+    } catch(e) {
+      console.error('[authorCrossRef] save failed:', e?.message)
+    }
+  }
+
+  async function removeAuthorCrossRef(ref) {
+    const key = `${ref.src_book}:${ref.src_chapter}`
+    try {
+      await deleteAuthorCrossRef(ref.id)
+      setAuthorCrossRefs(prev => {
+        const chMap = { ...(prev[key] || {}) }
+        chMap[ref.src_verse] = (chMap[ref.src_verse] || []).filter(r => r.id !== ref.id)
+        if (!chMap[ref.src_verse].length) delete chMap[ref.src_verse]
+        return { ...prev, [key]: chMap }
+      })
+    } catch(e) {
+      console.error('[authorCrossRef] delete failed:', e?.message)
+    }
   }
 
   /* ── Verse tap-to-select ── */
@@ -2269,6 +2414,157 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 </div>
                               </div>
                             )}
+
+                            {/* ── Author cross-refs ── */}
+                            {(() => {
+                              const chKey    = `${seg.book}:${seg.chapter}`
+                              const xrefs    = authorCrossRefs[chKey]?.[verse] || []
+                              const avk      = `${seg.book}:${seg.chapter}:${verse}`
+                              const isAddingHere = addingCrossRefTo === avk
+                              if (!xrefs.length && !isAuthorUser && !isAddingHere) return null
+                              return (
+                                <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
+                                  <span style={r.authorXrefIcon}>↗</span>
+                                  {xrefs.map(ref => {
+                                    const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
+                                    const chipLabel = ref.label ? `${ref.label} (${tgt})` : tgt
+                                    return (
+                                      <span key={ref.id} style={r.authorXrefChipWrap}>
+                                        <button
+                                          style={r.authorXrefChip}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            navigate(ref.tgt_book, ref.tgt_chapter)
+                                            if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+                                          }}
+                                          title={`Author link → ${tgt}`}
+                                        >{chipLabel}</button>
+                                        {isAuthorUser && (
+                                          <button style={r.authorXrefDeleteBtn}
+                                            onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
+                                            title="Remove link">×</button>
+                                        )}
+                                      </span>
+                                    )
+                                  })}
+                                  {isAuthorUser && !isAddingHere && (
+                                    <button style={r.authorXrefAddBtn}
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        setAddingCrossRefTo(avk)
+                                        setCrossRefDraft({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+                                        setEditingAuthorNote(null)
+                                      }}
+                                      title="Add passage link">+ link</button>
+                                  )}
+                                  {isAuthorUser && isAddingHere && (
+                                    <div style={r.authorXrefForm}>
+                                      <div style={r.authorXrefFormRow}>
+                                        <input
+                                          style={r.authorXrefInput}
+                                          placeholder="Book (e.g. Numbers)"
+                                          value={crossRefDraft.tgt_book}
+                                          onChange={e => setCrossRefDraft(d => ({ ...d, tgt_book: e.target.value }))}
+                                          list="author-xref-book-list"
+                                        />
+                                        <datalist id="author-xref-book-list">
+                                          {BIBLE_BOOKS.map(b => <option key={b.name} value={b.name} />)}
+                                        </datalist>
+                                        <input
+                                          style={{ ...r.authorXrefInput, width: 48 }}
+                                          placeholder="Ch"
+                                          value={crossRefDraft.tgt_chapter}
+                                          onChange={e => setCrossRefDraft(d => ({ ...d, tgt_chapter: e.target.value }))}
+                                          type="number" min="1"
+                                        />
+                                        <input
+                                          style={{ ...r.authorXrefInput, width: 48 }}
+                                          placeholder="Vs"
+                                          value={crossRefDraft.tgt_verse}
+                                          onChange={e => setCrossRefDraft(d => ({ ...d, tgt_verse: e.target.value }))}
+                                          type="number" min="1"
+                                        />
+                                      </div>
+                                      <div style={r.authorXrefFormRow}>
+                                        <input
+                                          style={{ ...r.authorXrefInput, flex: 1 }}
+                                          placeholder="Label (optional)"
+                                          value={crossRefDraft.label}
+                                          onChange={e => setCrossRefDraft(d => ({ ...d, label: e.target.value }))}
+                                        />
+                                        <button style={r.noteSaveBtn}
+                                          onClick={e => { e.stopPropagation(); saveAuthorCrossRef(seg.book, seg.chapter, verse) }}>
+                                          Save
+                                        </button>
+                                        <button style={r.noteCancelBtn}
+                                          onClick={e => { e.stopPropagation(); setAddingCrossRefTo(null) }}>
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+
+                            {/* ── Author study note (visible to all) ── */}
+                            {(() => {
+                              const chKey    = `${seg.book}:${seg.chapter}`
+                              const authorNoteObj = authorNotes[chKey]?.[verse]
+                              const avk      = `${seg.book}:${seg.chapter}:${verse}`
+                              const isEditingAuthor = editingAuthorNote === avk
+                              if (!authorNoteObj && !isAuthorUser) return null
+                              return (
+                                <div style={r.authorNoteBlock} onClick={e => e.stopPropagation()}>
+                                  {/* Display mode (all users see this when a note exists) */}
+                                  {authorNoteObj && !isEditingAuthor && (
+                                    <div style={r.authorNoteDisplay}>
+                                      <div style={r.authorNoteHeader}>
+                                        <span style={r.authorNoteLabel}>Study Note</span>
+                                        {isAuthorUser && (
+                                          <button style={r.authorEditBtn}
+                                            onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
+                                            title="Edit study note">
+                                            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                              <path d="M2 9l.5-2L7.5 1.5l2 2L4.5 9 2 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                              <line x1="7" y1="2" x2="9" y2="4" stroke="currentColor" strokeWidth="1.2"/>
+                                            </svg>
+                                          </button>
+                                        )}
+                                      </div>
+                                      <p style={r.authorNoteText}>{authorNoteObj.note}</p>
+                                    </div>
+                                  )}
+                                  {/* Author edit / add controls */}
+                                  {isAuthorUser && !isEditingAuthor && !authorNoteObj && (
+                                    <button style={r.authorAddNoteBtn}
+                                      onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
+                                      title="Add study note">
+                                      + Study Note
+                                    </button>
+                                  )}
+                                  {isAuthorUser && isEditingAuthor && (
+                                    <div style={r.noteEditorWrap}>
+                                      <div style={r.authorNoteHeader}>
+                                        <span style={r.authorNoteLabel}>Study Note</span>
+                                      </div>
+                                      <textarea
+                                        value={authorNoteDraft}
+                                        onChange={e => setAuthorNoteDraft(e.target.value)}
+                                        placeholder={`Study note for ${seg.book} ${seg.chapter}:${verse}…`}
+                                        style={{ ...r.noteTextarea, minHeight: 72 }}
+                                        autoFocus rows={4}
+                                      />
+                                      <div style={r.noteEditorActions}>
+                                        <button onClick={() => saveAuthorNote(seg.book, seg.chapter, verse)} style={r.noteSaveBtn}>Save</button>
+                                        <button onClick={() => setEditingAuthorNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                                        {authorNoteObj && <button onClick={() => removeAuthorNote(seg.book, seg.chapter, verse)} style={r.noteDeleteBtn}>Delete</button>}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         )
                       })}
@@ -2931,6 +3227,90 @@ const r = {
     border:'1px solid rgba(180,50,50,0.3)', borderRadius:'var(--radius)',
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     marginLeft:'auto',
+  },
+
+  /* ── Author cross-ref row ── */
+  authorXrefRow: {
+    display:'flex', flexWrap:'wrap', alignItems:'center',
+    gap:4, paddingLeft:28, paddingTop:4, paddingBottom:2,
+  },
+  authorXrefIcon: {
+    fontSize:10, color:'var(--teal)', opacity:0.7, flexShrink:0,
+  },
+  authorXrefChipWrap: {
+    display:'inline-flex', alignItems:'center', gap:0,
+  },
+  authorXrefChip: {
+    fontSize:10, fontWeight:600,
+    background:'var(--teal-light)', color:'var(--teal)',
+    border:'1px solid var(--teal)', borderRadius:'99px 0 0 99px',
+    padding:'2px 7px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
+  },
+  authorXrefDeleteBtn: {
+    fontSize:11, fontWeight:700,
+    background:'var(--teal-light)', color:'var(--teal)',
+    border:'1px solid var(--teal)', borderLeft:'none',
+    borderRadius:'0 99px 99px 0',
+    padding:'2px 6px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
+  },
+  authorXrefAddBtn: {
+    fontSize:10, fontWeight:600, color:'var(--ink-faint)',
+    background:'none', border:'1px dashed var(--border)',
+    borderRadius:99, padding:'2px 8px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  authorXrefForm: {
+    display:'flex', flexDirection:'column', gap:4,
+    marginTop:4, width:'100%',
+  },
+  authorXrefFormRow: {
+    display:'flex', gap:4, flexWrap:'wrap', alignItems:'center',
+  },
+  authorXrefInput: {
+    fontSize:12, padding:'4px 8px',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    background:'var(--surface)', color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif",
+    outline:'none', flex:1, minWidth:100,
+  },
+
+  /* ── Author study note block ── */
+  authorNoteBlock: {
+    paddingLeft:28, paddingTop:4, paddingBottom:4,
+  },
+  authorNoteDisplay: {
+    background:'linear-gradient(135deg, rgba(var(--teal-rgb,45,127,120),0.06) 0%, rgba(var(--gold-rgb,180,140,60),0.06) 100%)',
+    border:'1px solid rgba(var(--teal-rgb,45,127,120),0.15)',
+    borderLeft:'3px solid var(--teal)',
+    borderRadius:'0 6px 6px 0',
+    padding:'8px 12px',
+  },
+  authorNoteHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    marginBottom:4,
+  },
+  authorNoteLabel: {
+    fontSize:9, fontWeight:800, letterSpacing:'0.1em',
+    color:'var(--teal)', textTransform:'uppercase',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  authorEditBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', padding:2, display:'flex',
+    alignItems:'center',
+  },
+  authorNoteText: {
+    margin:0, fontSize:13, color:'var(--ink)', lineHeight:1.7,
+    fontFamily:"'Georgia','Times New Roman',serif",
+    fontStyle:'italic',
+  },
+  authorAddNoteBtn: {
+    fontSize:10, fontWeight:600, color:'var(--ink-faint)',
+    background:'none', border:'1px dashed var(--border)',
+    borderRadius:99, padding:'2px 10px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
   },
 
   /* Inline confession cross-reference chips */
