@@ -654,16 +654,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
     submitSearch:   (q) => submitSearch(q),
     clearSearch:    () => closeSearch(),
-    loadAllResults: () => {
-      if (!dataReady) return
-      setSearching(true)
+    /** Run a Bible-wide search and deliver results ONLY to the onSearchResults callback.
+     *  Does NOT touch any internal KjvReader state — the reader stays on the current chapter. */
+    runSearch: (q) => {
+      const trimmed = q?.trim()
+      if (!trimmed) return
+      if (!dataReady) {
+        onSearchResults?.([], 0, false, trimmed)
+        return
+      }
       setTimeout(() => {
-        const { hits, total } = searchBibleVersion(versionData, searchQuery.trim(), version, Infinity)
-        setBibleResults(hits)
-        setBibleResultsTotal(total)
-        setBibleResultsCapped(false)
-        setSearching(false)
-        onSearchResults?.(hits, total, false, searchQuery.trim())
+        const { hits, total, capped } = searchBibleVersion(versionData, trimmed, version)
+        onSearchResults?.(hits, total, capped, trimmed)
+      }, 0)
+    },
+    /** Load ALL results for a given query into the onSearchResults callback. */
+    loadAllResults: (q) => {
+      const trimmed = q?.trim()
+      if (!trimmed || !dataReady) return
+      setTimeout(() => {
+        const { hits, total } = searchBibleVersion(versionData, trimmed, version, Infinity)
+        onSearchResults?.(hits, total, false, trimmed)
       }, 0)
     },
     navigateTo:     (newBook, newChapter, verse) => {

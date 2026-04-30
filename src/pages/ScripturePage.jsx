@@ -47,6 +47,8 @@ export default function ScripturePage() {
   const [searchResultsCapped,setSearchResultsCapped] = useState(false)
   const [panelQuery,         setPanelQuery]         = useState('')
   const [panelSearching,     setPanelSearching]     = useState(false)
+  // Which book groups are expanded in the results list
+  const [openBooks, setOpenBooks] = useState(new Set())
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -85,6 +87,18 @@ export default function ScripturePage() {
     if (!q.trim()) return
     addSearchHistory('kjv', q.trim())
     setSearchHistory(getSearchHistory('kjv'))
+  }
+
+  /** Kick off a panel search without touching KjvReader's internal state. */
+  function runPanelSearch(q) {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    saveSearchHistory(trimmed)
+    setPanelQuery(trimmed)
+    setPanelSearching(true)
+    setSearchResults(null)
+    setOpenBooks(new Set())
+    kjvRef.current?.runSearch(trimmed)
   }
 
   /* Today's Bible chapter (for KJV reader "Today" badge) */
@@ -174,6 +188,8 @@ export default function ScripturePage() {
         <div style={sp.backdrop} onClick={() => setSearchPanelOpen(false)} />
       )}
       <div style={{ ...sp.panel, transform: searchPanelOpen ? 'translateX(0)' : 'translateX(100%)' }}>
+
+        {/* Header */}
         <div style={sp.panelHeader}>
           <span style={sp.panelTitle}>Search Bible</span>
           <button style={sp.closeBtn} onClick={() => setSearchPanelOpen(false)}>
@@ -183,79 +199,108 @@ export default function ScripturePage() {
           </button>
         </div>
 
-        {/* Search input */}
-        <div style={sp.searchRow}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
-            <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
-            <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <input
-            autoFocus
-            style={sp.searchInput}
-            value={readSearch}
-            onChange={e => {
-              setReadSearch(e.target.value)
-              kjvRef.current?.setSearchQuery(e.target.value)
-              if (!e.target.value.trim()) { setSearchResults(null); setPanelQuery('') }
-            }}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                const q = readSearch.trim()
-                if (!q) return
-                saveSearchHistory(q)
-                setPanelQuery(q)
-                setPanelSearching(true)
+        {/* Search input + Submit button */}
+        <div style={sp.searchBox}>
+          <div style={sp.searchRow}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+              <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <input
+              autoFocus
+              style={sp.searchInput}
+              value={readSearch}
+              onChange={e => {
+                setReadSearch(e.target.value)
+                // If cleared, reset results — but don't touch KjvReader state
+                if (!e.target.value.trim()) { setSearchResults(null); setPanelQuery('') }
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') runPanelSearch(readSearch)
+                if (e.key === 'Escape') setSearchPanelOpen(false)
+              }}
+              placeholder="Search all books…"
+            />
+            {readSearch && (
+              <button style={sp.clearBtn} onClick={() => {
+                setReadSearch('')
                 setSearchResults(null)
-                kjvRef.current?.submitSearch(q)
-              }
-              if (e.key === 'Escape') { setSearchPanelOpen(false) }
-            }}
-            placeholder="Search all books…"
-          />
-          {readSearch && (
-            <button style={sp.clearBtn} onClick={() => {
-              setReadSearch('')
-              setSearchResults(null)
-              setPanelQuery('')
-              kjvRef.current?.clearSearch()
-            }}>×</button>
-          )}
+                setPanelQuery('')
+              }}>×</button>
+            )}
+          </div>
+          <button
+            style={sp.searchSubmitBtn}
+            onClick={() => runPanelSearch(readSearch)}
+            disabled={!readSearch.trim() || panelSearching}
+          >
+            {panelSearching ? 'Searching…' : 'Search Bible'}
+          </button>
         </div>
 
-        {/* Results area */}
+        {/* ── Results ── */}
         {searchResults !== null ? (
           <div style={sp.resultsArea}>
-            {/* Results header */}
+
+            {/* Summary bar */}
             <div style={sp.resultsHeader}>
               <div>
-                <span style={sp.resultsTitle}>
-                  {panelSearching ? 'Searching…'
-                    : searchResults.length === 0 ? `No results for "${panelQuery}"`
-                    : searchResultsCapped
-                      ? `${searchResults.length.toLocaleString()} of ${searchResultsTotal.toLocaleString()} verses`
-                      : `${searchResultsTotal.toLocaleString()} verse${searchResultsTotal !== 1 ? 's' : ''} found`}
-                </span>
-                {!panelSearching && searchResults.length > 0 && (
-                  <div style={sp.resultsSubtitle}>
-                    {(() => {
-                      const books = new Set(searchResults.map(r => r.book))
-                      return `${books.size} book${books.size !== 1 ? 's' : ''} — "${panelQuery}"`
-                    })()}
-                  </div>
+                {panelSearching ? (
+                  <span style={sp.resultsTitle}>Searching…</span>
+                ) : searchResults.length === 0 ? (
+                  <span style={sp.resultsTitle}>No results for "{panelQuery}"</span>
+                ) : (
+                  <>
+                    <span style={sp.resultsTitle}>
+                      {searchResultsCapped
+                        ? `First ${searchResults.length.toLocaleString()} of ${searchResultsTotal.toLocaleString()} verses`
+                        : `${searchResultsTotal.toLocaleString()} verse${searchResultsTotal !== 1 ? 's' : ''}`}
+                    </span>
+                    <div style={sp.resultsSubtitle}>
+                      {(() => {
+                        const books = new Set(searchResults.map(r => r.book))
+                        return `${books.size} book${books.size !== 1 ? 's' : ''} · "${panelQuery}"`
+                      })()}
+                    </div>
+                  </>
                 )}
               </div>
-              {searchResultsCapped && !panelSearching && (
-                <button style={sp.loadAllBtn} onClick={() => {
-                  setPanelSearching(true)
-                  kjvRef.current?.loadAllResults()
+              {/* Expand/collapse all */}
+              {!panelSearching && searchResults.length > 0 && (
+                <button style={sp.expandAllBtn} onClick={() => {
+                  const books = [...new Set(searchResults.map(r => r.book))]
+                  const allOpen = books.every(b => openBooks.has(b))
+                  setOpenBooks(allOpen ? new Set() : new Set(books))
                 }}>
-                  Load all {searchResultsTotal.toLocaleString()}
+                  {(() => {
+                    const books = [...new Set(searchResults.map(r => r.book))]
+                    return books.every(b => openBooks.has(b)) ? 'Collapse all' : 'Expand all'
+                  })()}
                 </button>
               )}
             </div>
 
-            {/* Result rows */}
+            {/* Load-all banner */}
+            {searchResultsCapped && !panelSearching && (
+              <div style={sp.loadAllBar}>
+                <span style={sp.loadAllNote}>Showing first {searchResults.length.toLocaleString()} of {searchResultsTotal.toLocaleString()}</span>
+                <button style={sp.loadAllBtn} onClick={() => {
+                  setPanelSearching(true)
+                  kjvRef.current?.loadAllResults(panelQuery)
+                }}>Load all</button>
+              </div>
+            )}
+
+            {/* Grouped results */}
             {!panelSearching && searchResults.length > 0 && (() => {
+              // Group by book in canonical order
+              const map = new Map()
+              for (const hit of searchResults) {
+                if (!map.has(hit.book)) map.set(hit.book, [])
+                map.get(hit.book).push(hit)
+              }
+              const grouped = BIBLE_BOOKS.filter(b => map.has(b.name)).map(b => ({ book: b.name, hits: map.get(b.name) }))
+
               const q = panelQuery.toLowerCase()
               const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
               function hlText(text) {
@@ -269,21 +314,53 @@ export default function ScripturePage() {
                   )
                 } catch { return text }
               }
+
               return (
-                <div style={sp.resultsList}>
-                  {searchResults.map((hit, i) => (
-                    <button
-                      key={i}
-                      style={sp.resultItem}
-                      onClick={() => {
-                        kjvRef.current?.navigateTo(hit.book, hit.chapter, hit.verse)
-                        setSearchPanelOpen(false)
-                      }}
-                    >
-                      <span style={sp.resultRef}>{hit.book} {hit.chapter}:{hit.verse}</span>
-                      <span style={sp.resultText}>{hlText(hit.text)}</span>
-                    </button>
-                  ))}
+                <div style={sp.groupList}>
+                  {grouped.map(({ book, hits }) => {
+                    const isOpen = openBooks.has(book)
+                    return (
+                      <div key={book} style={sp.bookGroup}>
+                        {/* Book header row — click to expand/collapse */}
+                        <button
+                          style={sp.bookHeader}
+                          onClick={() => setOpenBooks(prev => {
+                            const next = new Set(prev)
+                            next.has(book) ? next.delete(book) : next.add(book)
+                            return next
+                          })}
+                        >
+                          <svg
+                            width="10" height="10" viewBox="0 0 10 10" fill="none"
+                            style={{ flexShrink:0, transition:'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', color:'var(--ink-faint)' }}
+                          >
+                            <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                          <span style={sp.bookName}>{book}</span>
+                          <span style={sp.bookCount}>{hits.length}</span>
+                        </button>
+
+                        {/* Verse rows — only when expanded */}
+                        {isOpen && (
+                          <div style={sp.verseRows}>
+                            {hits.map((hit, i) => (
+                              <button
+                                key={i}
+                                style={sp.verseRow}
+                                onClick={() => {
+                                  kjvRef.current?.navigateTo(hit.book, hit.chapter, hit.verse)
+                                  setSearchPanelOpen(false)
+                                }}
+                              >
+                                <span style={sp.verseRef}>{hit.chapter}:{hit.verse}</span>
+                                <span style={sp.verseText}>{hlText(hit.text)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })()}
@@ -292,20 +369,16 @@ export default function ScripturePage() {
               <p style={sp.noResults}>Try a different word or phrase.</p>
             )}
           </div>
+
         ) : (
-          /* History (shown when no active search results) */
+          /* History — shown when no active search */
           searchHistory.length > 0 && (
             <div style={sp.section}>
               <div style={sp.sectionLabel}>Recent searches</div>
               {searchHistory.map(q => (
                 <button key={q} style={sp.histItem} onClick={() => {
                   setReadSearch(q)
-                  kjvRef.current?.setSearchQuery(q)
-                  saveSearchHistory(q)
-                  setPanelQuery(q)
-                  setPanelSearching(true)
-                  setSearchResults(null)
-                  kjvRef.current?.submitSearch(q)
+                  runPanelSearch(q)
                 }}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
                     <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2"/>
@@ -344,6 +417,7 @@ export default function ScripturePage() {
           setSearchResultsCapped(capped)
           setPanelQuery(q)
           setPanelSearching(false)
+          setOpenBooks(new Set()) // always start collapsed on new search
         }}
       />
 
@@ -462,7 +536,7 @@ const sp = {
   },
   searchRow: {
     display:'flex', alignItems:'center', gap:8,
-    margin:'12px 16px', padding:'0 10px',
+    padding:'0 10px',
     border:'1px solid var(--border)', borderRadius:'var(--radius)',
     background:'var(--parchment)',
   },
@@ -492,13 +566,26 @@ const sp = {
     background:'none', cursor:'pointer', fontSize:11, color:'var(--ink-faint)',
     fontFamily:"'DM Sans',sans-serif",
   },
-  // Results area
+
+  /* Search box row (input + submit button) */
+  searchBox: {
+    display:'flex', flexDirection:'column', gap:8, padding:'0 16px 12px',
+    borderBottom:'1px solid var(--border)', flexShrink:0,
+  },
+  searchSubmitBtn: {
+    padding:'8px 0', borderRadius:'var(--radius)', border:'none',
+    background:'var(--teal)', color:'white', fontWeight:600, fontSize:13,
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    opacity:1, transition:'opacity 0.1s',
+  },
+
+  /* Results container */
   resultsArea: {
-    flex:1, display:'flex', flexDirection:'column', overflowY:'auto',
+    flex:1, display:'flex', flexDirection:'column', overflow:'hidden',
   },
   resultsHeader: {
     display:'flex', alignItems:'flex-start', justifyContent:'space-between',
-    padding:'12px 16px 8px', borderBottom:'1px solid var(--border)',
+    padding:'10px 16px 8px', borderBottom:'1px solid var(--border)',
     flexShrink:0, gap:8,
   },
   resultsTitle: {
@@ -506,29 +593,68 @@ const sp = {
     display:'block', marginBottom:2,
   },
   resultsSubtitle: {
-    fontSize:11, color:'var(--ink-faint)', fontStyle:'italic',
+    fontSize:11, color:'var(--ink-faint)',
   },
+  expandAllBtn: {
+    fontSize:10, fontWeight:600, color:'var(--ink-faint)',
+    background:'none', border:'1px solid var(--border)', borderRadius:99,
+    padding:'3px 8px', cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* Load-all banner */
+  loadAllBar: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'6px 16px', background:'var(--parchment)',
+    borderBottom:'1px solid var(--border)', flexShrink:0, gap:8,
+  },
+  loadAllNote: { fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" },
   loadAllBtn: {
     fontSize:11, fontWeight:600, color:'var(--teal)',
     background:'var(--teal-light)', border:'none', borderRadius:99,
-    padding:'4px 10px', cursor:'pointer', flexShrink:0, whiteSpace:'nowrap',
+    padding:'4px 10px', cursor:'pointer', flexShrink:0,
     fontFamily:"'DM Sans',sans-serif",
   },
-  resultsList: {
-    display:'flex', flexDirection:'column', padding:'8px 0',
-    flex:1, overflowY:'auto',
+
+  /* Grouped results list */
+  groupList: {
+    flex:1, overflowY:'auto', padding:'4px 0',
   },
-  resultItem: {
-    display:'flex', flexDirection:'column', gap:3, textAlign:'left',
-    padding:'9px 16px', border:'none', background:'none', cursor:'pointer',
-    borderBottom:'1px solid var(--border)', fontFamily:"'DM Sans',sans-serif",
+  bookGroup: {
+    borderBottom:'1px solid var(--border)',
+  },
+  bookHeader: {
+    display:'flex', alignItems:'center', gap:8, width:'100%',
+    padding:'9px 16px', border:'none', background:'none',
+    cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif",
     transition:'background 0.1s',
   },
-  resultRef: {
-    fontSize:11, fontWeight:700, color:'var(--teal)', letterSpacing:'0.02em',
+  bookName: {
+    fontSize:13, fontWeight:700, color:'var(--ink)', flex:1,
   },
-  resultText: {
-    fontSize:13, color:'var(--ink)', lineHeight:1.6,
+  bookCount: {
+    fontSize:10, fontWeight:700, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:99,
+    padding:'1px 7px', flexShrink:0,
+  },
+  verseRows: {
+    display:'flex', flexDirection:'column',
+    borderTop:'1px solid var(--border)',
+  },
+  verseRow: {
+    display:'flex', gap:10, alignItems:'flex-start', textAlign:'left',
+    padding:'7px 16px 7px 28px', border:'none', background:'none',
+    cursor:'pointer', borderBottom:'1px solid rgba(0,0,0,0.04)',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.1s',
+    width:'100%',
+  },
+  verseRef: {
+    fontSize:10, fontWeight:800, color:'var(--teal)',
+    flexShrink:0, minWidth:36, paddingTop:2,
+    letterSpacing:'0.02em', fontVariantNumeric:'tabular-nums',
+  },
+  verseText: {
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.6, flex:1,
     fontFamily:"'Georgia','Times New Roman',serif",
   },
   noResults: {
