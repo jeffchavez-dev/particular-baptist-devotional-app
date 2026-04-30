@@ -126,10 +126,10 @@ function highlight(text, q) {
 }
 
 const SOURCES = {
-  '2lbcf':     { label: '2LBCF',     name: 'Second London Baptist Confession (1677/1689)', color: 'var(--purple-ink)', bg: 'var(--purple-soft)', href: 'https://www.the1689confession.com/' },
-  'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",            color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
-  '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',       color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
-  'orthodox':  { label: 'Orthodox',  name: 'An Orthodox Catechism (1680)',                 color: 'var(--sky)',       bg: 'var(--sky-light)',  href: 'https://1689.com/an-orthodox-catechism/' },
+  '2lbcf':     { label: '2LBCF',     name: 'Second London Baptist Confession (1677/1689)', desc: 'The doctrinal standard of Particular Baptists — 32 chapters of Reformed theology grounded in Scripture, closely following the Westminster Confession with key Baptist modifications.', stat: '32 chapters', color: 'var(--purple-ink)', bg: 'var(--purple-soft)', href: 'https://www.the1689confession.com/' },
+  'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",             desc: 'One hundred and fourteen questions and answers teaching the essentials of Christian doctrine — designed for instruction in faith and practice for all ages.', stat: '114 Q&A',      color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
+  '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',        desc: 'The founding document of the Particular Baptist movement — fifty-two articles affirming biblical faith and believer\'s baptism.', stat: '52 articles',  color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
+  'orthodox':  { label: 'Orthodox',  name: 'An Orthodox Catechism (1680)',                  desc: 'Composed by Hercules Collins following the structure of the Heidelberg Catechism while affirming Particular Baptist distinctives.', stat: '196 Q&A',      color: 'var(--sky)',        bg: 'var(--sky-light)',   href: 'https://1689.com/an-orthodox-catechism/' },
 }
 
 /* ── Proof-text helpers (sidebar panel) ── */
@@ -669,8 +669,8 @@ export default function ConfessionsPage() {
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
-  const _saved = loadState('conf', { tab: '2lbcf', search: '' })
-  const tab    = searchParams.get('t') || _saved.tab
+  const _saved = loadState('conf', { tab: null, search: '' })
+  const tab    = searchParams.get('t') || _saved.tab || null
 
   const [activeChapter, setActiveChapter] = useState(null)
   const [search,        setSearch]        = useState(_saved.search)
@@ -678,7 +678,7 @@ export default function ConfessionsPage() {
   const [kjvModal,      setKjvModal]      = useState(null)
   const [shareCard,     setShareCard]     = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
-  const [sidebarConf,   setSidebarConf]   = useState(tab)
+  const [sidebarConf,   setSidebarConf]   = useState(tab || '2lbcf')
   const pendingScrollRef = useRef(null)
   const contentRef = useRef(null)
   const searchWrapRef = useRef(null)
@@ -970,6 +970,18 @@ export default function ConfessionsPage() {
       {/* ── Sticky header ── */}
       <header style={s.header}>
         <div style={s.headerInner}>
+          {tab && (
+            <button
+              style={sl.libraryBtn}
+              onClick={() => { setSearchParams({}); saveState('conf', { tab: null, search: '' }) }}
+              title="Back to library"
+              aria-label="Back to confession library"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
           {isMobile && (
             <button
               onClick={() => setNavOpen(o => !o)}
@@ -1068,6 +1080,40 @@ export default function ConfessionsPage() {
 
         {/* ── Main content ── */}
         <main style={s.main} ref={contentRef}>
+
+          {/* ── Landing card grid (first visit / no tab selected) ── */}
+          {!tab && (
+            <div style={sl.landing}>
+              <div style={sl.landingHero}>
+                <h1 style={sl.landingTitle}>Historic Baptist Confessions</h1>
+                <p style={sl.landingSubtitle}>Select a confession or catechism to begin reading</p>
+              </div>
+              <div style={sl.cardGrid}>
+                {Object.entries(SOURCES).map(([key, src]) => (
+                  <button
+                    key={key}
+                    style={sl.card}
+                    onClick={() => setTab(key)}
+                  >
+                    <div style={{ ...sl.cardAccent, background: src.color }} />
+                    <div style={sl.cardBody}>
+                      <div style={sl.cardTop}>
+                        <span style={{ ...sl.cardBadge, background: src.bg, color: src.color }}>
+                          {src.label}
+                        </span>
+                        <span style={sl.cardStat}>{src.stat}</span>
+                      </div>
+                      <div style={sl.cardName}>{src.name}</div>
+                      <p style={sl.cardDesc}>{src.desc}</p>
+                    </div>
+                    <div style={{ ...sl.cardArrow, color: src.color }}>→</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!tab && (<>
 
           {q && resultCounts && (() => {
             const count = resultCounts[tab === '2lbcf' ? 'lbcf2' : tab === 'catechism' ? 'catechism' : 'lbcf1']
@@ -1333,6 +1379,8 @@ export default function ConfessionsPage() {
             </div>
           )}
 
+          </>)}
+
         </main>
       </div>
 
@@ -1490,4 +1538,50 @@ const s = {
 
   refs: { fontSize:12, color:'var(--ink-faint)', lineHeight:1.65, marginTop:8, borderLeft:'2px solid var(--border)', paddingLeft:10, fontFamily:"'DM Sans',sans-serif" },
   refsLabel: { fontWeight:600, color:'var(--ink-muted)' },
+}
+
+const sl = {
+  libraryBtn: {
+    display:'flex', alignItems:'center', justifyContent:'center',
+    width:32, height:32, borderRadius:'var(--radius)', border:'1px solid var(--border)',
+    background:'var(--surface)', cursor:'pointer', flexShrink:0,
+    color:'var(--ink-muted)',
+  },
+  landing: { padding:'24px 0 40px' },
+  landingHero: { marginBottom:28, textAlign:'center' },
+  landingTitle: {
+    fontSize:26, fontWeight:700, color:'var(--ink)', margin:'0 0 8px',
+    fontFamily:"'Cormorant Garamond',serif",
+  },
+  landingSubtitle: { fontSize:14, color:'var(--ink-muted)', margin:0 },
+  cardGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 },
+  card: {
+    display:'flex', flexDirection:'row', alignItems:'stretch',
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', cursor:'pointer', textAlign:'left',
+    padding:0, overflow:'hidden', transition:'box-shadow 0.15s, transform 0.15s',
+    fontFamily:"'DM Sans',sans-serif",
+    boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
+  },
+  cardAccent: { width:5, flexShrink:0 },
+  cardBody: { flex:1, padding:'16px 12px 16px 16px', minWidth:0 },
+  cardTop: { display:'flex', alignItems:'center', gap:8, marginBottom:8 },
+  cardBadge: {
+    fontSize:9, fontWeight:700, letterSpacing:'0.08em',
+    padding:'2px 7px', borderRadius:99,
+  },
+  cardStat: { fontSize:11, color:'var(--ink-faint)', marginLeft:'auto' },
+  cardName: {
+    fontSize:15, fontWeight:700, color:'var(--ink)', lineHeight:1.35,
+    marginBottom:6, fontFamily:"'Cormorant Garamond',serif",
+  },
+  cardDesc: {
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.6,
+    margin:0, display:'-webkit-box', WebkitLineClamp:3,
+    WebkitBoxOrient:'vertical', overflow:'hidden',
+  },
+  cardArrow: {
+    display:'flex', alignItems:'center', paddingRight:14,
+    fontSize:18, fontWeight:700, flexShrink:0,
+  },
 }

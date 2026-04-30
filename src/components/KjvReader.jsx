@@ -488,7 +488,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, parallelMode = false }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -595,10 +595,40 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Which word is selected/expanded inside the parallel section */
   const [parallelWord, setParallelWord] = useState(null) // {verseKey, lang, wordIdx} | null
 
+  // parallelVersions: Set of version IDs to show as parallel panels
+  // e.g. new Set(['abab', 'gnt']) means show ABAB text + GNT morph
+  const [parallelVersions, setParallelVersions] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('parallel-versions')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch { return new Set() }
+  })
+
+  // Data for text-version parallels (KJV, ABAB)
+  const [parallelTextData, setParallelTextData] = useState({}) // { 'Book:ch:version': [{verse,text}] }
+  const parallelTextLoadedRef = useRef(new Set())
+
   /* ── LXX reader mode word data (version === 'lxx') ── */
   const [lxxReaderWords,   setLxxReaderWords]   = useState({}) // 'Book:ch' → [{v, words:[{w,s}]}]
   const [lxxReaderWord,    setLxxReaderWord]     = useState(null) // {verseKey, wordIdx} | null
   const lxxReaderLoadedRef = useRef(new Set())
+
+  function toggleParallel(versionId) {
+    setParallelVersions(prev => {
+      const next = new Set(prev)
+      if (next.has(versionId)) next.delete(versionId)
+      else next.add(versionId)
+      try { sessionStorage.setItem('parallel-versions', JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
+
+  // Derived: any original-language parallel selected
+  const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
+  // Which text-version parallel is selected (if any)
+  const textParallelVersion = version === 'kjv' && parallelVersions.has('abab') ? 'abab'
+    : version === 'abab' && parallelVersions.has('kjv') ? 'kjv'
+    : null
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -652,7 +682,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* Load GNT/HOT parallel word data for each visible segment */
   useEffect(() => {
-    if (!parallelMode || version === 'greek' || version === 'hebrew' || version === 'lxx') return
+    if (!(parallelVersions.has('gnt') || parallelVersions.has('hot')) || version === 'greek' || version === 'hebrew' || version === 'lxx') return
     for (const seg of segments) {
       const key = `${seg.book}:${seg.chapter}`
       if (parallelLoadedRef.current.has(key)) continue
@@ -669,11 +699,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         setParallelData(prev => ({ ...prev, [key]: chData }))
       }).catch(() => { parallelLoadedRef.current.delete(key) })
     }
-  }, [parallelMode, segments, version]) // eslint-disable-line
+  }, [parallelVersions, segments, version]) // eslint-disable-line
 
   /* Load LXX parallel word+Strongs data for OT segments */
   useEffect(() => {
-    if (!parallelMode || version === 'greek' || version === 'hebrew' || version === 'lxx') return
+    if (!parallelVersions.has('lxx') || version === 'greek' || version === 'hebrew' || version === 'lxx') return
     for (const seg of segments) {
       if (NT_BOOKS.has(seg.book)) continue // LXX is OT only
       const key = `lxx:${seg.book}:${seg.chapter}`
@@ -689,7 +719,23 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         setParallelLxxData(prev => ({ ...prev, [`${bookKey}:${chKey}`]: chData }))
       }).catch(() => { parallelLxxLoadedRef.current.delete(key) })
     }
-  }, [parallelMode, segments, version]) // eslint-disable-line
+  }, [parallelVersions, segments, version]) // eslint-disable-line
+
+  /* Load text-parallel data when textParallelVersion is set */
+  useEffect(() => {
+    if (!textParallelVersion || !segments.length) return
+    for (const seg of segments) {
+      const key = `${seg.book}:${seg.chapter}:${textParallelVersion}`
+      if (parallelTextLoadedRef.current.has(key)) continue
+      parallelTextLoadedRef.current.add(key)
+      loadBibleVersion(textParallelVersion)
+        .then(data => {
+          const verses = getChapterVerses(data, seg.book, seg.chapter)
+          if (verses) setParallelTextData(prev => ({ ...prev, [key]: verses }))
+        })
+        .catch(() => { parallelTextLoadedRef.current.delete(key) })
+    }
+  }, [textParallelVersion, segments]) // eslint-disable-line
 
   /* Load LXX word+Strongs data in reader mode (version === 'lxx') */
   useEffect(() => {
@@ -1377,6 +1423,77 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         </div>
 
+        {/* ── Parallel section ── */}
+        {(version === 'kjv' || version === 'abab') && (
+          <div style={sb.parallelSection}>
+            <div style={sb.versionSectionTitle}>Parallel</div>
+
+            {/* Text parallel — the other text version */}
+            {(() => {
+              const altId    = version === 'kjv' ? 'abab' : 'kjv'
+              const altLabel = version === 'kjv' ? 'ABAB' : 'KJV'
+              const altFull  = version === 'kjv' ? 'Ang Bagong Ang Biblia' : 'King James Version'
+              const checked  = parallelVersions.has(altId)
+              return (
+                <label style={sb.parallelRow}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleParallel(altId)}
+                    style={{ accentColor:'var(--teal)' }}
+                  />
+                  <span style={sb.parallelLabel}>
+                    <span style={sb.parallelAbbr}>{altLabel}</span>
+                    <span style={sb.parallelHint}>{altFull}</span>
+                  </span>
+                </label>
+              )
+            })()}
+
+            {/* GNT (NT only) */}
+            <label style={sb.parallelRow}>
+              <input
+                type="checkbox"
+                checked={parallelVersions.has('gnt')}
+                onChange={() => toggleParallel('gnt')}
+                style={{ accentColor:'var(--teal)' }}
+              />
+              <span style={sb.parallelLabel}>
+                <span style={sb.parallelAbbr}>GNT</span>
+                <span style={sb.parallelHint}>Greek NT · NT books</span>
+              </span>
+            </label>
+
+            {/* HOT (OT only) */}
+            <label style={sb.parallelRow}>
+              <input
+                type="checkbox"
+                checked={parallelVersions.has('hot')}
+                onChange={() => toggleParallel('hot')}
+                style={{ accentColor:'var(--teal)' }}
+              />
+              <span style={sb.parallelLabel}>
+                <span style={sb.parallelAbbr}>HOT</span>
+                <span style={sb.parallelHint}>Hebrew OT · OT books</span>
+              </span>
+            </label>
+
+            {/* LXX (OT only) */}
+            <label style={sb.parallelRow}>
+              <input
+                type="checkbox"
+                checked={parallelVersions.has('lxx')}
+                onChange={() => toggleParallel('lxx')}
+                style={{ accentColor:'var(--teal)' }}
+              />
+              <span style={sb.parallelLabel}>
+                <span style={sb.parallelAbbr}>LXX</span>
+                <span style={sb.parallelHint}>Greek Septuagint · OT</span>
+              </span>
+            </label>
+          </div>
+        )}
+
         <BookSidebar
           selectedBook={book}
           selectedChapter={chapter}
@@ -1932,12 +2049,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const isHeb   = !isNT
                               const lang    = isNT ? 'GNT' : 'HOT'
 
-                              // GNT/HOT data
-                              const morphCh   = parallelData[pKey]
+                              // GNT/HOT data — only show for the relevant testament
+                              const showMorph = (isNT && parallelVersions.has('gnt')) || (isHeb && parallelVersions.has('hot'))
+                              const morphCh   = showMorph ? parallelData[pKey] : null
                               const morphVerse = morphCh?.find(pv => pv.verse === verse)
 
                               // LXX data (OT only) — lxx-words.json uses 'v' key (not 'verse')
-                              const lxxCh    = isHeb ? parallelLxxData[pKey] : null
+                              const lxxCh    = (isHeb && parallelVersions.has('lxx')) ? parallelLxxData[pKey] : null
                               const lxxVerse = lxxCh?.find(pv => (pv.v ?? pv.verse) === verse)
 
                               if (!morphVerse && !lxxVerse) return null
@@ -2131,6 +2249,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     </>
                                   )}
 
+                                </div>
+                              )
+                            })()}
+
+                            {/* ── Text parallel (ABAB/KJV) ── */}
+                            {textParallelVersion && (() => {
+                              const tKey    = `${seg.book}:${seg.chapter}:${textParallelVersion}`
+                              const tVData  = parallelTextData[tKey]
+                              const tVerse  = tVData?.find(tv => tv.verse === verse)
+                              if (!tVerse) return null
+                              const tLabel  = textParallelVersion === 'abab' ? 'ABAB' : 'KJV'
+                              const morphVerse = parallelData[`${seg.book}:${seg.chapter}`]?.find(pv => pv.verse === verse)
+                              const lxxVerse = parallelLxxData[`${seg.book}:${seg.chapter}`]?.find(pv => (pv.v ?? pv.verse) === verse)
+                              return (
+                                <div style={{ ...r.parallelBlock, borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }}>
+                                  <div style={r.parallelLine}>
+                                    <span style={{ ...r.parallelBadge, background:'rgba(120,80,20,0.10)', color:'var(--amber-ink)' }}>
+                                      {tLabel}
+                                    </span>
+                                    <span style={{ fontSize: prefs.sizePx * 0.92, color:'var(--ink-muted)', lineHeight:1.7, flex:1 }}>
+                                      {tVerse.text}
+                                    </span>
+                                  </div>
                                 </div>
                               )
                             })()}
@@ -2492,6 +2633,18 @@ const sb = {
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'all 0.1s',
   },
+  parallelSection: {
+    padding:'14px 12px 10px',
+    borderTop:'1px solid var(--border)',
+  },
+  parallelRow: {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'5px 4px', cursor:'pointer',
+    borderRadius:'var(--radius)', fontSize:13,
+  },
+  parallelLabel: { display:'flex', flexDirection:'column', gap:1 },
+  parallelAbbr: { fontSize:12, fontWeight:700, color:'var(--ink)' },
+  parallelHint: { fontSize:10, color:'var(--ink-faint)' },
 }
 
 /* ── Reader styles ── */

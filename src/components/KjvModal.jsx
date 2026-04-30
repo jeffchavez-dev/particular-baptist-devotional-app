@@ -1,9 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchKjvChapter } from './KjvReader'
+import { loadBibleVersion, getChapterVerses } from '../lib/bibleVersions'
+import { getDefaultReaderVersion, DEFAULT_VERSION_OPTIONS, originalVersionForBook } from '../lib/readerPrefs'
+import { BIBLE_BOOKS } from '../lib/bibleBooks'
 
 /**
- * KjvModal — inline popup for reading a KJV chapter directly from any page.
+ * KjvModal — inline popup for reading a Bible chapter directly from any page.
+ *
+ * The translation shown (and navigated to) honours the user's
+ * "Default Bible Translation" preference (KJV · ABAB · Original).
+ *
+ * When the preference is "Original":
+ *   • The modal displays KJV text (original-language word-level rendering
+ *     is only available in the full Scripture reader).
+ *   • A "HOT" or "GNT" badge indicates the original that will open.
+ *   • "Open in Scripture" navigates to HOT (OT) or GNT (NT).
  *
  * Props:
  *   book       string      — full book name, e.g. "Romans"
@@ -19,16 +30,39 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
   const [error,    setError]    = useState(null)
   const bodyRef    = useRef(null)
 
-  /* Load chapter */
+  // Resolve preference once — stable for this modal's lifetime.
+  const pref = getDefaultReaderVersion()
+
+  // 'original' → resolve the correct original-language version for this book.
+  // For the in-modal text display we always fall back to 'kjv' (original-language
+  // data is morphological and requires the full reader to render).
+  const isOriginalPref  = pref === 'original'
+  const resolvedVersion = isOriginalPref
+    ? originalVersionForBook(book, BIBLE_BOOKS)   // 'hebrew' | 'greek'
+    : pref                                         // 'kjv' | 'abab'
+  const textVersion     = isOriginalPref ? 'kjv' : pref  // version used for modal text
+
+  // Badge shown in the modal header
+  const badgeLabel = isOriginalPref
+    ? (resolvedVersion === 'greek' ? 'GNT' : 'HOT')
+    : (DEFAULT_VERSION_OPTIONS.find(v => v.id === pref)?.label ?? 'KJV')
+
+  /* Load chapter text in the appropriate translation */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchKjvChapter(book, chapter)
-      .then(v => { if (!cancelled) { setVerses(v); setLoading(false) } })
+    loadBibleVersion(textVersion)
+      .then(data => {
+        if (cancelled) return
+        const cv = getChapterVerses(data, book, chapter)
+        if (!cv || cv.length === 0) throw new Error(`${book} ${chapter} not found`)
+        setVerses(cv)
+        setLoading(false)
+      })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     return () => { cancelled = true }
-  }, [book, chapter])
+  }, [book, chapter, textVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Scroll to target verse after verses load */
   useEffect(() => {
@@ -65,7 +99,8 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
   function goToScripture() {
     onClose()
     navigate('/scripture', {
-      state: { book, chapter, verse: verse ?? null, mode: 'read' },
+      // For 'original', pass the resolved HOT/GNT version so ScripturePage switches to it.
+      state: { book, chapter, verse: verse ?? null, mode: 'read', version: resolvedVersion },
     })
   }
 
@@ -80,7 +115,12 @@ export default function KjvModal({ book, chapter, verse, refDisplay, onClose }) 
             {refDisplay && refDisplay !== `${book} ${chapter}` && (
               <span style={m.refLabel}>{refDisplay}</span>
             )}
-            <span style={m.kjvBadge}>KJV</span>
+            <span style={m.kjvBadge}>{badgeLabel}</span>
+            {/* When "Original" is the preference, show a KJV sub-label so the
+                user knows the modal text is KJV and the reader will open in original */}
+            {isOriginalPref && (
+              <span style={m.kjvSubBadge}>KJV preview</span>
+            )}
           </div>
           <div style={m.headerRight}>
             <button style={m.goBtn} onClick={goToScripture} title="Open in Scripture reader">
@@ -166,6 +206,10 @@ const m = {
     fontSize:9, fontWeight:700, letterSpacing:'0.08em',
     background:'var(--gold-faint)', color:'var(--gold)',
     padding:'2px 6px', borderRadius:99,
+  },
+  kjvSubBadge: {
+    fontSize:9, fontWeight:600, letterSpacing:'0.04em',
+    color:'var(--ink-faint)', padding:'2px 0',
   },
   goBtn: {
     display:'flex', alignItems:'center', gap:5,

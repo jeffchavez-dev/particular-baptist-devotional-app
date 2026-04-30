@@ -16,6 +16,9 @@ import {
   loadHighlights, loadItemNotes,
   clearAllHighlights, clearAllNotes,
 } from '../lib/annotations'
+import {
+  getDefaultReaderVersion, setDefaultReaderVersion, DEFAULT_VERSION_OPTIONS,
+} from '../lib/readerPrefs'
 
 const SCHEDULE = buildSchedule()
 
@@ -528,6 +531,8 @@ export default function AboutPage() {
   const { dark, toggleDark } = useTheme()
   const { prefs, updatePrefs } = usePrefs()
 
+  const [defaultVersion, setDefaultVersion] = useState(() => getDefaultReaderVersion())
+
   const [exportOpen,   setExportOpen]   = useState(false)
   const [resetDone,    setResetDone]    = useState(false)
   const [resetting,    setResetting]    = useState(false)
@@ -866,6 +871,49 @@ export default function AboutPage() {
                   transition:'left 0.2s',
                 }} />
               </button>
+            </div>
+
+            {/* Default Bible Translation */}
+            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Default Bible Translation</span>
+                <span style={s.settingHint}>Used when opening Scripture from devotionals and confession proof texts</span>
+              </div>
+              <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                {DEFAULT_VERSION_OPTIONS.map(opt => {
+                  const active = defaultVersion === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      title={opt.full}
+                      onClick={() => {
+                        setDefaultVersion(opt.id)
+                        setDefaultReaderVersion(opt.id)
+                        // For concrete versions, update sessionStorage immediately so the
+                        // Scripture page picks it up. For 'original', clear the session key
+                        // so ScripturePage resolves HOT/GNT from the book context.
+                        try {
+                          if (opt.id === 'original') {
+                            sessionStorage.removeItem('reader-version')
+                          } else {
+                            sessionStorage.setItem('reader-version', opt.id)
+                          }
+                        } catch {}
+                      }}
+                      style={{
+                        padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700,
+                        fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                        border: active ? '1.5px solid var(--teal)' : '1.5px solid var(--border-strong)',
+                        background: active ? 'var(--teal-light)' : 'var(--surface)',
+                        color: active ? 'var(--teal)' : 'var(--ink-muted)',
+                        transition:'all 0.15s',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             {/* Backup */}
