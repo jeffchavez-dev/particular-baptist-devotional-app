@@ -9,6 +9,7 @@ import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersio
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { addSearchHistory, getSearchHistory, clearSearchHistory } from '../lib/annotations'
+import { isAuthor } from '../lib/authorContent'
 
 /* ══════════════════════════════════════════════════════════════════ */
 export default function ScripturePage() {
@@ -49,6 +50,9 @@ export default function ScripturePage() {
   const [panelSearching,     setPanelSearching]     = useState(false)
   // Which book groups are expanded in the results list
   const [openBooks, setOpenBooks] = useState(new Set())
+  // Author-only edit mode for study notes / cross-refs
+  const isAuthorUser = isAuthor(session)
+  const [authorEditMode, setAuthorEditMode] = useState(false)
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -167,9 +171,29 @@ export default function ScripturePage() {
             <span style={s.readBookCh}>Ch. {readChapter}</span>
           </button>
 
+          {/* Author edit-mode toggle — only visible to the author */}
+          {isAuthorUser && (
+            <button
+              style={{
+                ...s.menuBtn,
+                marginLeft:'auto',
+                ...(authorEditMode ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}),
+              }}
+              onClick={() => setAuthorEditMode(m => !m)}
+              aria-label="Toggle author edit mode"
+              title={authorEditMode ? 'Exit edit mode' : 'Enter edit mode (author)'}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"
+                  stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+
           {/* Search icon button */}
           <button
-            style={{ ...s.menuBtn, marginLeft:'auto' }}
+            style={{ ...s.menuBtn, ...(isAuthorUser ? {} : { marginLeft:'auto' }) }}
             onClick={() => setSearchPanelOpen(p => !p)}
             aria-label="Search Bible"
             title="Search Bible"
@@ -411,6 +435,7 @@ export default function ScripturePage() {
           setCanGoBack(b)
           setCanGoForward(f)
         }}
+        authorEditMode={authorEditMode}
         onSearchResults={(hits, total, capped, q) => {
           setSearchResults(hits)
           setSearchResultsTotal(total)

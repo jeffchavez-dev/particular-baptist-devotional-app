@@ -493,7 +493,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -623,6 +623,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* ── Author content (notes + cross-refs) ── */
   const isAuthorUser = isAuthor(session)
+  // canEdit is true only when the author has explicitly toggled edit mode on
+  const canEdit = isAuthorUser && authorEditMode
   // { 'Book:ch': { verseNum: { id, note } } }
   const [authorNotes, setAuthorNotes] = useState({})
   // { 'Book:ch': { verseNum: [{id, src_book, src_chapter, src_verse, tgt_book, tgt_chapter, tgt_verse, label}] } }
@@ -2114,7 +2116,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         if (range) {
                                           range.expand('word')
                                           const word = range.toString().trim().replace(/[^a-zA-ZͰ-Ͽἀ-῿'-]/g, '')
-                                          if (word.length >= 2) setWordSearchModal({ word })
+                                          // Word-tap modal disabled — use the search panel instead
                                         }
                                       } catch {}
                                     }}
@@ -2455,7 +2457,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const xrefs    = authorCrossRefs[chKey]?.[verse] || []
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
-                              if (!xrefs.length && !isAuthorUser && !isAddingHere) return null
+                              if (!xrefs.length && !canEdit && !isAddingHere) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
                                   <span style={r.authorXrefIcon}>↗</span>
@@ -2495,7 +2497,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           }}
                                           title={`Author link → ${tgt}`}
                                         >{chipLabel}</button>
-                                        {isAuthorUser && (
+                                        {canEdit && (
                                           <button style={r.authorXrefDeleteBtn}
                                             onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
                                             title="Remove link">×</button>
@@ -2503,7 +2505,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       </span>
                                     )
                                   })}
-                                  {isAuthorUser && !isAddingHere && (
+                                  {canEdit && !isAddingHere && (
                                     <button style={r.authorXrefAddBtn}
                                       onClick={e => {
                                         e.stopPropagation()
@@ -2513,7 +2515,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       }}
                                       title="Add passage link">+ link</button>
                                   )}
-                                  {isAuthorUser && isAddingHere && (
+                                  {canEdit && isAddingHere && (
                                     <div style={r.authorXrefForm}>
                                       <div style={r.authorXrefFormRow}>
                                         <input
@@ -2569,7 +2571,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const authorNoteObj = authorNotes[chKey]?.[verse]
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isEditingAuthor = editingAuthorNote === avk
-                              if (!authorNoteObj && !isAuthorUser) return null
+                              if (!authorNoteObj && !canEdit) return null
                               return (
                                 <div style={r.authorNoteBlock} onClick={e => e.stopPropagation()}>
                                   {/* Display mode (all users see this when a note exists) */}
@@ -2577,7 +2579,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     <div style={r.authorNoteDisplay}>
                                       <div style={r.authorNoteHeader}>
                                         <span style={r.authorNoteLabel}>Study Note</span>
-                                        {isAuthorUser && (
+                                        {canEdit && (
                                           <button style={r.authorEditBtn}
                                             onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
                                             title="Edit study note">
@@ -2591,15 +2593,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       <p style={r.authorNoteText}>{authorNoteObj.note}</p>
                                     </div>
                                   )}
-                                  {/* Author edit / add controls */}
-                                  {isAuthorUser && !isEditingAuthor && !authorNoteObj && (
+                                  {/* Author edit / add controls — only in edit mode */}
+                                  {canEdit && !isEditingAuthor && !authorNoteObj && (
                                     <button style={r.authorAddNoteBtn}
                                       onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
                                       title="Add study note">
                                       + Study Note
                                     </button>
                                   )}
-                                  {isAuthorUser && isEditingAuthor && (
+                                  {canEdit && isEditingAuthor && (
                                     <div style={r.noteEditorWrap}>
                                       <div style={r.authorNoteHeader}>
                                         <span style={r.authorNoteLabel}>Study Note</span>
@@ -2836,34 +2838,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         </div>
       )}
 
-      {/* KJV word-tap search modal */}
-      {wordSearchModal && (
-        <div
-          style={r.wordSearchBackdrop}
-          onClick={() => setWordSearchModal(null)}
-        >
-          <div style={r.wordSearchCard} onClick={e => e.stopPropagation()}>
-            <div style={r.wordSearchWord}>"{wordSearchModal.word}"</div>
-            <div style={r.wordSearchActions}>
-              <button
-                style={r.wordSearchBtn}
-                onClick={() => {
-                  submitSearch(wordSearchModal.word)
-                  setWordSearchModal(null)
-                }}
-              >
-                Search in Bible
-              </button>
-              <button
-                style={r.wordSearchCancel}
-                onClick={() => setWordSearchModal(null)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* KJV word-tap search modal — disabled; use the search panel (magnifying glass) instead */}
     </div>
   )
 })
