@@ -674,6 +674,7 @@ export default function ConfessionsPage() {
 
   const [activeChapter, setActiveChapter] = useState(null)
   const [search,        setSearch]        = useState(_saved.search)
+  const [searchOpen,    setSearchOpen]    = useState(false)
   const [navOpen,       setNavOpen]       = useState(false)
   const [kjvModal,      setKjvModal]      = useState(null)
   const [shareCard,     setShareCard]     = useState(null)
@@ -941,6 +942,22 @@ export default function ConfessionsPage() {
     setShowHistDrop(false)
   }
 
+  /* Navigate to a search result: switch tab if needed, then scroll to item */
+  function navigateToResult(result) {
+    setSearchOpen(false)
+    const targetTab = result.source
+    if (tab !== targetTab) {
+      pendingScrollRef.current = result.id
+      setSearchParams({ t: targetTab })
+    } else {
+      const el = document.getElementById(result.id)
+      if (el) {
+        const top = el.getBoundingClientRect().top + window.scrollY - headerH - 12
+        window.scrollTo({ top, behavior: 'smooth' })
+      }
+    }
+  }
+
   /* Chapter nav for sidebar */
   const chapterNav = useMemo(() => {
     if (sidebarConf === '2lbcf') {
@@ -958,26 +975,35 @@ export default function ConfessionsPage() {
 
   const q = search.toLowerCase().trim()
 
-  const resultCounts = useMemo(() => {
-    if (!q) return null
-    let lbcf2Count = 0, catCount = 0, lbcf1Count = 0, orthodoxCount = 0
+  /* Build a flat list of search results across all sources */
+  const searchResults = useMemo(() => {
+    if (!q) return []
+    const hits = []
     Object.entries(LBCF2_CHAPTERS).forEach(([chNum, paras]) => {
-      const chTitle = (CHAPTER_TITLES[parseInt(chNum)] || '').toLowerCase()
-      const chMatch = chTitle.includes(q)
+      const chTitle = CHAPTER_TITLES[parseInt(chNum)] || ''
+      const chMatch = chTitle.toLowerCase().includes(q)
       paras.forEach(p => {
-        if (chMatch || textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)) lbcf2Count++
+        if (chMatch || textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)) {
+          hits.push({ source: '2lbcf', label: `Ch.${chNum} §${p.para}`, text: p.text, id: `p-${p.key}` })
+        }
       })
     })
     Object.entries(CATECHISM).forEach(([num, item]) => {
-      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.catechism[num] || '', q)) catCount++
+      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.catechism[num] || '', q)) {
+        hits.push({ source: 'catechism', label: `Q&A ${num}`, text: `Q. ${item.q}`, id: `qa-${num}` })
+      }
     })
     Object.entries(LBCF1).forEach(([num, item]) => {
-      if (textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) lbcf1Count++
+      if (textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) {
+        hits.push({ source: '1lbcf', label: `Art. ${num}`, text: item.title ? `${item.title} — ${item.text}` : item.text, id: `art-${num}` })
+      }
     })
     Object.entries(ORTHODOX_CATECHISM).forEach(([num, item]) => {
-      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.orthodox[num] || '', q)) orthodoxCount++
+      if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.orthodox[num] || '', q)) {
+        hits.push({ source: 'orthodox', label: `Q&A ${num}`, text: `Q. ${item.q}`, id: `qa-${num}` })
+      }
     })
-    return { lbcf2: lbcf2Count, catechism: catCount, lbcf1: lbcf1Count, orthodox: orthodoxCount }
+    return hits
   }, [q])
 
   /* ── Sidebar content ── */
@@ -1125,14 +1151,42 @@ export default function ConfessionsPage() {
             </div>
           )}
 
-          {/* Search with history */}
-          <div style={{...s.searchBox, position:'relative'}} ref={searchWrapRef}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
-              <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          {/* Search icon toggle */}
+          <button
+            onClick={() => { setSearchOpen(o => !o); if (searchOpen) { setSearch(''); setShowHistDrop(false) } }}
+            style={{
+              ...sl.searchIconBtn,
+              color: searchOpen || search ? 'var(--teal)' : 'var(--ink-faint)',
+              background: searchOpen || search ? 'var(--teal-light)' : 'none',
+            }}
+            title="Search confessions"
+            aria-label="Search"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            {search && <span style={sl.searchBadge}>{searchResults.length}</span>}
+          </button>
+
+        </div>
+      </header>
+
+      {isMobile && navOpen && (
+        <div style={s.backdrop} onClick={() => setNavOpen(false)} />
+      )}
+
+      {/* ── Search panel ── */}
+      {searchOpen && (
+        <div style={sl.searchPanel}>
+          <div style={sl.searchInputRow} ref={searchWrapRef}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
+              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
             <input
-              style={s.searchInput}
+              autoFocus
+              style={sl.searchPanelInput}
               value={search}
               onChange={e => {
                 setSearch(e.target.value)
@@ -1141,36 +1195,48 @@ export default function ConfessionsPage() {
               onFocus={() => { if (!search && searchHistory.length) setShowHistDrop(true) }}
               onKeyDown={e => {
                 if (e.key === 'Enter') submitSearch(search)
-                if (e.key === 'Escape') { setSearch(''); setShowHistDrop(false) }
+                if (e.key === 'Escape') { setSearch(''); setSearchOpen(false) }
               }}
-              placeholder="Search…"
+              placeholder="Search all confessions & catechisms…"
             />
-            {search && (
-              <button onClick={() => { setSearch(''); setShowHistDrop(false) }} style={s.clearBtn}>×</button>
-            )}
+            {search
+              ? <button onClick={() => setSearch('')} style={s.clearBtn}>×</button>
+              : <button onClick={() => setSearchOpen(false)} style={s.clearBtn} aria-label="Close search">×</button>
+            }
             {showHistDrop && searchHistory.length > 0 && (
               <SearchHistDrop
                 history={searchHistory}
                 onSelect={q => { setSearch(q); setShowHistDrop(false) }}
-                onRemove={q => {
-                  removeSearchEntry('conf', q)
-                  setSearchHistory(getSearchHistory('conf'))
-                }}
-                onClear={() => {
-                  clearSearchHistory('conf')
-                  setSearchHistory([])
-                  setShowHistDrop(false)
-                }}
+                onRemove={q => { removeSearchEntry('conf', q); setSearchHistory(getSearchHistory('conf')) }}
+                onClear={() => { clearSearchHistory('conf'); setSearchHistory([]); setShowHistDrop(false) }}
                 onClose={() => setShowHistDrop(false)}
               />
             )}
           </div>
 
+          {/* Results list */}
+          {search && searchResults.length === 0 && (
+            <div style={sl.searchEmpty}>No results for "{search}"</div>
+          )}
+          {search && searchResults.length > 0 && (
+            <div style={sl.resultsList}>
+              <div style={sl.resultsCount}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
+              {searchResults.map((r, i) => {
+                const srcInfo = SOURCES[r.source] || SOURCES['2lbcf']
+                const snippet = r.text ? r.text.slice(0, 120) + (r.text.length > 120 ? '…' : '') : ''
+                return (
+                  <button key={i} style={sl.resultItem} onClick={() => navigateToResult(r)}>
+                    <div style={sl.resultTop}>
+                      <span style={{...sl.resultBadge, background: srcInfo.bg, color: srcInfo.color}}>{srcInfo.label}</span>
+                      <span style={sl.resultLabel}>{r.label}</span>
+                    </div>
+                    <p style={sl.resultSnippet}>{highlight(snippet, search)}</p>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
-      </header>
-
-      {isMobile && navOpen && (
-        <div style={s.backdrop} onClick={() => setNavOpen(false)} />
       )}
 
       <div style={s.layout}>
@@ -1238,28 +1304,6 @@ export default function ConfessionsPage() {
           )}
 
           {!!tab && (<>
-
-          {q && resultCounts && (() => {
-            const count = resultCounts[tab === '2lbcf' ? 'lbcf2' : tab === 'catechism' ? 'catechism' : 'lbcf1']
-            if (count === 0) return (
-              <div style={s.empty}>No results for "{search}"
-                {searchHistory.length > 0 && (
-                  <div style={{marginTop:10, fontSize:12, color:'var(--teal)'}}>
-                    Recent: {searchHistory.slice(0,3).map((q, i) => (
-                      <button key={q} onClick={() => setSearch(q)} style={{background:'none',border:'none',color:'var(--teal)',cursor:'pointer',textDecoration:'underline',fontSize:12,marginLeft:i>0?8:0}}>
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-            return (
-              <div style={s.resultBanner}>
-                {count} {tab === 'catechism' ? 'Q&A' : 'section'}{count !== 1 ? 's' : ''} matched "{search}"
-              </div>
-            )
-          })()}
 
           {isMobile && (
             <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:'1rem', flexWrap:'wrap'}}>
@@ -1707,5 +1751,64 @@ const sl = {
   cardArrow: {
     display:'flex', alignItems:'center', paddingRight:14,
     fontSize:18, fontWeight:700, flexShrink:0,
+  },
+
+  /* Search icon button in header */
+  searchIconBtn: {
+    display:'flex', alignItems:'center', gap:5,
+    padding:'6px 8px', borderRadius:'var(--radius)',
+    border:'1px solid transparent', cursor:'pointer',
+    transition:'all 0.15s', flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  searchBadge: {
+    fontSize:10, fontWeight:700, minWidth:16, height:16,
+    display:'inline-flex', alignItems:'center', justifyContent:'center',
+    background:'var(--teal)', color:'white', borderRadius:99, padding:'0 4px',
+  },
+
+  /* Search panel */
+  searchPanel: {
+    position:'fixed', top:0, left:0, right:0, zIndex:200,
+    background:'var(--surface)',
+    borderBottom:'1px solid var(--border)',
+    boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+    maxHeight:'80vh', overflowY:'auto',
+  },
+  searchInputRow: {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'12px 16px', position:'relative',
+    borderBottom:'1px solid var(--border)',
+  },
+  searchPanelInput: {
+    flex:1, border:'none', background:'transparent', outline:'none',
+    fontSize:15, color:'var(--ink)', fontFamily:"'DM Sans',sans-serif",
+  },
+  searchEmpty: {
+    padding:'24px 16px', textAlign:'center',
+    fontSize:14, color:'var(--ink-faint)',
+  },
+  resultsList: { display:'flex', flexDirection:'column' },
+  resultsCount: {
+    fontSize:11, fontWeight:600, color:'var(--ink-faint)',
+    padding:'8px 16px 4px', textTransform:'uppercase', letterSpacing:'0.06em',
+  },
+  resultItem: {
+    display:'flex', flexDirection:'column', gap:4, textAlign:'left',
+    padding:'10px 16px', border:'none', borderBottom:'1px solid var(--border)',
+    background:'var(--surface)', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.12s',
+  },
+  resultTop: { display:'flex', alignItems:'center', gap:8 },
+  resultBadge: {
+    fontSize:9, fontWeight:700, letterSpacing:'0.07em',
+    padding:'2px 7px', borderRadius:99, flexShrink:0,
+  },
+  resultLabel: { fontSize:12, fontWeight:600, color:'var(--ink)' },
+  resultSnippet: {
+    fontSize:13, color:'var(--ink-muted)', margin:0, lineHeight:1.5,
+    display:'-webkit-box', WebkitLineClamp:2,
+    WebkitBoxOrient:'vertical', overflow:'hidden',
+    fontFamily:"'Cormorant Garamond',serif",
   },
 }

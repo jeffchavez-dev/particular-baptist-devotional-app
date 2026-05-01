@@ -2,8 +2,7 @@
  * BibleTrackerSection
  * Moved from ScripturePage — used in Settings (AboutPage) under "Bible Tracker".
  */
-import React, { useState, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useCallback } from 'react'
 import { BIBLE_BOOKS, TOTAL_CHAPTERS } from '../lib/bibleBooks'
 import { getBibleProgress, setBibleChapter } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
@@ -246,13 +245,11 @@ function TestamentSection({ testament, categories, planByBook, bibBooks, progres
    Main export
    ══════════════════════════════════════════════════════════════════ */
 export default function BibleTrackerSection() {
-  const nav = useNavigate()
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
-  const [trackerTab, setTrackerTab] = useState('plan') // 'plan' | 'bible'
-  const [progress,   setProgress]   = useState(() => getBibleProgress())
-  const [openCats,   setOpenCats]   = useState(new Set())
+  const [progress, setProgress] = useState(() => getBibleProgress())
+  const [openCats, setOpenCats] = useState(new Set())
 
   function setOpenCat(id) {
     setOpenCats(prev => {
@@ -272,90 +269,37 @@ export default function BibleTrackerSection() {
     })
   }, [userId])
 
-  const planDone  = useMemo(() => PLAN_BOOKS_ORDERED.reduce((s, b) =>
-    s + PLAN_BY_BOOK[b].filter(ch => progress[`${b} ${ch}`]).length, 0), [progress])
   const bibleDone = Object.keys(progress).length
 
   return (
     <div style={t.wrap}>
-      {/* Tab switcher */}
-      <div style={t.tabs}>
-        <button
-          style={{...t.tab, ...(trackerTab === 'plan' ? t.tabActive : {})}}
-          onClick={() => setTrackerTab('plan')}
-        >
-          Reading Plan
-          <span style={{...t.tabBadge, ...(trackerTab === 'plan' ? t.tabBadgeActive : {})}}>
-            {planDone}/{PLAN_TOTAL}
-          </span>
-        </button>
-        <button
-          style={{...t.tab, ...(trackerTab === 'bible' ? t.tabActive : {})}}
-          onClick={() => setTrackerTab('bible')}
-        >
-          Full Bible
-          <span style={{...t.tabBadge, ...(trackerTab === 'bible' ? t.tabBadgeActive : {})}}>
-            {bibleDone}/{TOTAL_CHAPTERS}
-          </span>
-        </button>
+      <div style={t.section}>
+        <div style={t.progressCard}>
+          <ProgressBar done={bibleDone} total={TOTAL_CHAPTERS} label="Bible chapters read" />
+          <p style={t.progressNote}>
+            Track your personal Bible reading progress across all {TOTAL_CHAPTERS} chapters.
+            <span style={{marginLeft:8, display:'inline-flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
+              <span style={t.legend}><span style={{...t.dot, background:'var(--teal)'}} />Read</span>
+              <span style={t.legend}><span style={{...t.dot, background:'var(--teal-light)', border:'1.5px solid rgba(29,107,90,0.35)'}} />In plan</span>
+              <span style={t.legend}><span style={{...t.dot, background:'var(--surface)', border:'1.5px solid var(--border)'}} />Unread</span>
+            </span>
+          </p>
+        </div>
+        <TestamentSection
+          testament="OT" categories={OT_CATEGORIES}
+          planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+          progress={progress} mode="bible"
+          onToggle={toggleChapter}
+          openCats={openCats} setOpenCat={setOpenCat}
+        />
+        <TestamentSection
+          testament="NT" categories={NT_CATEGORIES}
+          planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
+          progress={progress} mode="bible"
+          onToggle={toggleChapter}
+          openCats={openCats} setOpenCat={setOpenCat}
+        />
       </div>
-
-      {/* Reading plan */}
-      {trackerTab === 'plan' && (
-        <div style={t.section}>
-          <div style={t.progressCard}>
-            <ProgressBar done={planDone} total={PLAN_TOTAL} label="Reading plan progress" />
-            <p style={t.progressNote}>
-              One chapter per devotional day (360 total). Click a day chip to jump to that devotional.
-            </p>
-          </div>
-          <TestamentSection
-            testament="OT" categories={OT_CATEGORIES}
-            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
-            progress={progress} mode="plan"
-            onNavigate={d => nav(`/day/${d}`)}
-            openCats={openCats} setOpenCat={setOpenCat}
-          />
-          <TestamentSection
-            testament="NT" categories={NT_CATEGORIES}
-            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
-            progress={progress} mode="plan"
-            onNavigate={d => nav(`/day/${d}`)}
-            openCats={openCats} setOpenCat={setOpenCat}
-          />
-        </div>
-      )}
-
-      {/* Full Bible */}
-      {trackerTab === 'bible' && (
-        <div style={t.section}>
-          <div style={t.progressCard}>
-            <ProgressBar done={bibleDone} total={TOTAL_CHAPTERS} label="Bible chapters read" />
-            <p style={t.progressNote}>
-              Track your personal Bible reading progress across all {TOTAL_CHAPTERS} chapters.
-              <span style={{marginLeft:8, display:'inline-flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
-                <span style={t.legend}><span style={{...t.dot, background:'var(--teal)'}} />Read</span>
-                <span style={t.legend}><span style={{...t.dot, background:'var(--teal-light)', border:'1.5px solid rgba(29,107,90,0.35)'}} />In plan</span>
-                <span style={t.legend}><span style={{...t.dot, background:'var(--surface)', border:'1.5px solid var(--border)'}} />Unread</span>
-              </span>
-            </p>
-          </div>
-          <TestamentSection
-            testament="OT" categories={OT_CATEGORIES}
-            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
-            progress={progress} mode="bible"
-            onToggle={toggleChapter}
-            openCats={openCats} setOpenCat={setOpenCat}
-          />
-          <TestamentSection
-            testament="NT" categories={NT_CATEGORIES}
-            planByBook={PLAN_BY_BOOK} bibBooks={BIBLE_BOOKS}
-            progress={progress} mode="bible"
-            onToggle={toggleChapter}
-            openCats={openCats} setOpenCat={setOpenCat}
-          />
-        </div>
-      )}
     </div>
   )
 }

@@ -388,27 +388,8 @@ export default function Dashboard() {
           <span style={s.barLabel}>{pct}% complete</span>
         </div>
 
-        {/* Search + filters */}
+        {/* Filters */}
         <div style={s.controls}>
-          <div style={s.searchWrap}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={s.searchIcon}>
-              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
-              <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            <input
-              style={s.searchInput}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search readings, quotes, or notes…"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} style={s.searchClear} aria-label="Clear">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
-            )}
-          </div>
           <select value={filterSrc} onChange={e => setFilterSrc(e.target.value)} style={s.select}>
             <option value="">All sources</option>
             <option value="2LBCF">2LBCF</option>
