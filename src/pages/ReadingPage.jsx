@@ -472,6 +472,7 @@ export default function ReadingPage() {
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
+  const [navVisible, setNavVisible] = useState(true)
   const { prefs, updatePrefs } = usePrefs()
   const orthodoxContent = prefs.includeOrthodox ? getOrthodoxContent(day) : null
   const bibleChapter = entry?.bibleChapter || null
@@ -490,6 +491,24 @@ export default function ReadingPage() {
     restoreScroll(`reading-${day}`)
     return () => saveScroll(`reading-${day}`)
   }, [day])
+
+  /* ── Scroll-direction detection: hide/show nav chrome ── */
+  useEffect(() => {
+    let lastY = window.scrollY
+    function handler() {
+      const y = window.scrollY
+      const delta = y - lastY
+      if (Math.abs(delta) < 8) return
+      lastY = y
+      const direction = delta > 0 ? 'down' : 'up'
+      window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
+        detail: { direction, scrollTop: y },
+      }))
+      setNavVisible(direction === 'up' || y < 30)
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
 
   useEffect(() => {
     if (!entry) return
@@ -590,19 +609,18 @@ export default function ReadingPage() {
 
   return (
     <div style={s.page}>
-      <header style={s.header}>
+      <header style={{
+        ...s.header,
+        transform: `translateY(${navVisible ? '0' : '-100%'})`,
+        transition: 'transform 0.28s ease',
+      }}>
         <div style={s.headerInner}>
           <button onClick={()=>navigate('/')} className="btn btn-ghost" style={{gap:4}} title="Back to all days" aria-label="Back to all days">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 3L5 7l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </button>
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
-            <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
-            {!session && (
-              <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:12, padding:'5px 12px'}}>Sign in</button>
-            )}
-          </div>
+          <span style={{fontSize:13,color:'var(--ink-faint)'}}>Day {day} of 365</span>
         </div>
       </header>
 

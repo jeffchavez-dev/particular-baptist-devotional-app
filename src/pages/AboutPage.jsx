@@ -640,14 +640,27 @@ export default function AboutPage() {
             <img src="/pb-icon.svg" alt="P.B." style={{width:26, height:26}} />
             <h1 style={s.headerTitle}>Settings &amp; About</h1>
           </div>
-          {session && (
-            <span style={s.signedIn}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <circle cx="6" cy="6" r="5" stroke="var(--teal)" strokeWidth="1.2"/>
-                <path d="M3.5 6l2 2 3-3" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {session.user.email?.split('@')[0]}
-            </span>
+          {session ? (
+            <div style={{display:'flex', alignItems:'center', gap:10}}>
+              <span style={s.signedIn}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <circle cx="6" cy="6" r="5" stroke="var(--teal)" strokeWidth="1.2"/>
+                  <path d="M3.5 6l2 2 3-3" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {session.user.email?.split('@')[0]}
+              </span>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="btn btn-ghost"
+                style={{fontSize:12, padding:'4px 10px'}}
+              >Sign out</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => navigate('/auth')}
+              className="btn btn-outline"
+              style={{fontSize:13, padding:'5px 12px'}}
+            >Sign in</button>
           )}
         </div>
       </header>

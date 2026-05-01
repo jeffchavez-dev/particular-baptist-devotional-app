@@ -287,8 +287,6 @@ export default function Dashboard() {
     return null
   }, [todayEntry])
 
-  async function signOut() { await supabase.auth.signOut() }
-
   if (loading) {
     return (
       <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:12}}>
@@ -301,40 +299,7 @@ export default function Dashboard() {
   return (
     <div style={s.page}>
 
-      {/* ── Header ── */}
-      <header style={s.header}>
-        <div style={s.headerInner}>
-          <div style={{display:'flex', alignItems:'center', gap:12}}>
-            <img
-              src="/pb-icon.svg" alt="P.B."
-              style={{width:36, height:36, flexShrink:0, cursor:'pointer'}}
-              onClick={() => navigate('/')}
-              title="Home"
-            />
-            <div>
-              <h1 style={{...s.siteTitle, display: isMobile ? 'none' : 'block'}}>Particular Baptist Devotional</h1>
-              {session && <p style={s.siteGreeting}>Welcome back, {userName}</p>}
-            </div>
-          </div>
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
-            {session
-              ? <button onClick={signOut} className="btn btn-ghost" style={{fontSize:13}}>Sign out</button>
-              : <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13}}>Sign in</button>
-            }
-          </div>
-        </div>
-      </header>
-
       <main style={s.main}>
-        {/* Guest banner */}
-        {!session && (
-          <div style={s.guestBanner}>
-            <span>Browsing as guest — progress is saved locally.</span>
-            <button onClick={() => navigate('/auth')} style={s.guestBannerLink}>
-              Sign in to sync across devices →
-            </button>
-          </div>
-        )}
 
         {/* Today's Reading */}
         {todayEntry && (
