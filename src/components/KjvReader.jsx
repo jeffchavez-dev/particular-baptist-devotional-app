@@ -22,6 +22,7 @@ import {
   fetchAuthorNotes, upsertAuthorNote, deleteAuthorNote,
   fetchAuthorCrossRefs, upsertAuthorCrossRef, deleteAuthorCrossRef,
 } from '../lib/authorContent'
+import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -128,9 +129,78 @@ function getNextChapter(bookName, ch) {
   return null
 }
 
+function getPrevChapter(bookName, ch) {
+  if (ch > 1) return { book: bookName, chapter: ch - 1 }
+  const idx = BIBLE_BOOKS.findIndex(b => b.name === bookName)
+  if (idx > 0) {
+    const prevBook = BIBLE_BOOKS[idx - 1]
+    const prevMeta = BOOK_META[prevBook.name]
+    return { book: prevBook.name, chapter: prevMeta?.chapters || 1 }
+  }
+  return null // Genesis 1 — nothing before
+}
+
 /** Stable DOM id for a given verse (book/chapter/verse) */
 function verseId(bookName, ch, verse) {
   return `v-${bookName.replace(/\s+/g, '')}-${ch}-${verse}`
+}
+
+function loadReaderPosition(version) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(`bible-reader-${version}`) || 'null')
+    if (saved?.book && saved?.chapter) {
+      return { book: saved.book, chapter: parseInt(saved.chapter, 10) || 1 }
+    }
+    return {
+      book: localStorage.getItem(`bible-book-${version}`) || 'Genesis',
+      chapter: parseInt(localStorage.getItem(`bible-chapter-${version}`) || '1', 10) || 1,
+    }
+  } catch {
+    return { book: 'Genesis', chapter: 1 }
+  }
+}
+
+function saveReaderAnchor(version, root) {
+  if (!root) return
+  try {
+    const rootTop = root.getBoundingClientRect().top
+    const verses = root.querySelectorAll('[data-anchor-book][data-anchor-chapter][data-anchor-verse]')
+    let target = null
+    for (const el of verses) {
+      if (el.getBoundingClientRect().bottom >= rootTop + 8) {
+        target = el
+        break
+      }
+    }
+    if (!target) return
+    const rect = target.getBoundingClientRect()
+    const payload = {
+      book: target.dataset.anchorBook,
+      chapter: parseInt(target.dataset.anchorChapter, 10) || 1,
+      verse: parseInt(target.dataset.anchorVerse, 10) || null,
+      offset: Math.round(rect.top - rootTop),
+    }
+    localStorage.setItem(`bible-reader-${version}`, JSON.stringify(payload))
+  } catch {}
+}
+
+function restoreReaderAnchor(version, root) {
+  if (!root) return false
+  try {
+    const saved = JSON.parse(localStorage.getItem(`bible-reader-${version}`) || 'null')
+    if (!saved?.book || !saved?.chapter || !saved?.verse) return false
+    requestAnimationFrame(() => {
+      const selector = `[data-anchor-book="${CSS.escape(saved.book)}"][data-anchor-chapter="${saved.chapter}"][data-anchor-verse="${saved.verse}"]`
+      const el = root.querySelector(selector)
+      if (!el) return
+      const rootTop = root.getBoundingClientRect().top
+      const rect = el.getBoundingClientRect()
+      root.scrollTop += rect.top - rootTop - (saved.offset || 0)
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 /* ── Source chip colours for cross-references ── */
@@ -498,10 +568,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const routerNavigate = useNavigate()
 
   const [book, setBook] = useState(() => {
-    try { return sessionStorage.getItem(`bible-book-${version}`) || 'Genesis' } catch { return 'Genesis' }
+    return loadReaderPosition(version).book
   })
   const [chapter, setChapter] = useState(() => {
-    try { return parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1') } catch { return 1 }
+    return loadReaderPosition(version).chapter
   })
 
   /* ── Passage history (back / forward navigation) ── */
@@ -509,14 +579,25 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   if (!navHistoryRef.current) {
     // Lazy-init: seed history with whatever the reader opens to (matches book/chapter init)
     try {
-      const initBook = sessionStorage.getItem(`bible-book-${version}`) || 'Genesis'
-      const initCh   = parseInt(sessionStorage.getItem(`bible-chapter-${version}`) || '1')
-      navHistoryRef.current = [{ book: initBook, chapter: initCh, version }]
+      const savedHistory = JSON.parse(localStorage.getItem('bible-nav-history') || 'null')
+      if (Array.isArray(savedHistory?.entries) && savedHistory.entries.length) {
+        navHistoryRef.current = savedHistory.entries
+      } else {
+        const init = loadReaderPosition(version)
+        navHistoryRef.current = [{ book: init.book, chapter: init.chapter, version }]
+      }
     } catch {
-      navHistoryRef.current = [{ book: 'Genesis', chapter: 1, version }]
+      const init = loadReaderPosition(version)
+      navHistoryRef.current = [{ book: init.book, chapter: init.chapter, version }]
     }
   }
-  const [histIdx, setHistIdx] = useState(0)
+  const [histIdx, setHistIdx] = useState(() => {
+    try {
+      const savedHistory = JSON.parse(localStorage.getItem('bible-nav-history') || 'null')
+      const idx = parseInt(savedHistory?.idx, 10)
+      return Number.isFinite(idx) ? Math.max(0, Math.min(idx, navHistoryRef.current.length - 1)) : 0
+    } catch { return 0 }
+  })
   // Ref used to suppress version-sync during history navigation (avoids the race where
   // histIdx and version both change in the same flush and the effect mis-updates history)
   const histNavVersionRef = useRef(null)
@@ -529,6 +610,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [error,         setError]         = useState(null)
   const [sideOpen,      setSideOpen]      = useState(false)
   const sentinelRef     = useRef(null)
+  const topSentinelRef  = useRef(null)
 
   /* Refs so imperative handle methods always see the latest values without recreating the handle */
   const versionDataRef = useRef(null)
@@ -573,6 +655,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [selection, setSelection] = useState('')
   const verseListRef = useRef(null)
   const readerRef    = useRef(null)
+  const restoreReaderScrollRef = useRef(true)
+  const skipNextTopScrollRef   = useRef(false)
+  const prependAdjustRef       = useRef(null)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
@@ -723,10 +808,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
         detail: { direction: delta > 0 ? 'down' : 'up', scrollTop: y },
       }))
+      saveElementScroll(`scripture-${versionRef.current}`, el)
+      saveReaderAnchor(versionRef.current, el)
     }
     el.addEventListener('scroll', handler, { passive: true })
     return () => el.removeEventListener('scroll', handler)
   }, []) // eslint-disable-line
+
+  useEffect(() => {
+    return () => {
+      saveElementScroll(`scripture-${versionRef.current}`, readerRef.current)
+      saveReaderAnchor(versionRef.current, readerRef.current)
+    }
+  }, [])
 
   /* ── Pinch-to-zoom: two-finger spread/pinch adjusts font size ── */
   useEffect(() => {
@@ -770,6 +864,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [visBook,    setVisBook]    = useState(book)
   const [visChapter, setVisChapter] = useState(chapter)
 
+  useEffect(() => {
+    try {
+      const existing = JSON.parse(localStorage.getItem(`bible-reader-${version}`) || 'null') || {}
+      localStorage.setItem(`bible-reader-${version}`, JSON.stringify({ ...existing, book: visBook, chapter: visChapter }))
+      localStorage.setItem(`bible-book-${version}`, visBook)
+      localStorage.setItem(`bible-chapter-${version}`, String(visChapter))
+    } catch {}
+  }, [visBook, visChapter, version])
+
   /* Notify parent whenever the visible chapter changes (scroll or explicit nav) */
   useEffect(() => { onNavChange?.(visBook, visChapter) }, [visBook, visChapter]) // eslint-disable-line
   /* Notify parent of search query changes */
@@ -780,6 +883,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       canGoBack:    histIdx > 0,
       canGoForward: histIdx < navHistoryRef.current.length - 1,
     })
+    try {
+      localStorage.setItem('bible-nav-history', JSON.stringify({
+        entries: navHistoryRef.current,
+        idx: histIdx,
+      }))
+    } catch {}
   }, [histIdx]) // eslint-disable-line
 
   /* Clear the history-nav suppression flag once the version restored by goBack/goForward takes effect.
@@ -960,8 +1069,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Persist position per version */
   useEffect(() => {
     try {
-      sessionStorage.setItem(`bible-book-${version}`, book)
-      sessionStorage.setItem(`bible-chapter-${version}`, String(chapter))
+      localStorage.setItem(`bible-book-${version}`, book)
+      localStorage.setItem(`bible-chapter-${version}`, String(chapter))
     } catch {}
   }, [book, chapter, version])
 
@@ -1119,12 +1228,61 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) { setSegments([{ book, chapter, verses: v }]); setError(null) }
     else    { setError('Chapter not found') }
-    if (readerRef.current) readerRef.current.scrollTop = 0
+    if (readerRef.current) {
+      if (restoreReaderScrollRef.current) {
+        restoreReaderScrollRef.current = false
+        if (!restoreReaderAnchor(version, readerRef.current)) {
+          restoreElementScroll(`scripture-${version}`, readerRef.current)
+        }
+      } else if (skipNextTopScrollRef.current) {
+        skipNextTopScrollRef.current = false
+      } else {
+        readerRef.current.scrollTop = 0
+      }
+    }
   }, [book, chapter, dataReady, versionData, version])
+
+  /* Keep scroll anchored after a previous chapter is prepended above the viewport */
+  useEffect(() => {
+    const pending = prependAdjustRef.current
+    const el = readerRef.current
+    if (!pending || !el) return
+    prependAdjustRef.current = null
+    requestAnimationFrame(() => {
+      el.scrollTop = pending.scrollTop + (el.scrollHeight - pending.scrollHeight)
+    })
+  }, [segments, morphSegments])
+
+  /* Prepend previous chapter when the top sentinel becomes visible */
+  useEffect(() => {
+    const root = readerRef.current
+    if (!dataReady || !root || !topSentinelRef.current) return
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        setSegments(prev => {
+          if (!prev.length) return prev
+          const first = prev[0]
+          const prevChapter = getPrevChapter(first.book, first.chapter)
+          if (!prevChapter) return prev
+          const alreadyLoaded = prev.some(s => s.book === prevChapter.book && s.chapter === prevChapter.chapter)
+          if (alreadyLoaded) return prev
+          const v = getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version)
+          if (!v) return prev
+          prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
+          return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: v }, ...prev]
+        })
+      },
+      { root, rootMargin: '300px 0px 0px 0px' }
+    )
+    obs.observe(topSentinelRef.current)
+    return () => obs.disconnect()
+  }, [dataReady, segments, versionData, version])
 
   /* Append next chapter when sentinel becomes visible */
   useEffect(() => {
-    if (!dataReady || !sentinelRef.current) return
+    const root = readerRef.current
+    if (!dataReady || !root || !sentinelRef.current) return
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return
@@ -1141,7 +1299,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           return [...prev, { book: next.book, chapter: next.chapter, verses: v }]
         })
       },
-      { rootMargin: '300px' }
+      { root, rootMargin: '0px 0px 300px 0px' }
     )
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
@@ -1160,14 +1318,54 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     } else {
       setMorphError(`Chapter not found in ${version === 'greek' ? 'Greek NT' : 'Hebrew OT'}`)
     }
-    if (readerRef.current) readerRef.current.scrollTop = 0
+    if (readerRef.current) {
+      if (restoreReaderScrollRef.current) {
+        restoreReaderScrollRef.current = false
+        if (!restoreReaderAnchor(version, readerRef.current)) {
+          restoreElementScroll(`scripture-${version}`, readerRef.current)
+        }
+      } else if (skipNextTopScrollRef.current) {
+        skipNextTopScrollRef.current = false
+      } else {
+        readerRef.current.scrollTop = 0
+      }
+    }
     setSelectedWord(null)
   }, [book, chapter, version, morphReady]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Morph infinite-scroll - prepend previous chapter when top sentinel is visible */
+  useEffect(() => {
+    const isMorph = version === 'greek' || version === 'hebrew'
+    const root = readerRef.current
+    if (!isMorph || !morphReady || !root || !topSentinelRef.current) return
+    const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
+    const getChFn     = version === 'greek' ? getGreekChapter : getHebrewChapter
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return
+        setMorphSegments(prev => {
+          if (!prev.length) return prev
+          const first = prev[0]
+          const prevChapter = getPrevChapter(first.book, first.chapter)
+          if (!prevChapter || !allowedBooks.has(prevChapter.book)) return prev
+          if (prev.some(s => s.book === prevChapter.book && s.chapter === prevChapter.chapter)) return prev
+          const chData = getChFn(prevChapter.book, prevChapter.chapter)
+          if (!chData) return prev
+          prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
+          return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: chData }, ...prev]
+        })
+      },
+      { root, rootMargin: '300px 0px 0px 0px' }
+    )
+    obs.observe(topSentinelRef.current)
+    return () => obs.disconnect()
+  }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Morph infinite-scroll — append next chapter when sentinel becomes visible */
   useEffect(() => {
     const isMorph = version === 'greek' || version === 'hebrew'
-    if (!isMorph || !morphReady || !sentinelRef.current) return
+    const root = readerRef.current
+    if (!isMorph || !morphReady || !root || !sentinelRef.current) return
     const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
     const getChFn     = version === 'greek' ? getGreekChapter : getHebrewChapter
     const obs = new IntersectionObserver(
@@ -1184,7 +1382,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           return [...prev, { book: next.book, chapter: next.chapter, verses: chData }]
         })
       },
-      { rootMargin: '300px' }
+      { root, rootMargin: '0px 0px 300px 0px' }
     )
     obs.observe(sentinelRef.current)
     return () => obs.disconnect()
@@ -1735,6 +1933,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       <div style={r.readerWrap} ref={readerRef}>
 
         <div style={r.content}>
+          <div ref={topSentinelRef} style={{ height: 1 }} />
           {/* ── Search status bar (text versions only) ── */}
           {version !== 'greek' && version !== 'hebrew' && searchQuery.trim() && (
             <div style={r.searchStatusBar}>
@@ -1878,6 +2077,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <div
                                 key={verse}
                                 id={verseId(seg.book, seg.chapter, verse)}
+                                data-anchor-book={seg.book}
+                                data-anchor-chapter={seg.chapter}
+                                data-anchor-verse={verse}
                                 style={{
                                   ...r.verseOuter,
                                   ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
@@ -2126,6 +2328,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           <div
                             key={verse}
                             id={verseId(seg.book, seg.chapter, verse)}
+                            data-anchor-book={seg.book}
+                            data-anchor-chapter={seg.chapter}
+                            data-anchor-verse={verse}
                             style={{
                               ...r.verseOuter,
                               ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :

@@ -25,7 +25,7 @@ export default function ScripturePage() {
     // 'original' is a meta-preference: resolve to 'hebrew' on first load
     // (the reader starts at Genesis which is OT; switches happen via navigation)
     try {
-      const session = sessionStorage.getItem('reader-version')
+      const session = localStorage.getItem('reader-version')
       // sessionStorage stores concrete version IDs only ('kjv','abab','hebrew','greek','lxx')
       if (session && session !== 'original') return session
       const pref = getDefaultReaderVersion()
@@ -93,7 +93,7 @@ export default function ScripturePage() {
     const needsVersionSwitch = resolvedVer && resolvedVer !== readVersion
     if (needsVersionSwitch) {
       setReadVersion(resolvedVer)
-      try { sessionStorage.setItem('reader-version', resolvedVer) } catch {}
+      try { localStorage.setItem('reader-version', resolvedVer) } catch {}
       // parallel mode is now managed inside KjvReader
     }
 
@@ -477,7 +477,7 @@ export default function ScripturePage() {
         version={readVersion}
         onVersionChange={v => {
           setReadVersion(v)
-          try { sessionStorage.setItem('reader-version', v) } catch {}
+          try { localStorage.setItem('reader-version', v) } catch {}
         }}
         todayChapter={todayBibleChapter}
         onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
@@ -515,7 +515,7 @@ export default function ScripturePage() {
                   onClick={() => {
                     setDefaultReaderVersion(['kjv','abab'].includes(v.id) ? v.id : 'kjv')
                     setReadVersion(v.id)
-                    try { sessionStorage.setItem('reader-version', v.id) } catch {}
+                    try { localStorage.setItem('reader-version', v.id) } catch {}
                     setShowVersionPicker(false)
                   }}
                 >

@@ -94,6 +94,11 @@ export default function BottomNav() {
   const active = getActive()
   if (active === null) return null
 
+  function getTargetPath(tab) {
+    if (tab.path !== '/') return tab.path
+    try { return localStorage.getItem('pb-last-devotional-path') || '/' } catch { return '/' }
+  }
+
   const desktopNav = isDesktop ? {
     left: '50%',
     right: 'auto',
@@ -124,7 +129,7 @@ export default function BottomNav() {
           return (
             <button
               key={tab.path}
-              onClick={() => navigate(tab.path)}
+              onClick={() => navigate(getTargetPath(tab))}
               style={{ ...n.tab, color: isActive ? 'var(--teal)' : 'var(--ink-faint)' }}
               title={tab.label}
               aria-label={tab.label}

@@ -481,6 +481,10 @@ export default function ReadingPage() {
   )
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(day))
 
+  useEffect(() => {
+    try { localStorage.setItem('pb-last-devotional-path', `/day/${day}`) } catch {}
+  }, [day])
+
   /* ── Save scroll on unmount, restore on mount ── */
   useEffect(() => {
     restoreScroll(`reading-${day}`)
