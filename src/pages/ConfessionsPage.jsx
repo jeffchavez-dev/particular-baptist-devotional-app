@@ -680,8 +680,13 @@ export default function ConfessionsPage() {
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
   const [sidebarConf,   setSidebarConf]   = useState(tab || '2lbcf')
   const pendingScrollRef = useRef(null)
-  const contentRef = useRef(null)
+  const contentRef    = useRef(null)
   const searchWrapRef = useRef(null)
+  const headerRef     = useRef(null)
+  const prefsSizeRef  = useRef(prefs.sizePx)
+
+  const [headerH,   setHeaderH]   = useState(53)
+  const [chromeVis, setChromeVis] = useState(true)
 
   /* Deep-link from Settings: scroll to specific paragraph/Q&A/article */
   const deepLinkRef = useRef(
@@ -732,6 +737,68 @@ export default function ConfessionsPage() {
       window.removeEventListener('pb-note-changed', onNoteChanged)
     }
   }, [])
+
+  /* Keep prefsSizeRef in sync for pinch handler */
+  useEffect(() => { prefsSizeRef.current = prefs.sizePx }, [prefs.sizePx])
+
+  /* Measure header once it mounts */
+  useEffect(() => {
+    if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
+  }, [])
+
+  /* Window scroll → dispatch pb-scroll-dir (for BottomNav) + update chromeVis */
+  useEffect(() => {
+    let lastY = window.scrollY
+    function handler() {
+      const y = window.scrollY
+      const delta = y - lastY
+      if (Math.abs(delta) < 8) return
+      lastY = y
+      const direction = delta > 0 ? 'down' : 'up'
+      window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
+        detail: { direction, scrollTop: y },
+      }))
+      setChromeVis(direction === 'up' || y < 30)
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  /* Always restore chrome visibility when tab changes */
+  useEffect(() => { setChromeVis(true) }, [tab])
+
+  /* Pinch-to-zoom on content area */
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const pinch = { active: false, dist: 0, startSize: 16 }
+    function getDist(t0, t1) {
+      return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+    }
+    function onTouchStart(e) {
+      if (e.touches.length === 2) {
+        pinch.active    = true
+        pinch.dist      = getDist(e.touches[0], e.touches[1])
+        pinch.startSize = prefsSizeRef.current
+      } else { pinch.active = false }
+    }
+    function onTouchMove(e) {
+      if (!pinch.active || e.touches.length !== 2) return
+      e.preventDefault()
+      const d    = getDist(e.touches[0], e.touches[1])
+      const next = Math.round(Math.min(28, Math.max(12, pinch.startSize * (d / pinch.dist))))
+      if (next !== prefsSizeRef.current) updatePrefs({ sizePx: next })
+    }
+    function onTouchEnd() { pinch.active = false }
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, []) // eslint-disable-line
 
   useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
@@ -965,10 +1032,17 @@ export default function ConfessionsPage() {
   )
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, paddingTop: headerH }}>
 
-      {/* ── Sticky header ── */}
-      <header style={s.header}>
+      {/* ── Fixed header (auto-hides on scroll down) ── */}
+      <header
+        ref={headerRef}
+        style={{
+          ...s.header,
+          transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
+          transition: 'transform 0.28s ease',
+        }}
+      >
         <div style={s.headerInner}>
           {tab && (
             <button
@@ -1056,7 +1130,11 @@ export default function ConfessionsPage() {
       <div style={s.layout}>
 
         {!isMobile && (
-          <aside style={s.desktopSidebar}>
+          <aside style={{
+            ...s.desktopSidebar,
+            top: headerH,
+            height: `calc(100vh - ${headerH}px)`,
+          }}>
             {SidebarContent}
           </aside>
         )}
@@ -1410,7 +1488,7 @@ const s = {
   page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", paddingBottom:'env(safe-area-inset-bottom)' },
 
   header: {
-    position:'sticky', top:0, zIndex:30,
+    position:'fixed', top:0, left:0, right:0, zIndex:30,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },

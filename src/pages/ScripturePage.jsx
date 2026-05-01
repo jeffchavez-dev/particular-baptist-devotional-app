@@ -53,13 +53,28 @@ export default function ScripturePage() {
   // Author-only edit mode for study notes / cross-refs
   const isAuthorUser = isAuthor(session)
   const [authorEditMode, setAuthorEditMode] = useState(false)
-  // Study mode: show/hide all notes and cross-reference chips
-  const [studyMode, setStudyMode] = useState(true)
+  // Study mode: show/hide all notes and cross-reference chips (off by default for clean reading)
+  const [studyMode, setStudyMode] = useState(false)
   // Ref for search input (avoid autoFocus keyboard-on-load on mobile)
   const searchInputRef = useRef(null)
   useEffect(() => {
     if (searchPanelOpen) setTimeout(() => searchInputRef.current?.focus(), 50)
   }, [searchPanelOpen])
+
+  // Auto-hide header on scroll-down, show on scroll-up
+  const headerRef   = useRef(null)
+  const [headerH,   setHeaderH]   = useState(57)
+  const [chromeVis, setChromeVis] = useState(true)
+  useEffect(() => {
+    if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
+  }, [])
+  useEffect(() => {
+    function handler(e) {
+      setChromeVis(e.detail.direction === 'up' || e.detail.scrollTop < 30)
+    }
+    window.addEventListener('pb-scroll-dir', handler)
+    return () => window.removeEventListener('pb-scroll-dir', handler)
+  }, [])
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -122,7 +137,15 @@ export default function ScripturePage() {
     <div style={s.page}>
 
       {/* ── Header ── */}
-      <header style={s.header}>
+      <header
+        ref={headerRef}
+        style={{
+          ...s.header,
+          transform:    chromeVis ? 'translateY(0)' : 'translateY(-100%)',
+          marginBottom: chromeVis ? 0 : -headerH,
+          transition:   'transform 0.28s ease, margin-bottom 0.28s ease',
+        }}
+      >
         <div style={s.headerInner}>
           {/* Hamburger → opens KjvReader's internal book/version sidebar */}
           <button

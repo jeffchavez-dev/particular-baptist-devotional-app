@@ -63,12 +63,26 @@ export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 769)
+  const [visible,   setVisible]   = useState(true)
 
   useEffect(() => {
     const handler = () => setIsDesktop(window.innerWidth >= 769)
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
+
+  /* Auto-hide on scroll down, show on scroll up */
+  useEffect(() => {
+    function onScrollDir(e) {
+      const { direction, scrollTop } = e.detail
+      setVisible(direction === 'up' || scrollTop < 30)
+    }
+    window.addEventListener('pb-scroll-dir', onScrollDir)
+    return () => window.removeEventListener('pb-scroll-dir', onScrollDir)
+  }, [])
+
+  /* Always show when route changes */
+  useEffect(() => { setVisible(true) }, [pathname])
 
   function getActive() {
     if (pathname === '/' || pathname.startsWith('/day/')) return '/'
@@ -93,7 +107,18 @@ export default function BottomNav() {
   return (
     <>
       <div data-bottom-nav style={n.spacer} />
-      <nav data-bottom-nav style={{ ...n.nav, ...desktopNav }} aria-label="Main navigation">
+      <nav
+        data-bottom-nav
+        style={{
+          ...n.nav,
+          ...desktopNav,
+          transform: isDesktop
+            ? `translateX(-50%) translateY(${visible ? '0' : '100%'})`
+            : `translateY(${visible ? '0' : '100%'})`,
+          transition: 'transform 0.28s ease',
+        }}
+        aria-label="Main navigation"
+      >
         {TABS.map(tab => {
           const isActive = active === tab.path
           return (

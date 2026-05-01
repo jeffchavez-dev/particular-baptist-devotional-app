@@ -534,9 +534,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const versionDataRef = useRef(null)
   const dataReadyRef   = useRef(false)
   const versionRef     = useRef(version)
+  /* Stable ref to current font size — used by pinch-to-zoom without stale closures */
+  const prefsSizeRef   = useRef(prefs.sizePx)
   useEffect(() => { versionDataRef.current = versionData }, [versionData])
   useEffect(() => { dataReadyRef.current   = dataReady   }, [dataReady])
   useEffect(() => { versionRef.current     = version     }, [version])
+  useEffect(() => { prefsSizeRef.current   = prefs.sizePx }, [prefs.sizePx])
 
   /* Share + confession modals */
   const [shareCard,       setShareCard]       = useState(null)
@@ -706,6 +709,61 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     window.addEventListener('resize', h)
     return () => window.removeEventListener('resize', h)
   }, [])
+
+  /* ── Dispatch scroll direction so header/nav can auto-hide ── */
+  useEffect(() => {
+    const el = readerRef.current
+    if (!el) return
+    let lastY = 0
+    const handler = () => {
+      const y = el.scrollTop
+      const delta = y - lastY
+      if (Math.abs(delta) < 8) return
+      lastY = y
+      window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
+        detail: { direction: delta > 0 ? 'down' : 'up', scrollTop: y },
+      }))
+    }
+    el.addEventListener('scroll', handler, { passive: true })
+    return () => el.removeEventListener('scroll', handler)
+  }, []) // eslint-disable-line
+
+  /* ── Pinch-to-zoom: two-finger spread/pinch adjusts font size ── */
+  useEffect(() => {
+    const el = readerRef.current
+    if (!el) return
+    const pinch = { active: false, dist: 0, startSize: 16 }
+
+    function getDist(t0, t1) {
+      return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+    }
+    function onTouchStart(e) {
+      if (e.touches.length === 2) {
+        pinch.active    = true
+        pinch.dist      = getDist(e.touches[0], e.touches[1])
+        pinch.startSize = prefsSizeRef.current
+      } else {
+        pinch.active = false
+      }
+    }
+    function onTouchMove(e) {
+      if (!pinch.active || e.touches.length !== 2) return
+      e.preventDefault()
+      const d    = getDist(e.touches[0], e.touches[1])
+      const next = Math.round(Math.min(28, Math.max(12, pinch.startSize * (d / pinch.dist))))
+      if (next !== prefsSizeRef.current) updatePrefs({ sizePx: next })
+    }
+    function onTouchEnd() { pinch.active = false }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, []) // eslint-disable-line
 
   /* Visible book/chapter — updated by explicit navigation AND by scroll-spy.
      Kept separate from book/chapter so updating it never resets segments. */
@@ -2127,22 +2185,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       fontFamily: version === 'lxx'
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
-                                    }}
-                                    onClick={e => {
-                                      // Only enable KJV word-tap search for non-LXX text versions
-                                      if (version === 'lxx') return
-                                      e.stopPropagation()
-                                      try {
-                                        let range = null
-                                        if (document.caretRangeFromPoint) {
-                                          range = document.caretRangeFromPoint(e.clientX, e.clientY)
-                                        }
-                                        if (range) {
-                                          range.expand('word')
-                                          const word = range.toString().trim().replace(/[^a-zA-ZͰ-Ͽἀ-῿'-]/g, '')
-                                          // Word-tap modal disabled — use the search panel instead
-                                        }
-                                      } catch {}
                                     }}
                                   >{highlightSearchInText(text)}</span>
                                 )}
