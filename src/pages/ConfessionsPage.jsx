@@ -669,7 +669,7 @@ export default function ConfessionsPage() {
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
-  const _saved = loadState('conf', { tab: null, search: '' })
+  const _saved = loadState('conf', { tab: null, search: '', anchorId: null })
   const tab    = searchParams.get('t') || _saved.tab || null
 
   const [activeChapter, setActiveChapter] = useState(null)
@@ -684,6 +684,7 @@ export default function ConfessionsPage() {
   const searchWrapRef = useRef(null)
   const headerRef     = useRef(null)
   const prefsSizeRef  = useRef(prefs.sizePx)
+  const didInitAnchorRef = useRef(false)
 
   const [headerH,   setHeaderH]   = useState(53)
   const [chromeVis, setChromeVis] = useState(true)
@@ -747,6 +748,23 @@ export default function ConfessionsPage() {
   }, [])
 
   /* Window scroll → dispatch pb-scroll-dir (for BottomNav) + update chromeVis */
+  function getCurrentAnchorId() {
+    try {
+      const els = contentRef.current?.querySelectorAll('[id^="p-"],[id^="qa-"],[id^="art-"]')
+      if (!els?.length) return null
+      for (const el of els) {
+        if (el.getBoundingClientRect().bottom >= headerH + 8) return el.id
+      }
+      return els[0]?.id || null
+    } catch { return null }
+  }
+
+  function saveCurrentAnchor() {
+    const anchorId = getCurrentAnchorId()
+    saveScroll('conf')
+    saveState('conf', { tab, search, anchorId })
+  }
+
   useEffect(() => {
     let lastY = window.scrollY
     function handler() {
@@ -759,10 +777,11 @@ export default function ConfessionsPage() {
         detail: { direction, scrollTop: y },
       }))
       setChromeVis(direction === 'up' || y < 30)
+      saveCurrentAnchor()
     }
     window.addEventListener('scroll', handler, { passive: true })
     return () => window.removeEventListener('scroll', handler)
-  }, [])
+  }, [tab, search])
 
   /* Always restore chrome visibility when tab changes */
   useEffect(() => { setChromeVis(true) }, [tab])
@@ -800,10 +819,30 @@ export default function ConfessionsPage() {
     }
   }, []) // eslint-disable-line
 
-  useEffect(() => { saveState('conf', { tab, search }) }, [tab, search])
   useEffect(() => {
-    restoreScroll('conf')
-    return () => saveScroll('conf')
+    if (!didInitAnchorRef.current) {
+      didInitAnchorRef.current = true
+      return
+    }
+    saveCurrentAnchor()
+  }, [tab, search]) // eslint-disable-line
+  useEffect(() => {
+    const saved = loadState('conf', { anchorId: null })
+    const timer = setTimeout(() => {
+      if (saved.anchorId) {
+        const el = document.getElementById(saved.anchorId)
+        if (el) {
+          window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
+          setActiveChapter(saved.anchorId)
+          return
+        }
+      }
+      restoreScroll('conf')
+    }, 80)
+    return () => {
+      clearTimeout(timer)
+      saveCurrentAnchor()
+    }
   }, [])
 
   /* Deep-link scroll: fires once after the tab content renders */

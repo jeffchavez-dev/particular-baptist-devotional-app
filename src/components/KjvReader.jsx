@@ -659,6 +659,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const skipNextTopScrollRef   = useRef(false)
   const suppressTopPrependRef  = useRef(true)
   const pendingChapterScrollRef = useRef(false)
+  const pendingVisibleTargetRef = useRef(null)
   const prependAdjustRef       = useRef(null)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
@@ -1035,6 +1036,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (!entry.isIntersecting) continue
           const b  = entry.target.dataset.segBook
           const ch = parseInt(entry.target.dataset.segChapter, 10)
+          const pending = pendingVisibleTargetRef.current
+          if (pending && (pending.book !== b || pending.chapter !== ch)) continue
           if (b && ch) { setVisBook(b); setVisChapter(ch) }
         }
       },
@@ -1230,6 +1233,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     if (!dataReady) return
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) {
+      pendingVisibleTargetRef.current = { book, chapter }
       const prevChapter = getPrevChapter(book, chapter)
       const prevVerses = prevChapter ? getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version) : null
       setSegments(prevVerses
@@ -1245,6 +1249,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
+        setTimeout(() => {
+          const pending = pendingVisibleTargetRef.current
+          if (pending?.book === book && pending?.chapter === chapter) {
+            pendingVisibleTargetRef.current = null
+          }
+        }, 350)
       } else if (skipNextTopScrollRef.current) {
         skipNextTopScrollRef.current = false
       } else {
@@ -1279,6 +1289,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       const rootTop = root.getBoundingClientRect().top
       const rect = el.getBoundingClientRect()
       root.scrollTop += rect.top - rootTop
+      setVisBook(book)
+      setVisChapter(chapter)
+      setTimeout(() => {
+        const pending = pendingVisibleTargetRef.current
+        if (pending?.book === book && pending?.chapter === chapter) {
+          pendingVisibleTargetRef.current = null
+        }
+      }, 250)
     })
   }, [segments, morphSegments, book, chapter])
 
@@ -1343,6 +1361,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       ? getGreekChapter(book, chapter)
       : getHebrewChapter(book, chapter)
     if (chData) {
+      pendingVisibleTargetRef.current = { book, chapter }
       const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
       const getChFn = version === 'greek' ? getGreekChapter : getHebrewChapter
       const prevChapter = getPrevChapter(book, chapter)
@@ -1363,6 +1382,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
+        setTimeout(() => {
+          const pending = pendingVisibleTargetRef.current
+          if (pending?.book === book && pending?.chapter === chapter) {
+            pendingVisibleTargetRef.current = null
+          }
+        }, 350)
       } else if (skipNextTopScrollRef.current) {
         skipNextTopScrollRef.current = false
       } else {
@@ -1811,6 +1836,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function navigate(newBook, newChapter) {
     suppressTopPrependRef.current = true
+    pendingVisibleTargetRef.current = { book: newBook, chapter: newChapter }
     // Push to history — include current version so back/forward can restore it
     const current = navHistoryRef.current[histIdx]
     if (!current || current.book !== newBook || current.chapter !== newChapter) {
@@ -1831,6 +1857,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     suppressTopPrependRef.current = true
     const newIdx = histIdx - 1
     const entry  = navHistoryRef.current[newIdx]
+    pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
     setHistIdx(newIdx)
     setBook(entry.book); setChapter(entry.chapter)
     setVisBook(entry.book); setVisChapter(entry.chapter)
@@ -1846,6 +1873,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     suppressTopPrependRef.current = true
     const newIdx = histIdx + 1
     const entry  = navHistoryRef.current[newIdx]
+    pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
     setHistIdx(newIdx)
     setBook(entry.book); setChapter(entry.chapter)
     setVisBook(entry.book); setVisChapter(entry.chapter)
