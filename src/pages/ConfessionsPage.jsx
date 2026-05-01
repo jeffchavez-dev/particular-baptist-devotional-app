@@ -679,6 +679,13 @@ export default function ConfessionsPage() {
   const [shareCard,     setShareCard]     = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
   const [sidebarConf,   setSidebarConf]   = useState(tab || '2lbcf')
+
+  // Always-current refs so cleanup callbacks never capture stale values
+  const currentTabRef    = useRef(tab)
+  currentTabRef.current  = tab
+  const currentSearchRef   = useRef(search)
+  currentSearchRef.current = search
+
   const pendingScrollRef = useRef(null)
   const contentRef    = useRef(null)
   const searchWrapRef = useRef(null)
@@ -762,7 +769,7 @@ export default function ConfessionsPage() {
   function saveCurrentAnchor() {
     const anchorId = getCurrentAnchorId()
     saveScroll('conf')
-    saveState('conf', { tab, search, anchorId })
+    saveState('conf', { tab: currentTabRef.current, search: currentSearchRef.current, anchorId })
   }
 
   useEffect(() => {

@@ -1234,12 +1234,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) {
       pendingVisibleTargetRef.current = { book, chapter }
-      const prevChapter = getPrevChapter(book, chapter)
-      const prevVerses = prevChapter ? getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version) : null
-      setSegments(prevVerses
-        ? [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: prevVerses }, { book, chapter, verses: v }]
-        : [{ book, chapter, verses: v }]
-      )
+      setSegments([{ book, chapter, verses: v }])
       setError(null)
     }
     else    { setError('Chapter not found') }
@@ -1362,16 +1357,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       : getHebrewChapter(book, chapter)
     if (chData) {
       pendingVisibleTargetRef.current = { book, chapter }
-      const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
-      const getChFn = version === 'greek' ? getGreekChapter : getHebrewChapter
-      const prevChapter = getPrevChapter(book, chapter)
-      const prevData = prevChapter && allowedBooks.has(prevChapter.book)
-        ? getChFn(prevChapter.book, prevChapter.chapter)
-        : null
-      setMorphSegments(prevData
-        ? [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: prevData }, { book, chapter, verses: chData }]
-        : [{ book, chapter, verses: chData }]
-      )
+      setMorphSegments([{ book, chapter, verses: chData }])
       setMorphError(null)
     } else {
       setMorphError(`Chapter not found in ${version === 'greek' ? 'Greek NT' : 'Hebrew OT'}`)
