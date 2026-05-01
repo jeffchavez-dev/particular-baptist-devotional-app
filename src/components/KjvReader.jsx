@@ -685,7 +685,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     goForward:      () => goForward(),
     canGoBack:      histIdx > 0,
     canGoForward:   histIdx < navHistoryRef.current.length - 1,
-  }), [histIdx]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [histIdx, dataReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
@@ -2459,8 +2459,30 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           style={r.authorXrefChip}
                                           onClick={e => {
                                             e.stopPropagation()
-                                            navigate(ref.tgt_book, ref.tgt_chapter)
-                                            if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+                                            // If the target testament is incompatible with the current
+                                            // version, switch to a compatible one first.
+                                            const tgtIsNT = NT_BOOKS.has(ref.tgt_book)
+                                            const tgtIsOT = !tgtIsNT
+                                            const needsSwitch =
+                                              (tgtIsNT && (version === 'lxx' || version === 'hebrew')) ||
+                                              (tgtIsOT && version === 'greek')
+                                            if (needsSwitch) {
+                                              // Match original-language preference, else fall back to KJV
+                                              const isOrigLang = version === 'hebrew' || version === 'greek' || version === 'lxx'
+                                              const nextVer = isOrigLang
+                                                ? (tgtIsNT ? 'greek' : 'hebrew')
+                                                : 'kjv'
+                                              onVersionChange?.(nextVer)
+                                              try { sessionStorage.setItem('reader-version', nextVer) } catch {}
+                                              // Give the version-load effect a moment to fire
+                                              setTimeout(() => {
+                                                navigate(ref.tgt_book, ref.tgt_chapter)
+                                                if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+                                              }, 120)
+                                            } else {
+                                              navigate(ref.tgt_book, ref.tgt_chapter)
+                                              if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+                                            }
                                           }}
                                           title={`Author link → ${tgt}`}
                                         >{chipLabel}</button>
