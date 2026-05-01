@@ -530,6 +530,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [sideOpen,      setSideOpen]      = useState(false)
   const sentinelRef     = useRef(null)
 
+  /* Refs so imperative handle methods always see the latest values without recreating the handle */
+  const versionDataRef = useRef(null)
+  const dataReadyRef   = useRef(false)
+  const versionRef     = useRef(version)
+  useEffect(() => { versionDataRef.current = versionData }, [versionData])
+  useEffect(() => { dataReadyRef.current   = dataReady   }, [dataReady])
+  useEffect(() => { versionRef.current     = version     }, [version])
+
   /* Share + confession modals */
   const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
@@ -655,25 +663,26 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     submitSearch:   (q) => submitSearch(q),
     clearSearch:    () => closeSearch(),
     /** Run a Bible-wide search and deliver results ONLY to the onSearchResults callback.
-     *  Does NOT touch any internal KjvReader state — the reader stays on the current chapter. */
+     *  Uses refs so it always searches the currently-loaded version without needing the
+     *  handle to be recreated on every version change. */
     runSearch: (q) => {
       const trimmed = q?.trim()
       if (!trimmed) return
-      if (!dataReady) {
+      if (!dataReadyRef.current || !versionDataRef.current) {
         onSearchResults?.([], 0, false, trimmed)
         return
       }
       setTimeout(() => {
-        const { hits, total, capped } = searchBibleVersion(versionData, trimmed, version)
+        const { hits, total, capped } = searchBibleVersion(versionDataRef.current, trimmed, versionRef.current)
         onSearchResults?.(hits, total, capped, trimmed)
       }, 0)
     },
     /** Load ALL results for a given query into the onSearchResults callback. */
     loadAllResults: (q) => {
       const trimmed = q?.trim()
-      if (!trimmed || !dataReady) return
+      if (!trimmed || !dataReadyRef.current || !versionDataRef.current) return
       setTimeout(() => {
-        const { hits, total } = searchBibleVersion(versionData, trimmed, version, Infinity)
+        const { hits, total } = searchBibleVersion(versionDataRef.current, trimmed, versionRef.current, Infinity)
         onSearchResults?.(hits, total, false, trimmed)
       }, 0)
     },
@@ -685,7 +694,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     goForward:      () => goForward(),
     canGoBack:      histIdx > 0,
     canGoForward:   histIdx < navHistoryRef.current.length - 1,
-  }), [histIdx, dataReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [histIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
