@@ -111,7 +111,13 @@ export default function BottomNav() {
 
   return (
     <>
-      <div data-bottom-nav style={n.spacer} />
+      <div
+        data-bottom-nav
+        style={{
+          ...n.spacer,
+          height: visible ? 'calc(64px + env(safe-area-inset-bottom))' : 0,
+        }}
+      />
       <nav
         data-bottom-nav
         style={{
@@ -146,7 +152,7 @@ export default function BottomNav() {
 }
 
 const n = {
-  spacer: { height: 'calc(64px + env(safe-area-inset-bottom))', display: 'block' },
+  spacer: { height: 'calc(64px + env(safe-area-inset-bottom))', display: 'block', transition: 'height 0.28s ease' },
   nav: {
     position: 'fixed', bottom: 0, left: 0, right: 0,
     paddingBottom: 'env(safe-area-inset-bottom)',

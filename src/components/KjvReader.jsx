@@ -657,6 +657,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const readerRef    = useRef(null)
   const restoreReaderScrollRef = useRef(true)
   const skipNextTopScrollRef   = useRef(false)
+  const suppressTopPrependRef  = useRef(true)
+  const pendingChapterScrollRef = useRef(false)
   const prependAdjustRef       = useRef(null)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
@@ -802,6 +804,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     let lastY = 0
     const handler = () => {
       const y = el.scrollTop
+      if (y > 80) suppressTopPrependRef.current = false
       const delta = y - lastY
       if (Math.abs(delta) < 8) return
       lastY = y
@@ -1116,12 +1119,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Chapter-level matches — only against the first (navigated) segment */
   const chapterMatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    const firstVerses = segments[0]?.verses || []
-    if (!q || bibleResults !== null || !firstVerses.length) return []
-    return firstVerses
+    const activeVerses = segments.find(s => s.book === book && s.chapter === chapter)?.verses || []
+    if (!q || bibleResults !== null || !activeVerses.length) return []
+    return activeVerses
       .map((v, idx) => ({ idx, verse: v.verse, match: v.text.toLowerCase().includes(q) }))
       .filter(v => v.match)
-  }, [searchQuery, segments, bibleResults])
+  }, [searchQuery, segments, bibleResults, book, chapter])
 
   /* Scroll to focused match within navigated chapter */
   useEffect(() => {
@@ -1226,7 +1229,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => {
     if (!dataReady) return
     const v = getChapterVerses(versionData, book, chapter, version)
-    if (v) { setSegments([{ book, chapter, verses: v }]); setError(null) }
+    if (v) {
+      const prevChapter = getPrevChapter(book, chapter)
+      const prevVerses = prevChapter ? getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version) : null
+      setSegments(prevVerses
+        ? [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: prevVerses }, { book, chapter, verses: v }]
+        : [{ book, chapter, verses: v }]
+      )
+      setError(null)
+    }
     else    { setError('Chapter not found') }
     if (readerRef.current) {
       if (restoreReaderScrollRef.current) {
@@ -1237,7 +1248,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       } else if (skipNextTopScrollRef.current) {
         skipNextTopScrollRef.current = false
       } else {
-        readerRef.current.scrollTop = 0
+        pendingChapterScrollRef.current = true
       }
     }
   }, [book, chapter, dataReady, versionData, version])
@@ -1253,6 +1264,24 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     })
   }, [segments, morphSegments])
 
+  useEffect(() => {
+    if (!pendingChapterScrollRef.current) return
+    const root = readerRef.current
+    if (!root) return
+    pendingChapterScrollRef.current = false
+    requestAnimationFrame(() => {
+      const selector = `[data-seg-book="${CSS.escape(book)}"][data-seg-chapter="${chapter}"]`
+      const el = root.querySelector(selector)
+      if (!el) {
+        root.scrollTop = 0
+        return
+      }
+      const rootTop = root.getBoundingClientRect().top
+      const rect = el.getBoundingClientRect()
+      root.scrollTop += rect.top - rootTop
+    })
+  }, [segments, morphSegments, book, chapter])
+
   /* Prepend previous chapter when the top sentinel becomes visible */
   useEffect(() => {
     const root = readerRef.current
@@ -1260,6 +1289,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return
+        if (suppressTopPrependRef.current && root.scrollTop < 80) return
         setSegments(prev => {
           if (!prev.length) return prev
           const first = prev[0]
@@ -1313,7 +1343,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       ? getGreekChapter(book, chapter)
       : getHebrewChapter(book, chapter)
     if (chData) {
-      setMorphSegments([{ book, chapter, verses: chData }])
+      const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
+      const getChFn = version === 'greek' ? getGreekChapter : getHebrewChapter
+      const prevChapter = getPrevChapter(book, chapter)
+      const prevData = prevChapter && allowedBooks.has(prevChapter.book)
+        ? getChFn(prevChapter.book, prevChapter.chapter)
+        : null
+      setMorphSegments(prevData
+        ? [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: prevData }, { book, chapter, verses: chData }]
+        : [{ book, chapter, verses: chData }]
+      )
       setMorphError(null)
     } else {
       setMorphError(`Chapter not found in ${version === 'greek' ? 'Greek NT' : 'Hebrew OT'}`)
@@ -1327,7 +1366,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       } else if (skipNextTopScrollRef.current) {
         skipNextTopScrollRef.current = false
       } else {
-        readerRef.current.scrollTop = 0
+        pendingChapterScrollRef.current = true
       }
     }
     setSelectedWord(null)
@@ -1343,6 +1382,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const obs = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return
+        if (suppressTopPrependRef.current && root.scrollTop < 80) return
         setMorphSegments(prev => {
           if (!prev.length) return prev
           const first = prev[0]
@@ -1770,6 +1810,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function navigate(newBook, newChapter) {
+    suppressTopPrependRef.current = true
     // Push to history — include current version so back/forward can restore it
     const current = navHistoryRef.current[histIdx]
     if (!current || current.book !== newBook || current.chapter !== newChapter) {
@@ -1787,6 +1828,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function goBack() {
     if (histIdx <= 0) return
+    suppressTopPrependRef.current = true
     const newIdx = histIdx - 1
     const entry  = navHistoryRef.current[newIdx]
     setHistIdx(newIdx)
@@ -1801,6 +1843,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function goForward() {
     if (histIdx >= navHistoryRef.current.length - 1) return
+    suppressTopPrependRef.current = true
     const newIdx = histIdx + 1
     const entry  = navHistoryRef.current[newIdx]
     setHistIdx(newIdx)
@@ -2046,7 +2089,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   <div ref={verseListRef}>
                     {morphSegments.map((seg, segIdx) => (
                       <div key={`${seg.book}|${seg.chapter}`}>
-                        {segIdx === 0
+                        {seg.book === book && seg.chapter === chapter
                           ? <h2
                               data-seg-book={seg.book}
                               data-seg-chapter={String(seg.chapter)}
@@ -2288,7 +2331,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               <div ref={verseListRef}>
                 {!loading && !error && segments.length > 0 && bibleResults === null && segments.map((seg, segIdx) => (
                   <div key={`${seg.book}|${seg.chapter}`}>
-                    {segIdx === 0
+                    {seg.book === book && seg.chapter === chapter
                       ? <h2
                           data-seg-book={seg.book}
                           data-seg-chapter={String(seg.chapter)}
@@ -2314,8 +2357,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const isEditing     = editingNote === verseKey
                         const isSelected    = selectedVerses.has(verseKey)
                         const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
-                        const isSearchMatch = segIdx === 0 && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
-                        const isFocusMatch  = segIdx === 0 && !bibleResults && chapterMatches[searchFocus]?.verse === verse
+                        const isActiveSegment = seg.book === book && seg.chapter === chapter
+                        const isSearchMatch = isActiveSegment && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
+                        const isFocusMatch  = isActiveSegment && !bibleResults && chapterMatches[searchFocus]?.verse === verse
 
                         // LXX word chips
                         const lxxPKey       = `${seg.book}:${seg.chapter}`
