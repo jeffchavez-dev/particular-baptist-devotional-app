@@ -493,7 +493,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -636,6 +636,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Author cross-ref adding
   const [addingCrossRefTo, setAddingCrossRefTo] = useState(null)  // verseKey 'book:ch:v'
   const [crossRefDraft, setCrossRefDraft] = useState({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+  // Author cross-ref verse preview modal
+  const [authorRefModal, setAuthorRefModal] = useState(null)      // { ref } | null
+  const [authorRefModalText, setAuthorRefModalText] = useState(null) // fetched verse text
 
   /* ── LXX reader mode word data (version === 'lxx') ── */
   const [lxxReaderWords,   setLxxReaderWords]   = useState({}) // 'Book:ch' → [{v, words:[{w,s}]}]
@@ -812,6 +815,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         .catch(() => { authorContentLoadedRef.current.delete(key) })
     }
   }, [segments]) // eslint-disable-line
+
+  /* Fetch verse text for author cross-ref preview modal */
+  useEffect(() => {
+    if (!authorRefModal) { setAuthorRefModalText(null); return }
+    const { ref } = authorRefModal
+    if (!ref.tgt_verse) { setAuthorRefModalText(null); return }
+    // Try current versionData first (works when same testament / version loaded)
+    const localVerses = versionData
+      ? getChapterVerses(versionData, ref.tgt_book, ref.tgt_chapter, version)
+      : null
+    const localVerse = localVerses?.find(v => v.verse === ref.tgt_verse)
+    if (localVerse) { setAuthorRefModalText(localVerse.text); return }
+    // Fall back to KJV fetch
+    setAuthorRefModalText(null)
+    fetchKjvChapter(ref.tgt_book, ref.tgt_chapter, 'kjv')
+      .then(verses => {
+        const v = verses.find(v => v.verse === ref.tgt_verse)
+        setAuthorRefModalText(v?.text || null)
+      })
+      .catch(() => setAuthorRefModalText(null))
+  }, [authorRefModal]) // eslint-disable-line
 
   /* Load LXX word+Strongs data in reader mode (version === 'lxx') */
   useEffect(() => {
@@ -1926,7 +1950,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 })()}
 
                                 {/* ── Note display ── */}
-                                {note && !isEditing && (
+                                {studyMode && note && !isEditing && (
                                   <div style={r.noteDisplay} onClick={e => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                                       <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -2123,7 +2147,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   >{highlightSearchInText(text)}</span>
                                 )}
 
-                                {verseRefs.length > 0 && (
+                                {studyMode && verseRefs.length > 0 && (
                                   <span style={r.inlineCrossRefs}>
                                     {verseRefs.map(ref => {
                                       const chip = SRC_CHIP[ref.src] || {}
@@ -2416,7 +2440,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               )
                             })()}
 
-                            {note && !isEditing && (
+                            {studyMode && note && !isEditing && (
                               <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                                   <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -2457,7 +2481,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const xrefs    = authorCrossRefs[chKey]?.[verse] || []
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
-                              if (!xrefs.length && !canEdit && !isAddingHere) return null
+                              // Show row if: editing (canEdit), or study mode with refs to display
+                              if (!canEdit && !isAddingHere && (!studyMode || !xrefs.length)) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
                                   <span style={r.authorXrefIcon}>↗</span>
@@ -2470,30 +2495,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           style={r.authorXrefChip}
                                           onClick={e => {
                                             e.stopPropagation()
-                                            // If the target testament is incompatible with the current
-                                            // version, switch to a compatible one first.
-                                            const tgtIsNT = NT_BOOKS.has(ref.tgt_book)
-                                            const tgtIsOT = !tgtIsNT
-                                            const needsSwitch =
-                                              (tgtIsNT && (version === 'lxx' || version === 'hebrew')) ||
-                                              (tgtIsOT && version === 'greek')
-                                            if (needsSwitch) {
-                                              // Match original-language preference, else fall back to KJV
-                                              const isOrigLang = version === 'hebrew' || version === 'greek' || version === 'lxx'
-                                              const nextVer = isOrigLang
-                                                ? (tgtIsNT ? 'greek' : 'hebrew')
-                                                : 'kjv'
-                                              onVersionChange?.(nextVer)
-                                              try { sessionStorage.setItem('reader-version', nextVer) } catch {}
-                                              // Give the version-load effect a moment to fire
-                                              setTimeout(() => {
-                                                navigate(ref.tgt_book, ref.tgt_chapter)
-                                                if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
-                                              }, 120)
-                                            } else {
-                                              navigate(ref.tgt_book, ref.tgt_chapter)
-                                              if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
-                                            }
+                                            // Show verse preview modal instead of navigating directly
+                                            setAuthorRefModal({ ref })
                                           }}
                                           title={`Author link → ${tgt}`}
                                         >{chipLabel}</button>
@@ -2565,13 +2568,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               )
                             })()}
 
-                            {/* ── Author study note (visible to all) ── */}
+                            {/* ── Author study note (visible to all in study mode) ── */}
                             {(() => {
                               const chKey    = `${seg.book}:${seg.chapter}`
                               const authorNoteObj = authorNotes[chKey]?.[verse]
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isEditingAuthor = editingAuthorNote === avk
-                              if (!authorNoteObj && !canEdit) return null
+                              // Show if canEdit (author can manage), or if studyMode and note exists
+                              if (!canEdit && (!studyMode || !authorNoteObj)) return null
                               return (
                                 <div style={r.authorNoteBlock} onClick={e => e.stopPropagation()}>
                                   {/* Display mode (all users see this when a note exists) */}
@@ -2837,6 +2841,75 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           <button style={r.lexBackDismiss} onClick={() => setLexReturn(null)} title="Dismiss">×</button>
         </div>
       )}
+
+      {/* Author cross-ref verse preview modal */}
+      {authorRefModal && (() => {
+        const ref = authorRefModal.ref
+        const tgtRef = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
+
+        function doNavigate() {
+          const tgtIsNT = NT_BOOKS.has(ref.tgt_book)
+          const tgtIsOT = !tgtIsNT
+          const needsSwitch =
+            (tgtIsNT && (version === 'lxx' || version === 'hebrew')) ||
+            (tgtIsOT && version === 'greek')
+          setAuthorRefModal(null)
+          if (needsSwitch) {
+            const isOrigLang = version === 'hebrew' || version === 'greek' || version === 'lxx'
+            const nextVer = isOrigLang ? (tgtIsNT ? 'greek' : 'hebrew') : 'kjv'
+            onVersionChange?.(nextVer)
+            try { sessionStorage.setItem('reader-version', nextVer) } catch {}
+            setTimeout(() => {
+              navigate(ref.tgt_book, ref.tgt_chapter)
+              if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+            }, 120)
+          } else {
+            navigate(ref.tgt_book, ref.tgt_chapter)
+            if (ref.tgt_verse) pendingVerseRef.current = { book: ref.tgt_book, chapter: ref.tgt_chapter, verse: ref.tgt_verse }
+          }
+        }
+
+        return (
+          <div style={r.modalBackdrop} onClick={() => setAuthorRefModal(null)}>
+            <div style={r.authorRefModalBox} onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div style={r.authorRefModalHeader}>
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <span style={r.authorRefModalRef}>{tgtRef}</span>
+                  {ref.label && <span style={r.authorRefModalLabel}>{ref.label}</span>}
+                </div>
+                <button style={r.confCloseBtn} onClick={() => setAuthorRefModal(null)}>✕</button>
+              </div>
+
+              {/* Verse text */}
+              <div style={r.authorRefModalBody}>
+                {ref.tgt_verse ? (
+                  authorRefModalText
+                    ? <p style={r.authorRefModalVerseText}>
+                        <span style={r.authorRefModalVerseNum}>{ref.tgt_verse}</span>
+                        {authorRefModalText}
+                      </p>
+                    : <p style={{ color:'var(--ink-faint)', fontSize:13, fontFamily:"'DM Sans',sans-serif", margin:0 }}>Loading…</p>
+                ) : (
+                  <p style={{ color:'var(--ink-faint)', fontSize:13, fontFamily:"'DM Sans',sans-serif", margin:0 }}>
+                    Navigate to read {ref.tgt_book} {ref.tgt_chapter}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer action */}
+              <div style={r.authorRefModalFooter}>
+                <button style={r.authorRefModalGoBtn} onClick={doNavigate}>
+                  Go to {tgtRef}
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ marginLeft:5, flexShrink:0 }}>
+                    <path d="M3 6.5h7M7 3.5l3 3-3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* KJV word-tap search modal — disabled; use the search panel (magnifying glass) instead */}
     </div>
@@ -3648,5 +3721,76 @@ const r = {
     fontFamily:"'SBL Hebrew','David','Arial Hebrew','Times New Roman',serif",
     color:'var(--ink)', direction:'rtl',
     letterSpacing:'0.02em',
+  },
+
+  /* ── Shared modal backdrop ── */
+  modalBackdrop: {
+    position:'fixed', inset:0, zIndex:500,
+    background:'rgba(0,0,0,0.45)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    padding:20,
+  },
+
+  /* ── Author cross-ref verse preview modal ── */
+  authorRefModalBox: {
+    background:'var(--surface)',
+    borderRadius:'var(--radius-lg)',
+    boxShadow:'0 16px 48px rgba(0,0,0,0.22)',
+    width:'100%', maxWidth:420,
+    display:'flex', flexDirection:'column',
+    overflow:'hidden',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  authorRefModalHeader: {
+    display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+    padding:'16px 18px 12px',
+    borderBottom:'1px solid var(--border)',
+    gap:10,
+  },
+  authorRefModalRef: {
+    fontSize:17, fontWeight:700,
+    fontFamily:"'Cormorant Garamond',serif",
+    color:'var(--ink)', lineHeight:1.25,
+  },
+  authorRefModalLabel: {
+    fontSize:11, fontWeight:600, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:99,
+    padding:'2px 9px', display:'inline-block',
+    letterSpacing:'0.02em',
+  },
+  confCloseBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', fontSize:16, lineHeight:1,
+    padding:'2px 4px', flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  authorRefModalBody: {
+    padding:'16px 18px',
+    minHeight:60,
+  },
+  authorRefModalVerseText: {
+    margin:0, fontSize:15, lineHeight:1.8, color:'var(--ink)',
+    fontFamily:"'Georgia','Times New Roman',serif",
+  },
+  authorRefModalVerseNum: {
+    fontWeight:700, color:'var(--teal)',
+    marginRight:7, fontSize:12,
+    fontFamily:"'DM Sans',sans-serif",
+    verticalAlign:'super',
+  },
+  authorRefModalFooter: {
+    padding:'12px 18px 16px',
+    borderTop:'1px solid var(--border)',
+    display:'flex', justifyContent:'flex-end',
+  },
+  authorRefModalGoBtn: {
+    display:'inline-flex', alignItems:'center',
+    padding:'9px 18px',
+    background:'var(--teal)', color:'white',
+    border:'none', borderRadius:'var(--radius)',
+    fontSize:13, fontWeight:700, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+    transition:'opacity 0.15s',
+    letterSpacing:'0.01em',
   },
 }

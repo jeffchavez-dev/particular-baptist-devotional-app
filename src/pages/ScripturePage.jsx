@@ -53,6 +53,13 @@ export default function ScripturePage() {
   // Author-only edit mode for study notes / cross-refs
   const isAuthorUser = isAuthor(session)
   const [authorEditMode, setAuthorEditMode] = useState(false)
+  // Study mode: show/hide all notes and cross-reference chips
+  const [studyMode, setStudyMode] = useState(true)
+  // Ref for search input (avoid autoFocus keyboard-on-load on mobile)
+  const searchInputRef = useRef(null)
+  useEffect(() => {
+    if (searchPanelOpen) setTimeout(() => searchInputRef.current?.focus(), 50)
+  }, [searchPanelOpen])
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -191,9 +198,30 @@ export default function ScripturePage() {
             </button>
           )}
 
+          {/* Study mode toggle — show/hide all notes and reference chips */}
+          <button
+            style={{
+              ...s.menuBtn,
+              ...(isAuthorUser ? {} : { marginLeft:'auto' }),
+              ...(studyMode ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}),
+            }}
+            onClick={() => setStudyMode(m => !m)}
+            aria-label={studyMode ? 'Hide notes & references' : 'Show notes & references'}
+            title={studyMode ? 'Hide notes & references' : 'Show notes & references'}
+          >
+            {/* Open book icon */}
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <path d="M2 3.5C2 3.5 4 3 8.5 3C13 3 15 3.5 15 3.5V13.5C15 13.5 13 13 8.5 13C4 13 2 13.5 2 13.5V3.5Z"
+                stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+              <path d="M8.5 3V13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <path d="M5 5.5C5 5.5 6.5 5.2 8.5 5.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+              <path d="M5 7.5C5 7.5 6.5 7.2 8.5 7.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+          </button>
+
           {/* Search icon button */}
           <button
-            style={{ ...s.menuBtn, ...(isAuthorUser ? {} : { marginLeft:'auto' }) }}
+            style={s.menuBtn}
             onClick={() => setSearchPanelOpen(p => !p)}
             aria-label="Search Bible"
             title="Search Bible"
@@ -231,7 +259,7 @@ export default function ScripturePage() {
               <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
             <input
-              autoFocus
+              ref={searchInputRef}
               style={sp.searchInput}
               value={readSearch}
               onChange={e => {
@@ -436,6 +464,7 @@ export default function ScripturePage() {
           setCanGoForward(f)
         }}
         authorEditMode={authorEditMode}
+        studyMode={studyMode}
         onSearchResults={(hits, total, capped, q) => {
           setSearchResults(hits)
           setSearchResultsTotal(total)
