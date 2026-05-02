@@ -108,7 +108,7 @@ export default function LandingPage() {
       <nav style={s.nav}>
         <div style={s.navInner}>
           <div style={s.navBrand}>
-            <img src="/pb-icon.svg" alt="P.B." style={{ width: 30, height: 30 }} />
+            <img src="/pb-icon.png" alt="P.B." style={{ width: 30, height: 30, borderRadius: '50%' }} />
             <span style={s.navTitle}>Particular Baptist Devotional</span>
           </div>
           <div style={s.navActions}>
@@ -133,7 +133,7 @@ export default function LandingPage() {
             <span style={s.heroBadge}>365-Day Reading Plan</span>
           </div>
 
-          <img src="/pb-icon.svg" alt="P.B." style={s.heroIcon} />
+          <img src="/pb-icon.png" alt="P.B." style={s.heroIcon} />
 
           <h1 style={s.heroTitle}>
             A Year in the<br />Great Confessions
@@ -249,7 +249,7 @@ export default function LandingPage() {
       {/* ── Final CTA ── */}
       <section style={s.ctaSection}>
         <div style={s.ctaSectionInner}>
-          <img src="/pb-icon.svg" alt="P.B." style={s.ctaIcon} />
+          <img src="/pb-icon.png" alt="P.B." style={s.ctaIcon} />
           <h2 style={s.ctaTitle}>Begin Your Year in the Confessions</h2>
           <p style={s.ctaBody}>
             No commitment required. Start today and mark your progress as you go.
@@ -339,7 +339,7 @@ const s = {
     borderRadius: 99,
     padding: '4px 14px',
   },
-  heroIcon: { width: 76, height: 76, margin: '0 auto 1.75rem', display: 'block' },
+  heroIcon: { width: 76, height: 76, margin: '0 auto 1.75rem', display: 'block', borderRadius: '50%' },
   heroTitle: {
     fontSize: 'clamp(42px,7vw,76px)',
     fontFamily: "'Cormorant Garamond', serif",
@@ -560,6 +560,7 @@ const s = {
     height: 52,
     margin: '0 auto 1.75rem',
     display: 'block',
+    borderRadius: '50%',
     opacity: 0.9,
   },
   ctaTitle: {

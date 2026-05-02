@@ -151,7 +151,7 @@ export default function AboutModal({ open, onClose }) {
           {/* Header */}
           <div style={{ padding: '24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <img src="/pb-icon.svg" alt="P.B." style={{ width: 28, height: 28 }} />
+              <img src="/pb-icon.png" alt="P.B." style={{ width: 28, height: 28, borderRadius: '50%' }} />
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'var(--ink)' }}>
                 About Particular Baptist Devotional
               </h2>

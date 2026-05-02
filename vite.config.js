@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pb-icon.svg', 'pwa-192.png', 'pwa-512.png'],
+      includeAssets: ['pb-icon.png', 'pwa-192.png', 'pwa-512.png'],
 
       manifest: {
         name: 'Particular Baptist Devotional',
@@ -41,9 +41,9 @@ export default defineConfig({
             purpose: 'maskable',
           },
           {
-            src: 'pb-icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'pb-icon.png',
+            sizes: '64x64',
+            type: 'image/png',
             purpose: 'any',
           },
         ],

@@ -671,7 +671,7 @@ function ResultsScreen({ score, total, tier, answers, questions, navigate }) {
       <div style={s.resultsBody}>
         {/* Score hero */}
         <div style={s.scoreCard}>
-          <img src="/pb-icon.svg" alt="P.B." style={{width:56,height:56,margin:'0 auto 1rem',display:'block'}} />
+          <img src="/pb-icon.png" alt="P.B." style={{width:56,height:56,margin:'0 auto 1rem',display:'block',borderRadius:'50%'}} />
           <div style={{...s.tierLabel, color: tier.color, background: tier.bg}}>{tier.label}</div>
           <div style={s.scoreNum}>{score}<span style={s.scoreOf}> / {total}</span></div>
           <div style={s.scorePct}>{pct}% correct</div>

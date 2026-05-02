@@ -637,10 +637,7 @@ export default function AboutPage() {
       {/* ── Header ── */}
       <header style={s.header}>
         <div style={s.headerInner}>
-          <div style={{display:'flex', alignItems:'center', gap:10}}>
-            <img src="/pb-icon.svg" alt="P.B." style={{width:26, height:26}} />
-            <h1 style={s.headerTitle}>Settings &amp; About</h1>
-          </div>
+          <img src="/pb-icon.png" alt="P.B." style={{width:36, height:36, borderRadius:'50%'}} />
           {session ? (
             <div style={{display:'flex', alignItems:'center', gap:10}}>
               <span style={s.signedIn}>

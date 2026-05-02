@@ -86,10 +86,11 @@ export default function SplashScreen({ onDone }) {
 
         {/* ── icon ── */}
         <img
-          src="/pb-icon.svg"
+          src="/pb-icon.png"
           alt=""
           style={{
-            width: 56, height: 56,
+            width: 72, height: 72,
+            borderRadius: '50%',
             marginBottom: 24,
             animation: 'pb-icon-in 0.6s 0.3s both cubic-bezier(0.34,1.56,0.64,1)',
           }}
@@ -107,7 +108,7 @@ export default function SplashScreen({ onDone }) {
           letterSpacing: '0.01em',
           animation: 'pb-title-up 0.65s 0.4s both ease-out',
         }}>
-          A Year in the<br />Great Confessions
+          Particular Baptist<br />Devotional
         </h1>
 
         {/* ── sub ── */}
@@ -121,7 +122,7 @@ export default function SplashScreen({ onDone }) {
           textAlign: 'center',
           animation: 'pb-sub-up 0.6s 0.55s both ease-out',
         }}>
-          On the Confessions &amp; Catechism
+          On the Confessions, Catechisms &amp; Scriptures
         </p>
 
         {/* ── bottom decorative rule ── */}
