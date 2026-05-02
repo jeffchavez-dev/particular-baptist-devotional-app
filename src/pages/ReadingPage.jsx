@@ -67,12 +67,17 @@ function getOrthodoxContent(day) {
   return { type: 'catechism', q: item.q, a: item.a, refs: item.refs, _orthodoxNum: num }
 }
 
+/* Map any legacy / alternate book names to the canonical form used by bibleBooks.js */
+const BOOK_NAME_ALIASES = { 'Psalm': 'Psalms' }
+function normalizeBookName(name) { return BOOK_NAME_ALIASES[name] ?? name }
+
 /** Parse "1 Corinthians 8" or "Isaiah 44" → { book, chapter, refDisplay } */
 function parseBibleChapterRef(str) {
   if (!str) return null
   const m = str.match(/^(.*?)\s+(\d+)$/)
   if (!m) return null
-  return { book: m[1].trim(), chapter: parseInt(m[2]), refDisplay: str }
+  const book = normalizeBookName(m[1].trim())
+  return { book, chapter: parseInt(m[2]), refDisplay: str }
 }
 
 function BodyText({ text, textStyle = {} }) {
@@ -475,7 +480,9 @@ export default function ReadingPage() {
   const [navVisible, setNavVisible] = useState(true)
   const { prefs, updatePrefs } = usePrefs()
   const orthodoxContent = prefs.includeOrthodox ? getOrthodoxContent(day) : null
-  const bibleChapter = entry?.bibleChapter || null
+  const bibleChapter = entry?.bibleChapter
+    ? entry.bibleChapter.replace(/^(.*?)\s+(\d+)$/, (_, b, n) => `${normalizeBookName(b)} ${n}`)
+    : null
   const parsedBibleChapter = parseBibleChapterRef(bibleChapter)
   const [bibleChapterDone, setBibleChapterDone] = useState(() =>
     bibleChapter ? !!getBibleProgress()[bibleChapter] : false
