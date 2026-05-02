@@ -97,19 +97,15 @@ function applyBackground(ctx, preset, w, h, customBg) {
 }
 
 function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
+  const refDim = Math.min(w, h)
   /* Rule */
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.35; ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(PAD, h * 0.1); ctx.lineTo(w - PAD, h * 0.1); ctx.stroke()
   ctx.globalAlpha = 1
 
-  /* P.B. monogram - removed */
-  // ctx.fillStyle = accentColor; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
-  // ctx.font = `bold ${Math.round(w * 0.026)}px 'DM Sans','Helvetica Neue',sans-serif`
-  // ctx.fillText('P.B.', PAD, h * 0.088)
-
   /* Source badge */
   const srcColors = SRC_COLORS[source] || { bg:'#333', text:'#eee' }
-  const bFontSz = Math.round(w * 0.019)
+  const bFontSz = Math.round(refDim * 0.019)
   ctx.font = `bold ${bFontSz}px 'DM Sans','Helvetica Neue',sans-serif`
   const bLabel = source || 'Note'
   const bPadX = w * 0.02, bPadY = w * 0.013
@@ -124,11 +120,12 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
 }
 
 function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
+  const refDim = Math.min(w, h)
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.35; ctx.lineWidth = 1
   ctx.beginPath(); ctx.moveTo(PAD, h * 0.921); ctx.lineTo(w - PAD, h * 0.921); ctx.stroke()
   ctx.globalAlpha = 1
 
-  const fSz = Math.round(w * 0.019)
+  const fSz = Math.round(refDim * 0.019)
   ctx.font = `${fSz}px 'DM Sans','Helvetica Neue',sans-serif`
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.45; ctx.textAlign = 'left'
   ctx.fillText('Particular Baptist Devotional', PAD, h * 0.94)
@@ -140,6 +137,7 @@ function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
 
 /* ── Reading / Note card ── */
 function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
+  const refDim   = Math.min(w, h)
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
 
@@ -147,71 +145,64 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
   const isHeb    = card.script === 'hebrew' || hasHebrew(card.text || '')
   const bodyFont = isHeb ? HEBREW_FONT : "'Georgia','Times New Roman',serif"
 
-  /* Subtitle - removed */
-  // const subSz = Math.round(w * 0.022)
-  // ctx.font = `${subSz}px 'DM Sans','Helvetica Neue',sans-serif`
-  // ctx.fillStyle = textColor; ctx.globalAlpha = 0.55
-  // ctx.fillText(card.subtitle || '', PAD, sourceY + subSz * 2)
-  // ctx.globalAlpha = 1
-
   /* Title */
-  const titleSz = Math.round(w * 0.048)
-  const titleY  = sourceY + titleSz * 1.4 // adjusted since subtitle removed
+  const titleSz = Math.round(refDim * 0.048)
+  const titleY  = sourceY + titleSz * 1.4
   ctx.fillStyle = textColor
   ctx.font = `600 ${titleSz}px 'Georgia','Times New Roman',serif`
   const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.25, 3)
 
   /* Divider */
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.25; ctx.lineWidth = 1
-  const divY = titleBottom + w * 0.025
+  const divY = titleBottom + refDim * 0.025
   ctx.beginPath(); ctx.moveTo(PAD, divY); ctx.lineTo(w - PAD, divY); ctx.stroke()
   ctx.globalAlpha = 1
 
   /* Optional label */
-  let contentY = divY + w * 0.06
+  let contentY = divY + refDim * 0.06
   if (card.label) {
     ctx.fillStyle = accentColor
-    ctx.font = `bold ${Math.round(w * 0.018)}px 'DM Sans','Helvetica Neue',sans-serif`
+    ctx.font = `bold ${Math.round(refDim * 0.018)}px 'DM Sans','Helvetica Neue',sans-serif`
     ctx.fillText(card.label.toUpperCase(), PAD, contentY)
-    contentY += w * 0.05
+    contentY += refDim * 0.05
   }
 
   /* Decorative quote mark — mirrored for Hebrew RTL */
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.22
-  ctx.font = `${Math.round(w * 0.13)}px 'Georgia',serif`
+  ctx.font = `${Math.round(refDim * 0.13)}px 'Georgia',serif`
   if (isHeb) {
     ctx.textAlign = 'right'; ctx.direction = 'rtl'
-    ctx.fillText('\u201D', w - PAD + w * 0.008, contentY + w * 0.045)
+    ctx.fillText('\u201D', w - PAD + refDim * 0.008, contentY + refDim * 0.045)
     ctx.textAlign = 'left'; ctx.direction = 'ltr'
   } else {
-    ctx.fillText('\u201C', PAD - w * 0.008, contentY + w * 0.045)
+    ctx.fillText('\u201C', PAD - refDim * 0.008, contentY + refDim * 0.045)
   }
   ctx.globalAlpha = 1
 
   /* Content body — Hebrew RTL or LTR, font scaled by user preference */
-  const cSz = Math.round(w * 0.031 * scale)
+  const cSz = Math.round(refDim * 0.031 * scale)
   const cLineH = cSz * (isHeb ? 2.1 : 1.75)
   const refsPresent = !!(card.refs && card.refs.trim())
-  const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.52)) / cLineH))
+  const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.58)) / cLineH))
   ctx.fillStyle = textColor
   let contentBottom
   if (isHeb) {
     const hebSz = Math.round(cSz * 1.3)
     ctx.font = `${hebSz}px ${bodyFont}`
     ctx.direction = 'rtl'; ctx.textAlign = 'right'
-    contentBottom = wrapText(ctx, card.text || '', PAD, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines, true)
+    contentBottom = wrapText(ctx, card.text || '', PAD, contentY + refDim * 0.02, contentW - refDim * 0.04, cLineH, maxLines, true)
     ctx.direction = 'ltr'; ctx.textAlign = 'left'
   } else {
     ctx.font = `italic ${cSz}px ${bodyFont}`
     ctx.direction = 'ltr'; ctx.textAlign = 'left'
-    contentBottom = wrapText(ctx, card.text || '', PAD + w * 0.04, contentY + w * 0.02, contentW - w * 0.04, cLineH, maxLines)
+    contentBottom = wrapText(ctx, card.text || '', PAD + refDim * 0.04, contentY + refDim * 0.02, contentW - refDim * 0.04, cLineH, maxLines)
   }
 
   /* Scripture references — smaller, muted, below content */
   if (refsPresent) {
-    const refAreaTop = contentBottom + w * 0.03
+    const refAreaTop = contentBottom + refDim * 0.03
     if (refAreaTop < h * 0.88) {
-      const refSz   = Math.round(w * 0.017)
+      const refSz   = Math.round(refDim * 0.017)
       const refLineH = refSz * 1.55
       const refMaxLines = Math.max(1, Math.floor((h * 0.88 - refAreaTop) / refLineH))
       // Clean footnote markers
@@ -233,6 +224,7 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
 
 /* ── Quote card — quote text is the hero ── */
 function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
+  const refDim   = Math.min(w, h)
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
 
@@ -244,44 +236,44 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0
   // ctx.globalAlpha = 1
 
   /* Section heading (label) */
-  let headY = sourceY + w * 0.046 // adjusted since subtitle removed
+  let headY = sourceY + refDim * 0.046
   if (card.label) {
     ctx.fillStyle = accentColor
-    ctx.font = `bold ${Math.round(w * 0.02)}px 'DM Sans','Helvetica Neue',sans-serif`
+    ctx.font = `bold ${Math.round(refDim * 0.02)}px 'DM Sans','Helvetica Neue',sans-serif`
     ctx.fillText(card.label.toUpperCase(), PAD, headY)
-    headY += w * 0.046
+    headY += refDim * 0.046
   }
 
   /* Large decorative open-quote */
-  const qMarkSz = Math.round(w * 0.19)
+  const qMarkSz = Math.round(refDim * 0.19)
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.2
   ctx.font = `${qMarkSz}px 'Georgia',serif`
-  ctx.fillText('\u201C', PAD - w * 0.01, headY + qMarkSz * 0.52)
+  ctx.fillText('\u201C', PAD - refDim * 0.01, headY + qMarkSz * 0.52)
   ctx.globalAlpha = 1
 
   /* Quote text — most prominent, font scaled by user preference */
-  const qSz = Math.round(w * 0.038 * scale), qLineH = qSz * 1.85
-  const maxLines = Math.max(4, Math.floor((h * 0.54) / qLineH))
+  const qSz = Math.round(refDim * 0.038 * scale), qLineH = qSz * 1.85
+  const maxLines = Math.max(4, Math.floor((h * 0.65) / qLineH))
   ctx.fillStyle = textColor
   ctx.font = `italic ${qSz}px 'Georgia','Times New Roman',serif`
-  const quoteBottom = wrapText(ctx, card.text || '', PAD + w * 0.04, headY + w * 0.04, contentW - w * 0.06, qLineH, maxLines)
+  const quoteBottom = wrapText(ctx, card.text || '', PAD + refDim * 0.04, headY + refDim * 0.04, contentW - refDim * 0.06, qLineH, maxLines)
 
   /* Closing quote mark */
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.25
-  ctx.font = `${Math.round(w * 0.07)}px 'Georgia',serif`
+  ctx.font = `${Math.round(refDim * 0.07)}px 'Georgia',serif`
   ctx.textAlign = 'right'
-  ctx.fillText('\u201D', w - PAD + w * 0.005, quoteBottom)
+  ctx.fillText('\u201D', w - PAD + refDim * 0.005, quoteBottom)
   ctx.globalAlpha = 1; ctx.textAlign = 'left'
 
   /* Attribution */
-  const attribY = Math.min(quoteBottom + w * 0.07, h * 0.87)
+  const attribY = Math.min(quoteBottom + refDim * 0.07, h * 0.87)
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.75
-  ctx.font = `500 ${Math.round(w * 0.024)}px 'DM Sans','Helvetica Neue',sans-serif`
+  ctx.font = `500 ${Math.round(refDim * 0.024)}px 'DM Sans','Helvetica Neue',sans-serif`
   if (card.title) ctx.fillText(`\u2014 ${card.title}`, PAD, attribY)
   if (card.subtitle2) {
     ctx.globalAlpha = 0.5
-    ctx.font = `italic ${Math.round(w * 0.021)}px 'Georgia',serif`
-    ctx.fillText(card.subtitle2, PAD, attribY + w * 0.042)
+    ctx.font = `italic ${Math.round(refDim * 0.021)}px 'Georgia',serif`
+    ctx.fillText(card.subtitle2, PAD, attribY + refDim * 0.042)
   }
   ctx.globalAlpha = 1
 
@@ -293,7 +285,7 @@ function drawCard(canvas, card, preset, format, customBg, customText, scale = 1.
   const { w, h } = format
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
-  const PAD         = Math.round(w * 0.08)
+  const PAD         = Math.round(Math.min(w, h) * 0.08)
   const textColor   = preset.id === 'custom' ? (customText || '#1a1410') : preset.textColor
   const accentColor = preset.accentColor
 
@@ -421,7 +413,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
           <div style={m.preview}>
             <canvas
               ref={canvasRef}
-              style={{ maxWidth:'100%', maxHeight:320, borderRadius:8, boxShadow:'0 4px 24px rgba(0,0,0,0.25)', display:'block' }}
+              style={{ maxWidth:'100%', maxHeight: format.id === 'wide' ? 240 : 360, borderRadius:8, boxShadow:'0 4px 24px rgba(0,0,0,0.25)', display:'block' }}
             />
           </div>
 
@@ -573,7 +565,7 @@ const m = {
   body: { padding:'20px', overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:16 },
   preview: {
     display:'flex', justifyContent:'center', alignItems:'center',
-    background:'#e8e8e8', borderRadius:10, padding:12,
+    background:'#e8e8e8', borderRadius:10, padding:6,
   },
   section: { display:'flex', flexDirection:'column', gap:8 },
   label: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' },

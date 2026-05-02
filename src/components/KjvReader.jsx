@@ -21,6 +21,7 @@ import {
   isAuthor,
   fetchAuthorNotes, upsertAuthorNote, deleteAuthorNote,
   fetchAuthorCrossRefs, upsertAuthorCrossRef, deleteAuthorCrossRef,
+  fetchAuthorBackRefs,
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 
@@ -723,6 +724,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [authorNotes, setAuthorNotes] = useState({})
   // { 'Book:ch': { verseNum: [{id, src_book, src_chapter, src_verse, tgt_book, tgt_chapter, tgt_verse, label}] } }
   const [authorCrossRefs, setAuthorCrossRefs] = useState({})
+  // Back-refs: keyed by tgt_verse — passages that link TO this chapter's verses
+  // { 'Book:ch': { verseNum: [ref, ...] } }
+  const [authorBackRefs, setAuthorBackRefs] = useState({})
   const authorContentLoadedRef = useRef(new Set())
   // Author note editing
   const [editingAuthorNote, setEditingAuthorNote] = useState(null) // verseKey 'book:ch:v'
@@ -998,8 +1002,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       if (authorContentLoadedRef.current.has(key)) continue
       authorContentLoadedRef.current.add(key)
       const { book: b, chapter: ch } = seg
-      Promise.all([fetchAuthorNotes(b, ch), fetchAuthorCrossRefs(b, ch)])
-        .then(([notes, refs]) => {
+      Promise.all([fetchAuthorNotes(b, ch), fetchAuthorCrossRefs(b, ch), fetchAuthorBackRefs(b, ch)])
+        .then(([notes, refs, backRefs]) => {
           const noteMap = {}
           notes.forEach(n => { noteMap[n.verse] = { id: n.id, note: n.note } })
           setAuthorNotes(prev => ({ ...prev, [key]: noteMap }))
@@ -1009,6 +1013,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             refMap[r.src_verse].push(r)
           })
           setAuthorCrossRefs(prev => ({ ...prev, [key]: refMap }))
+          // Back-refs: keyed by tgt_verse so they appear on the correct verse
+          const backRefMap = {}
+          backRefs.filter(r => r.tgt_verse).forEach(r => {
+            if (!backRefMap[r.tgt_verse]) backRefMap[r.tgt_verse] = []
+            backRefMap[r.tgt_verse].push(r)
+          })
+          setAuthorBackRefs(prev => ({ ...prev, [key]: backRefMap }))
         })
         .catch(() => { authorContentLoadedRef.current.delete(key) })
     }
@@ -1614,13 +1625,28 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         tgt_verse: tgt_verse.trim() ? parseInt(tgt_verse, 10) : null,
         label: label.trim() || null,
       })
-      const fresh = await fetchAuthorCrossRefs(src_book, src_chapter)
+      const tgtBook = matched.name
+      const tgtCh   = parseInt(tgt_chapter, 10)
+      const [fresh, freshBackRefs] = await Promise.all([
+        fetchAuthorCrossRefs(src_book, src_chapter),
+        fetchAuthorBackRefs(tgtBook, tgtCh),
+      ])
       const refMap = {}
       fresh.forEach(r => {
         if (!refMap[r.src_verse]) refMap[r.src_verse] = []
         refMap[r.src_verse].push(r)
       })
       setAuthorCrossRefs(prev => ({ ...prev, [`${src_book}:${src_chapter}`]: refMap }))
+      // Immediately update back-refs for the target chapter so the link appears right away
+      // if the user navigates there without a full reload.
+      const backRefMap = {}
+      freshBackRefs.filter(r => r.tgt_verse).forEach(r => {
+        if (!backRefMap[r.tgt_verse]) backRefMap[r.tgt_verse] = []
+        backRefMap[r.tgt_verse].push(r)
+      })
+      setAuthorBackRefs(prev => ({ ...prev, [`${tgtBook}:${tgtCh}`]: backRefMap }))
+      // Allow the target chapter to re-fetch fresh data next time it loads
+      authorContentLoadedRef.current.delete(`${tgtBook}:${tgtCh}`)
       setAddingCrossRefTo(null)
       setCrossRefDraft({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
     } catch(e) {
@@ -1629,15 +1655,28 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   async function removeAuthorCrossRef(ref) {
-    const key = `${ref.src_book}:${ref.src_chapter}`
+    const srcKey = `${ref.src_book}:${ref.src_chapter}`
+    const tgtKey = `${ref.tgt_book}:${ref.tgt_chapter}`
     try {
       await deleteAuthorCrossRef(ref.id)
+      // Remove from forward refs (source chapter)
       setAuthorCrossRefs(prev => {
-        const chMap = { ...(prev[key] || {}) }
+        const chMap = { ...(prev[srcKey] || {}) }
         chMap[ref.src_verse] = (chMap[ref.src_verse] || []).filter(r => r.id !== ref.id)
         if (!chMap[ref.src_verse].length) delete chMap[ref.src_verse]
-        return { ...prev, [key]: chMap }
+        return { ...prev, [srcKey]: chMap }
       })
+      // Remove from back-refs (target chapter) so the link disappears immediately
+      if (ref.tgt_verse) {
+        setAuthorBackRefs(prev => {
+          const chMap = { ...(prev[tgtKey] || {}) }
+          chMap[ref.tgt_verse] = (chMap[ref.tgt_verse] || []).filter(r => r.id !== ref.id)
+          if (!chMap[ref.tgt_verse].length) delete chMap[ref.tgt_verse]
+          return { ...prev, [tgtKey]: chMap }
+        })
+      }
+      // Allow target chapter to re-fetch fresh data next time it loads
+      authorContentLoadedRef.current.delete(tgtKey)
     } catch(e) {
       console.error('[authorCrossRef] delete failed:', e?.message)
     }
@@ -2818,17 +2857,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </div>
                             )}
 
-                            {/* ── Author cross-refs ── */}
+                            {/* ── Author cross-refs (forward links + automatic back-refs) ── */}
                             {(() => {
                               const chKey    = `${seg.book}:${seg.chapter}`
                               const xrefs    = authorCrossRefs[chKey]?.[verse] || []
+                              const backRefs = authorBackRefs[chKey]?.[verse]  || []
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
                               // Show row if: editing (canEdit), or study mode with refs to display
-                              if (!canEdit && !isAddingHere && (!studyMode || !xrefs.length)) return null
+                              if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
                                   <span style={r.authorXrefIcon}>↗</span>
+                                  {/* Forward links (author-added from this verse) */}
                                   {xrefs.map(ref => {
                                     const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
                                     const chipLabel = ref.label ? `${ref.label} (${tgt})` : tgt
@@ -2848,6 +2889,32 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                             onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
                                             title="Remove link">×</button>
                                         )}
+                                      </span>
+                                    )
+                                  })}
+                                  {/* Back-references — automatically shown when another passage links here */}
+                                  {backRefs.map(ref => {
+                                    const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
+                                    const chipLabel = ref.label ? `${ref.label} (${src})` : src
+                                    // Build a synthetic ref swapping src↔tgt so the existing
+                                    // preview modal navigates to the source passage
+                                    const syntheticRef = {
+                                      id:          ref.id,
+                                      tgt_book:    ref.src_book,
+                                      tgt_chapter: ref.src_chapter,
+                                      tgt_verse:   ref.src_verse,
+                                      label:       ref.label,
+                                    }
+                                    return (
+                                      <span key={`back-${ref.id}`} style={r.authorXrefChipWrap}>
+                                        <button
+                                          style={{ ...r.authorXrefChip, ...r.authorBackXrefChip }}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            setAuthorRefModal({ ref: syntheticRef })
+                                          }}
+                                          title={`Back-link from ${src}`}
+                                        >↩ {chipLabel}</button>
                                       </span>
                                     )
                                   })}
@@ -3691,6 +3758,12 @@ const r = {
     fontSize:10, fontWeight:600,
     background:'var(--teal-light)', color:'var(--teal)',
     border:'1px solid var(--teal)', borderRadius:'99px 0 0 99px',
+    padding:'2px 7px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
+  },
+  authorBackXrefChip: {
+    background:'rgba(61,43,107,0.10)', color:'#3d2b6b',
+    border:'1px solid rgba(61,43,107,0.25)', borderRadius:99,
     padding:'2px 7px', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
   },

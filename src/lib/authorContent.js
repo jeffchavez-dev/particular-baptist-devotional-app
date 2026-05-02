@@ -96,6 +96,29 @@ export async function fetchAuthorCrossRefs(book, chapter) {
 }
 
 /**
+ * Fetch all author cross-refs where the TARGET is the given book + chapter.
+ * Used to display automatic back-references (reverse links) on the target passage.
+ * Returns an array of:
+ *   { id, src_book, src_chapter, src_verse,
+ *       tgt_book, tgt_chapter, tgt_verse, label, updated_at }
+ */
+export async function fetchAuthorBackRefs(book, chapter) {
+  try {
+    const { data, error } = await supabase
+      .from('author_cross_refs')
+      .select('*')
+      .eq('tgt_book', book)
+      .eq('tgt_chapter', Number(chapter))
+      .order('src_verse', { ascending: true })
+    if (error) throw error
+    return data || []
+  } catch (e) {
+    console.warn('[authorContent] fetchAuthorBackRefs:', e?.message)
+    return []
+  }
+}
+
+/**
  * Create or update an author cross-ref.
  * Conflict key: (src_book, src_chapter, src_verse, tgt_book, tgt_chapter, tgt_verse)
  */

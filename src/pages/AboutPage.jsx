@@ -70,6 +70,7 @@ const SCRIPTURE_FEATURES = [
   { title: 'King James Version', body: 'Full KJV Bible with continuous infinite-scroll reading. Tap any word to search it across the whole Bible instantly.' },
   { title: 'Greek New Testament (GNT)', body: 'Read the Translators Amalgamated GNT (TAGNT) word-by-word. Tap any word to see its Robinson morphology, Strong\'s number, gloss, and transliteration.' },
   { title: 'Hebrew Old Testament (HOT)', body: 'Read the TAHOT with full Masoretic pointing and cantillation. Each word displays ETCBC morphology — stem, aspect, person, gender, and number.' },
+  { title: 'Greek Septuagint (LXX)', body: 'Read the Greek Old Testament (Septuagint) word-by-word. Tap any word to see its Strong\'s number and gloss in an inline strip. Enable LXX alongside the Hebrew OT in parallel mode to compare the two side-by-side. Jump to any LXX occurrence from the Strong\'s lexicon using "Find in LXX."' },
   { title: 'In-App Strong\'s Lexicon', body: 'Tap a Strong\'s number to open a full lexicon entry — lemma, transliteration, pronunciation, and definition — without leaving the app. Browse all 8,600+ entries.' },
   { title: 'Find in GNT / HOT', body: 'From any lexicon entry, search every occurrence of a word across the Greek NT or Hebrew OT. Results navigate to the exact verse with the matching word auto-highlighted.' },
   { title: 'Scroll-Synced Navigation', body: 'The chapter indicator in the header always reflects which chapter you\'re currently reading as you scroll through continuous chapters.' },
