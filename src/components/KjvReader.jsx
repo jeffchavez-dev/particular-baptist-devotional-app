@@ -815,14 +815,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       saveElementScroll(`scripture-${versionRef.current}`, el)
       saveReaderAnchor(versionRef.current, el)
       // Keep chapter indicator in sync: find the last heading that has
-      // scrolled at or above 60px from the reader top (i.e. the current chapter)
+      // entered the top half of the reader (switches as soon as the next
+      // chapter heading scrolls past the midpoint — feels immediate).
       if (!pendingVisibleTargetRef.current) {
         const headings = el.querySelectorAll('[data-seg-book]')
         if (headings.length) {
-          const elTop = el.getBoundingClientRect().top
+          const elTop  = el.getBoundingClientRect().top
+          const cutoff = el.clientHeight * 0.5
           let current = headings[0]
           for (const h of headings) {
-            if (h.getBoundingClientRect().top - elTop <= 60) current = h
+            if (h.getBoundingClientRect().top - elTop < cutoff) current = h
           }
           const b  = current.dataset.segBook
           const ch = parseInt(current.dataset.segChapter, 10)
