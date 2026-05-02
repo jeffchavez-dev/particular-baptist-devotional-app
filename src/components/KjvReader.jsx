@@ -24,6 +24,7 @@ import {
   fetchAuthorBackRefs,
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
+import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -567,6 +568,16 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
+
+  /* ── Bible chapter read progress (synced with tracker & devotional) ── */
+  const [bibleProgress, setBibleProgressState] = useState(() => getBibleProgress())
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === BIBLE_KEY) setBibleProgressState(getBibleProgress())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const [book, setBook] = useState(() => {
     return loadReaderPosition(version).book
@@ -3041,6 +3052,45 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         )
                       })}
                     </div>
+
+                    {/* ── Chapter-end read button (KJV / ABAB only) ── */}
+                    {(version === 'kjv' || version === 'abab') && (() => {
+                      const chKey = `${seg.book} ${seg.chapter}`
+                      const isDone = !!bibleProgress[chKey]
+                      return (
+                        <div style={r.chapterReadRow}>
+                          <button
+                            onClick={() => {
+                              const newDone = !isDone
+                              setBibleChapter(chKey, newDone, session?.user?.id)
+                              setBibleProgressState(prev => {
+                                const next = { ...prev }
+                                if (newDone) next[chKey] = true; else delete next[chKey]
+                                return next
+                              })
+                            }}
+                            style={{
+                              ...r.chapterReadBtn,
+                              background: isDone ? 'var(--teal)' : 'transparent',
+                              borderColor: isDone ? 'var(--teal)' : 'var(--border-strong)',
+                              color: isDone ? 'white' : 'var(--ink-faint)',
+                            }}
+                            title={isDone ? 'Mark as unread' : 'Mark chapter as read'}
+                          >
+                            {isDone ? (
+                              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            ) : (
+                              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+                              </svg>
+                            )}
+                            <span>{isDone ? `${seg.book} ${seg.chapter} — read` : `Mark ${seg.book} ${seg.chapter} as read`}</span>
+                          </button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 ))}
 
@@ -3576,6 +3626,21 @@ const r = {
     color:'var(--ink-muted)', letterSpacing:'0.01em', flexShrink:0,
   },
   verseList: { display:'flex', flexDirection:'column', gap:0 },
+
+  /* ── Chapter-end read button ── */
+  chapterReadRow: {
+    display:'flex', justifyContent:'center',
+    padding:'18px 0 6px',
+    borderTop:'1px solid var(--border)',
+    marginTop:12,
+  },
+  chapterReadBtn: {
+    display:'inline-flex', alignItems:'center', gap:7,
+    padding:'6px 18px', borderRadius:99, border:'1.5px solid',
+    fontSize:12, fontWeight:600,
+    fontFamily:"'DM Sans','Helvetica Neue',sans-serif",
+    cursor:'pointer', transition:'all 0.15s',
+  },
 
   /* ── Verse outer wrapper ── */
   verseOuter: {

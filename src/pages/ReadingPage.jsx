@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked, getOrthodoxForDay } from '../lib/supabase'
+import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked, getOrthodoxForDay, BIBLE_KEY } from '../lib/supabase'
 import { useAuth, usePrefs } from '../App'
 import { LBCF2 } from '../data/lbcf2'
 import { CATECHISM } from '../data/catechism'
@@ -481,6 +481,16 @@ export default function ReadingPage() {
     bibleChapter ? !!getBibleProgress()[bibleChapter] : false
   )
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(day))
+
+  /* Sync bibleChapterDone when KJV reader or Bible Tracker marks it externally */
+  useEffect(() => {
+    if (!bibleChapter) return
+    function onStorage(e) {
+      if (e.key === BIBLE_KEY) setBibleChapterDone(!!getBibleProgress()[bibleChapter])
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [bibleChapter])
 
   useEffect(() => {
     try { localStorage.setItem('pb-last-devotional-path', `/day/${day}`) } catch {}

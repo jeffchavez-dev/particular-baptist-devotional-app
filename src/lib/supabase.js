@@ -72,7 +72,7 @@ export function getOrthodoxForDay(day) {
 }
 
 // ── Bible chapter progress (localStorage) ────────────────────────────────
-const BIBLE_KEY = 'pb-bible-progress'
+export const BIBLE_KEY = 'pb-bible-progress'
 
 export function getBibleProgress() {
   try { return JSON.parse(localStorage.getItem(BIBLE_KEY) || '{}') }

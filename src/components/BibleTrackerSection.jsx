@@ -2,9 +2,9 @@
  * BibleTrackerSection
  * Moved from ScripturePage — used in Settings (AboutPage) under "Bible Tracker".
  */
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { BIBLE_BOOKS, TOTAL_CHAPTERS } from '../lib/bibleBooks'
-import { getBibleProgress, setBibleChapter } from '../lib/supabase'
+import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
 import { useAuth } from '../App'
 
@@ -250,6 +250,15 @@ export default function BibleTrackerSection() {
 
   const [progress, setProgress] = useState(() => getBibleProgress())
   const [openCats, setOpenCats] = useState(new Set())
+
+  /* Sync progress when any other part of the app marks a chapter */
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === BIBLE_KEY) setProgress(getBibleProgress())
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   function setOpenCat(id) {
     setOpenCats(prev => {
