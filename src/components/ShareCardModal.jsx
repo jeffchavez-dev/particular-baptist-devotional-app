@@ -100,7 +100,7 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
   const refDim = Math.min(w, h)
   /* Rule */
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.35; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(PAD, h * 0.1); ctx.lineTo(w - PAD, h * 0.1); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, h * 0.055); ctx.lineTo(w - PAD, h * 0.055); ctx.stroke()
   ctx.globalAlpha = 1
 
   /* Source badge */
@@ -108,9 +108,9 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
   const bFontSz = Math.round(refDim * 0.019)
   ctx.font = `bold ${bFontSz}px 'DM Sans','Helvetica Neue',sans-serif`
   const bLabel = source || 'Note'
-  const bPadX = w * 0.02, bPadY = w * 0.013
+  const bPadX = refDim * 0.02, bPadY = refDim * 0.013
   const bH = bFontSz + bPadY * 2, bW = ctx.measureText(bLabel).width + bPadX * 2
-  const sourceY = h * 0.155
+  const sourceY = h * 0.1
   ctx.fillStyle = srcColors.bg
   roundRect(ctx, PAD, sourceY - bFontSz - bPadY, bW, bH, bH / 2)
   ctx.fill()
@@ -122,13 +122,13 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
 function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
   const refDim = Math.min(w, h)
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.35; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(PAD, h * 0.921); ctx.lineTo(w - PAD, h * 0.921); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, h * 0.9); ctx.lineTo(w - PAD, h * 0.9); ctx.stroke()
   ctx.globalAlpha = 1
 
   const fSz = Math.round(refDim * 0.019)
   ctx.font = `${fSz}px 'DM Sans','Helvetica Neue',sans-serif`
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.45; ctx.textAlign = 'left'
-  ctx.fillText('Particular Baptist Devotional', PAD, h * 0.94)
+  ctx.fillText('Particular Baptist Devotional', PAD, h * 0.92)
   /* Removed URL */
   // ctx.fillStyle = accentColor; ctx.globalAlpha = 0.65; ctx.textAlign = 'right'
   // ctx.fillText('pb-devotional.vercel.app', w - PAD, h * 0.94)
@@ -147,19 +147,19 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
 
   /* Title */
   const titleSz = Math.round(refDim * 0.048)
-  const titleY  = sourceY + titleSz * 1.4
+  const titleY  = sourceY + titleSz * 1.0
   ctx.fillStyle = textColor
   ctx.font = `600 ${titleSz}px 'Georgia','Times New Roman',serif`
   const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.25, 3)
 
   /* Divider */
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.25; ctx.lineWidth = 1
-  const divY = titleBottom + refDim * 0.025
+  const divY = titleBottom + refDim * 0.015
   ctx.beginPath(); ctx.moveTo(PAD, divY); ctx.lineTo(w - PAD, divY); ctx.stroke()
   ctx.globalAlpha = 1
 
   /* Optional label */
-  let contentY = divY + refDim * 0.06
+  let contentY = divY + refDim * 0.038
   if (card.label) {
     ctx.fillStyle = accentColor
     ctx.font = `bold ${Math.round(refDim * 0.018)}px 'DM Sans','Helvetica Neue',sans-serif`
@@ -236,12 +236,12 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0
   // ctx.globalAlpha = 1
 
   /* Section heading (label) */
-  let headY = sourceY + refDim * 0.046
+  let headY = sourceY + refDim * 0.025
   if (card.label) {
     ctx.fillStyle = accentColor
     ctx.font = `bold ${Math.round(refDim * 0.02)}px 'DM Sans','Helvetica Neue',sans-serif`
     ctx.fillText(card.label.toUpperCase(), PAD, headY)
-    headY += refDim * 0.046
+    headY += refDim * 0.032
   }
 
   /* Large decorative open-quote */
@@ -256,7 +256,7 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0
   const maxLines = Math.max(4, Math.floor((h * 0.65) / qLineH))
   ctx.fillStyle = textColor
   ctx.font = `italic ${qSz}px 'Georgia','Times New Roman',serif`
-  const quoteBottom = wrapText(ctx, card.text || '', PAD + refDim * 0.04, headY + refDim * 0.04, contentW - refDim * 0.06, qLineH, maxLines)
+  const quoteBottom = wrapText(ctx, card.text || '', PAD + refDim * 0.04, headY + refDim * 0.025, contentW - refDim * 0.06, qLineH, maxLines)
 
   /* Closing quote mark */
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.25

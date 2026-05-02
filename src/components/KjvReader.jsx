@@ -2872,7 +2872,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   {/* Forward links (author-added from this verse) */}
                                   {xrefs.map(ref => {
                                     const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
-                                    const chipLabel = ref.label ? `${ref.label} (${tgt})` : tgt
+                                    const shortLabel = ref.label ? ref.label.split(' - ')[0] : null
+                                    const chipLabel = shortLabel || tgt
                                     return (
                                       <span key={ref.id} style={r.authorXrefChipWrap}>
                                         <button
@@ -2895,9 +2896,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   {/* Back-references — automatically shown when another passage links here */}
                                   {backRefs.map(ref => {
                                     const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
-                                    const chipLabel = ref.label ? `${ref.label} (${src})` : src
-                                    // Build a synthetic ref swapping src↔tgt so the existing
-                                    // preview modal navigates to the source passage
+                                    const shortLabel = ref.label ? ref.label.split(' - ')[0] : null
+                                    const chipLabel = shortLabel || src
                                     const syntheticRef = {
                                       id:          ref.id,
                                       tgt_book:    ref.src_book,
@@ -2908,7 +2908,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     return (
                                       <span key={`back-${ref.id}`} style={r.authorXrefChipWrap}>
                                         <button
-                                          style={{ ...r.authorXrefChip, ...r.authorBackXrefChip }}
+                                          style={{ ...r.authorXrefChip, borderRadius: 99 }}
                                           onClick={e => {
                                             e.stopPropagation()
                                             setAuthorRefModal({ ref: syntheticRef })
@@ -3758,12 +3758,6 @@ const r = {
     fontSize:10, fontWeight:600,
     background:'var(--teal-light)', color:'var(--teal)',
     border:'1px solid var(--teal)', borderRadius:'99px 0 0 99px',
-    padding:'2px 7px', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
-  },
-  authorBackXrefChip: {
-    background:'rgba(61,43,107,0.10)', color:'#3d2b6b',
-    border:'1px solid rgba(61,43,107,0.25)', borderRadius:99,
     padding:'2px 7px', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
   },

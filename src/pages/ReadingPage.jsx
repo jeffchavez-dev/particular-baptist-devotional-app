@@ -635,6 +635,47 @@ export default function ReadingPage() {
           <p style={s.readingDetail}>{entry.detail}</p>
         </div>
 
+        {/* Scripture Reading — shown first so the reader opens the passage before the confession */}
+        {bibleChapter && (
+          <div className="card" style={s.bibleCard}>
+            <div style={s.bibleCardInner}>
+              <div style={s.bibleLeft}>
+                <span style={s.bibleLabel}>Scripture Reading</span>
+                <button
+                  style={s.bibleChapterBtn}
+                  onClick={() => parsedBibleChapter && setKjvModal(parsedBibleChapter)}
+                  title="Read chapter in KJV"
+                >
+                  {bibleChapter}
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{opacity:0.6, flexShrink:0}}>
+                    <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </button>
+                <span style={s.bibleHint}>Tap to read in KJV · check when done</span>
+              </div>
+              <button
+                onClick={toggleBibleChapter}
+                style={{
+                  ...s.bibleCheck,
+                  background: bibleChapterDone ? 'var(--teal)' : 'white',
+                  borderColor: bibleChapterDone ? 'var(--teal)' : 'var(--border-strong)',
+                }}
+                title={bibleChapterDone ? 'Mark unread' : 'Mark as read'}
+                aria-label={bibleChapterDone ? 'Mark unread' : 'Mark chapter as read'}
+              >
+                {bibleChapterDone && (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            </div>
+            {bibleChapterDone && (
+              <div style={s.bibleReadBadge}>✓ Chapter read</div>
+            )}
+          </div>
+        )}
+
         {/* Inline confession / catechism text */}
         <ContentBlock
           content={content}
@@ -718,47 +759,6 @@ export default function ReadingPage() {
             </div>
           </div>
         </div>
-
-        {/* Scripture Reading */}
-        {bibleChapter && (
-          <div className="card" style={s.bibleCard}>
-            <div style={s.bibleCardInner}>
-              <div style={s.bibleLeft}>
-                <span style={s.bibleLabel}>Scripture Reading</span>
-                <button
-                  style={s.bibleChapterBtn}
-                  onClick={() => parsedBibleChapter && setKjvModal(parsedBibleChapter)}
-                  title="Read chapter in KJV"
-                >
-                  {bibleChapter}
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{opacity:0.6, flexShrink:0}}>
-                    <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                  </svg>
-                </button>
-                <span style={s.bibleHint}>Tap to read in KJV · check when done</span>
-              </div>
-              <button
-                onClick={toggleBibleChapter}
-                style={{
-                  ...s.bibleCheck,
-                  background: bibleChapterDone ? 'var(--teal)' : 'white',
-                  borderColor: bibleChapterDone ? 'var(--teal)' : 'var(--border-strong)',
-                }}
-                title={bibleChapterDone ? 'Mark unread' : 'Mark as read'}
-                aria-label={bibleChapterDone ? 'Mark unread' : 'Mark chapter as read'}
-              >
-                {bibleChapterDone && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            </div>
-            {bibleChapterDone && (
-              <div style={s.bibleReadBadge}>✓ Chapter read</div>
-            )}
-          </div>
-        )}
 
         {/* Notes */}
         <div className="card" style={s.notesCard}>
