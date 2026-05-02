@@ -661,6 +661,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const pendingChapterScrollRef = useRef(false)
   const pendingVisibleTargetRef = useRef(null)
   const prependAdjustRef       = useRef(null)
+  /* Timestamp of the last explicit navigation — used to suppress scroll-spy
+     for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
+  const lastNavMsRef           = useRef(0)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
@@ -814,14 +817,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       }))
       saveElementScroll(`scripture-${versionRef.current}`, el)
       saveReaderAnchor(versionRef.current, el)
-      // Keep chapter indicator in sync: find the last heading that has
-      // entered the top half of the reader (switches as soon as the next
-      // chapter heading scrolls past the midpoint — feels immediate).
-      if (!pendingVisibleTargetRef.current) {
+      // Keep chapter indicator in sync.
+      // Skip for ~400 ms after an explicit navigation so we don't flash the wrong chapter
+      // while the reader is programmatically scrolling to the target heading.
+      if (Date.now() - lastNavMsRef.current > 400) {
         const headings = el.querySelectorAll('[data-seg-book]')
         if (headings.length) {
+          // A heading is "current" when it has entered the top 80 % of the reader
+          // (switches as soon as the next chapter heading is clearly in view).
           const elTop  = el.getBoundingClientRect().top
-          const cutoff = el.clientHeight * 0.5
+          const cutoff = el.clientHeight * 0.8
           let current = headings[0]
           for (const h of headings) {
             if (h.getBoundingClientRect().top - elTop < cutoff) current = h
@@ -884,6 +889,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
      Kept separate from book/chapter so updating it never resets segments. */
   const [visBook,    setVisBook]    = useState(book)
   const [visChapter, setVisChapter] = useState(chapter)
+  /* Always-current refs so share/copy functions don't capture stale closure values */
+  const visBookRef    = useRef(book)
+  const visChapterRef = useRef(chapter)
+  visBookRef.current    = visBook
+  visChapterRef.current = visChapter
 
   useEffect(() => {
     try {
@@ -1058,7 +1068,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (b && ch) { setVisBook(b); setVisChapter(ch) }
         }
       },
-      { root, rootMargin: '0px 0px -60% 0px', threshold: 0 }
+      { root, rootMargin: '0px 0px -30% 0px', threshold: 0 }
     )
     root.querySelectorAll('[data-seg-book]').forEach(el => observer.observe(el))
     return () => observer.disconnect()
@@ -1250,6 +1260,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     if (!dataReady) return
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) {
+      lastNavMsRef.current = Date.now()
       pendingVisibleTargetRef.current = { book, chapter }
       setSegments([{ book, chapter, verses: v }])
       setError(null)
@@ -1373,6 +1384,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       ? getGreekChapter(book, chapter)
       : getHebrewChapter(book, chapter)
     if (chData) {
+      lastNavMsRef.current = Date.now()
       pendingVisibleTargetRef.current = { book, chapter }
       setMorphSegments([{ book, chapter, verses: chData }])
       setMorphError(null)
@@ -1737,7 +1749,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
     setShareCard({
       type:     'reading',
-      title:    `${book} ${chapter}`,
+      title:    `${visBookRef.current} ${visChapterRef.current}`,
       subtitle: versMeta?.label || 'King James Version',
       source:   versMeta?.abbreviation || 'KJV',
       text:     shareText,
@@ -1758,7 +1770,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function handleShareSelection() {
     setShareCard({
       type: 'reading',
-      title: `${book} ${chapter}`,
+      title: `${visBookRef.current} ${visChapterRef.current}`,
       subtitle: 'King James Version',
       source: 'KJV',
       text: selection,
@@ -1767,12 +1779,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function handleShareChapter() {
-    const firstSeg = segments[0]
-    if (!firstSeg) return
-    const chText = firstSeg.verses.map(v => `${v.verse} ${v.text}`).join('\n')
+    const vb = visBookRef.current
+    const vc = visChapterRef.current
+    // Find the segment for the currently visible chapter (may differ from segments[0] when
+    // the user has scrolled into a chapter loaded via infinite scroll)
+    const seg = segments.find(s => s.book === vb && s.chapter === vc)
+             || morphSegments.find(s => s.book === vb && s.chapter === vc)
+             || segments[0]
+    if (!seg) return
+    const chText = seg.verses.map(v => `${v.verse} ${v.text ?? v.words?.map(w => w.w).join(' ') ?? ''}`).join('\n')
     setShareCard({
       type: 'reading',
-      title: `${firstSeg.book} ${firstSeg.chapter}`,
+      title: `${seg.book} ${seg.chapter}`,
       subtitle: 'King James Version',
       source: 'KJV',
       text: chText.slice(0, 1200),
@@ -1839,6 +1857,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function navigate(newBook, newChapter) {
     suppressTopPrependRef.current = true
+    lastNavMsRef.current = Date.now()
     pendingVisibleTargetRef.current = { book: newBook, chapter: newChapter }
     // Push to history — include current version so back/forward can restore it
     const current = navHistoryRef.current[histIdx]
@@ -1858,6 +1877,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function goBack() {
     if (histIdx <= 0) return
     suppressTopPrependRef.current = true
+    lastNavMsRef.current = Date.now()
     const newIdx = histIdx - 1
     const entry  = navHistoryRef.current[newIdx]
     pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
@@ -1874,6 +1894,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function goForward() {
     if (histIdx >= navHistoryRef.current.length - 1) return
     suppressTopPrependRef.current = true
+    lastNavMsRef.current = Date.now()
     const newIdx = histIdx + 1
     const entry  = navHistoryRef.current[newIdx]
     pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
