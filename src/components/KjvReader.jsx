@@ -673,6 +673,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const pendingChapterScrollRef = useRef(false)
   const pendingVisibleTargetRef = useRef(null)
   const prependAdjustRef       = useRef(null)
+  const isPrependingRef        = useRef(false)  // cooldown: one chapter at a time
   /* Timestamp of the last explicit navigation — used to suppress scroll-spy
      for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
   const lastNavMsRef           = useRef(0)
@@ -1308,14 +1309,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }, [book, chapter, dataReady, versionData, version])
 
-  /* Keep scroll anchored after a previous chapter is prepended above the viewport */
+  /* Keep scroll anchored after a previous chapter is prepended above the viewport.
+     Double-rAF ensures the browser has fully laid out the new content before we
+     read scrollHeight; clearing isPrependingRef at the end releases the cooldown. */
   useEffect(() => {
     const pending = prependAdjustRef.current
     const el = readerRef.current
     if (!pending || !el) return
     prependAdjustRef.current = null
     requestAnimationFrame(() => {
-      el.scrollTop = pending.scrollTop + (el.scrollHeight - pending.scrollHeight)
+      requestAnimationFrame(() => {
+        el.scrollTop = pending.scrollTop + (el.scrollHeight - pending.scrollHeight)
+        isPrependingRef.current = false
+      })
     })
   }, [segments, morphSegments])
 
@@ -1353,6 +1359,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       ([entry]) => {
         if (!entry.isIntersecting) return
         if (suppressTopPrependRef.current && root.scrollTop < 80) return
+        if (isPrependingRef.current) return   // cooldown: wait for scroll adjustment to finish
         setSegments(prev => {
           if (!prev.length) return prev
           const first = prev[0]
@@ -1362,11 +1369,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (alreadyLoaded) return prev
           const v = getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version)
           if (!v) return prev
+          isPrependingRef.current = true
           prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
           return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: v }, ...prev]
         })
       },
-      { root, rootMargin: '300px 0px 0px 0px' }
+      { root, rootMargin: '100px 0px 0px 0px' }
     )
     obs.observe(topSentinelRef.current)
     return () => obs.disconnect()
@@ -1445,6 +1453,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       ([entry]) => {
         if (!entry.isIntersecting) return
         if (suppressTopPrependRef.current && root.scrollTop < 80) return
+        if (isPrependingRef.current) return   // cooldown
         setMorphSegments(prev => {
           if (!prev.length) return prev
           const first = prev[0]
@@ -1453,11 +1462,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (prev.some(s => s.book === prevChapter.book && s.chapter === prevChapter.chapter)) return prev
           const chData = getChFn(prevChapter.book, prevChapter.chapter)
           if (!chData) return prev
+          isPrependingRef.current = true
           prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
           return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: chData }, ...prev]
         })
       },
-      { root, rootMargin: '300px 0px 0px 0px' }
+      { root, rootMargin: '100px 0px 0px 0px' }
     )
     obs.observe(topSentinelRef.current)
     return () => obs.disconnect()
@@ -3495,6 +3505,7 @@ const r = {
   readerWrap: {
     flex:1, display:'flex', flexDirection:'column', overflowY:'auto',
     background:'var(--parchment)',
+    overflowAnchor: 'none',   // disable browser scroll-anchor; manual rAF adjustment owns this
   },
 
   toolbar: {
