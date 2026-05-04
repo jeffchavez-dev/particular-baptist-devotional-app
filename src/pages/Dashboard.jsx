@@ -102,10 +102,15 @@ export default function Dashboard() {
   const { prefs }    = usePrefs()
   const navigate     = useNavigate()
 
-  /* Use sessionStorage cache so returning to this page doesn't flash a spinner */
-  const _cached = loadDashProgress()
-  const [progress,     setProgress]     = useState(_cached || {})
-  const [loading,      setLoading]      = useState(!_cached)  // only show spinner on truly first visit
+  /* Seed from sessionStorage (fast) or fall back to localStorage (persistent) — never blank */
+  const _cached = loadDashProgress() ?? (() => {
+    const local = getLocalProgress()
+    const map = {}
+    Object.entries(local).forEach(([d, v]) => { map[parseInt(d)] = !!v.completed })
+    return Object.keys(map).length ? map : null
+  })()
+  const [progress, setProgress] = useState(_cached || {})
+  const [loading,  setLoading]  = useState(false)  // no spinner — content renders from cache
   const [search,       setSearch]       = useState('')
   const [filterSrc,    setFilterSrc]    = useState('')
   const [filterStatus, setFilterStatus] = useState(() => {
@@ -143,21 +148,26 @@ export default function Dashboard() {
     saveDashProgress(progress)
   }, [progress])
 
-  /* ── load progress (includes user's personal notes) ── */
+  /* ── Background sync: render cached progress immediately, update from Supabase quietly ── */
   useEffect(() => {
     if (session) {
       supabase.from('progress').select('day_number, completed, notes').eq('user_id', session.user.id)
         .then(({ data }) => {
+          if (!data) return
           const map = {}
           const notes = []
-          data?.forEach(r => {
+          data.forEach(r => {
             map[r.day_number] = r.completed
             if (r.notes && r.notes.trim()) notes.push({ day_number: r.day_number, notes: r.notes })
           })
           setProgress(map)
           setUserNotes(notes)
-          setLoading(false)
+          // Mirror back to localStorage so offline / next cold-start reads are current
+          const lp = {}
+          data.forEach(r => { if (r.completed || r.notes) lp[r.day_number] = { completed: r.completed, notes: r.notes || '' } })
+          try { localStorage.setItem('devotional_guest_progress', JSON.stringify(lp)) } catch {}
         })
+        .catch(() => {}) // silently stay offline-friendly
     } else {
       const local = getLocalProgress()
       const map = {}
@@ -168,7 +178,6 @@ export default function Dashboard() {
       })
       setProgress(map)
       setUserNotes(notes)
-      setLoading(false)
     }
   }, [session])
 
@@ -286,15 +295,6 @@ export default function Dashboard() {
     }
     return null
   }, [todayEntry])
-
-  if (loading) {
-    return (
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',flexDirection:'column',gap:12}}>
-        <div className="spinner" />
-        <p style={{color:'var(--ink-muted)',fontSize:14}}>Loading your progress…</p>
-      </div>
-    )
-  }
 
   return (
     <div style={s.page}>

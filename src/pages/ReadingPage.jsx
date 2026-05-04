@@ -469,10 +469,10 @@ export default function ReadingPage() {
   const next  = SCHEDULE.find(r => r.day === day + 1)
   const content = getContent(entry)
 
-  const [completed, setCompleted] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [savedNotes, setSavedNotes] = useState('')
-  const [loading, setLoading] = useState(true)
+  // ── Initialise immediately from localStorage so the page renders without a spinner ──
+  const [completed, setCompleted] = useState(() => !!getLocalProgress()[day]?.completed)
+  const [notes,     setNotes]     = useState(() => getLocalProgress()[day]?.notes || '')
+  const [savedNotes, setSavedNotes] = useState(() => getLocalProgress()[day]?.notes || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [shareCard, setShareCard] = useState(null)
@@ -527,35 +527,24 @@ export default function ReadingPage() {
     return () => window.removeEventListener('scroll', handler)
   }, [])
 
+  /* ── Background sync: local data renders immediately; Supabase updates silently ── */
   useEffect(() => {
-    if (!entry) return
-    if (session) {
-      async function load() {
-        setLoading(true)
-        const { data } = await supabase
-          .from('progress')
-          .select('completed, notes')
-          .eq('user_id', session.user.id)
-          .eq('day_number', day)
-          .single()
-        if (data) {
-          setCompleted(!!data.completed)
-          setNotes(data.notes || '')
-          setSavedNotes(data.notes || '')
-        } else {
-          setCompleted(false); setNotes(''); setSavedNotes('')
-        }
-        setLoading(false)
-      }
-      load()
-    } else {
-      const local = getLocalProgress()
-      const d = local[day] || {}
-      setCompleted(!!d.completed)
-      setNotes(d.notes || '')
-      setSavedNotes(d.notes || '')
-      setLoading(false)
-    }
+    if (!entry || !session) return
+    supabase
+      .from('progress')
+      .select('completed, notes')
+      .eq('user_id', session.user.id)
+      .eq('day_number', day)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        setCompleted(!!data.completed)
+        setNotes(data.notes || '')
+        setSavedNotes(data.notes || '')
+        // Keep localStorage in sync so next visit is instant
+        setLocalProgress(day, { completed: !!data.completed, notes: data.notes || '' })
+      })
+      .catch(() => {}) // stay offline-friendly: silently ignore network errors
   }, [day, session])
 
   async function toggleComplete() {
@@ -566,16 +555,16 @@ export default function ReadingPage() {
       setBibleChapter(bibleChapter, true, session?.user?.id)
       setBibleChapterDone(true)
     }
+    // Always write to localStorage so the next visit is instant / works offline
+    setLocalProgress(day, { completed: newVal, notes })
     if (session) {
-      await supabase.from('progress').upsert({
+      supabase.from('progress').upsert({
         user_id: session.user.id,
         day_number: day,
         completed: newVal,
         notes,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,day_number' })
-    } else {
-      setLocalProgress(day, { completed: newVal, notes })
+      }, { onConflict: 'user_id,day_number' }).catch(() => {})
     }
   }
 
@@ -593,16 +582,16 @@ export default function ReadingPage() {
 
   async function saveNotes() {
     setSaving(true)
+    // Always write locally first — instant and works offline
+    setLocalProgress(day, { completed, notes })
     if (session) {
-      await supabase.from('progress').upsert({
+      supabase.from('progress').upsert({
         user_id: session.user.id,
         day_number: day,
         completed,
         notes,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,day_number' })
-    } else {
-      setLocalProgress(day, { completed, notes })
+      }, { onConflict: 'user_id,day_number' }).catch(() => {})
     }
     setSavedNotes(notes)
     setSaving(false)
@@ -612,14 +601,6 @@ export default function ReadingPage() {
 
   if (!entry) {
     return <div style={{padding:'3rem',textAlign:'center'}}>Day not found. <button onClick={()=>navigate('/')} className="btn btn-ghost">Go home</button></div>
-  }
-
-  if (loading) {
-    return (
-      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}>
-        <div className="spinner" />
-      </div>
-    )
   }
 
   const hasUnsaved = notes !== savedNotes
