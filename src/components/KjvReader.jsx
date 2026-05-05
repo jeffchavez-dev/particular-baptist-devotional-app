@@ -2167,57 +2167,70 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   /** Renders the author-editable verse description below a verse row */
-  function renderScriptureVerseDesc(segBook, segChapter, verse) {
-    const vKey     = `${segBook}:${segChapter}:${verse}`
-    const existing = scriptureVerseDescs[vKey]
+  /**
+   * Renders an author-editable section heading ABOVE a verse.
+   * Marks the start of a new passage section (e.g. "The Greeting", "Warning against False Teachers").
+   * Stored in author_chapter_descs with chapter_key = 'Book:ch:v'.
+   */
+  function renderScriptureSectionHeading(segBook, segChapter, verse) {
+    const vKey      = `${segBook}:${segChapter}:${verse}`
+    const existing  = scriptureVerseDescs[vKey]
     const isEditing = editingVerseDesc === vKey
     if (!canEdit && !existing) return null
     return (
-      <div style={{ borderLeft: '2px solid var(--teal)', marginLeft: 4, paddingLeft: 8, marginTop: 4, marginBottom: 4 }}
-           onClick={e => e.stopPropagation()}>
+      <div style={{ marginTop: 20, marginBottom: 6 }} onClick={e => e.stopPropagation()}>
         {!isEditing && existing && (
-          <p style={{
-            margin: 0,
-            fontSize: 12.5,
-            fontStyle: 'italic',
-            color: 'var(--ink-muted)',
-            lineHeight: 1.55,
-            fontFamily: "'Lora', Georgia, serif",
-          }}>
-            {existing.description}
+          <div style={{ display:'flex', alignItems:'center', gap: 6 }}>
+            {/* Left rule */}
+            <span style={{ flex: 1, height: 1, background: 'var(--border, rgba(0,0,0,0.12))' }} />
+            <span style={{
+              fontSize: 11.5,
+              fontWeight: 700,
+              fontStyle: 'italic',
+              letterSpacing: '0.03em',
+              color: 'var(--ink-muted)',
+              fontFamily: "'Lora', Georgia, serif",
+              whiteSpace: 'nowrap',
+            }}>
+              {existing.description}
+            </span>
+            {/* Right rule */}
+            <span style={{ flex: 1, height: 1, background: 'var(--border, rgba(0,0,0,0.12))' }} />
             {canEdit && (
               <button
-                style={{ background:'none', border:'none', cursor:'pointer', marginLeft:5, padding:'1px 3px',
-                         color:'var(--teal)', fontSize:10, verticalAlign:'middle' }}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:'1px 3px',
+                         color:'var(--teal)', fontSize:10, flexShrink: 0 }}
                 onClick={e => { e.stopPropagation(); setEditingVerseDesc(vKey); setVerseDescDraft(existing.description) }}
-                title="Edit verse description">
+                title="Edit section heading">
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
                   <path d="M1.5 8.5l.4-1.6L6 2.5l1.5 1.5L3.1 8.5H1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                   <line x1="5.5" y1="3" x2="7" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
                 </svg>
               </button>
             )}
-          </p>
+          </div>
         )}
         {canEdit && !existing && !isEditing && (
           <button
-            style={{ background:'none', border:'1px dashed var(--teal)', borderRadius:4, cursor:'pointer',
-                     padding:'1px 7px', color:'var(--teal)', fontSize:10, fontFamily:"'DM Sans',sans-serif" }}
+            style={{ background:'none', border:'1px dashed var(--border, rgba(0,0,0,0.2))', borderRadius:4,
+                     cursor:'pointer', padding:'1px 8px', color:'var(--ink-faint)', fontSize:10,
+                     fontFamily:"'DM Sans',sans-serif", display:'block', width:'100%', textAlign:'center' }}
             onClick={e => { e.stopPropagation(); setEditingVerseDesc(vKey); setVerseDescDraft('') }}
-          >+ verse description</button>
+          >+ section heading before v{verse}</button>
         )}
         {canEdit && isEditing && (
-          <div>
-            <textarea
+          <div style={{ border:'1px solid var(--teal)', borderRadius:6, padding:'6px 8px', background:'var(--bg)' }}>
+            <input
               value={verseDescDraft}
               onChange={e => setVerseDescDraft(e.target.value)}
-              placeholder={`Description for ${segBook} ${segChapter}:${verse}…`}
-              style={{ width:'100%', minHeight:52, fontSize:12.5, padding:5, borderRadius:4,
-                       border:'1px solid var(--teal)', resize:'vertical', fontFamily:"'Lora', Georgia, serif",
-                       background:'var(--bg)', color:'var(--ink)', boxSizing:'border-box' }}
-              autoFocus rows={2}
+              onKeyDown={e => { if (e.key === 'Enter') saveScriptureVerseDesc(vKey); if (e.key === 'Escape') { setEditingVerseDesc(null); setVerseDescDraft('') } }}
+              placeholder={`Section heading before v${verse}…`}
+              style={{ width:'100%', fontSize:12.5, padding:'3px 4px', border:'none', outline:'none',
+                       fontFamily:"'Lora', Georgia, serif", fontStyle:'italic', fontWeight:600,
+                       background:'transparent', color:'var(--ink)', boxSizing:'border-box' }}
+              autoFocus
             />
-            <div style={{ display:'flex', gap:6, marginTop:3 }}>
+            <div style={{ display:'flex', gap:6, marginTop:4 }}>
               <button
                 style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'var(--teal)',
                          color:'#fff', border:'none', cursor:'pointer' }}
@@ -2483,8 +2496,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             const isWordVerse = selectedWord?.verseKey === verseKey
 
                             return (
+                              <React.Fragment key={verse}>
+                                {renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
                               <div
-                                key={verse}
                                 id={verseId(seg.book, seg.chapter, verse)}
                                 data-anchor-book={seg.book}
                                 data-anchor-chapter={seg.chapter}
@@ -2647,9 +2661,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   </div>
                                 )}
 
-                                {/* ── Scripture verse description (morph mode) ── */}
-                                {renderScriptureVerseDesc(seg.book, seg.chapter, verse)}
-
                                 {/* ── Confession cross-refs (morph mode) ── */}
                                 {studyMode && (() => {
                                   const verseRefs = getCrossRefs(seg.book, seg.chapter, verse)
@@ -2808,6 +2819,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   )
                                 })()}
                               </div>
+                              </React.Fragment>
                             )
                           })}
                         </div>
@@ -2897,8 +2909,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const isLxxWordVerse = lxxReaderWord?.verseKey === verseKey
 
                         return (
+                          <React.Fragment key={verse}>
+                            {renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
                           <div
-                            key={verse}
                             id={verseId(seg.book, seg.chapter, verse)}
                             data-anchor-book={seg.book}
                             data-anchor-chapter={seg.chapter}
@@ -3024,9 +3037,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 </div>
                               )
                             })()}
-
-                            {/* ── Scripture verse description ── */}
-                            {renderScriptureVerseDesc(seg.book, seg.chapter, verse)}
 
                             {/* ── Parallel original-language section ── */}
                             {parallelMode && (() => {
@@ -3478,6 +3488,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               )
                             })()}
                           </div>
+                          </React.Fragment>
                         )
                       })}
                     </div>
