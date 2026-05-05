@@ -84,7 +84,8 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/001_verse_c_modified_KEEP.csv\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/book_Rahlfs.csv\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/eliranwong/LXX-Rahlfs-1935/master/08_versification/book_maps.csv\")",
-      "Bash(curl -s \"https://api.github.com/repos/eliranwong/LXX-Rahlfs-1935/contents/01_wordlist_unicode\")"
+      "Bash(curl -s \"https://api.github.com/repos/eliranwong/LXX-Rahlfs-1935/contents/01_wordlist_unicode\")",
+      "Bash(node scripts/seed-2john-xrefs.mjs \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJobmZ1Z2tuaHdodXF4c3FvcGdqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjcwNTc3NCwiZXhwIjoyMDkyMjgxNzc0fQ.E635g82VvO4Nl8GaqUJqusPsIeqkYEMVFkw9iin6kQM\")"
     ]
   }
 }

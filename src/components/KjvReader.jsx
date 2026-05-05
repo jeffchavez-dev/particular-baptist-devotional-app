@@ -622,8 +622,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [dataReady,     setDataReady]     = useState(false)
   const [error,         setError]         = useState(null)
   const [sideOpen,      setSideOpen]      = useState(false)
-  const sentinelRef     = useRef(null)
-  const topSentinelRef  = useRef(null)
 
   /* Refs so imperative handle methods always see the latest values without recreating the handle */
   const versionDataRef = useRef(null)
@@ -668,16 +666,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [selection, setSelection] = useState('')
   const verseListRef = useRef(null)
   const readerRef    = useRef(null)
-  const restoreReaderScrollRef = useRef(true)
-  const skipNextTopScrollRef   = useRef(false)
-  const suppressTopPrependRef  = useRef(true)
-  const pendingChapterScrollRef = useRef(false)
+  const restoreReaderScrollRef  = useRef(true)
   const pendingVisibleTargetRef = useRef(null)
-  const prependAdjustRef       = useRef(null)
-  const isPrependingRef        = useRef(false)  // cooldown: one chapter at a time
   /* Timestamp of the last explicit navigation — used to suppress scroll-spy
      for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
-  const lastNavMsRef           = useRef(0)
+  const lastNavMsRef            = useRef(0)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
@@ -834,7 +827,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     let lastY = 0
     const handler = () => {
       const y = el.scrollTop
-      if (y > 80) suppressTopPrependRef.current = false
       const delta = y - lastY
       if (Math.abs(delta) < 8) return
       lastY = y
@@ -910,6 +902,44 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       el.removeEventListener('touchend',   onTouchEnd)
     }
   }, []) // eslint-disable-line
+
+  /* ── Swipe left/right to navigate chapters ── */
+  useEffect(() => {
+    const el = readerRef.current
+    if (!el) return
+    let startX = 0, startY = 0, tracking = false
+
+    function onTouchStart(e) {
+      if (e.touches.length !== 1) { tracking = false; return }
+      startX   = e.touches[0].clientX
+      startY   = e.touches[0].clientY
+      tracking = true
+    }
+    function onTouchEnd(e) {
+      if (!tracking || e.changedTouches.length !== 1) { tracking = false; return }
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      tracking = false
+      if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.65) return
+      const allowed = version === 'greek' ? NT_BOOKS
+        : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
+        : null
+      if (dx < 0) {
+        const next = getNextChapter(book, chapter)
+        if (next && (!allowed || allowed.has(next.book))) navigate(next.book, next.chapter)
+      } else {
+        const prev = getPrevChapter(book, chapter)
+        if (prev && (!allowed || allowed.has(prev.book))) navigate(prev.book, prev.chapter)
+      }
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [book, chapter, version]) // eslint-disable-line
 
   /* Visible book/chapter — updated by explicit navigation AND by scroll-spy.
      Kept separate from book/chapter so updating it never resets segments. */
@@ -1310,7 +1340,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     return () => { cancelled = true }
   }, [version]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Chapter navigation — reset to single segment, scroll to top */
+  /* Chapter navigation — load single segment, restore or reset scroll */
   useEffect(() => {
     if (!dataReady) return
     const v = getChapterVerses(versionData, book, chapter, version)
@@ -1319,124 +1349,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       pendingVisibleTargetRef.current = { book, chapter }
       setSegments([{ book, chapter, verses: v }])
       setError(null)
-    }
-    else    { setError('Chapter not found') }
+    } else { setError('Chapter not found') }
     if (readerRef.current) {
       if (restoreReaderScrollRef.current) {
         restoreReaderScrollRef.current = false
         if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
-        setTimeout(() => {
-          const pending = pendingVisibleTargetRef.current
-          if (pending?.book === book && pending?.chapter === chapter) {
-            pendingVisibleTargetRef.current = null
-          }
-        }, 350)
-      } else if (skipNextTopScrollRef.current) {
-        skipNextTopScrollRef.current = false
       } else {
-        pendingChapterScrollRef.current = true
+        readerRef.current.scrollTop = 0
       }
     }
   }, [book, chapter, dataReady, versionData, version])
 
-  /* Keep scroll anchored after a previous chapter is prepended above the viewport.
-     Double-rAF ensures the browser has fully laid out the new content before we
-     read scrollHeight; clearing isPrependingRef at the end releases the cooldown. */
-  useEffect(() => {
-    const pending = prependAdjustRef.current
-    const el = readerRef.current
-    if (!pending || !el) return
-    prependAdjustRef.current = null
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        el.scrollTop = pending.scrollTop + (el.scrollHeight - pending.scrollHeight)
-        isPrependingRef.current = false
-      })
-    })
-  }, [segments, morphSegments])
-
-  useEffect(() => {
-    if (!pendingChapterScrollRef.current) return
-    const root = readerRef.current
-    if (!root) return
-    pendingChapterScrollRef.current = false
-    requestAnimationFrame(() => {
-      const selector = `[data-seg-book="${CSS.escape(book)}"][data-seg-chapter="${chapter}"]`
-      const el = root.querySelector(selector)
-      if (!el) {
-        root.scrollTop = 0
-        return
-      }
-      const rootTop = root.getBoundingClientRect().top
-      const rect = el.getBoundingClientRect()
-      root.scrollTop += rect.top - rootTop
-      setVisBook(book)
-      setVisChapter(chapter)
-      setTimeout(() => {
-        const pending = pendingVisibleTargetRef.current
-        if (pending?.book === book && pending?.chapter === chapter) {
-          pendingVisibleTargetRef.current = null
-        }
-      }, 250)
-    })
-  }, [segments, morphSegments, book, chapter])
-
-  /* Prepend previous chapter when the top sentinel becomes visible */
-  useEffect(() => {
-    const root = readerRef.current
-    if (!dataReady || !root || !topSentinelRef.current) return
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return
-        if (suppressTopPrependRef.current && root.scrollTop < 80) return
-        if (isPrependingRef.current) return   // cooldown: wait for scroll adjustment to finish
-        setSegments(prev => {
-          if (!prev.length) return prev
-          const first = prev[0]
-          const prevChapter = getPrevChapter(first.book, first.chapter)
-          if (!prevChapter) return prev
-          const alreadyLoaded = prev.some(s => s.book === prevChapter.book && s.chapter === prevChapter.chapter)
-          if (alreadyLoaded) return prev
-          const v = getChapterVerses(versionData, prevChapter.book, prevChapter.chapter, version)
-          if (!v) return prev
-          isPrependingRef.current = true
-          prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
-          return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: v }, ...prev]
-        })
-      },
-      { root, rootMargin: '100px 0px 0px 0px' }
-    )
-    obs.observe(topSentinelRef.current)
-    return () => obs.disconnect()
-  }, [dataReady, segments, versionData, version])
-
-  /* Append next chapter when sentinel becomes visible */
-  useEffect(() => {
-    const root = readerRef.current
-    if (!dataReady || !root || !sentinelRef.current) return
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return
-        setSegments(prev => {
-          if (!prev.length) return prev
-          const last = prev[prev.length - 1]
-          const next = getNextChapter(last.book, last.chapter)
-          if (!next) return prev
-          // Avoid double-loading
-          const alreadyLoaded = prev.some(s => s.book === next.book && s.chapter === next.chapter)
-          if (alreadyLoaded) return prev
-          const v = getChapterVerses(versionData, next.book, next.chapter, version)
-          if (!v) return prev
-          return [...prev, { book: next.book, chapter: next.chapter, verses: v }]
-        })
-      },
-      { root, rootMargin: '0px 0px 300px 0px' }
-    )
-    obs.observe(sentinelRef.current)
-    return () => obs.disconnect()
-  }, [dataReady, segments, versionData, version])
 
   /* Load a morph chapter whenever book / chapter changes in Greek or Hebrew mode */
   useEffect(() => {
@@ -1459,78 +1384,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
-        setTimeout(() => {
-          const pending = pendingVisibleTargetRef.current
-          if (pending?.book === book && pending?.chapter === chapter) {
-            pendingVisibleTargetRef.current = null
-          }
-        }, 350)
-      } else if (skipNextTopScrollRef.current) {
-        skipNextTopScrollRef.current = false
       } else {
-        pendingChapterScrollRef.current = true
+        readerRef.current.scrollTop = 0
       }
     }
     setSelectedWord(null)
   }, [book, chapter, version, morphReady]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* Morph infinite-scroll - prepend previous chapter when top sentinel is visible */
-  useEffect(() => {
-    const isMorph = version === 'greek' || version === 'hebrew'
-    const root = readerRef.current
-    if (!isMorph || !morphReady || !root || !topSentinelRef.current) return
-    const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
-    const getChFn     = version === 'greek' ? getGreekChapter : getHebrewChapter
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return
-        if (suppressTopPrependRef.current && root.scrollTop < 80) return
-        if (isPrependingRef.current) return   // cooldown
-        setMorphSegments(prev => {
-          if (!prev.length) return prev
-          const first = prev[0]
-          const prevChapter = getPrevChapter(first.book, first.chapter)
-          if (!prevChapter || !allowedBooks.has(prevChapter.book)) return prev
-          if (prev.some(s => s.book === prevChapter.book && s.chapter === prevChapter.chapter)) return prev
-          const chData = getChFn(prevChapter.book, prevChapter.chapter)
-          if (!chData) return prev
-          isPrependingRef.current = true
-          prependAdjustRef.current = { scrollTop: root.scrollTop, scrollHeight: root.scrollHeight }
-          return [{ book: prevChapter.book, chapter: prevChapter.chapter, verses: chData }, ...prev]
-        })
-      },
-      { root, rootMargin: '100px 0px 0px 0px' }
-    )
-    obs.observe(topSentinelRef.current)
-    return () => obs.disconnect()
-  }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* Morph infinite-scroll — append next chapter when sentinel becomes visible */
-  useEffect(() => {
-    const isMorph = version === 'greek' || version === 'hebrew'
-    const root = readerRef.current
-    if (!isMorph || !morphReady || !root || !sentinelRef.current) return
-    const allowedBooks = version === 'greek' ? NT_BOOKS : OT_BOOKS
-    const getChFn     = version === 'greek' ? getGreekChapter : getHebrewChapter
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return
-        setMorphSegments(prev => {
-          if (!prev.length) return prev
-          const last = prev[prev.length - 1]
-          const next = getNextChapter(last.book, last.chapter)
-          if (!next || !allowedBooks.has(next.book)) return prev
-          if (prev.some(s => s.book === next.book && s.chapter === next.chapter)) return prev
-          const chData = getChFn(next.book, next.chapter)
-          if (!chData) return prev
-          return [...prev, { book: next.book, chapter: next.chapter, verses: chData }]
-        })
-      },
-      { root, rootMargin: '0px 0px 300px 0px' }
-    )
-    obs.observe(sentinelRef.current)
-    return () => obs.disconnect()
-  }, [version, morphReady, morphSegments]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Auto-select the matched word after navigating from lexicon scripture results (morph mode) */
   useEffect(() => {
@@ -2023,7 +1882,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function navigate(newBook, newChapter) {
-    suppressTopPrependRef.current = true
+
     lastNavMsRef.current = Date.now()
     pendingVisibleTargetRef.current = { book: newBook, chapter: newChapter }
     // Push to history — include current version so back/forward can restore it
@@ -2043,7 +1902,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function goBack() {
     if (histIdx <= 0) return
-    suppressTopPrependRef.current = true
+
     lastNavMsRef.current = Date.now()
     const newIdx = histIdx - 1
     const entry  = navHistoryRef.current[newIdx]
@@ -2060,7 +1919,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function goForward() {
     if (histIdx >= navHistoryRef.current.length - 1) return
-    suppressTopPrependRef.current = true
+
     lastNavMsRef.current = Date.now()
     const newIdx = histIdx + 1
     const entry  = navHistoryRef.current[newIdx]
@@ -2350,11 +2209,47 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         />
       </aside>
 
+      {/* ── Fixed chapter navigation arrows ── */}
+      {(() => {
+        const allowed = version === 'greek' ? NT_BOOKS
+          : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
+          : null
+        const prevCh = getPrevChapter(book, chapter)
+        const nextCh = getNextChapter(book, chapter)
+        const hasPrev = !!prevCh && (!allowed || allowed.has(prevCh.book))
+        const hasNext = !!nextCh && (!allowed || allowed.has(nextCh.book))
+        // On desktop the sidebar is 220px wide; leave room for it on the left
+        const leftOffset = isMobile ? 6 : 228
+        return (
+          <>
+            <button
+              style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev ? 1 : 0, pointerEvents: hasPrev ? 'auto' : 'none' }}
+              onClick={() => hasPrev && navigate(prevCh.book, prevCh.chapter)}
+              title={hasPrev ? `${prevCh.book} ${prevCh.chapter}` : ''}
+              aria-label="Previous chapter"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M8.5 2L4.5 6.5l4 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button
+              style={{ ...r.chNavArrow, right: 6, opacity: hasNext ? 1 : 0, pointerEvents: hasNext ? 'auto' : 'none' }}
+              onClick={() => hasNext && navigate(nextCh.book, nextCh.chapter)}
+              title={hasNext ? `${nextCh.book} ${nextCh.chapter}` : ''}
+              aria-label="Next chapter"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M4.5 2l4 4.5-4 4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </>
+        )
+      })()}
+
       {/* Reader panel */}
       <div style={r.readerWrap} ref={readerRef}>
 
         <div style={r.content}>
-          <div ref={topSentinelRef} style={{ height: 1 }} />
           {/* ── Search status bar (text versions only) ── */}
           {version !== 'greek' && version !== 'hebrew' && searchQuery.trim() && (
             <div style={r.searchStatusBar}>
@@ -2827,7 +2722,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     ))}
 
                     {/* Sentinel for morph infinite scroll */}
-                    {!morphLoading && <div ref={sentinelRef} style={{ height:40 }} />}
                   </div>
                 </>
               )}
@@ -3534,8 +3428,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   </div>
                 ))}
 
-                {/* Sentinel — IntersectionObserver triggers next chapter load here */}
-                {!loading && !bibleResults && <div ref={sentinelRef} style={{ height:40 }} />}
               </div>
             </>
           )}
@@ -3936,6 +3828,21 @@ const r = {
     flex:1, display:'flex', flexDirection:'column', overflowY:'auto',
     background:'var(--parchment)',
     overflowAnchor: 'none',   // disable browser scroll-anchor; manual rAF adjustment owns this
+  },
+
+  chNavArrow: {
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    zIndex: 120,
+    width: 34, height: 34, borderRadius: '50%',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,0.82)',
+    border: '1px solid rgba(0,0,0,0.10)',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.13)',
+    backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+    cursor: 'pointer', color: 'var(--ink)',
+    transition: 'opacity 0.2s, background 0.15s',
+    fontFamily: "'DM Sans',sans-serif",
+    WebkitTapHighlightColor: 'transparent',
   },
 
   toolbar: {

@@ -147,6 +147,242 @@ const ALL_BOOKS = [
     { verse: 15, tgt_book: 'John',           tgt_chapter: 10, tgt_verse: 3 },
   ]},
 
+
+  // ── Zephaniah 1 ─────────────────────────────────────────────────────────────
+  { src_book: 'Zephaniah', src_chapter: 1, xrefs: [
+    // Verse 1
+    { verse: 1, tgt_book: 'Jeremiah',       tgt_chapter: 1,  tgt_verse: 2 },
+    { verse: 1, tgt_book: '2 Kings',        tgt_chapter: 22, tgt_verse: 1 },
+    // Verse 2
+    { verse: 2, tgt_book: 'Jeremiah',       tgt_chapter: 8,  tgt_verse: 13 },
+    { verse: 2, tgt_book: '2 Kings',        tgt_chapter: 22, tgt_verse: 16 },
+    { verse: 2, tgt_book: '2 Kings',        tgt_chapter: 22, tgt_verse: 17 },
+    // Verse 3
+    { verse: 3, tgt_book: 'Hosea',          tgt_chapter: 4,  tgt_verse: 3 },
+    { verse: 3, tgt_book: 'Ezekiel',        tgt_chapter: 7,  tgt_verse: 19 },
+    { verse: 3, tgt_book: 'Ezekiel',        tgt_chapter: 14, tgt_verse: 17 },
+    // Verse 4
+    { verse: 4, tgt_book: '2 Kings',        tgt_chapter: 23, tgt_verse: 4 },
+    // Verse 5
+    { verse: 5, tgt_book: 'Jeremiah',       tgt_chapter: 19, tgt_verse: 13 },
+    { verse: 5, tgt_book: '1 Kings',        tgt_chapter: 18, tgt_verse: 21 },
+    { verse: 5, tgt_book: '2 Kings',        tgt_chapter: 17, tgt_verse: 33 },
+    { verse: 5, tgt_book: '2 Kings',        tgt_chapter: 17, tgt_verse: 41 },
+    { verse: 5, tgt_book: '1 Kings',        tgt_chapter: 11, tgt_verse: 5 },
+    { verse: 5, tgt_book: '1 Kings',        tgt_chapter: 11, tgt_verse: 33 },
+    // Verse 6
+    { verse: 6, tgt_book: 'Jeremiah',       tgt_chapter: 2,  tgt_verse: 13 },
+    { verse: 6, tgt_book: 'Jeremiah',       tgt_chapter: 2,  tgt_verse: 17 },
+    { verse: 6, tgt_book: 'Jeremiah',       tgt_chapter: 15, tgt_verse: 6 },
+    { verse: 6, tgt_book: 'Jeremiah',       tgt_chapter: 5,  tgt_verse: 24 },
+    { verse: 6, tgt_book: 'Hebrews',        tgt_chapter: 11, tgt_verse: 6 },
+    // Verse 7
+    { verse: 7, tgt_book: 'Habakkuk',       tgt_chapter: 2,  tgt_verse: 20 },
+    { verse: 7, tgt_book: 'Joel',           tgt_chapter: 1,  tgt_verse: 15 },
+    { verse: 7, tgt_book: 'Isaiah',         tgt_chapter: 34, tgt_verse: 6 },
+    { verse: 7, tgt_book: 'Jeremiah',       tgt_chapter: 46, tgt_verse: 10 },
+    { verse: 7, tgt_book: 'Ezekiel',        tgt_chapter: 39, tgt_verse: 17 },
+    { verse: 7, tgt_book: 'Ezekiel',        tgt_chapter: 39, tgt_verse: 19 },
+    { verse: 7, tgt_book: '1 Samuel',       tgt_chapter: 16, tgt_verse: 5 },
+    // Verse 8
+    { verse: 8, tgt_book: '2 Kings',        tgt_chapter: 24, tgt_verse: 12 },
+    { verse: 8, tgt_book: '2 Kings',        tgt_chapter: 24, tgt_verse: 14 },
+    { verse: 8, tgt_book: '2 Kings',        tgt_chapter: 25, tgt_verse: 7 },
+    { verse: 8, tgt_book: 'Matthew',        tgt_chapter: 22, tgt_verse: 11 },
+    // Verse 9
+    { verse: 9, tgt_book: '1 Samuel',       tgt_chapter: 5,  tgt_verse: 5 },
+    // Verse 10
+    { verse: 10, tgt_book: '2 Chronicles',  tgt_chapter: 33, tgt_verse: 14 },
+    { verse: 10, tgt_book: 'Zechariah',     tgt_chapter: 11, tgt_verse: 3 },
+    { verse: 10, tgt_book: '2 Kings',       tgt_chapter: 22, tgt_verse: 14 },
+    // Verse 11
+    { verse: 11, tgt_book: 'Zechariah',     tgt_chapter: 11, tgt_verse: 2 },
+    { verse: 11, tgt_book: 'James',         tgt_chapter: 5,  tgt_verse: 1 },
+    // Verse 12
+    { verse: 12, tgt_book: 'Amos',          tgt_chapter: 9,  tgt_verse: 3 },
+    { verse: 12, tgt_book: 'Jeremiah',      tgt_chapter: 48, tgt_verse: 11 },
+    { verse: 12, tgt_book: 'Amos',          tgt_chapter: 6,  tgt_verse: 1 },
+    { verse: 12, tgt_book: 'Psalms',        tgt_chapter: 94, tgt_verse: 7 },
+    { verse: 12, tgt_book: 'Ezekiel',       tgt_chapter: 8,  tgt_verse: 12 },
+    { verse: 12, tgt_book: 'Malachi',       tgt_chapter: 2,  tgt_verse: 17 },
+    { verse: 12, tgt_book: 'Malachi',       tgt_chapter: 3,  tgt_verse: 14 },
+    { verse: 12, tgt_book: 'Malachi',       tgt_chapter: 3,  tgt_verse: 15 },
+    // Verse 13
+    { verse: 13, tgt_book: 'Isaiah',        tgt_chapter: 42, tgt_verse: 22 },
+    { verse: 13, tgt_book: 'Amos',          tgt_chapter: 5,  tgt_verse: 11 },
+    { verse: 13, tgt_book: 'Micah',         tgt_chapter: 6,  tgt_verse: 15 },
+    // Verse 14
+    { verse: 14, tgt_book: 'Ezekiel',       tgt_chapter: 7,  tgt_verse: 7 },
+    { verse: 14, tgt_book: 'Ezekiel',       tgt_chapter: 7,  tgt_verse: 12 },
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 33, tgt_verse: 7 },
+    // Verse 15
+    { verse: 15, tgt_book: 'Joel',          tgt_chapter: 1,  tgt_verse: 15 },
+    { verse: 15, tgt_book: 'Job',           tgt_chapter: 30, tgt_verse: 3 },
+    { verse: 15, tgt_book: 'Joel',          tgt_chapter: 2,  tgt_verse: 2 },
+    // Verse 16
+    { verse: 16, tgt_book: 'Jeremiah',      tgt_chapter: 4,  tgt_verse: 19 },
+    { verse: 16, tgt_book: 'Isaiah',        tgt_chapter: 2,  tgt_verse: 15 },
+    // Verse 17
+    { verse: 17, tgt_book: 'Jeremiah',      tgt_chapter: 10, tgt_verse: 18 },
+    { verse: 17, tgt_book: 'Deuteronomy',   tgt_chapter: 28, tgt_verse: 29 },
+    { verse: 17, tgt_book: 'Isaiah',        tgt_chapter: 59, tgt_verse: 10 },
+    { verse: 17, tgt_book: 'Psalms',        tgt_chapter: 79, tgt_verse: 3 },
+    { verse: 17, tgt_book: 'Psalms',        tgt_chapter: 83, tgt_verse: 10 },
+    // Verse 18
+    { verse: 18, tgt_book: 'Ezekiel',       tgt_chapter: 7,  tgt_verse: 19 },
+    { verse: 18, tgt_book: 'Proverbs',      tgt_chapter: 11, tgt_verse: 4 },
+    { verse: 18, tgt_book: 'Ezekiel',       tgt_chapter: 36, tgt_verse: 5 },
+  ]},
+
+  // ── Zephaniah 2 ─────────────────────────────────────────────────────────────
+  { src_book: 'Zephaniah', src_chapter: 2, xrefs: [
+    // Verse 1
+    { verse: 1, tgt_book: 'Jeremiah',       tgt_chapter: 6,  tgt_verse: 15 },
+    // Verse 2
+    { verse: 2, tgt_book: 'Psalms',         tgt_chapter: 1,  tgt_verse: 4 },
+    { verse: 2, tgt_book: '2 Kings',        tgt_chapter: 23, tgt_verse: 26 },
+    // Verse 3
+    { verse: 3, tgt_book: 'Amos',           tgt_chapter: 5,  tgt_verse: 6 },
+    { verse: 3, tgt_book: 'Psalms',         tgt_chapter: 76, tgt_verse: 9 },
+    { verse: 3, tgt_book: 'Isaiah',         tgt_chapter: 11, tgt_verse: 4 },
+    { verse: 3, tgt_book: 'Amos',           tgt_chapter: 5,  tgt_verse: 14 },
+    { verse: 3, tgt_book: 'Amos',           tgt_chapter: 5,  tgt_verse: 15 },
+    { verse: 3, tgt_book: 'Isaiah',         tgt_chapter: 2,  tgt_verse: 10 },
+    { verse: 3, tgt_book: 'Isaiah',         tgt_chapter: 26, tgt_verse: 20 },
+    { verse: 3, tgt_book: 'Isaiah',         tgt_chapter: 26, tgt_verse: 21 },
+    // Verse 4
+    { verse: 4, tgt_book: 'Zechariah',      tgt_chapter: 9,  tgt_verse: 5 },
+    { verse: 4, tgt_book: 'Zechariah',      tgt_chapter: 9,  tgt_verse: 6 },
+    { verse: 4, tgt_book: 'Jeremiah',       tgt_chapter: 47, tgt_verse: 5 },
+    { verse: 4, tgt_book: 'Amos',           tgt_chapter: 1,  tgt_verse: 6 },
+    { verse: 4, tgt_book: 'Amos',           tgt_chapter: 1,  tgt_verse: 7 },
+    { verse: 4, tgt_book: 'Amos',           tgt_chapter: 1,  tgt_verse: 8 },
+    // Verse 5
+    { verse: 5, tgt_book: 'Jeremiah',       tgt_chapter: 47, tgt_verse: 7 },
+    { verse: 5, tgt_book: 'Ezekiel',        tgt_chapter: 25, tgt_verse: 16 },
+    { verse: 5, tgt_book: '1 Samuel',       tgt_chapter: 30, tgt_verse: 14 },
+    { verse: 5, tgt_book: 'Nahum',          tgt_chapter: 2,  tgt_verse: 13 },
+    { verse: 5, tgt_book: 'Joshua',         tgt_chapter: 13, tgt_verse: 3 },
+    // Verse 6
+    { verse: 6, tgt_book: 'Isaiah',         tgt_chapter: 65, tgt_verse: 10 },
+    // Verse 7
+    { verse: 7, tgt_book: 'Joshua',         tgt_chapter: 19, tgt_verse: 29 },
+    { verse: 7, tgt_book: 'Obadiah',        tgt_chapter: 1,  tgt_verse: 19 },
+    { verse: 7, tgt_book: 'Zechariah',      tgt_chapter: 10, tgt_verse: 3 },
+    { verse: 7, tgt_book: 'Luke',           tgt_chapter: 1,  tgt_verse: 68 },
+    // Verse 8
+    { verse: 8, tgt_book: 'Jeremiah',       tgt_chapter: 48, tgt_verse: 27 },
+    { verse: 8, tgt_book: 'Ezekiel',        tgt_chapter: 25, tgt_verse: 3 },
+    { verse: 8, tgt_book: 'Ezekiel',        tgt_chapter: 25, tgt_verse: 6 },
+    { verse: 8, tgt_book: 'Jeremiah',       tgt_chapter: 49, tgt_verse: 1 },
+    // Verse 9
+    { verse: 9, tgt_book: 'Isaiah',         tgt_chapter: 49, tgt_verse: 18 },
+    { verse: 9, tgt_book: 'Ezekiel',        tgt_chapter: 16, tgt_verse: 48 },
+    { verse: 9, tgt_book: 'Deuteronomy',    tgt_chapter: 29, tgt_verse: 23 },
+    { verse: 9, tgt_book: 'Isaiah',         tgt_chapter: 13, tgt_verse: 19 },
+    // Verse 10
+    { verse: 10, tgt_book: 'Isaiah',        tgt_chapter: 16, tgt_verse: 6 },
+    // Verse 11
+    { verse: 11, tgt_book: 'Isaiah',        tgt_chapter: 17, tgt_verse: 4 },
+    { verse: 11, tgt_book: 'Psalms',        tgt_chapter: 22, tgt_verse: 27 },
+    { verse: 11, tgt_book: 'Genesis',       tgt_chapter: 10, tgt_verse: 5 },
+    // Verse 13
+    { verse: 13, tgt_book: 'Isaiah',        tgt_chapter: 10, tgt_verse: 12 },
+    { verse: 13, tgt_book: 'Nahum',         tgt_chapter: 3,  tgt_verse: 7 },
+    // Verse 14
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 13, tgt_verse: 21 },
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 13, tgt_verse: 22 },
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 34, tgt_verse: 14 },
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 34, tgt_verse: 11 },
+    { verse: 14, tgt_book: 'Jeremiah',      tgt_chapter: 22, tgt_verse: 14 },
+    { verse: 14, tgt_book: 'Jeremiah',      tgt_chapter: 22, tgt_verse: 15 },
+    // Verse 15
+    { verse: 15, tgt_book: 'Isaiah',        tgt_chapter: 47, tgt_verse: 8 },
+    { verse: 15, tgt_book: 'Ezekiel',       tgt_chapter: 25, tgt_verse: 5 },
+    { verse: 15, tgt_book: 'Jeremiah',      tgt_chapter: 19, tgt_verse: 8 },
+    { verse: 15, tgt_book: 'Nahum',         tgt_chapter: 3,  tgt_verse: 19 },
+  ]},
+
+  // ── Zephaniah 3 ─────────────────────────────────────────────────────────────
+  { src_book: 'Zephaniah', src_chapter: 3, xrefs: [
+    // Verse 1
+    { verse: 1, tgt_book: 'Jeremiah',       tgt_chapter: 6,  tgt_verse: 6 },
+    // Verse 2
+    { verse: 2, tgt_book: 'Jeremiah',       tgt_chapter: 5,  tgt_verse: 3 },
+    // Verse 3
+    { verse: 3, tgt_book: 'Ezekiel',        tgt_chapter: 22, tgt_verse: 27 },
+    { verse: 3, tgt_book: 'Micah',          tgt_chapter: 3,  tgt_verse: 9 },
+    { verse: 3, tgt_book: 'Micah',          tgt_chapter: 3,  tgt_verse: 10 },
+    { verse: 3, tgt_book: 'Habakkuk',       tgt_chapter: 1,  tgt_verse: 8 },
+    // Verse 4
+    { verse: 4, tgt_book: 'Jeremiah',       tgt_chapter: 23, tgt_verse: 11 },
+    { verse: 4, tgt_book: 'Hosea',          tgt_chapter: 9,  tgt_verse: 7 },
+    { verse: 4, tgt_book: 'Ezekiel',        tgt_chapter: 22, tgt_verse: 26 },
+    // Verse 5
+    { verse: 5, tgt_book: 'Jeremiah',       tgt_chapter: 12, tgt_verse: 1 },
+    // Verse 6
+    { verse: 6, tgt_book: 'Zechariah',      tgt_chapter: 7,  tgt_verse: 14 },
+    { verse: 6, tgt_book: 'Zechariah',      tgt_chapter: 9,  tgt_verse: 8 },
+    // Verse 7
+    { verse: 7, tgt_book: 'Jeremiah',       tgt_chapter: 36, tgt_verse: 3 },
+    { verse: 7, tgt_book: 'Micah',          tgt_chapter: 7,  tgt_verse: 3 },
+    // Verse 8
+    { verse: 8, tgt_book: 'Habakkuk',       tgt_chapter: 2,  tgt_verse: 3 },
+    { verse: 8, tgt_book: 'Isaiah',         tgt_chapter: 8,  tgt_verse: 17 },
+    { verse: 8, tgt_book: 'Joel',           tgt_chapter: 3,  tgt_verse: 2 },
+    // Verse 9
+    { verse: 9, tgt_book: 'Isaiah',         tgt_chapter: 19, tgt_verse: 18 },
+    // Verse 10
+    { verse: 10, tgt_book: 'Psalms',        tgt_chapter: 68, tgt_verse: 31 },
+    { verse: 10, tgt_book: 'Isaiah',        tgt_chapter: 11, tgt_verse: 11 },
+    { verse: 10, tgt_book: 'Isaiah',        tgt_chapter: 60, tgt_verse: 4 },
+    // Verse 11
+    { verse: 11, tgt_book: 'Isaiah',        tgt_chapter: 2,  tgt_verse: 11 },
+    { verse: 11, tgt_book: 'Isaiah',        tgt_chapter: 54, tgt_verse: 4 },
+    { verse: 11, tgt_book: 'Malachi',       tgt_chapter: 4,  tgt_verse: 1 },
+    { verse: 11, tgt_book: 'Jeremiah',      tgt_chapter: 7,  tgt_verse: 4 },
+    { verse: 11, tgt_book: 'Matthew',       tgt_chapter: 3,  tgt_verse: 9 },
+    // Verse 12
+    { verse: 12, tgt_book: 'Isaiah',        tgt_chapter: 14, tgt_verse: 32 },
+    { verse: 12, tgt_book: 'Matthew',       tgt_chapter: 5,  tgt_verse: 3 },
+    // Verse 13
+    { verse: 13, tgt_book: 'Isaiah',        tgt_chapter: 60, tgt_verse: 21 },
+    { verse: 13, tgt_book: 'Revelation',    tgt_chapter: 14, tgt_verse: 5 },
+    { verse: 13, tgt_book: 'Micah',         tgt_chapter: 5,  tgt_verse: 4 },
+    // Verse 14
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 12, tgt_verse: 6 },
+    { verse: 14, tgt_book: 'Isaiah',        tgt_chapter: 54, tgt_verse: 1 },
+    { verse: 14, tgt_book: 'Zechariah',     tgt_chapter: 2,  tgt_verse: 10 },
+    { verse: 14, tgt_book: 'Zechariah',     tgt_chapter: 9,  tgt_verse: 9 },
+    // Verse 15
+    { verse: 15, tgt_book: 'Matthew',       tgt_chapter: 27, tgt_verse: 42 },
+    { verse: 15, tgt_book: 'John',          tgt_chapter: 1,  tgt_verse: 49 },
+    { verse: 15, tgt_book: 'Psalms',        tgt_chapter: 46, tgt_verse: 5 },
+    { verse: 15, tgt_book: 'Zechariah',     tgt_chapter: 2,  tgt_verse: 10 },
+    { verse: 15, tgt_book: 'Revelation',    tgt_chapter: 21, tgt_verse: 3 },
+    // Verse 16
+    { verse: 16, tgt_book: 'Isaiah',        tgt_chapter: 35, tgt_verse: 3 },
+    { verse: 16, tgt_book: 'Hebrews',       tgt_chapter: 12, tgt_verse: 12 },
+    // Verse 17
+    { verse: 17, tgt_book: 'Isaiah',        tgt_chapter: 63, tgt_verse: 1 },
+    { verse: 17, tgt_book: 'Isaiah',        tgt_chapter: 62, tgt_verse: 5 },
+    { verse: 17, tgt_book: 'Jeremiah',      tgt_chapter: 32, tgt_verse: 41 },
+    // Verse 18
+    { verse: 18, tgt_book: 'Lamentations',  tgt_chapter: 1,  tgt_verse: 4 },
+    { verse: 18, tgt_book: 'Lamentations',  tgt_chapter: 2,  tgt_verse: 6 },
+    // Verse 19
+    { verse: 19, tgt_book: 'Isaiah',        tgt_chapter: 60, tgt_verse: 14 },
+    { verse: 19, tgt_book: 'Micah',         tgt_chapter: 4,  tgt_verse: 6 },
+    { verse: 19, tgt_book: 'Micah',         tgt_chapter: 4,  tgt_verse: 7 },
+    { verse: 19, tgt_book: 'Isaiah',        tgt_chapter: 61, tgt_verse: 7 },
+    { verse: 19, tgt_book: 'Jeremiah',      tgt_chapter: 13, tgt_verse: 11 },
+    { verse: 19, tgt_book: 'Jeremiah',      tgt_chapter: 33, tgt_verse: 9 },
+    // Verse 20
+    { verse: 20, tgt_book: 'Isaiah',        tgt_chapter: 11, tgt_verse: 12 },
+    { verse: 20, tgt_book: 'Jeremiah',      tgt_chapter: 32, tgt_verse: 37 },
+    { verse: 20, tgt_book: 'Ezekiel',       tgt_chapter: 11, tgt_verse: 17 },
+  ]},
+
 ]
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -181,7 +417,7 @@ for (const { src_book, src_chapter, xrefs } of ALL_BOOKS) {
 
     const { error } = await supabase
       .from('author_cross_refs')
-      .upsert(row, { onConflict: 'src_book,src_chapter,src_verse,tgt_book,tgt_chapter,tgt_verse' })
+      .upsert(row, { onConflict: 'src_book,src_chapter,src_verse,tgt_book,tgt_chapter,tgt_verse', ignoreDuplicates: true })
 
     if (error) {
       console.warn(`  ✗ v${xref.verse} → ${xref.tgt_book} ${xref.tgt_chapter}:${xref.tgt_verse}  [${error.message}]`)
