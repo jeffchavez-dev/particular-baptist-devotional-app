@@ -21,14 +21,36 @@ export function isAuthor(session) {
 }
 
 // ─────────────────────────────────────────────
+//  Offline cache helpers (localStorage)
+// ─────────────────────────────────────────────
+
+const CACHE_PREFIX = 'authorContent:'
+
+function cacheGet(key) {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + key)
+    if (!raw) return null
+    return JSON.parse(raw)
+  } catch { return null }
+}
+
+function cacheSet(key, value) {
+  try {
+    localStorage.setItem(CACHE_PREFIX + key, JSON.stringify(value))
+  } catch { /* storage full or unavailable — ignore */ }
+}
+
+// ─────────────────────────────────────────────
 //  Author Scripture Notes
 // ─────────────────────────────────────────────
 
 /**
  * Fetch all author notes for a given book + chapter.
  * Returns an array of { id, book, chapter, verse, note, updated_at }
+ * Falls back to localStorage cache when offline.
  */
 export async function fetchAuthorNotes(book, chapter) {
+  const cacheKey = `notes:${book}:${chapter}`
   try {
     const { data, error } = await supabase
       .from('author_scripture_notes')
@@ -37,10 +59,12 @@ export async function fetchAuthorNotes(book, chapter) {
       .eq('chapter', Number(chapter))
       .order('verse', { ascending: true })
     if (error) throw error
-    return data || []
+    const result = data || []
+    cacheSet(cacheKey, result)
+    return result
   } catch (e) {
     console.warn('[authorContent] fetchAuthorNotes:', e?.message)
-    return []
+    return cacheGet(cacheKey) || []
   }
 }
 
@@ -80,6 +104,7 @@ export async function deleteAuthorNote(id) {
  *       tgt_book, tgt_chapter, tgt_verse, label, updated_at }
  */
 export async function fetchAuthorCrossRefs(book, chapter) {
+  const cacheKey = `xrefs:${book}:${chapter}`
   try {
     const { data, error } = await supabase
       .from('author_cross_refs')
@@ -88,10 +113,12 @@ export async function fetchAuthorCrossRefs(book, chapter) {
       .eq('src_chapter', Number(chapter))
       .order('src_verse', { ascending: true })
     if (error) throw error
-    return data || []
+    const result = data || []
+    cacheSet(cacheKey, result)
+    return result
   } catch (e) {
     console.warn('[authorContent] fetchAuthorCrossRefs:', e?.message)
-    return []
+    return cacheGet(cacheKey) || []
   }
 }
 
@@ -103,6 +130,7 @@ export async function fetchAuthorCrossRefs(book, chapter) {
  *       tgt_book, tgt_chapter, tgt_verse, label, updated_at }
  */
 export async function fetchAuthorBackRefs(book, chapter) {
+  const cacheKey = `backrefs:${book}:${chapter}`
   try {
     const { data, error } = await supabase
       .from('author_cross_refs')
@@ -111,10 +139,12 @@ export async function fetchAuthorBackRefs(book, chapter) {
       .eq('tgt_chapter', Number(chapter))
       .order('src_verse', { ascending: true })
     if (error) throw error
-    return data || []
+    const result = data || []
+    cacheSet(cacheKey, result)
+    return result
   } catch (e) {
     console.warn('[authorContent] fetchAuthorBackRefs:', e?.message)
-    return []
+    return cacheGet(cacheKey) || []
   }
 }
 
@@ -163,16 +193,19 @@ export async function deleteAuthorCrossRef(id) {
  * `chapter_key` is the chapter/article/question identifier (string).
  */
 export async function fetchChapterDescs(source) {
+  const cacheKey = `chdescs:${source}`
   try {
     const { data, error } = await supabase
       .from('author_chapter_descs')
       .select('*')
       .eq('source', source)
     if (error) throw error
-    return data || []
+    const result = data || []
+    cacheSet(cacheKey, result)
+    return result
   } catch (e) {
     console.warn('[authorContent] fetchChapterDescs:', e?.message)
-    return []
+    return cacheGet(cacheKey) || []
   }
 }
 

@@ -22,6 +22,7 @@ import {
   fetchAuthorNotes, upsertAuthorNote, deleteAuthorNote,
   fetchAuthorCrossRefs, upsertAuthorCrossRef, deleteAuthorCrossRef,
   fetchAuthorBackRefs,
+  fetchChapterDescs, upsertChapterDesc, deleteChapterDesc,
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
@@ -749,6 +750,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Author cross-ref verse preview modal
   const [authorRefModal, setAuthorRefModal] = useState(null)      // { ref } | null
   const [authorRefModalText, setAuthorRefModalText] = useState(null) // fetched verse text
+  // Author chapter descriptions for scripture (source='scripture', chapter_key='Book:ch')
+  // { 'Book:ch': { id, description } }
+  const [scriptureChDescs, setScriptureChDescs] = useState({})
+  const [editingChDesc,    setEditingChDesc]    = useState(null)  // 'Book:ch' | null
+  const [chDescDraft,      setChDescDraft]      = useState('')
+  const scriptureChDescsLoadedRef = useRef(false)
 
   /* ── LXX reader mode word data (version === 'lxx') ── */
   const [lxxReaderWords,   setLxxReaderWords]   = useState({}) // 'Book:ch' → [{v, words:[{w,s}]}]
@@ -1036,6 +1043,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         .catch(() => { authorContentLoadedRef.current.delete(key) })
     }
   }, [segments]) // eslint-disable-line
+
+  /* Load scripture chapter descriptions once on mount */
+  useEffect(() => {
+    if (scriptureChDescsLoadedRef.current) return
+    scriptureChDescsLoadedRef.current = true
+    fetchChapterDescs('scripture').then(rows => {
+      const map = {}
+      rows.forEach(r => { map[r.chapter_key] = { id: r.id, description: r.description } })
+      setScriptureChDescs(map)
+    }).catch(() => { scriptureChDescsLoadedRef.current = false })
+  }, []) // eslint-disable-line
 
   /* Fetch verse text for author cross-ref preview modal */
   useEffect(() => {
@@ -1703,6 +1721,40 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }
 
+  /* ── Scripture chapter description CRUD ── */
+  async function saveScriptureChDesc(chKey) {
+    const trimmed = chDescDraft.trim()
+    if (!trimmed) return
+    try {
+      await upsertChapterDesc({ source: 'scripture', chapter_key: chKey, description: trimmed })
+      const rows = await fetchChapterDescs('scripture')
+      const map = {}
+      rows.forEach(r => { map[r.chapter_key] = { id: r.id, description: r.description } })
+      setScriptureChDescs(map)
+      setEditingChDesc(null)
+      setChDescDraft('')
+    } catch(e) {
+      console.error('[scriptureChDesc] save failed:', e?.message)
+    }
+  }
+
+  async function removeScriptureChDesc(chKey) {
+    const existing = scriptureChDescs[chKey]
+    if (!existing) return
+    try {
+      await deleteChapterDesc(existing.id)
+      setScriptureChDescs(prev => {
+        const next = { ...prev }
+        delete next[chKey]
+        return next
+      })
+      setEditingChDesc(null)
+      setChDescDraft('')
+    } catch(e) {
+      console.error('[scriptureChDesc] delete failed:', e?.message)
+    }
+  }
+
   /* ── Verse tap-to-select ── */
   function toggleVerse(verseKey) {
     setSelectedVerses(prev => {
@@ -1986,6 +2038,79 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     } catch { return text }
   }
 
+  /** Renders the author-editable chapter description below a chapter heading */
+  function renderScriptureChapterDesc(segBook, segChapter) {
+    const chKey   = `${segBook}:${segChapter}`
+    const existing = scriptureChDescs[chKey]
+    const isEditing = editingChDesc === chKey
+    if (!canEdit && !existing) return null
+    return (
+      <div style={{ padding: '0 0 8px 0', borderLeft: '3px solid var(--teal)', marginLeft: 2, paddingLeft: 10, marginBottom: 8 }}
+           onClick={e => e.stopPropagation()}>
+        {!isEditing && existing && (
+          <p style={{
+            margin: 0,
+            fontSize: 13,
+            fontStyle: 'italic',
+            color: 'var(--ink-muted)',
+            lineHeight: 1.5,
+            fontFamily: "'Lora', Georgia, serif",
+          }}>
+            {existing.description}
+            {canEdit && (
+              <button
+                style={{ background:'none', border:'none', cursor:'pointer', marginLeft:6, padding:'1px 4px',
+                         color:'var(--teal)', fontSize:11, verticalAlign:'middle' }}
+                onClick={e => { e.stopPropagation(); setEditingChDesc(chKey); setChDescDraft(existing.description) }}
+                title="Edit chapter description">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 8.5l.4-1.6L6 2.5l1.5 1.5L3.1 8.5H1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  <line x1="5.5" y1="3" x2="7" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                </svg>
+              </button>
+            )}
+          </p>
+        )}
+        {canEdit && !existing && !isEditing && (
+          <button
+            style={{ background:'none', border:'1px dashed var(--teal)', borderRadius:4, cursor:'pointer',
+                     padding:'2px 8px', color:'var(--teal)', fontSize:11, fontFamily:"'DM Sans',sans-serif" }}
+            onClick={e => { e.stopPropagation(); setEditingChDesc(chKey); setChDescDraft('') }}
+          >+ Chapter description</button>
+        )}
+        {canEdit && isEditing && (
+          <div>
+            <textarea
+              value={chDescDraft}
+              onChange={e => setChDescDraft(e.target.value)}
+              placeholder={`Description for ${segBook} ${segChapter}…`}
+              style={{ width:'100%', minHeight:60, fontSize:13, padding:6, borderRadius:4,
+                       border:'1px solid var(--teal)', resize:'vertical', fontFamily:"'Lora', Georgia, serif",
+                       background:'var(--bg)', color:'var(--ink)', boxSizing:'border-box' }}
+              autoFocus rows={3}
+            />
+            <div style={{ display:'flex', gap:6, marginTop:4 }}>
+              <button
+                style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'var(--teal)',
+                         color:'#fff', border:'none', cursor:'pointer' }}
+                onClick={e => { e.stopPropagation(); saveScriptureChDesc(chKey) }}>Save</button>
+              <button
+                style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'none',
+                         color:'var(--ink-muted)', border:'1px solid var(--border)', cursor:'pointer' }}
+                onClick={e => { e.stopPropagation(); setEditingChDesc(null); setChDescDraft('') }}>Cancel</button>
+              {existing && (
+                <button
+                  style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'none',
+                           color:'var(--red,#dc2626)', border:'1px solid var(--red,#dc2626)', cursor:'pointer', marginLeft:'auto' }}
+                  onClick={e => { e.stopPropagation(); removeScriptureChDesc(chKey) }}>Delete</button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={r.wrap}>
 
@@ -2217,6 +2342,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span style={r.chapterDividerLine} />
                             </div>
                         }
+                        {renderScriptureChapterDesc(seg.book, seg.chapter)}
 
                         <div style={r.verseList}>
                           {seg.verses.map(({ verse, words }) => {
@@ -2392,6 +2518,164 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     </div>
                                   </div>
                                 )}
+
+                                {/* ── Confession cross-refs (morph mode) ── */}
+                                {studyMode && (() => {
+                                  const verseRefs = getCrossRefs(seg.book, seg.chapter, verse)
+                                  if (!verseRefs.length) return null
+                                  return (
+                                    <span style={r.inlineCrossRefs}>
+                                      {verseRefs.map(ref => {
+                                        const chip = SRC_CHIP[ref.src] || {}
+                                        return (
+                                          <button
+                                            key={ref.key}
+                                            style={{ ...r.inlineChip, background: chip.bg, color: chip.color, borderColor: chip.border }}
+                                            onClick={(e) => { e.stopPropagation(); setConfessionModal(ref) }}
+                                          >
+                                            <span style={{ ...r.inlineChipSrc, background: chip.color }}>{ref.src}</span>
+                                            <span style={r.inlineChipLabel}>{ref.label}</span>
+                                          </button>
+                                        )
+                                      })}
+                                    </span>
+                                  )
+                                })()}
+
+                                {/* ── Author cross-refs (morph mode) ── */}
+                                {(() => {
+                                  const chKey    = `${seg.book}:${seg.chapter}`
+                                  const xrefs    = authorCrossRefs[chKey]?.[verse] || []
+                                  const backRefs = authorBackRefs[chKey]?.[verse]  || []
+                                  const avk      = `${seg.book}:${seg.chapter}:${verse}`
+                                  const isAddingHere = addingCrossRefTo === avk
+                                  if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
+                                  return (
+                                    <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
+                                      <span style={r.authorXrefIcon}>↗</span>
+                                      {xrefs.map(ref => {
+                                        const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
+                                        const chipLabel = ref.label ? ref.label.split(' - ')[0] : tgt
+                                        return (
+                                          <span key={ref.id} style={r.authorXrefChipWrap}>
+                                            <button style={r.authorXrefChip}
+                                              onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref }) }}
+                                              title={`Author link → ${tgt}`}>{chipLabel}</button>
+                                            {canEdit && (
+                                              <button style={r.authorXrefDeleteBtn}
+                                                onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
+                                                title="Remove link">×</button>
+                                            )}
+                                          </span>
+                                        )
+                                      })}
+                                      {backRefs.map(ref => {
+                                        const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
+                                        const chipLabel = ref.label ? ref.label.split(' - ')[0] : src
+                                        const syntheticRef = { id: ref.id, tgt_book: ref.src_book, tgt_chapter: ref.src_chapter, tgt_verse: ref.src_verse, label: ref.label }
+                                        return (
+                                          <span key={`back-${ref.id}`} style={r.authorXrefChipWrap}>
+                                            <button style={{ ...r.authorXrefChip, borderRadius: 99 }}
+                                              onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
+                                              title={`Back-link from ${src}`}>↩ {chipLabel}</button>
+                                          </span>
+                                        )
+                                      })}
+                                      {canEdit && !isAddingHere && (
+                                        <button style={r.authorXrefAddBtn}
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            setAddingCrossRefTo(avk)
+                                            setCrossRefDraft({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+                                            setEditingAuthorNote(null)
+                                          }}
+                                          title="Add passage link">+ link</button>
+                                      )}
+                                      {canEdit && isAddingHere && (
+                                        <div style={r.authorXrefForm}>
+                                          <div style={r.authorXrefFormRow}>
+                                            <input style={r.authorXrefInput} placeholder="Book (e.g. Numbers)"
+                                              value={crossRefDraft.tgt_book}
+                                              onChange={e => setCrossRefDraft(d => ({ ...d, tgt_book: e.target.value }))}
+                                              list="author-xref-book-list" />
+                                            <input style={{ ...r.authorXrefInput, width: 48 }} placeholder="Ch"
+                                              value={crossRefDraft.tgt_chapter}
+                                              onChange={e => setCrossRefDraft(d => ({ ...d, tgt_chapter: e.target.value }))}
+                                              type="number" min="1" />
+                                            <input style={{ ...r.authorXrefInput, width: 48 }} placeholder="Vs"
+                                              value={crossRefDraft.tgt_verse}
+                                              onChange={e => setCrossRefDraft(d => ({ ...d, tgt_verse: e.target.value }))}
+                                              type="number" min="1" />
+                                          </div>
+                                          <div style={r.authorXrefFormRow}>
+                                            <input style={{ ...r.authorXrefInput, flex: 1 }} placeholder="Label (optional)"
+                                              value={crossRefDraft.label}
+                                              onChange={e => setCrossRefDraft(d => ({ ...d, label: e.target.value }))} />
+                                            <button style={r.noteSaveBtn}
+                                              onClick={e => { e.stopPropagation(); saveAuthorCrossRef(seg.book, seg.chapter, verse) }}>Save</button>
+                                            <button style={r.noteCancelBtn}
+                                              onClick={e => { e.stopPropagation(); setAddingCrossRefTo(null) }}>Cancel</button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
+
+                                {/* ── Author study note (morph mode) ── */}
+                                {(() => {
+                                  const chKey = `${seg.book}:${seg.chapter}`
+                                  const authorNoteObj = authorNotes[chKey]?.[verse]
+                                  const avk = `${seg.book}:${seg.chapter}:${verse}`
+                                  const isEditingAuthor = editingAuthorNote === avk
+                                  if (!canEdit && (!studyMode || !authorNoteObj)) return null
+                                  return (
+                                    <div style={r.authorNoteBlock} onClick={e => e.stopPropagation()}>
+                                      {authorNoteObj && !isEditingAuthor && (
+                                        <div style={r.authorNoteDisplay}>
+                                          <div style={r.authorNoteHeader}>
+                                            <span style={r.authorNoteLabel}>Study Note</span>
+                                            {canEdit && (
+                                              <button style={r.authorEditBtn}
+                                                onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
+                                                title="Edit study note">
+                                                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                                  <path d="M2 9l.5-2L7.5 1.5l2 2L4.5 9 2 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                                  <line x1="7" y1="2" x2="9" y2="4" stroke="currentColor" strokeWidth="1.2"/>
+                                                </svg>
+                                              </button>
+                                            )}
+                                          </div>
+                                          <p style={r.authorNoteText}>{authorNoteObj.note}</p>
+                                        </div>
+                                      )}
+                                      {canEdit && !isEditingAuthor && !authorNoteObj && (
+                                        <button style={r.authorAddNoteBtn}
+                                          onClick={() => openAuthorNoteEditor(seg.book, seg.chapter, verse)}
+                                          title="Add study note">+ Study Note</button>
+                                      )}
+                                      {canEdit && isEditingAuthor && (
+                                        <div style={r.noteEditorWrap}>
+                                          <div style={r.authorNoteHeader}>
+                                            <span style={r.authorNoteLabel}>Study Note</span>
+                                          </div>
+                                          <textarea
+                                            value={authorNoteDraft}
+                                            onChange={e => setAuthorNoteDraft(e.target.value)}
+                                            placeholder={`Study note for ${seg.book} ${seg.chapter}:${verse}…`}
+                                            style={{ ...r.noteTextarea, minHeight: 72 }}
+                                            autoFocus rows={4}
+                                          />
+                                          <div style={r.noteEditorActions}>
+                                            <button onClick={() => saveAuthorNote(seg.book, seg.chapter, verse)} style={r.noteSaveBtn}>Save</button>
+                                            <button onClick={() => setEditingAuthorNote(null)} style={r.noteCancelBtn}>Cancel</button>
+                                            {authorNoteObj && <button onClick={() => removeAuthorNote(seg.book, seg.chapter, verse)} style={r.noteDeleteBtn}>Delete</button>}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             )
                           })}
@@ -2459,6 +2743,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           <span style={r.chapterDividerLine} />
                         </div>
                     }
+                    {renderScriptureChapterDesc(seg.book, seg.chapter)}
 
                     <div style={r.verseList}>
                       {seg.verses.map(({ verse, text }) => {

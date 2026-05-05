@@ -199,6 +199,20 @@ export default function ScripturePage() {
             </svg>
             <span style={s.readBookName}>{readBook}</span>
             <span style={s.readBookCh}>Ch. {readChapter}</span>
+            <span style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              color: 'var(--ink-muted)',
+              background: 'var(--bg-muted, rgba(0,0,0,0.07))',
+              borderRadius: 4,
+              padding: '1px 5px',
+              marginLeft: 2,
+              fontFamily: "'DM Sans', sans-serif",
+              textTransform: 'uppercase',
+            }}>
+              {BIBLE_VERSIONS.find(v => v.id === readVersion)?.abbreviation || readVersion.toUpperCase()}
+            </span>
           </button>
 
           {/* Author edit-mode toggle — only visible to the author */}
