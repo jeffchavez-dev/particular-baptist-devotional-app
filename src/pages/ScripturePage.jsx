@@ -34,8 +34,8 @@ export default function ScripturePage() {
       return pref === 'original' ? 'hebrew' : pref
     } catch { return 'kjv' }
   })
-  const [canGoBack,    setCanGoBack]    = useState(false)
-  const [canGoForward, setCanGoForward] = useState(false)
+  const [navHistory,    setNavHistory]    = useState([])
+  const [navHistoryIdx, setNavHistoryIdx] = useState(0)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [showVersionDropdown, setShowVersionDropdown] = useState(false)
   // Show version picker on first launch (no saved preference)
@@ -153,38 +153,11 @@ export default function ScripturePage() {
         ref={headerRef}
         style={{
           ...s.header,
-          transform:    chromeVis ? 'translateY(0)' : 'translateY(-100%)',
-          marginBottom: chromeVis ? 0 : -headerH,
-          transition:   'transform 0.28s ease, margin-bottom 0.28s ease',
+          transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
+          transition: 'transform 0.28s ease',
         }}
       >
         <div style={s.headerInner}>
-          {/* History back / forward */}
-          <div style={s.historyBtns}>
-            <button
-              style={{ ...s.histBtn, opacity: canGoBack ? 1 : 0.3 }}
-              disabled={!canGoBack}
-              onClick={() => kjvRef.current?.goBack()}
-              title="Go back"
-              aria-label="Go back"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button
-              style={{ ...s.histBtn, opacity: canGoForward ? 1 : 0.3 }}
-              disabled={!canGoForward}
-              onClick={() => kjvRef.current?.goForward()}
-              title="Go forward"
-              aria-label="Go forward"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5 2l4 5-4 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-
           {/* Book / chapter pill */}
           <button
             style={s.readBookPill}
@@ -488,30 +461,77 @@ export default function ScripturePage() {
           </div>
 
         ) : (
-          /* History — shown when no active search */
-          searchHistory.length > 0 && (
-            <div style={sp.section}>
-              <div style={sp.sectionLabel}>Recent searches</div>
-              {searchHistory.map(q => (
-                <button key={q} style={sp.histItem} onClick={() => {
-                  setReadSearch(q)
-                  runPanelSearch(q)
-                }}>
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
-                    <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M5.5 3.5v2l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                  </svg>
-                  <span style={{ flex:1 }}>{q}</span>
-                </button>
-              ))}
-              <button style={sp.clearHistBtn} onClick={() => {
-                clearSearchHistory('kjv')
-                setSearchHistory([])
-              }}>Clear history</button>
-            </div>
-          )
+          /* Shown when no active search */
+          <div>
+            {/* Recent searches */}
+            {searchHistory.length > 0 && (
+              <div style={sp.section}>
+                <div style={sp.sectionLabel}>Recent searches</div>
+                {searchHistory.map(q => (
+                  <button key={q} style={sp.histItem} onClick={() => {
+                    setReadSearch(q)
+                    runPanelSearch(q)
+                  }}>
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+                      <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M5.5 3.5v2l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{ flex:1 }}>{q}</span>
+                  </button>
+                ))}
+                <button style={sp.clearHistBtn} onClick={() => {
+                  clearSearchHistory('kjv')
+                  setSearchHistory([])
+                }}>Clear history</button>
+              </div>
+            )}
+
+            {/* Chapter navigation history */}
+            {navHistory.length > 0 && (
+              <div style={{ ...sp.section, borderTop: searchHistory.length > 0 ? '1px solid var(--border)' : 'none', paddingTop: searchHistory.length > 0 ? 16 : 4 }}>
+                <div style={sp.sectionLabel}>Chapters visited</div>
+                {[...navHistory].reverse().map((entry, i) => {
+                  const origIdx = navHistory.length - 1 - i
+                  const isCurrent = origIdx === navHistoryIdx
+                  return (
+                    <button
+                      key={i}
+                      style={{
+                        ...sp.histItem,
+                        ...(isCurrent ? { background:'var(--teal-light)', color:'var(--teal)', fontWeight:600 } : {}),
+                      }}
+                      onClick={() => {
+                        kjvRef.current?.navigateTo(entry.book, entry.chapter)
+                        setSearchPanelOpen(false)
+                      }}
+                    >
+                      {/* Book icon */}
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: isCurrent ? 'var(--teal)' : 'var(--ink-faint)', flexShrink:0 }}>
+                        <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
+                        <path d="M3 3.5h5M3 5.5h5M3 7.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                      </svg>
+                      <span style={{ flex:1 }}>{entry.book} {entry.chapter}</span>
+                      {isCurrent && (
+                        <span style={{ fontSize:10, color:'var(--teal)', fontWeight:700, letterSpacing:'0.04em' }}>NOW</span>
+                      )}
+                    </button>
+                  )
+                })}
+                <button style={sp.clearHistBtn} onClick={() => {
+                  kjvRef.current?.clearNavHistory()
+                  setNavHistory(h => h.length > 0 ? [h[navHistoryIdx]] : [])
+                  setNavHistoryIdx(0)
+                }}>Clear chapters visited</button>
+              </div>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Spacer reserves the header height so the reader's scroll container
+          never resizes when the fixed header slides in/out. This prevents
+          scroll-position clamping that caused the bottom-of-chapter vibration. */}
+      <div style={{ flexShrink: 0, height: headerH }} />
 
       {/* ══ KJV / Greek / Hebrew Reader ══ */}
       <KjvReader
@@ -524,9 +544,9 @@ export default function ScripturePage() {
         todayChapter={todayBibleChapter}
         onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
         onSearchChange={q => setReadSearch(q)}
-        onHistoryChange={({ canGoBack: b, canGoForward: f }) => {
-          setCanGoBack(b)
-          setCanGoForward(f)
+        onHistoryChange={({ entries, currentIdx }) => {
+          if (entries) setNavHistory([...entries])
+          if (currentIdx != null) setNavHistoryIdx(currentIdx)
         }}
         authorEditMode={authorEditMode}
         studyMode={studyMode}
@@ -578,9 +598,9 @@ const s = {
   /* Lock the page to viewport height so the sidebar never scrolls with bible content */
   page: { height:'100vh', overflow:'hidden', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column' },
 
-  /* header */
+  /* header — fixed so hiding it never resizes the scroll container */
   header: {
-    position:'sticky', top:0, zIndex:20, flexShrink:0,
+    position:'fixed', top:0, left:0, right:0, zIndex:20,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
@@ -591,19 +611,6 @@ const s = {
     width:36, height:36, borderRadius:'var(--radius)', border:'1px solid var(--border)',
     background:'var(--surface)', cursor:'pointer', flexShrink:0,
     color:'var(--ink-muted)', transition:'background 0.15s',
-  },
-
-  /* history back/forward */
-  historyBtns: {
-    display:'flex', alignItems:'center', gap:1, flexShrink:0,
-    border:'1px solid var(--border)', borderRadius:'var(--radius)',
-    background:'var(--surface)', overflow:'hidden',
-  },
-  histBtn: {
-    display:'flex', alignItems:'center', justifyContent:'center',
-    width:30, height:30, border:'none', background:'none',
-    cursor:'pointer', color:'var(--ink-muted)', transition:'background 0.15s, opacity 0.15s',
-    padding:0,
   },
 
   /* parallel toggle */

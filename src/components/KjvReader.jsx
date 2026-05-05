@@ -116,8 +116,8 @@ const OT_CATS = [
 const NT_CATS = [
   { id:'gospels',label:'Gospels',          color:'#1d6b5a', bg:'#e4f0ec', books:['Matthew','Mark','Luke','John'] },
   { id:'acts',   label:'History',          color:'#5a3e8c', bg:'#f0ecfa', books:['Acts'] },
-  { id:'pauline',label:'Pauline Letters',  color:'#7c5230', bg:'#fdf3e3', books:['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon'] },
-  { id:'general',label:'General Epistles', color:'#3e5a8c', bg:'#e8eefa', books:['Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
+  { id:'pauline',label:'Pauline Letters',  color:'#7c5230', bg:'#fdf3e3', books:['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews'] },
+  { id:'general',label:'General Epistles', color:'#3e5a8c', bg:'#e8eefa', books:['James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
 ]
 
 const BOOK_META = Object.fromEntries(BIBLE_BOOKS.map(b => [b.name, b]))
@@ -462,10 +462,17 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 
   function toggleCat(id) {
     setOpenCats(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
+      if (prev.has(id)) {
+        // Close this category
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      }
+      // Open exclusively — close all others and collapse any expanded book
+      return new Set([id])
     })
+    // Collapse any open book chapter grid when switching categories
+    setExpandedBook(null)
   }
 
   function handleBookClick(bookName) {
@@ -808,10 +815,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       navigate(newBook, newChapter)
       if (verse) pendingVerseRef.current = { book: newBook, chapter: newChapter, verse }
     },
-    goBack:         () => goBack(),
-    goForward:      () => goForward(),
-    canGoBack:      histIdx > 0,
-    canGoForward:   histIdx < navHistoryRef.current.length - 1,
+    goBack:           () => goBack(),
+    goForward:        () => goForward(),
+    clearNavHistory:  () => clearNavHistory(),
+    canGoBack:        histIdx > 0,
+    canGoForward:     histIdx < navHistoryRef.current.length - 1,
   }), [histIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -964,11 +972,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => { onNavChange?.(visBook, visChapter) }, [visBook, visChapter]) // eslint-disable-line
   /* Notify parent of search query changes */
   useEffect(() => { onSearchChange?.(searchQuery) }, [searchQuery]) // eslint-disable-line
-  /* Notify parent of history state changes so it can enable/disable back/forward buttons */
+  /* Notify parent of history state changes */
   useEffect(() => {
     onHistoryChange?.({
       canGoBack:    histIdx > 0,
       canGoForward: histIdx < navHistoryRef.current.length - 1,
+      entries:      navHistoryRef.current,
+      currentIdx:   histIdx,
     })
     try {
       localStorage.setItem('bible-nav-history', JSON.stringify({
@@ -1900,6 +1910,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setVisChapter(newChapter)
   }
 
+  function clearNavHistory() {
+    const current = navHistoryRef.current[histIdx]
+    navHistoryRef.current = current ? [current] : []
+    setHistIdx(0)
+    try {
+      localStorage.setItem('bible-nav-history', JSON.stringify({ entries: navHistoryRef.current, idx: 0 }))
+    } catch {}
+  }
+
   function goBack() {
     if (histIdx <= 0) return
 
@@ -2140,29 +2159,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             </button>
           </div>
         )}
-
-        {/* ── Version picker ── */}
-        <div style={sb.versionSection}>
-          <div style={sb.versionSectionTitle}>Translation</div>
-          <div style={sb.versionList}>
-            {BIBLE_VERSIONS.filter(v2 => !v2.hidden).map(v2 => {
-              const isActive = version === v2.id
-              return (
-                <button
-                  key={v2.id}
-                  style={{ ...sb.versionBtn, ...(isActive ? sb.versionBtnActive : {}) }}
-                  onClick={() => onVersionChange?.(v2.id)}
-                  title={v2.description}
-                >
-                  <span style={{ ...sb.versionAbbr, ...(isActive ? { color:'white' } : {}) }}>{v2.abbreviation}</span>
-                  <span style={{ ...sb.versionLang, ...(isActive ? { color:'rgba(255,255,255,0.75)' } : {}) }}>
-                    {v2.language}{v2.scope ? ` · ${v2.scope}` : ''}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
 
         {/* ── Parallel section ── */}
         {(version === 'kjv' || version === 'abab') && (

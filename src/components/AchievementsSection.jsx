@@ -47,8 +47,8 @@ const BIBLE_CATS = [
   { id:'minor',   label:'Minor Prophets',  testament:'OT', books:['Hosea','Joel','Amos','Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah','Malachi'] },
   { id:'gospels', label:'Gospels',         testament:'NT', books:['Matthew','Mark','Luke','John'] },
   { id:'acts',    label:'Acts',            testament:'NT', books:['Acts'] },
-  { id:'pauline', label:'Pauline Letters', testament:'NT', books:['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon'] },
-  { id:'general', label:'General Epistles',testament:'NT', books:['Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
+  { id:'pauline', label:'Pauline Letters', testament:'NT', books:['Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians','Philippians','Colossians','1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon','Hebrews'] },
+  { id:'general', label:'General Epistles',testament:'NT', books:['James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
 ]
 
 const BOOK_META = Object.fromEntries(BIBLE_BOOKS.map(b => [b.name, b]))
