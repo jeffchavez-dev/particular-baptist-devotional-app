@@ -752,9 +752,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [authorRefModalText, setAuthorRefModalText] = useState(null) // fetched verse text
   // Author chapter descriptions for scripture (source='scripture', chapter_key='Book:ch')
   // { 'Book:ch': { id, description } }
-  const [scriptureChDescs, setScriptureChDescs] = useState({})
-  const [editingChDesc,    setEditingChDesc]    = useState(null)  // 'Book:ch' | null
-  const [chDescDraft,      setChDescDraft]      = useState('')
+  const [scriptureChDescs,   setScriptureChDescs]   = useState({}) // { 'Book:ch': { id, description } }
+  const [scriptureVerseDescs, setScriptureVerseDescs] = useState({}) // { 'Book:ch:v': { id, description } }
+  const [editingChDesc,      setEditingChDesc]      = useState(null)  // 'Book:ch' | null
+  const [chDescDraft,        setChDescDraft]        = useState('')
+  const [editingVerseDesc,   setEditingVerseDesc]   = useState(null)  // 'Book:ch:v' | null
+  const [verseDescDraft,     setVerseDescDraft]     = useState('')
   const scriptureChDescsLoadedRef = useRef(false)
 
   /* ── LXX reader mode word data (version === 'lxx') ── */
@@ -1044,14 +1047,25 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }, [segments]) // eslint-disable-line
 
-  /* Load scripture chapter descriptions once on mount */
+  /* Load scripture chapter + verse descriptions once on mount.
+     chapter_key format: 'Book:ch' for chapter-level, 'Book:ch:v' for verse-level */
   useEffect(() => {
     if (scriptureChDescsLoadedRef.current) return
     scriptureChDescsLoadedRef.current = true
     fetchChapterDescs('scripture').then(rows => {
-      const map = {}
-      rows.forEach(r => { map[r.chapter_key] = { id: r.id, description: r.description } })
-      setScriptureChDescs(map)
+      const chMap = {}
+      const vMap  = {}
+      rows.forEach(r => {
+        const parts = r.chapter_key.split(':')
+        const entry = { id: r.id, description: r.description }
+        if (parts.length === 3) {
+          vMap[r.chapter_key] = entry   // 'Book:ch:v'
+        } else {
+          chMap[r.chapter_key] = entry  // 'Book:ch'
+        }
+      })
+      setScriptureChDescs(chMap)
+      setScriptureVerseDescs(vMap)
     }).catch(() => { scriptureChDescsLoadedRef.current = false })
   }, []) // eslint-disable-line
 
@@ -1755,6 +1769,47 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }
 
+  /* ── Scripture verse description CRUD ── */
+  async function saveScriptureVerseDesc(vKey) {
+    const trimmed = verseDescDraft.trim()
+    if (!trimmed) return
+    try {
+      await upsertChapterDesc({ source: 'scripture', chapter_key: vKey, description: trimmed })
+      const rows = await fetchChapterDescs('scripture')
+      const chMap = {}
+      const vMap  = {}
+      rows.forEach(r => {
+        const parts = r.chapter_key.split(':')
+        const entry = { id: r.id, description: r.description }
+        if (parts.length === 3) vMap[r.chapter_key] = entry
+        else chMap[r.chapter_key] = entry
+      })
+      setScriptureChDescs(chMap)
+      setScriptureVerseDescs(vMap)
+      setEditingVerseDesc(null)
+      setVerseDescDraft('')
+    } catch(e) {
+      console.error('[scriptureVerseDesc] save failed:', e?.message)
+    }
+  }
+
+  async function removeScriptureVerseDesc(vKey) {
+    const existing = scriptureVerseDescs[vKey]
+    if (!existing) return
+    try {
+      await deleteChapterDesc(existing.id)
+      setScriptureVerseDescs(prev => {
+        const next = { ...prev }
+        delete next[vKey]
+        return next
+      })
+      setEditingVerseDesc(null)
+      setVerseDescDraft('')
+    } catch(e) {
+      console.error('[scriptureVerseDesc] delete failed:', e?.message)
+    }
+  }
+
   /* ── Verse tap-to-select ── */
   function toggleVerse(verseKey) {
     setSelectedVerses(prev => {
@@ -2103,6 +2158,79 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'none',
                            color:'var(--red,#dc2626)', border:'1px solid var(--red,#dc2626)', cursor:'pointer', marginLeft:'auto' }}
                   onClick={e => { e.stopPropagation(); removeScriptureChDesc(chKey) }}>Delete</button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  /** Renders the author-editable verse description below a verse row */
+  function renderScriptureVerseDesc(segBook, segChapter, verse) {
+    const vKey     = `${segBook}:${segChapter}:${verse}`
+    const existing = scriptureVerseDescs[vKey]
+    const isEditing = editingVerseDesc === vKey
+    if (!canEdit && !existing) return null
+    return (
+      <div style={{ borderLeft: '2px solid var(--teal)', marginLeft: 4, paddingLeft: 8, marginTop: 4, marginBottom: 4 }}
+           onClick={e => e.stopPropagation()}>
+        {!isEditing && existing && (
+          <p style={{
+            margin: 0,
+            fontSize: 12.5,
+            fontStyle: 'italic',
+            color: 'var(--ink-muted)',
+            lineHeight: 1.55,
+            fontFamily: "'Lora', Georgia, serif",
+          }}>
+            {existing.description}
+            {canEdit && (
+              <button
+                style={{ background:'none', border:'none', cursor:'pointer', marginLeft:5, padding:'1px 3px',
+                         color:'var(--teal)', fontSize:10, verticalAlign:'middle' }}
+                onClick={e => { e.stopPropagation(); setEditingVerseDesc(vKey); setVerseDescDraft(existing.description) }}
+                title="Edit verse description">
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 8.5l.4-1.6L6 2.5l1.5 1.5L3.1 8.5H1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  <line x1="5.5" y1="3" x2="7" y2="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                </svg>
+              </button>
+            )}
+          </p>
+        )}
+        {canEdit && !existing && !isEditing && (
+          <button
+            style={{ background:'none', border:'1px dashed var(--teal)', borderRadius:4, cursor:'pointer',
+                     padding:'1px 7px', color:'var(--teal)', fontSize:10, fontFamily:"'DM Sans',sans-serif" }}
+            onClick={e => { e.stopPropagation(); setEditingVerseDesc(vKey); setVerseDescDraft('') }}
+          >+ verse description</button>
+        )}
+        {canEdit && isEditing && (
+          <div>
+            <textarea
+              value={verseDescDraft}
+              onChange={e => setVerseDescDraft(e.target.value)}
+              placeholder={`Description for ${segBook} ${segChapter}:${verse}…`}
+              style={{ width:'100%', minHeight:52, fontSize:12.5, padding:5, borderRadius:4,
+                       border:'1px solid var(--teal)', resize:'vertical', fontFamily:"'Lora', Georgia, serif",
+                       background:'var(--bg)', color:'var(--ink)', boxSizing:'border-box' }}
+              autoFocus rows={2}
+            />
+            <div style={{ display:'flex', gap:6, marginTop:3 }}>
+              <button
+                style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'var(--teal)',
+                         color:'#fff', border:'none', cursor:'pointer' }}
+                onClick={e => { e.stopPropagation(); saveScriptureVerseDesc(vKey) }}>Save</button>
+              <button
+                style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'none',
+                         color:'var(--ink-muted)', border:'1px solid var(--border)', cursor:'pointer' }}
+                onClick={e => { e.stopPropagation(); setEditingVerseDesc(null); setVerseDescDraft('') }}>Cancel</button>
+              {existing && (
+                <button
+                  style={{ fontSize:11, padding:'2px 10px', borderRadius:4, background:'none',
+                           color:'var(--red,#dc2626)', border:'1px solid var(--red,#dc2626)', cursor:'pointer', marginLeft:'auto' }}
+                  onClick={e => { e.stopPropagation(); removeScriptureVerseDesc(vKey) }}>Delete</button>
               )}
             </div>
           </div>
@@ -2519,6 +2647,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   </div>
                                 )}
 
+                                {/* ── Scripture verse description (morph mode) ── */}
+                                {renderScriptureVerseDesc(seg.book, seg.chapter, verse)}
+
                                 {/* ── Confession cross-refs (morph mode) ── */}
                                 {studyMode && (() => {
                                   const verseRefs = getCrossRefs(seg.book, seg.chapter, verse)
@@ -2893,6 +3024,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 </div>
                               )
                             })()}
+
+                            {/* ── Scripture verse description ── */}
+                            {renderScriptureVerseDesc(seg.book, seg.chapter, verse)}
 
                             {/* ── Parallel original-language section ── */}
                             {parallelMode && (() => {
