@@ -3,15 +3,15 @@
  *
  * One-time script: upserts author cross-references for 2 John.
  *
- * Usage:
- *   node scripts/seed-2john-xrefs.mjs <your-password>
+ * Usage (service role key — bypasses RLS, no login needed):
+ *   node scripts/seed-2john-xrefs.mjs <service-role-key>
+ *
+ * Get it from: Supabase dashboard → Project Settings → API → service_role key
  */
 
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL  = 'https://bhnfugknhwhuqxsqopgj.supabase.co'
-const ANON_KEY      = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJobmZ1Z2tuaHdodXF4c3FvcGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3MDU3NzQsImV4cCI6MjA5MjI4MTc3NH0.oPRazImWrXZcrkvEmEIcpJFp-Oj0BtYllEF29-wfBE4'
-const AUTHOR_EMAIL  = 'jeffchavez0828@gmail.com'
+const SUPABASE_URL = 'https://bhnfugknhwhuqxsqopgj.supabase.co'
 
 // ── Book name normalisation ──────────────────────────────────────────────────
 // Maps abbreviated names to full canonical names used in the database.
@@ -114,21 +114,19 @@ const XREFS = [
 ]
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-const password = process.argv[2]
-if (!password) {
-  console.error('Usage: node scripts/seed-2john-xrefs.mjs <your-password>')
+const serviceRoleKey = process.argv[2]
+if (!serviceRoleKey) {
+  console.error('Usage: node scripts/seed-2john-xrefs.mjs <service-role-key>')
+  console.error('  Get it from: Supabase dashboard → Project Settings → API → service_role key')
   process.exit(1)
 }
 
-const supabase = createClient(SUPABASE_URL, ANON_KEY)
-
-console.log(`Signing in as ${AUTHOR_EMAIL}…`)
-const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-  email: AUTHOR_EMAIL,
-  password,
+// Service role key bypasses RLS — no sign-in needed
+const supabase = createClient(SUPABASE_URL, serviceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
 })
-if (authError) { console.error('Sign-in failed:', authError.message); process.exit(1) }
-console.log('Signed in successfully.')
+
+console.log('Upserting 2 John cross-references…')
 
 let inserted = 0
 let skipped  = 0
@@ -159,4 +157,3 @@ for (const xref of XREFS) {
 }
 
 console.log(`\nDone. ${inserted} upserted, ${skipped} failed.`)
-await supabase.auth.signOut()
