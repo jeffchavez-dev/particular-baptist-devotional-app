@@ -19,6 +19,12 @@ import {
   setHighlight, setItemNote,
   addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
 } from '../lib/annotations'
+import {
+  isAuthor,
+  fetchChapterDescs,
+  upsertChapterDesc,
+  deleteChapterDesc,
+} from '../lib/authorContent'
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
@@ -712,6 +718,11 @@ export default function ConfessionsPage() {
 
   const [activeItemKey, setActiveItemKey] = useState(null) // tap-to-show actions
 
+  /* Author chapter descriptions */
+  const [chapterDescs,   setChapterDescs]   = useState({}) // { [chapter_key]: {id, description} }
+  const [editingChDesc,  setEditingChDesc]  = useState(null) // chapter_key being edited, or null
+  const [chDescDraft,    setChDescDraft]    = useState('')
+
   const handleHighlight = useCallback((key, colorId) => {
     setHighlight(key, colorId, userId)
     setHlData(loadHighlights())
@@ -746,6 +757,16 @@ export default function ConfessionsPage() {
       window.removeEventListener('pb-note-changed', onNoteChanged)
     }
   }, [])
+
+  /* Fetch chapter descriptions whenever the active tab changes */
+  useEffect(() => {
+    const src = tab || '2lbcf'
+    fetchChapterDescs(src).then(rows => {
+      const map = {}
+      rows.forEach(r => { map[r.chapter_key] = { id: r.id, description: r.description } })
+      setChapterDescs(map)
+    })
+  }, [tab])
 
   /* Keep prefsSizeRef in sync for pinch handler */
   useEffect(() => { prefsSizeRef.current = prefs.sizePx }, [prefs.sizePx])
@@ -904,6 +925,88 @@ export default function ConfessionsPage() {
   const src = SOURCES[tab] || SOURCES['2lbcf']
   const sidebarSrc = SOURCES[sidebarConf] || SOURCES['2lbcf']
   const textStyle = { fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId) }
+  const _isAuthor = isAuthor(session)
+
+  /* Renders chapter description + author edit controls for a given chapter_key + source */
+  function ChapterDesc({ chapterKey, srcKey }) {
+    const existing = chapterDescs[chapterKey]
+    const isEditing = editingChDesc === chapterKey
+    const srcColor = (SOURCES[srcKey] || SOURCES['2lbcf']).color
+
+    async function saveDesc() {
+      const text = chDescDraft.trim()
+      if (!text) {
+        // treat as delete
+        if (existing?.id) {
+          await deleteChapterDesc(existing.id)
+          setChapterDescs(prev => { const n = {...prev}; delete n[chapterKey]; return n })
+        }
+      } else {
+        await upsertChapterDesc({ source: srcKey, chapter_key: chapterKey, description: text })
+        setChapterDescs(prev => ({
+          ...prev,
+          [chapterKey]: { ...prev[chapterKey], description: text },
+        }))
+      }
+      setEditingChDesc(null)
+    }
+
+    async function deleteDesc() {
+      if (existing?.id) await deleteChapterDesc(existing.id)
+      setChapterDescs(prev => { const n = {...prev}; delete n[chapterKey]; return n })
+      setEditingChDesc(null)
+    }
+
+    if (isEditing) {
+      return (
+        <div style={cd.editorWrap}>
+          <textarea
+            autoFocus
+            rows={4}
+            value={chDescDraft}
+            onChange={e => setChDescDraft(e.target.value)}
+            placeholder="Write a chapter introduction or description visible to all readers…"
+            style={cd.textarea}
+          />
+          <div style={cd.actions}>
+            <button onClick={saveDesc} style={cd.saveBtn}>Save</button>
+            <button onClick={() => setEditingChDesc(null)} style={cd.cancelBtn}>Cancel</button>
+            {existing?.description && (
+              <button onClick={deleteDesc} style={cd.deleteBtn}>Delete</button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div style={cd.wrap}>
+        {existing?.description && (
+          <p style={cd.text}>{existing.description}</p>
+        )}
+        {_isAuthor && (
+          <button
+            style={{
+              ...cd.editBtn,
+              color: existing?.description ? srcColor : 'var(--ink-faint)',
+              opacity: existing?.description ? 1 : 0.45,
+            }}
+            onClick={() => {
+              setChDescDraft(existing?.description || '')
+              setEditingChDesc(chapterKey)
+            }}
+            title={existing?.description ? 'Edit chapter description' : 'Add chapter description'}
+          >
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M1 9.5l.4-2L7 2l2 2-5.6 5.5-2.4.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none"/>
+              <line x1="6.2" y1="2.8" x2="8.2" y2="4.8" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+            <span style={{fontSize:10}}>{existing?.description ? 'Edit intro' : 'Add intro'}</span>
+          </button>
+        )}
+      </div>
+    )
+  }
 
   function setTab(t) {
     setSearchParams({ t })
@@ -1332,6 +1435,7 @@ export default function ConfessionsPage() {
                       {chNum !== '0' && <span style={s.chapterNum}>Chapter {chNum}</span>}
                       <h2 style={s.chapterTitle}>{chNum === '0' ? 'Preface' : chTitle}</h2>
                     </div>
+                    <ChapterDesc chapterKey={chNum} srcKey="2lbcf" />
                     {paras.map(p => {
                       const paraMatches = !q || chTitleMatches ||
                         textMatches(p.text, p.refs, SEARCH_IDX.lbcf2[p.key] || '', q)
@@ -1462,6 +1566,7 @@ export default function ConfessionsPage() {
                         <h2 style={s.articleTitle}>{item.title}</h2>
                       </div>
                     </div>
+                    <ChapterDesc chapterKey={num} srcKey="1lbcf" />
                     <div style={s.articleBody}>
                       {lines.map((line, i) => {
                         const clean = line.replace(/^\d+\s+/, '').trim()
@@ -1810,5 +1915,46 @@ const sl = {
     display:'-webkit-box', WebkitLineClamp:2,
     WebkitBoxOrient:'vertical', overflow:'hidden',
     fontFamily:"'Cormorant Garamond',serif",
+  },
+}
+
+/* Chapter description styles */
+const cd = {
+  wrap: { marginBottom:'1rem' },
+  text: {
+    fontSize:15, fontFamily:"'Cormorant Garamond',serif", fontStyle:'italic',
+    color:'var(--ink-muted)', lineHeight:1.75, margin:'0 0 8px',
+    borderLeft:'2px solid var(--border)', paddingLeft:12,
+  },
+  editBtn: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:11, fontWeight:500, background:'none',
+    border:'1px solid var(--border)', borderRadius:99,
+    padding:'4px 10px', cursor:'pointer', transition:'all 0.12s',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  editorWrap: { marginBottom:'1.25rem' },
+  textarea: {
+    width:'100%', padding:'8px 10px', boxSizing:'border-box',
+    border:'1.5px solid var(--teal)', borderRadius:'var(--radius)',
+    fontSize:14, color:'var(--ink)', lineHeight:1.65,
+    fontFamily:"'Cormorant Garamond',serif", fontStyle:'italic',
+    background:'var(--surface)', resize:'vertical', outline:'none',
+  },
+  actions: { display:'flex', gap:6, alignItems:'center', marginTop:6 },
+  saveBtn: {
+    fontSize:11, fontWeight:700, padding:'5px 12px',
+    background:'var(--teal)', color:'white', border:'none',
+    borderRadius:'var(--radius)', cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  cancelBtn: {
+    fontSize:11, padding:'5px 10px', background:'none', color:'var(--ink-muted)',
+    border:'1px solid var(--border)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+  },
+  deleteBtn: {
+    fontSize:11, padding:'5px 10px', background:'none', color:'#b33',
+    border:'1px solid rgba(180,50,50,0.3)', borderRadius:'var(--radius)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif", marginLeft:'auto',
   },
 }

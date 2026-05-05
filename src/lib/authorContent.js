@@ -152,6 +152,55 @@ export async function deleteAuthorCrossRef(id) {
   if (error) throw error
 }
 
+// ─────────────────────────────────────────────
+//  Author Chapter Descriptions
+// ─────────────────────────────────────────────
+
+/**
+ * Fetch all author chapter descriptions for a given source.
+ * Returns an array of { id, source, chapter_key, description, updated_at }
+ * `source` is one of: '2lbcf', '1lbcf', 'catechism', 'orthodox'
+ * `chapter_key` is the chapter/article/question identifier (string).
+ */
+export async function fetchChapterDescs(source) {
+  try {
+    const { data, error } = await supabase
+      .from('author_chapter_descs')
+      .select('*')
+      .eq('source', source)
+    if (error) throw error
+    return data || []
+  } catch (e) {
+    console.warn('[authorContent] fetchChapterDescs:', e?.message)
+    return []
+  }
+}
+
+/**
+ * Create or update a chapter description.
+ * Conflict key: (source, chapter_key)
+ */
+export async function upsertChapterDesc({ source, chapter_key, description }) {
+  const { error } = await supabase
+    .from('author_chapter_descs')
+    .upsert(
+      { source, chapter_key, description, updated_at: new Date().toISOString() },
+      { onConflict: 'source,chapter_key' }
+    )
+  if (error) throw error
+}
+
+/**
+ * Delete a chapter description by its primary key id.
+ */
+export async function deleteChapterDesc(id) {
+  const { error } = await supabase
+    .from('author_chapter_descs')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
 /* ──────────────────────────────────────────────────────────────────────────────
    SQL MIGRATION — run once in the Supabase SQL editor
    ──────────────────────────────────────────────────────────────────────────────
@@ -200,6 +249,27 @@ create policy "public read author xrefs"
 -- Only the author can write
 create policy "author write xrefs"
   on author_cross_refs for all
+  using  (auth.jwt() ->> 'email' = 'jeffchavez0828@gmail.com')
+  with check (auth.jwt() ->> 'email' = 'jeffchavez0828@gmail.com');
+
+-- 3) Author chapter descriptions (heading-level commentary per chapter/article)
+create table if not exists author_chapter_descs (
+  id          uuid        default gen_random_uuid() primary key,
+  source      text        not null,       -- '2lbcf' | '1lbcf' | 'catechism' | 'orthodox'
+  chapter_key text        not null,       -- chapter number / article number / etc. as string
+  description text        not null default '',
+  updated_at  timestamptz default now(),
+  unique(source, chapter_key)
+);
+alter table author_chapter_descs enable row level security;
+
+-- Everyone can read
+create policy "public read chapter descs"
+  on author_chapter_descs for select using (true);
+
+-- Only the author can write
+create policy "author write chapter descs"
+  on author_chapter_descs for all
   using  (auth.jwt() ->> 'email' = 'jeffchavez0828@gmail.com')
   with check (auth.jwt() ->> 'email' = 'jeffchavez0828@gmail.com');
 
