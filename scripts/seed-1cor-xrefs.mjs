@@ -78,6 +78,7 @@ const BOOK_MAP = {
   'Ruth':     'Ruth',
   'Song':     'Song of Solomon',
   'Titus':    'Titus',
+  'Ezra':     'Ezra',
 }
 
 // Sort longest-first so "1 Thess." is tried before "1 Tim." etc.
@@ -471,6 +472,10 @@ function parseChapterVerse(book, rest) {
   return verses.map(v => ({ tgt_book: book, tgt_chapter: ch, tgt_verse: v }))
 }
 
+function stripQualifier(s) {
+  return s.replace(/^(Cited from|Cited|See)\s+/i, '').trim()
+}
+
 function parseOneRef(s, srcChapter, lastBook) {
   s = s.trim()
   if (!s) return []
@@ -478,11 +483,14 @@ function parseOneRef(s, srcChapter, lastBook) {
   // Strip "For ver. X-Y, " prefix (e.g. "For ver. 23-25, see Matt...")
   s = s.replace(/^For\s+ver\.\s*[\d,\s-]+,?\s*/i, '')
 
-  // Strip leading qualifier words
-  s = s.replace(/^(Cited from|Cited|See)\s+/i, '')
+  // Strip leading qualifier words (before AND after bracket removal)
+  s = stripQualifier(s)
 
   // Strip surrounding brackets (may be partial after semicolon split)
   s = s.replace(/^\[/, '').replace(/\]$/, '').trim()
+
+  // Strip qualifier words again (handles "[See ver. X]" pattern)
+  s = stripQualifier(s)
 
   // Strip Greek annotation
   s = s.replace(/\s*\(Gk\.\)\s*/g, '')
@@ -504,15 +512,25 @@ function parseOneRef(s, srcChapter, lastBook) {
     return parseChapterVerse('1 Corinthians', s.replace(/^ch\.\s*/i, ''))
   }
 
-  // Standalone chapter:verse (e.g. "105:40" continuing Psalms)
+  // Standalone chapter:verse shorthand (e.g. "105:40", "14:37" continuing prev book)
   if (/^\d+:\d+/.test(s) && lastBook) {
     return parseChapterVerse(lastBook, s)
   }
 
   // Book reference — try longest abbreviations first
   for (const abbr of ABBR_SORTED) {
-    if (s.startsWith(abbr + ' ') || s === abbr) {
+    // Match "ABBR rest" (space after abbr) or exact match "ABBR" alone
+    if (s === abbr || s.startsWith(abbr + ' ') || s.startsWith(abbr + '\t')) {
       const rest = s.slice(abbr.length).trim()
+      return parseChapterVerse(BOOK_MAP[abbr], rest)
+    }
+  }
+
+  // Fallback: try matching without trailing dot (e.g. "Ezra" as plain word)
+  for (const abbr of ABBR_SORTED) {
+    const base = abbr.replace(/\.$/, '')
+    if (s.startsWith(base + ' ') || s === base) {
+      const rest = s.slice(base.length).trim()
       return parseChapterVerse(BOOK_MAP[abbr], rest)
     }
   }
@@ -549,8 +567,8 @@ function parseLine(line) {
           tgt_chapter: r.tgt_chapter,
           tgt_verse:   r.tgt_verse ?? null,
         })
-        // Track last explicitly named (non-1Cor) book for shorthand refs
-        if (r.tgt_book !== '1 Corinthians') lastBook = r.tgt_book
+        // Track last book (inc. 1 Corinthians) so bare ch:verse shorthands resolve correctly
+        if (r.tgt_book) lastBook = r.tgt_book
       }
     }
   }

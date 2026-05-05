@@ -16,7 +16,8 @@ export default function ScripturePage() {
   const { state: locationState } = useLocation()
   const { session } = useAuth()
 
-  const kjvRef    = useRef(null)
+  const kjvRef             = useRef(null)
+  const versionDropdownRef = useRef(null)
   const [readBook,    setReadBook]    = useState('Genesis')
   const [readChapter, setReadChapter] = useState(1)
   const [readSearch,  setReadSearch]  = useState('')
@@ -36,6 +37,7 @@ export default function ScripturePage() {
   const [canGoBack,    setCanGoBack]    = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
+  const [showVersionDropdown, setShowVersionDropdown] = useState(false)
   // Show version picker on first launch (no saved preference)
   const [showVersionPicker, setShowVersionPicker] = useState(() => {
     try { return !localStorage.getItem('pb-default-version') } catch { return false }
@@ -60,6 +62,16 @@ export default function ScripturePage() {
   useEffect(() => {
     if (searchPanelOpen) setTimeout(() => searchInputRef.current?.focus(), 50)
   }, [searchPanelOpen])
+
+  // Close version dropdown on outside click
+  useEffect(() => {
+    if (!showVersionDropdown) return
+    function onOutside(e) {
+      if (!versionDropdownRef.current?.contains(e.target)) setShowVersionDropdown(false)
+    }
+    document.addEventListener('mousedown', onOutside)
+    return () => document.removeEventListener('mousedown', onOutside)
+  }, [showVersionDropdown])
 
   // Auto-hide header on scroll-down, show on scroll-up
   const headerRef   = useRef(null)
@@ -147,20 +159,6 @@ export default function ScripturePage() {
         }}
       >
         <div style={s.headerInner}>
-          {/* Hamburger → opens KjvReader's internal book/version sidebar */}
-          <button
-            onClick={() => kjvRef.current?.openSidebar()}
-            style={s.menuBtn}
-            aria-label="Browse books & versions"
-            title="Browse books & versions"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <rect x="2" y="3.5" width="14" height="1.8" rx="0.9" fill="currentColor"/>
-              <rect x="2" y="8.1" width="10"  height="1.8" rx="0.9" fill="currentColor"/>
-              <rect x="2" y="12.7" width="12" height="1.8" rx="0.9" fill="currentColor"/>
-            </svg>
-          </button>
-
           {/* History back / forward */}
           <div style={s.historyBtns}>
             <button
@@ -199,21 +197,51 @@ export default function ScripturePage() {
             </svg>
             <span style={s.readBookName}>{readBook}</span>
             <span style={s.readBookCh}>Ch. {readChapter}</span>
-            <span style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              color: 'var(--ink-muted)',
-              background: 'var(--bg-muted, rgba(0,0,0,0.07))',
-              borderRadius: 4,
-              padding: '1px 5px',
-              marginLeft: 2,
-              fontFamily: "'DM Sans', sans-serif",
-              textTransform: 'uppercase',
-            }}>
-              {BIBLE_VERSIONS.find(v => v.id === readVersion)?.abbreviation || readVersion.toUpperCase()}
-            </span>
           </button>
+
+          {/* Version dropdown */}
+          <div ref={versionDropdownRef} style={{ position:'relative', flexShrink:0 }}>
+            <button
+              style={s.versionBtn}
+              onClick={() => setShowVersionDropdown(d => !d)}
+              aria-label="Select Bible translation"
+              title="Select Bible translation"
+            >
+              <span style={s.versionBtnLabel}>
+                {BIBLE_VERSIONS.find(v => v.id === readVersion)?.abbreviation || readVersion.toUpperCase()}
+              </span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.6 }}>
+                <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            {showVersionDropdown && (
+              <div style={s.versionDropdown}>
+                {BIBLE_VERSIONS.map(v => (
+                  <button
+                    key={v.id}
+                    style={{
+                      ...s.versionDropdownItem,
+                      ...(v.id === readVersion ? s.versionDropdownItemActive : {}),
+                    }}
+                    onClick={() => {
+                      setReadVersion(v.id)
+                      try { localStorage.setItem('reader-version', v.id) } catch {}
+                      setDefaultReaderVersion(v.id)
+                      setShowVersionDropdown(false)
+                    }}
+                  >
+                    <span style={s.versionDropdownAbbr}>{v.abbreviation}</span>
+                    <span style={s.versionDropdownName}>{v.label}</span>
+                    {v.id === readVersion && (
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ marginLeft:'auto', flexShrink:0 }}>
+                        <path d="M2 5.5l3 3 4-5" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Author edit-mode toggle — only visible to the author */}
           {isAuthorUser && (
@@ -599,6 +627,43 @@ const s = {
   },
   readBookName: { fontSize:13, fontWeight:600, color:'var(--ink)' },
   readBookCh:   { fontSize:11, color:'var(--ink-faint)' },
+
+  /* version dropdown button */
+  versionBtn: {
+    display:'flex', alignItems:'center', gap:4,
+    padding:'5px 8px', borderRadius:'var(--radius)',
+    border:'1px solid var(--border)', background:'var(--surface)',
+    cursor:'pointer', flexShrink:0, fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.15s',
+    height:36,
+  },
+  versionBtnLabel: {
+    fontSize:11, fontWeight:700, color:'var(--ink-muted)',
+    letterSpacing:'0.04em', textTransform:'uppercase',
+  },
+  versionDropdown: {
+    position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:200,
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderRadius:'var(--radius-lg)', boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
+    minWidth:180, overflow:'hidden',
+    display:'flex', flexDirection:'column',
+  },
+  versionDropdownItem: {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'9px 12px', border:'none', background:'none',
+    cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.1s', width:'100%',
+  },
+  versionDropdownItemActive: {
+    background:'var(--teal-light)',
+  },
+  versionDropdownAbbr: {
+    fontSize:11, fontWeight:700, color:'var(--ink)',
+    letterSpacing:'0.04em', textTransform:'uppercase', minWidth:32,
+  },
+  versionDropdownName: {
+    fontSize:12, color:'var(--ink-muted)', flex:1,
+  },
 
 }
 
