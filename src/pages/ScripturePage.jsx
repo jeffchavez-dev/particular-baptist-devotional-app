@@ -638,11 +638,11 @@ export default function ScripturePage() {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        paddingTop: headerH,
       }}>
         <KjvReader
           ref={kjvRef}
           version={readVersion}
+          topInset={headerH}
           onVersionChange={v => {
             setReadVersion(v)
             try { localStorage.setItem('reader-version', v) } catch {}

@@ -575,7 +575,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark, topInset = 0 }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -2350,7 +2350,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       })()}
 
       {/* Reader panel */}
-      <div style={r.readerWrap} ref={readerRef}>
+      <div style={{ ...r.readerWrap, paddingTop: topInset }} ref={readerRef}>
 
         <div style={r.content}>
 

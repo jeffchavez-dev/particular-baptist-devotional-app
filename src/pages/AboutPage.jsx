@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
-import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
+import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
@@ -420,94 +420,50 @@ export default function AboutPage() {
             </div>
 
             {/* Font Style */}
-            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+            <div style={s.settingRow}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Reading Font Style</span>
                 <span style={s.settingHint}>Typeface for confession &amp; reading text</span>
               </div>
-              <div style={s.fontGrid}>
-                {FONT_OPTIONS.map(f => {
-                  const active = prefs.fontId === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => updatePrefs({ ...prefs, fontId: f.id })}
-                      style={{
-                        ...s.fontBtn, fontFamily: f.css,
-                        background: active ? 'var(--teal-light)' : 'var(--surface)',
-                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
-                        color: active ? 'var(--teal)' : 'var(--ink)',
-                      }}
-                    >
-                      <span style={{fontSize:14, lineHeight:1.2}}>The fear of the Lord</span>
-                      <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)'}}>
-                        {f.label}
-                      </span>
-                    </button>
-                  )
-                })}
+              <div style={s.fontDropdownWrap}>
+                <FontDropdown
+                  value={prefs.fontId}
+                  options={FONT_OPTIONS}
+                  onChange={id => updatePrefs({ ...prefs, fontId: id })}
+                  sampleKey="sample"
+                />
               </div>
             </div>
 
             {/* Greek Script Font */}
-            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+            <div style={s.settingRow}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Greek NT Font</span>
                 <span style={s.settingHint}>Typeface for Greek New Testament text</span>
               </div>
-              <div style={s.fontGrid}>
-                {GREEK_FONTS.map(f => {
-                  const active = prefs.greekFontId === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      title={f.hint}
-                      onClick={() => updatePrefs({ ...prefs, greekFontId: f.id })}
-                      style={{
-                        ...s.fontBtn, fontFamily: f.css,
-                        background: active ? 'var(--teal-light)' : 'var(--surface)',
-                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
-                        color: active ? 'var(--teal)' : 'var(--ink)',
-                      }}
-                    >
-                      <span style={{fontSize:14, lineHeight:1.3}}>λόγος ζωῆς</span>
-                      <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)'}}>
-                        {f.label}
-                      </span>
-                    </button>
-                  )
-                })}
+              <div style={s.fontDropdownWrap}>
+                <FontDropdown
+                  value={prefs.greekFontId}
+                  options={GREEK_FONTS}
+                  onChange={id => updatePrefs({ ...prefs, greekFontId: id })}
+                  sampleKey="sample"
+                />
               </div>
             </div>
 
             {/* Hebrew Script Font */}
-            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+            <div style={s.settingRow}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Hebrew OT Font</span>
                 <span style={s.settingHint}>Typeface for Hebrew Old Testament text</span>
               </div>
-              <div style={s.fontGrid}>
-                {HEBREW_FONTS.map(f => {
-                  const active = prefs.hebrewFontId === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      title={f.hint}
-                      onClick={() => updatePrefs({ ...prefs, hebrewFontId: f.id })}
-                      style={{
-                        ...s.fontBtn, fontFamily: f.css, direction:'rtl',
-                        background: active ? 'var(--teal-light)' : 'var(--surface)',
-                        borderColor: active ? 'var(--teal)' : 'var(--border-strong)',
-                        color: active ? 'var(--teal)' : 'var(--ink)',
-                      }}
-                    >
-                      <span style={{fontSize:16, lineHeight:1.4}}>בְּרֵאשִׁית</span>
-                      <span style={{fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:600, color: active ? 'var(--teal)' : 'var(--ink-faint)', direction:'ltr'}}>
-                        {f.label}
-                      </span>
-                    </button>
-                  )
-                })}
+              <div style={s.fontDropdownWrap}>
+                <FontDropdown
+                  value={prefs.hebrewFontId}
+                  options={HEBREW_FONTS}
+                  onChange={id => updatePrefs({ ...prefs, hebrewFontId: id })}
+                  sampleKey="sample"
+                />
               </div>
             </div>
 
@@ -953,12 +909,7 @@ const s = {
     justifyContent:'center', fontFamily:"'Cormorant Garamond',serif",
   },
 
-  fontGrid: { display:'flex', flexDirection:'column', gap:5, flex:1, minWidth:200 },
-  fontBtn: {
-    display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:10,
-    padding:'8px 12px', border:'1.5px solid', borderRadius:'var(--radius)',
-    cursor:'pointer', transition:'all 0.12s', width:'100%', textAlign:'left',
-  },
+  fontDropdownWrap: { flex:1, minWidth:160, maxWidth:260 },
 
   sectionTitle: {
     fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em',

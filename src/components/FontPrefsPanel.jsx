@@ -28,18 +28,21 @@ export const GREEK_FONTS = [
     label: 'Palatino',
     css: "'Palatino Linotype','Palatino','Book Antiqua',serif",
     hint: 'Classic scholarly serif — system font, no download',
+    sample: 'λόγος ζωῆς',
   },
   {
     id: 'gentium',
     label: 'Gentium',
     css: "'Gentium Plus','Gentium',serif",
     hint: 'Designed for biblical & linguistic texts',
+    sample: 'λόγος ζωῆς',
   },
   {
     id: 'garamond',
     label: 'Garamond',
     css: "'EB Garamond','Garamond',serif",
     hint: 'Elegant humanist serif with polytonic Greek',
+    sample: 'λόγος ζωῆς',
   },
 ]
 
@@ -49,18 +52,21 @@ export const HEBREW_FONTS = [
     label: 'SBL',
     css: "'SBL Hebrew','David','Arial Hebrew',serif",
     hint: 'Society of Biblical Literature academic font',
+    sample: 'בְּרֵאשִׁית',
   },
   {
     id: 'frankruhl',
     label: 'Frank Ruhl',
     css: "'Frank Ruhl Libre','FrankRuehl','David',serif",
     hint: 'Classic Hebrew newspaper / print style',
+    sample: 'בְּרֵאשִׁית',
   },
   {
     id: 'noto',
     label: 'Noto',
     css: "'Noto Serif Hebrew',serif",
     hint: "Google Noto — universal Unicode coverage",
+    sample: 'בְּרֵאשִׁית',
   },
 ]
 
@@ -93,7 +99,7 @@ export function getFontCss(fontId) {
 }
 
 /* ── Custom dropdown — shows font name, sample rendered in that font ── */
-function FontDropdown({ value, options, onChange, sampleKey = 'sample' }) {
+export function FontDropdown({ value, options, onChange, sampleKey = 'sample' }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const active = options.find(f => f.id === value) || options[0]
