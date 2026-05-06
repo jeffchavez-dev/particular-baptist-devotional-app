@@ -55,6 +55,11 @@ function cacheSet(key, value) {
 
 const BULK_CACHE_KEY = 'authorContent:bulk_v2'
 
+// Re-fetch from network at most once every 6 hours.
+// Offline sessions always use the localStorage cache; the TTL only applies
+// when the device is online and the cache is older than this threshold.
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000   // 6 hours
+
 let _xrefsMap    = null   // null = not yet loaded from storage
 let _backRefsMap = null
 let _notesMap    = null
@@ -83,76 +88,79 @@ function buildMaps(xrefs, notes) {
 
 /**
  * Attempt to load the bulk cache from localStorage into memory (synchronous).
- * Returns true if the cache was present and loaded successfully.
+ * Returns { loaded: bool, stale: bool }.
+ * stale = true when the cache is older than CACHE_TTL_MS (needs a network refresh).
  */
 function loadBulkFromStorage() {
-  if (_bulkReady) return true
+  if (_bulkReady) return { loaded: true, stale: false }
   try {
     const raw = localStorage.getItem(BULK_CACHE_KEY)
-    if (!raw) return false
-    const { xrefs, notes } = JSON.parse(raw)
+    if (!raw) return { loaded: false, stale: true }
+    const { xrefs, notes, savedAt } = JSON.parse(raw)
     buildMaps(xrefs, notes)
-    return true
-  } catch { return false }
+    const age = Date.now() - (savedAt || 0)
+    return { loaded: true, stale: age > CACHE_TTL_MS }
+  } catch { return { loaded: false, stale: true } }
 }
 
 /**
- * Fetch ALL author content from Supabase in two queries, save to localStorage,
- * and rebuild the in-memory maps.  Call once at app startup; safe to call
- * multiple times (subsequent calls are no-ops if called while a fetch is
- * already in flight).
+ * Fetch ALL rows from a Supabase table, paginating past the 1,000-row default cap.
+ */
+async function fetchAllRows(table) {
+  const PAGE = 1000
+  const rows = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('*')
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    rows.push(...(data || []))
+    if (!data || data.length < PAGE) break   // reached last page
+    from += PAGE
+  }
+  return rows
+}
+
+/**
+ * Fetch ALL author content from Supabase, save to localStorage, rebuild maps.
  *
- * After completion, dispatches 'pb-author-content-ready' so components that
- * rendered before the prefetch finished can update themselves.
+ * Strategy — offline-first with TTL-based background revalidation:
+ *   • Always loads the localStorage cache instantly (fast first render, works offline).
+ *   • Only hits the network when the cache is missing or older than CACHE_TTL_MS.
+ *   • If the network fetch fails (offline), the existing cache is kept and used silently.
+ *   • After a successful fetch, dispatches 'pb-author-content-ready' so components
+ *     that rendered before fresh data arrived can re-render.
  */
 let _prefetchInFlight = false
 export async function prefetchAllAuthorContent() {
-  // Load from localStorage cache immediately so existing data renders fast
-  const hadCache = loadBulkFromStorage()
+  // 1. Load cache immediately — instant render, works offline
+  const { loaded: hadCache, stale } = loadBulkFromStorage()
 
-  // Don't start a second network fetch if one is already in flight
+  // 2. If cache is fresh enough, nothing more to do
+  if (hadCache && !stale) return
+
+  // 3. Cache is missing or stale — do a background network refresh
   if (_prefetchInFlight) return
   _prefetchInFlight = true
 
-  // Always re-fetch from the network so newly-seeded data is picked up.
-  // If we already served from cache, this runs as a background revalidation.
   try {
-    // Paginate to fetch ALL rows — Supabase caps at 1,000 per request by default.
-    const PAGE = 1000
-    async function fetchAll(table) {
-      const rows = []
-      let from = 0
-      while (true) {
-        const { data, error } = await supabase
-          .from(table)
-          .select('*')
-          .range(from, from + PAGE - 1)
-        if (error) throw error
-        rows.push(...(data || []))
-        if (!data || data.length < PAGE) break   // last page
-        from += PAGE
-      }
-      return rows
-    }
-
     const [xrefs, notes] = await Promise.all([
-      fetchAll('author_cross_refs'),
-      fetchAll('author_scripture_notes'),
+      fetchAllRows('author_cross_refs'),
+      fetchAllRows('author_scripture_notes'),
     ])
     buildMaps(xrefs, notes)
 
     try {
-      localStorage.setItem(BULK_CACHE_KEY, JSON.stringify({ xrefs, notes }))
-    } catch { /* quota exceeded — ignore */ }
+      localStorage.setItem(BULK_CACHE_KEY, JSON.stringify({ xrefs, notes, savedAt: Date.now() }))
+    } catch { /* storage quota exceeded — ignore */ }
 
-    // Notify components to re-render with fresh data (important when cache was stale)
+    // Tell components to re-render with fresh data
     window.dispatchEvent(new CustomEvent('pb-author-content-ready'))
   } catch (e) {
-    console.warn('[authorContent] prefetch failed, will use per-chapter fallback:', e?.message)
-    // If we had no cache and network failed, try per-chapter fallback
-    if (!hadCache) {
-      _bulkReady = false
-    }
+    // Network failed (offline) — silently keep using whatever cache we have
+    console.warn('[authorContent] network refresh skipped (offline?):', e?.message)
   } finally {
     _prefetchInFlight = false
   }
