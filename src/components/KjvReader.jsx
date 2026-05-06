@@ -778,9 +778,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
-  // Which text-version parallel is selected (if any)
-  const textParallelVersion = version === 'kjv' && parallelVersions.has('abab') ? 'abab'
-    : version === 'abab' && parallelVersions.has('kjv') ? 'kjv'
+  // Which text-version parallel is selected (if any) — supports KJV, ABAB, NASB
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb'])
+  const textParallelVersion = _TEXT_VERSIONS.has(version)
+    ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
 
   useImperativeHandle(ref, () => ({
@@ -2229,12 +2230,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         )}
 
         {/* ── Parallel section ── */}
-        {(version === 'kjv' || version === 'abab') && (
+        {(version === 'kjv' || version === 'abab' || version === 'nasb') && (
           <div style={sb.parallelSection}>
             <div style={sb.versionSectionTitle}>Parallel</div>
             <div style={sb.parallelPills}>
               {[
-                { id: version === 'kjv' ? 'abab' : 'kjv', label: version === 'kjv' ? 'ABAB' : 'KJV', title: version === 'kjv' ? 'Ang Bagong Ang Biblia' : 'King James Version' },
+                ...[
+                  { id: 'kjv',  label: 'KJV',  title: 'King James Version' },
+                  { id: 'abab', label: 'ABAB', title: 'Ang Bagong Ang Biblia' },
+                  { id: 'nasb', label: 'NASB', title: 'New American Standard Bible 1995' },
+                ].filter(v => v.id !== version),
                 { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
                 { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
                 { id: 'lxx', label: 'LXX', title: 'Greek Septuagint (OT books)' },
@@ -3213,7 +3218,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const tVData  = parallelTextData[tKey]
                               const tVerse  = tVData?.find(tv => tv.verse === verse)
                               if (!tVerse) return null
-                              const tLabel  = textParallelVersion === 'abab' ? 'ABAB' : 'KJV'
+                              const tLabel  = BIBLE_VERSIONS.find(v => v.id === textParallelVersion)?.abbreviation ?? textParallelVersion.toUpperCase()
                               const morphVerse = parallelData[`${seg.book}:${seg.chapter}`]?.find(pv => pv.verse === verse)
                               const lxxVerse = parallelLxxData[`${seg.book}:${seg.chapter}`]?.find(pv => (pv.v ?? pv.verse) === verse)
                               return (
@@ -3451,8 +3456,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       })}
                     </div>
 
-                    {/* ── Chapter-end read button (KJV / ABAB only) ── */}
-                    {(version === 'kjv' || version === 'abab') && (() => {
+                    {/* ── Chapter-end read button (KJV / ABAB / NASB only) ── */}
+                    {(version === 'kjv' || version === 'abab' || version === 'nasb') && (() => {
                       const chKey = `${seg.book} ${seg.chapter}`
                       const isDone = !!bibleProgress[chKey]
                       return (

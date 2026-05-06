@@ -65,8 +65,16 @@ export const BIBLE_VERSIONS = [
     scope: 'OT',        // OT books; LXX includes additional deuterocanonical books
     source: 'CCAT (Thesaurus Linguae Graecae / CATSS) CC BY 4.0',
   },
+  {
+    id: 'nasb',
+    label: 'New American Standard Bible 1995',
+    abbreviation: 'NASB',
+    language: 'English',
+    year: '1995',
+    description: 'New American Standard Bible, 1995 edition',
+    dataFile: '/nasb.json',
+  },
   // { id: 'esv',    label: 'English Standard Version', abbreviation: 'ESV', ... },
-  // { id: 'nasb',   label: 'New American Standard Bible', abbreviation: 'NASB', ... },
 ]
 
 // ── Version Data Cache ────────────────────────────────────────────────────

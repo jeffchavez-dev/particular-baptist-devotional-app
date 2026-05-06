@@ -19,6 +19,7 @@ const KEY = 'pb-default-version'
 export const DEFAULT_VERSION_OPTIONS = [
   { id: 'kjv',      label: 'KJV',      full: 'King James Version' },
   { id: 'abab',     label: 'ABAB',     full: 'Ang Bagong Ang Biblia' },
+  { id: 'nasb',     label: 'NASB',     full: 'New American Standard Bible 1995' },
   { id: 'original', label: 'Original', full: 'HOT (OT) · GNT (NT)' },
 ]
 
