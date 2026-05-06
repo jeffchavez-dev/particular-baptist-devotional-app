@@ -439,6 +439,7 @@ export default function ScripturePage() {
                                 style={sp.verseRow}
                                 onClick={() => {
                                   kjvRef.current?.navigateTo(hit.book, hit.chapter, hit.verse)
+                                  kjvRef.current?.setSearchQuery(panelQuery)
                                   setSearchPanelOpen(false)
                                 }}
                               >
@@ -462,7 +463,7 @@ export default function ScripturePage() {
 
         ) : (
           /* Shown when no active search */
-          <div>
+          <div style={{ flex:1, overflowY:'auto' }}>
             {/* Recent searches */}
             {searchHistory.length > 0 && (
               <div style={sp.section}>
@@ -676,11 +677,11 @@ const s = {
 
 const sp = {
   backdrop: {
-    position:'fixed', inset:0, zIndex:90,
+    position:'fixed', inset:0, zIndex:150,
     background:'rgba(0,0,0,0.3)',
   },
   panel: {
-    position:'fixed', top:0, right:0, bottom:0, zIndex:100,
+    position:'fixed', top:0, right:0, bottom:0, zIndex:160,
     width: 320, maxWidth:'90vw',
     background:'var(--surface)', borderLeft:'1px solid var(--border)',
     boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
