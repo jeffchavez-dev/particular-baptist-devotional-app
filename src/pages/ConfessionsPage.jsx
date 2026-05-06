@@ -1281,7 +1281,7 @@ export default function ConfessionsPage() {
 
       {/* ── Search panel ── */}
       {searchOpen && (
-        <div style={sl.searchPanel}>
+        <div style={{ ...sl.searchPanel, top: headerH }}>
           <div style={sl.searchInputRow} ref={searchWrapRef}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
               <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>

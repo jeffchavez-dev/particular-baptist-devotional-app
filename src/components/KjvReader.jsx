@@ -2322,47 +2322,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       <div style={r.readerWrap} ref={readerRef}>
 
         <div style={r.content}>
-          {/* ── Search status bar (text versions only) ── */}
-          {version !== 'greek' && version !== 'hebrew' && searchQuery.trim() && (
-            <div style={r.searchStatusBar}>
-              {searching ? (
-                <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Searching…</span>
-              ) : bibleResults !== null ? (
-                bibleResults.length === 0 ? (
-                  <span style={{ fontSize:12, color:'var(--ink-faint)' }}>No matches in Bible</span>
-                ) : (
-                  <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
-                    {bibleResults.length}{bibleResults.length === 200 ? '+' : ''} verse{bibleResults.length !== 1 ? 's' : ''} found
-                  </span>
-                )
-              ) : chapterMatches.length === 0 ? (
-                <span style={{ fontSize:12, color:'var(--ink-faint)' }}>
-                  Not in {book} {chapter} —{' '}
-                  <button
-                    style={{ background:'none', border:'none', cursor:'pointer', color:'var(--teal)', fontSize:12, fontWeight:600, padding:0, fontFamily:"'DM Sans',sans-serif" }}
-                    onClick={() => submitSearch(searchQuery)}
-                  >
-                    Search whole Bible ↵
-                  </button>
-                </span>
-              ) : (
-                <>
-                  <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>
-                    {searchFocus + 1} / {chapterMatches.length} in chapter
-                  </span>
-                  <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.max(0, f - 1))}>↑</button>
-                  <button style={r.searchNavBtn} onClick={() => setSearchFocus(f => Math.min(chapterMatches.length - 1, f + 1))}>↓</button>
-                  <button
-                    style={{ ...r.searchNavBtn, color:'var(--teal)', borderColor:'var(--teal)', fontWeight:600 }}
-                    onClick={() => submitSearch(searchQuery)}
-                    title="Search whole Bible"
-                  >
-                    Search Bible
-                  </button>
-                </>
-              )}
-            </div>
-          )}
 
           {/* ══════════════════════════════════════════════
               MORPHOLOGICAL MODE (GREEK NT / HEBREW OT)
@@ -3968,20 +3927,6 @@ const r = {
     background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
     fontSize:16, lineHeight:1, padding:'0 2px', flexShrink:0,
   },
-  /* Status bar — sticky just below the page header */
-  searchStatusBar: {
-    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap',
-    padding:'5px 14px', background:'var(--surface)',
-    borderBottom:'1px solid var(--border)',
-    position:'sticky', top:56, zIndex:9,
-    fontFamily:"'DM Sans',sans-serif",
-  },
-  searchNavBtn: {
-    background:'var(--parchment)', border:'1px solid var(--border)',
-    borderRadius:4, padding:'3px 7px', cursor:'pointer', fontSize:12,
-    color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
-  },
-
   /* History dropdown */
   histDropdown: {
     position:'absolute', top:0, left:0, right:0, zIndex:20,

@@ -557,7 +557,7 @@ export default function Dashboard() {
 
 /* ─── Styles ─── */
 const s = {
-  page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif" },
+  page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", paddingTop:'env(safe-area-inset-top)' },
 
   /* header */
   header: { borderBottom:'1px solid var(--border)', background:'var(--surface)', position:'sticky', top:0, zIndex:30 },
