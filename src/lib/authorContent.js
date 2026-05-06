@@ -21,7 +21,7 @@ export function isAuthor(session) {
 }
 
 // ─────────────────────────────────────────────
-//  Offline cache helpers (localStorage)
+//  Per-chapter localStorage cache (legacy fallback)
 // ─────────────────────────────────────────────
 
 const CACHE_PREFIX = 'authorContent:'
@@ -41,15 +41,128 @@ function cacheSet(key, value) {
 }
 
 // ─────────────────────────────────────────────
+//  Bulk in-memory cache (populated at startup)
+//
+//  After the first successful online prefetch, ALL rows are saved to a
+//  single localStorage key.  On subsequent loads (including offline),
+//  the maps are rebuilt from localStorage instantly — no network needed.
+//
+//  Maps:
+//    _xrefsMap    – 'src_book:src_chapter'  → raw xref rows[]
+//    _backRefsMap – 'tgt_book:tgt_chapter'  → raw xref rows[]
+//    _notesMap    – 'book:chapter'           → raw note rows[]
+// ─────────────────────────────────────────────
+
+const BULK_CACHE_KEY = 'authorContent:bulk_v1'
+
+let _xrefsMap    = null   // null = not yet loaded from storage
+let _backRefsMap = null
+let _notesMap    = null
+let _bulkReady   = false  // true once maps are populated from storage or network
+
+/** Build in-memory maps from raw row arrays. */
+function buildMaps(xrefs, notes) {
+  _xrefsMap    = {}
+  _backRefsMap = {}
+  _notesMap    = {}
+  for (const r of (xrefs || [])) {
+    const sk = `${r.src_book}:${r.src_chapter}`
+    if (!_xrefsMap[sk])    _xrefsMap[sk]    = []
+    _xrefsMap[sk].push(r)
+    const tk = `${r.tgt_book}:${r.tgt_chapter}`
+    if (!_backRefsMap[tk]) _backRefsMap[tk] = []
+    _backRefsMap[tk].push(r)
+  }
+  for (const n of (notes || [])) {
+    const k = `${n.book}:${n.chapter}`
+    if (!_notesMap[k]) _notesMap[k] = []
+    _notesMap[k].push(n)
+  }
+  _bulkReady = true
+}
+
+/**
+ * Attempt to load the bulk cache from localStorage into memory (synchronous).
+ * Returns true if the cache was present and loaded successfully.
+ */
+function loadBulkFromStorage() {
+  if (_bulkReady) return true
+  try {
+    const raw = localStorage.getItem(BULK_CACHE_KEY)
+    if (!raw) return false
+    const { xrefs, notes } = JSON.parse(raw)
+    buildMaps(xrefs, notes)
+    return true
+  } catch { return false }
+}
+
+/**
+ * Fetch ALL author content from Supabase in two queries, save to localStorage,
+ * and rebuild the in-memory maps.  Call once at app startup; safe to call
+ * multiple times (subsequent calls are no-ops if called while a fetch is
+ * already in flight).
+ *
+ * After completion, dispatches 'pb-author-content-ready' so components that
+ * rendered before the prefetch finished can update themselves.
+ */
+let _prefetchInFlight = false
+export async function prefetchAllAuthorContent() {
+  // Already loaded from storage OR network fetch is running → nothing to do
+  if (loadBulkFromStorage() || _prefetchInFlight) return
+  _prefetchInFlight = true
+  try {
+    const [xrefRes, noteRes] = await Promise.all([
+      supabase.from('author_cross_refs').select('*'),
+      supabase.from('author_scripture_notes').select('*'),
+    ])
+    if (xrefRes.error) throw xrefRes.error
+    if (noteRes.error) throw noteRes.error
+
+    const xrefs = xrefRes.data || []
+    const notes = noteRes.data || []
+    buildMaps(xrefs, notes)
+
+    try {
+      localStorage.setItem(BULK_CACHE_KEY, JSON.stringify({ xrefs, notes }))
+    } catch { /* quota exceeded — ignore */ }
+
+    window.dispatchEvent(new CustomEvent('pb-author-content-ready'))
+  } catch (e) {
+    console.warn('[authorContent] prefetch failed, will use per-chapter fallback:', e?.message)
+  } finally {
+    _prefetchInFlight = false
+  }
+}
+
+/**
+ * Invalidate the in-memory bulk cache (e.g. after an author upsert/delete).
+ * Forces the next prefetch to re-download from Supabase.
+ */
+export function invalidateBulkCache() {
+  _bulkReady    = false
+  _xrefsMap     = null
+  _backRefsMap  = null
+  _notesMap     = null
+  try { localStorage.removeItem(BULK_CACHE_KEY) } catch {}
+}
+
+// ─────────────────────────────────────────────
 //  Author Scripture Notes
 // ─────────────────────────────────────────────
 
 /**
  * Fetch all author notes for a given book + chapter.
  * Returns an array of { id, book, chapter, verse, note, updated_at }
- * Falls back to localStorage cache when offline.
+ * Serves from the bulk in-memory cache when available (instant, offline-safe).
+ * Falls back to a per-chapter Supabase query → localStorage cache.
  */
 export async function fetchAuthorNotes(book, chapter) {
+  loadBulkFromStorage()
+  if (_bulkReady) {
+    return (_notesMap[`${book}:${chapter}`] || [])
+      .slice()
+      .sort((a, b) => a.verse - b.verse)
+  }
   const cacheKey = `notes:${book}:${chapter}`
   try {
     const { data, error } = await supabase
@@ -102,8 +215,15 @@ export async function deleteAuthorNote(id) {
  * Returns an array of:
  *   { id, src_book, src_chapter, src_verse,
  *       tgt_book, tgt_chapter, tgt_verse, label, updated_at }
+ * Serves from the bulk in-memory cache when available (instant, offline-safe).
  */
 export async function fetchAuthorCrossRefs(book, chapter) {
+  loadBulkFromStorage()
+  if (_bulkReady) {
+    return (_xrefsMap[`${book}:${chapter}`] || [])
+      .slice()
+      .sort((a, b) => a.src_verse - b.src_verse)
+  }
   const cacheKey = `xrefs:${book}:${chapter}`
   try {
     const { data, error } = await supabase
@@ -128,8 +248,15 @@ export async function fetchAuthorCrossRefs(book, chapter) {
  * Returns an array of:
  *   { id, src_book, src_chapter, src_verse,
  *       tgt_book, tgt_chapter, tgt_verse, label, updated_at }
+ * Serves from the bulk in-memory cache when available (instant, offline-safe).
  */
 export async function fetchAuthorBackRefs(book, chapter) {
+  loadBulkFromStorage()
+  if (_bulkReady) {
+    return (_backRefsMap[`${book}:${chapter}`] || [])
+      .slice()
+      .sort((a, b) => a.src_verse - b.src_verse)
+  }
   const cacheKey = `backrefs:${book}:${chapter}`
   try {
     const { data, error } = await supabase

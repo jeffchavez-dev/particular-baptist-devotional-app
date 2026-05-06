@@ -23,6 +23,7 @@ import {
   fetchAuthorCrossRefs, upsertAuthorCrossRef, deleteAuthorCrossRef,
   fetchAuthorBackRefs,
   fetchChapterDescs, upsertChapterDesc, deleteChapterDesc,
+  prefetchAllAuthorContent, invalidateBulkCache,
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
@@ -839,7 +840,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       if (Math.abs(delta) < 8) return
       lastY = y
       window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
-        detail: { direction: delta > 0 ? 'down' : 'up', scrollTop: y },
+        detail: {
+          direction:    delta > 0 ? 'down' : 'up',
+          scrollTop:    y,
+          scrollHeight: el.scrollHeight,
+          clientHeight: el.clientHeight,
+        },
       }))
       saveElementScroll(`scripture-${versionRef.current}`, el)
       saveReaderAnchor(versionRef.current, el)
@@ -1056,6 +1062,57 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         .catch(() => { parallelTextLoadedRef.current.delete(key) })
     }
   }, [textParallelVersion, segments]) // eslint-disable-line
+
+  /* ── Bulk-prefetch all author content on mount ──────────────────────────────
+     Fetches every row from author_cross_refs + author_scripture_notes once,
+     saves to localStorage, and rebuilds the in-memory maps.
+     After this completes (or if the localStorage cache already exists), every
+     subsequent call to fetchAuthorCrossRefs / fetchAuthorBackRefs /
+     fetchAuthorNotes returns synchronously from memory — no network delay,
+     no offline issues. */
+  useEffect(() => {
+    prefetchAllAuthorContent()
+  }, []) // eslint-disable-line
+
+  /* When the bulk prefetch completes, re-load any segments that were rendered
+     before the cache was ready (they may have gotten empty results). */
+  useEffect(() => {
+    const segmentsRef = { current: segments }
+    function onReady() {
+      for (const seg of segmentsRef.current) {
+        const key = `${seg.book}:${seg.chapter}`
+        // Clear the "already loaded" flag so the segments effect re-runs
+        authorContentLoadedRef.current.delete(key)
+      }
+      // Force the segments effect to re-run by flushing the state
+      // We do this by directly loading and setting state for current segments
+      for (const seg of segmentsRef.current) {
+        const { book: b, chapter: ch } = seg
+        const key = `${b}:${ch}`
+        Promise.all([fetchAuthorNotes(b, ch), fetchAuthorCrossRefs(b, ch), fetchAuthorBackRefs(b, ch)])
+          .then(([notes, refs, backRefs]) => {
+            const noteMap = {}
+            notes.forEach(n => { noteMap[n.verse] = { id: n.id, note: n.note } })
+            setAuthorNotes(prev => ({ ...prev, [key]: noteMap }))
+            const refMap = {}
+            refs.forEach(r => {
+              if (!refMap[r.src_verse]) refMap[r.src_verse] = []
+              refMap[r.src_verse].push(r)
+            })
+            setAuthorCrossRefs(prev => ({ ...prev, [key]: refMap }))
+            const backRefMap = {}
+            backRefs.filter(r => r.tgt_verse).forEach(r => {
+              if (!backRefMap[r.tgt_verse]) backRefMap[r.tgt_verse] = []
+              backRefMap[r.tgt_verse].push(r)
+            })
+            setAuthorBackRefs(prev => ({ ...prev, [key]: backRefMap }))
+          })
+          .catch(() => {})
+      }
+    }
+    window.addEventListener('pb-author-content-ready', onReady)
+    return () => window.removeEventListener('pb-author-content-ready', onReady)
+  }, [segments]) // eslint-disable-line
 
   /* Load author notes + cross-refs for each visible segment */
   useEffect(() => {
@@ -1500,14 +1557,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             delete chMap[verse]
             return { ...prev, [key]: chMap }
           })
+          invalidateBulkCache()
+          prefetchAllAuthorContent()
         }
       } else {
         await upsertAuthorNote({ book, chapter, verse, note })
-        // Re-fetch to get the id
+        // Invalidate bulk cache so the re-fetch hits Supabase for fresh data
+        invalidateBulkCache()
         const fresh = await fetchAuthorNotes(book, chapter)
         const noteMap = {}
         fresh.forEach(n => { noteMap[n.verse] = { id: n.id, note: n.note } })
         setAuthorNotes(prev => ({ ...prev, [key]: noteMap }))
+        prefetchAllAuthorContent() // rebuild bulk cache in background
       }
     } catch(e) {
       console.error('[authorNote] save failed:', e?.message)
@@ -1526,6 +1587,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         delete chMap[verse]
         return { ...prev, [key]: chMap }
       })
+      invalidateBulkCache()
+      prefetchAllAuthorContent()
     } catch(e) {
       console.error('[authorNote] delete failed:', e?.message)
     }
@@ -1549,6 +1612,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       })
       const tgtBook = matched.name
       const tgtCh   = parseInt(tgt_chapter, 10)
+      // Invalidate bulk cache so re-fetches hit Supabase for fresh data
+      invalidateBulkCache()
       const [fresh, freshBackRefs] = await Promise.all([
         fetchAuthorCrossRefs(src_book, src_chapter),
         fetchAuthorBackRefs(tgtBook, tgtCh),
@@ -1571,6 +1636,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       authorContentLoadedRef.current.delete(`${tgtBook}:${tgtCh}`)
       setAddingCrossRefTo(null)
       setCrossRefDraft({ tgt_book: '', tgt_chapter: '', tgt_verse: '', label: '' })
+      prefetchAllAuthorContent() // rebuild bulk cache in background
     } catch(e) {
       console.error('[authorCrossRef] save failed:', e?.message)
     }
@@ -1599,6 +1665,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       }
       // Allow target chapter to re-fetch fresh data next time it loads
       authorContentLoadedRef.current.delete(tgtKey)
+      invalidateBulkCache()
+      prefetchAllAuthorContent() // rebuild bulk cache in background
     } catch(e) {
       console.error('[authorCrossRef] delete failed:', e?.message)
     }

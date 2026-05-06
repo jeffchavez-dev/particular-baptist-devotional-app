@@ -82,11 +82,23 @@ export default function ScripturePage() {
   }, [])
   useEffect(() => {
     function handler(e) {
-      setChromeVis(e.detail.direction === 'up' || e.detail.scrollTop < 30)
+      const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
+      if (direction === 'down') {
+        // Don't hide the header when the user is close to the bottom of a chapter.
+        // If we did, the marginBottom transition would grow the reader container,
+        // clamp scrollTop, fire an "up" scroll event, and re-show the header — a
+        // vibration loop.  The guard threshold (headerH + 40 px) ensures there is
+        // always enough overflow space that the clamp can't happen.
+        const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
+        if (distToBottom < headerH + 40) return
+        setChromeVis(false)
+      } else {
+        setChromeVis(scrollTop < 30 || direction === 'up')
+      }
     }
     window.addEventListener('pb-scroll-dir', handler)
     return () => window.removeEventListener('pb-scroll-dir', handler)
-  }, [])
+  }, [headerH])
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -153,8 +165,9 @@ export default function ScripturePage() {
         ref={headerRef}
         style={{
           ...s.header,
-          transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 0.28s ease',
+          transform:    chromeVis ? 'translateY(0)' : 'translateY(-100%)',
+          marginBottom: chromeVis ? 0 : -headerH,
+          transition:   'transform 0.28s ease, margin-bottom 0.28s ease',
         }}
       >
         <div style={s.headerInner}>
@@ -529,11 +542,6 @@ export default function ScripturePage() {
         )}
       </div>
 
-      {/* Spacer reserves the header height so the reader's scroll container
-          never resizes when the fixed header slides in/out. This prevents
-          scroll-position clamping that caused the bottom-of-chapter vibration. */}
-      <div style={{ flexShrink: 0, height: headerH }} />
-
       {/* ══ KJV / Greek / Hebrew Reader ══ */}
       <KjvReader
         ref={kjvRef}
@@ -599,9 +607,9 @@ const s = {
   /* Lock the page to viewport height so the sidebar never scrolls with bible content */
   page: { height:'100vh', overflow:'hidden', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column' },
 
-  /* header — fixed so hiding it never resizes the scroll container */
+  /* header */
   header: {
-    position:'fixed', top:0, left:0, right:0, zIndex:20,
+    position:'sticky', top:0, zIndex:20, flexShrink:0,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
