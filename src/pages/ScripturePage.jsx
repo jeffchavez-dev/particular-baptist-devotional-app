@@ -93,10 +93,13 @@ export default function ScripturePage() {
   // changes when the header hides → no scroll-position side-effects, no
   // oscillation.  The distToBottom guard is a UX nicety: keep the header
   // visible near the chapter end so the "mark as read" button stays reachable.
-  const headerRef    = useRef(null)
-  const headerHRef   = useRef(57)           // mutable ref — read inside scroll handler
-  const [headerH,    setHeaderH]   = useState(57)   // state — used only for paddingTop
+  const headerRef      = useRef(null)
+  const headerHRef     = useRef(57)    // mutable ref — read inside scroll handler
+  const [headerH,    setHeaderH]   = useState(57)
   const [chromeVis,  setChromeVis] = useState(true)
+  // Timestamp until which we ignore scroll events — prevents the single
+  // layout-snap event (caused by paddingTop toggling) from re-triggering the header.
+  const suppressUntil = useRef(0)
 
   useEffect(() => {
     if (headerRef.current) {
@@ -107,22 +110,24 @@ export default function ScripturePage() {
   }, [])
 
   // Register the scroll-direction handler ONCE (empty deps).
-  // Uses headerHRef (not state) so re-renders never re-register the listener,
-  // and changing chromeVis never causes a layout shift that fires more scroll events.
+  // headerHRef is a mutable ref so the listener never needs to be re-registered.
   useEffect(() => {
     function handler(e) {
+      if (Date.now() < suppressUntil.current) return   // eat the one post-snap event
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
         if (distToBottom < headerHRef.current + 40) return   // keep header near chapter end
         setChromeVis(false)
+        suppressUntil.current = Date.now() + 80   // suppress for 80 ms after hiding
       } else {
         setChromeVis(true)
+        suppressUntil.current = Date.now() + 80   // suppress for 80 ms after showing
       }
     }
     window.addEventListener('pb-scroll-dir', handler)
     return () => window.removeEventListener('pb-scroll-dir', handler)
-  }, []) // intentionally empty — headerHRef is a ref, setChromeVis is stable
+  }, []) // intentionally empty — all values accessed via refs
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -588,17 +593,17 @@ export default function ScripturePage() {
       </div>
 
       {/* ══ KJV / Greek / Hebrew Reader ══
-          paddingTop is STATIC (always headerH) — never transitions.
-          The header slides over this fixed offset via transform-only, so the
-          scroll container height never changes → no layout-triggered scroll
-          events → no feedback loop / header oscillation. When the header is
-          hidden the parchment-coloured gap is invisible against the reader bg. */}
+          paddingTop toggles instantly (no CSS transition) between headerH and 0.
+          An instant snap produces at most one layout event and never changes
+          scrollTop, so the scroll-direction handler never fires spuriously.
+          The previous feedback loop was caused by a *animated* paddingTop
+          transition which fired dozens of scroll events over 280 ms. */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        paddingTop: headerH,
+        paddingTop: chromeVis ? headerH : 0,
       }}>
         <KjvReader
           ref={kjvRef}
