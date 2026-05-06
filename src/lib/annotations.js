@@ -357,6 +357,18 @@ export function getAllConfHighlights() {
     })
 }
 
+/** Return all personal (library) notes as [{ key, note, createdAt }] */
+export function getAllLibNotes() {
+  const all = loadItemNotes()
+  return Object.entries(all)
+    .filter(([k]) => k.startsWith('lib|'))
+    .map(([k, note]) => {
+      // key format: "lib|{isoTimestamp}"
+      return { key: k, note, createdAt: k.slice(4) }
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
 /** Return all confession notes as [{ key, note, source, itemKey }] */
 export function getAllConfNotes() {
   const all = loadItemNotes()
