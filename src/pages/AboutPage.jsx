@@ -4,24 +4,18 @@ import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
-import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule, syncAll } from '../lib/supabase'
+import { supabase, getLocalProgress, getBookmarks, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
 import BibleTrackerSection from '../components/BibleTrackerSection'
 import {
-  getAllKjvHighlights, getAllKjvNotes,
-  getAllConfHighlights, getAllConfNotes,
-  getAllScriptureBookmarks,
-  HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
   clearAllHighlights, clearAllNotes,
 } from '../lib/annotations'
 import {
   getDefaultReaderVersion, setDefaultReaderVersion, DEFAULT_VERSION_OPTIONS,
 } from '../lib/readerPrefs'
-
-const SCHEDULE = buildSchedule()
 
 const CONFESSIONS = [
   {
@@ -163,403 +157,6 @@ const cs = {
   body: { padding:'0 20px 20px' },
 }
 
-/* ── Dot with colour ── */
-function HlDot({ colorId, size = 10 }) {
-  const c = getHlStyle(colorId)
-  return (
-    <span style={{
-      display:'inline-block', width:size, height:size, borderRadius:'50%',
-      background:c.dot, flexShrink:0,
-    }} />
-  )
-}
-
-/* ── Notes / Bookmarks / Highlights panel ── */
-function AnnotationsPanel({ session, navigate }) {
-  const [progressData, setProgressData] = useState(null)
-  const [userNotes,  setUserNotes]  = useState([])
-  const [bookmarks,  setBookmarks]  = useState(() => getBookmarks())
-  const [showAllNotes, setShowAllNotes] = useState(false)
-  const [showAllBm,    setShowAllBm]    = useState(false)
-  const [showAllKjvHl, setShowAllKjvHl] = useState(false)
-  const [showAllKjvNt, setShowAllKjvNt] = useState(false)
-  const [showAllCHl,   setShowAllCHl]   = useState(false)
-  const [showAllCNt,   setShowAllCNt]   = useState(false)
-
-  // KJV annotations
-  const kjvHighlights = useMemo(() => getAllKjvHighlights(), [])
-  const kjvNotes      = useMemo(() => getAllKjvNotes(),      [])
-  const confHighlights = useMemo(() => getAllConfHighlights(), [])
-  const confNotes      = useMemo(() => getAllConfNotes(),      [])
-
-  useEffect(() => {
-    if (session) {
-      supabase.from('progress').select('day_number, completed, notes')
-        .eq('user_id', session.user.id)
-        .then(({ data }) => {
-          const rows = data || []
-          const notes = rows.filter(r => r.notes && r.notes.trim())
-          setUserNotes(notes)
-          setProgressData(rows)
-        })
-    } else {
-      const local = getLocalProgress()
-      const notes = Object.entries(local)
-        .filter(([, d]) => d.notes && d.notes.trim())
-        .map(([day, d]) => ({ day_number: parseInt(day), notes: d.notes }))
-      setUserNotes(notes)
-    }
-  }, [session])
-
-  useEffect(() => {
-    const handler = () => setBookmarks(getBookmarks())
-    window.addEventListener('focus', handler)
-    return () => window.removeEventListener('focus', handler)
-  }, [])
-
-  const enrichedNotes = useMemo(() =>
-    userNotes
-      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
-      .filter(n => n.entry)
-      .sort((a, b) => a.day_number - b.day_number),
-    [userNotes]
-  )
-
-  const bookmarkedEntries = useMemo(() =>
-    Object.keys(bookmarks)
-      .map(d => SCHEDULE.find(r => r.day === parseInt(d)))
-      .filter(Boolean)
-      .sort((a, b) => a.day - b.day),
-    [bookmarks]
-  )
-
-  function handleRemoveBookmark(day, e) {
-    e.stopPropagation()
-    toggleBookmark(day)
-    setBookmarks(prev => { const next = { ...prev }; delete next[day]; return next })
-  }
-
-  const PREVIEW = 3
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-
-      {/* Library shortcut */}
-      <button
-        onClick={() => navigate('/library')}
-        style={{
-          display:'flex', alignItems:'center', justifyContent:'space-between',
-          width:'100%', background:'var(--teal-light)', border:'1.5px solid var(--teal)',
-          borderRadius:'var(--radius-lg)', padding:'12px 14px',
-          cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
-          transition:'background 0.12s',
-        }}
-      >
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M4 3A1.5 1.5 0 015.5 1.5h7A1.5 1.5 0 0114 3V16l-5-3-5 3V3z"
-              stroke="var(--teal)" strokeWidth="1.5" strokeLinejoin="round"
-              fill="var(--teal)" fillOpacity="0.15"/>
-            <path d="M7 6h4M7 9h2.5" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <div style={{ textAlign:'left' }}>
-            <div style={{ fontSize:13, fontWeight:700, color:'var(--teal)' }}>Open My Library</div>
-            <div style={{ fontSize:11, color:'var(--teal)', opacity:0.8 }}>Manage all notes, bookmarks &amp; highlights in one place</div>
-          </div>
-        </div>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0 }}>
-          <path d="M4 3l5 4-5 4" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-
-      {/* Devotional Notes */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 2.5h10M2 5h6M2 7.5h8M2 10h5" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-          <span style={ap.subTitle}>Devotional Notes</span>
-          {enrichedNotes.length > 0 && <span style={ap.subBadge}>{enrichedNotes.length}</span>}
-        </div>
-        {!session ? (
-          <div style={ap.empty}>
-            <p style={ap.emptyText}>Sign in to sync and view all your notes here.</p>
-            <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{fontSize:12}}>Sign in →</button>
-          </div>
-        ) : enrichedNotes.length === 0 ? (
-          <p style={ap.emptyText}>No notes yet. Open any reading day to add your reflections.</p>
-        ) : (
-          <>
-            <div style={ap.cardList}>
-              {(showAllNotes ? enrichedNotes : enrichedNotes.slice(0, PREVIEW)).map(n => (
-                <div key={n.day_number} style={ap.card} onClick={() => navigate(`/day/${n.day_number}`)}>
-                  <div style={ap.cardHead}>
-                    <span style={ap.dayBadge}>Day {n.day_number}</span>
-                    <span style={ap.dateBadge}>{n.entry.date}</span>
-                    <span style={{...ap.srcBadge,
-                      background: n.entry.src==='2LBCF' ? 'var(--purple-soft)' : n.entry.src==='Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
-                      color: n.entry.src==='2LBCF' ? 'var(--purple-ink)' : n.entry.src==='Catechism' ? 'var(--teal)' : 'var(--amber-ink)',
-                    }}>{n.entry.src}</span>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:'auto',opacity:.35}}>
-                      <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <p style={ap.cardReading}>{n.entry.reading}</p>
-                  <p style={ap.cardPreview}>{n.notes.slice(0, 100)}{n.notes.length > 100 ? '…' : ''}</p>
-                </div>
-              ))}
-            </div>
-            {enrichedNotes.length > PREVIEW && (
-              <button style={ap.showAll} onClick={() => setShowAllNotes(o => !o)}>
-                {showAllNotes ? 'Show less' : `Show all ${enrichedNotes.length} notes`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Bookmarks */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M3 2A1.5 1.5 0 014.5 .5h5A1.5 1.5 0 0111 2v11l-4-2.5L3 13V2z"
-              stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round" fill="var(--teal)" fillOpacity="0.12"/>
-          </svg>
-          <span style={ap.subTitle}>Saved Days</span>
-          {bookmarkedEntries.length > 0 && <span style={ap.subBadge}>{bookmarkedEntries.length}</span>}
-        </div>
-        {bookmarkedEntries.length === 0 ? (
-          <p style={ap.emptyText}>No saved days yet. Tap the bookmark icon on any reading day.</p>
-        ) : (
-          <>
-            <div style={ap.cardList}>
-              {(showAllBm ? bookmarkedEntries : bookmarkedEntries.slice(0, PREVIEW)).map(entry => (
-                <div key={entry.day} style={ap.card} onClick={() => navigate(`/day/${entry.day}`)}>
-                  <div style={ap.cardHead}>
-                    <span style={ap.dayBadge}>Day {entry.day}</span>
-                    <span style={ap.dateBadge}>{entry.date}</span>
-                    <span style={{...ap.srcBadge,
-                      background: entry.src==='2LBCF' ? 'var(--purple-soft)' : entry.src==='Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
-                      color: entry.src==='2LBCF' ? 'var(--purple-ink)' : entry.src==='Catechism' ? 'var(--teal)' : 'var(--amber-ink)',
-                    }}>{entry.src}</span>
-                    <button onClick={(e) => handleRemoveBookmark(entry.day, e)} style={ap.removeBtn} title="Remove">×</button>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{opacity:.35}}>
-                      <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <p style={ap.cardReading}>{entry.reading}</p>
-                </div>
-              ))}
-            </div>
-            {bookmarkedEntries.length > PREVIEW && (
-              <button style={ap.showAll} onClick={() => setShowAllBm(o => !o)}>
-                {showAllBm ? 'Show less' : `Show all ${bookmarkedEntries.length} saved days`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Scripture highlights */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 11l1.5-3 6.5-6.5 2 2-6.5 6-3.5.5Z" stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"/>
-            <path d="M8 3l2 2" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <span style={ap.subTitle}>Scripture Highlights</span>
-          {kjvHighlights.length > 0 && <span style={ap.subBadge}>{kjvHighlights.length}</span>}
-          <div style={{display:'flex',gap:3,marginLeft:4}}>
-            {HIGHLIGHT_COLORS.map(c => (
-              <span key={c.id} style={{width:8,height:8,borderRadius:'50%',background:c.dot}} />
-            ))}
-          </div>
-        </div>
-        {kjvHighlights.length === 0 ? (
-          <p style={ap.emptyText}>No highlights yet. Open the Scripture reader and click a verse number to highlight.</p>
-        ) : (
-          <>
-            <div style={ap.hlGrid}>
-              {(showAllKjvHl ? kjvHighlights : kjvHighlights.slice(0, 8)).map(h => {
-                const c = getHlStyle(h.colorId)
-                return (
-                  <button
-                    key={h.key}
-                    style={{ ...ap.hlChip, background: c.rowBg, borderColor: c.border, color: c.numClr }}
-                    onClick={() => navigate('/scripture', { state: { book: h.book, chapter: h.chapter, verse: h.verse } })}
-                    title={`${h.book} ${h.chapter}:${h.verse}`}
-                  >
-                    <HlDot colorId={h.colorId} size={8} />
-                    {h.book} {h.chapter}:{h.verse}
-                  </button>
-                )
-              })}
-            </div>
-            {kjvHighlights.length > 8 && (
-              <button style={ap.showAll} onClick={() => setShowAllKjvHl(o => !o)}>
-                {showAllKjvHl ? 'Show less' : `Show all ${kjvHighlights.length} highlights`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Scripture notes */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="var(--teal)" strokeWidth="1.3"/>
-            <path d="M5 5.5h4M5 8h2.5" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <span style={ap.subTitle}>Scripture Notes</span>
-          {kjvNotes.length > 0 && <span style={ap.subBadge}>{kjvNotes.length}</span>}
-        </div>
-        {kjvNotes.length === 0 ? (
-          <p style={ap.emptyText}>No verse notes yet. Click the pencil icon next to any verse to add a note.</p>
-        ) : (
-          <>
-            <div style={ap.cardList}>
-              {(showAllKjvNt ? kjvNotes : kjvNotes.slice(0, PREVIEW)).map(n => (
-                <div key={n.key} style={ap.card} onClick={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}>
-                  <div style={ap.cardHead}>
-                    <span style={ap.refBadge}>{n.book} {n.chapter}:{n.verse}</span>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:'auto',opacity:.35}}>
-                      <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <p style={ap.cardPreview}>{n.note.slice(0, 120)}{n.note.length > 120 ? '…' : ''}</p>
-                </div>
-              ))}
-            </div>
-            {kjvNotes.length > PREVIEW && (
-              <button style={ap.showAll} onClick={() => setShowAllKjvNt(o => !o)}>
-                {showAllKjvNt ? 'Show less' : `Show all ${kjvNotes.length} verse notes`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Confession highlights */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 11l1.5-3 6.5-6.5 2 2-6.5 6-3.5.5Z" stroke="var(--purple-ink)" strokeWidth="1.3" strokeLinejoin="round"/>
-          </svg>
-          <span style={ap.subTitle}>Confession Highlights</span>
-          {confHighlights.length > 0 && <span style={ap.subBadge}>{confHighlights.length}</span>}
-        </div>
-        {confHighlights.length === 0 ? (
-          <p style={ap.emptyText}>No confession highlights yet. Open the Confessions page and use the Highlight button on any paragraph.</p>
-        ) : (
-          <>
-            <div style={ap.hlGrid}>
-              {(showAllCHl ? confHighlights : confHighlights.slice(0, 8)).map(h => {
-                const c = getHlStyle(h.colorId)
-                const srcLabel = h.source === '2lbcf' ? '2LBCF' : h.source === 'catechism' ? 'Catechism' : '1LBCF'
-                return (
-                  <button
-                    key={h.key}
-                    style={{ ...ap.hlChip, background: c.rowBg, borderColor: c.border, color: c.numClr }}
-                    onClick={() => navigate(`/confessions?t=${h.source}`, { state: { itemKey: h.itemKey, source: h.source } })}
-                    title={`${srcLabel} ${h.itemKey}`}
-                  >
-                    <HlDot colorId={h.colorId} size={8} />
-                    {srcLabel} {h.itemKey}
-                  </button>
-                )
-              })}
-            </div>
-            {confHighlights.length > 8 && (
-              <button style={ap.showAll} onClick={() => setShowAllCHl(o => !o)}>
-                {showAllCHl ? 'Show less' : `Show all ${confHighlights.length} highlights`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Confession notes */}
-      <div>
-        <div style={ap.subHeader}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <rect x="2" y="2" width="10" height="10" rx="1.5" stroke="var(--purple-ink)" strokeWidth="1.3"/>
-            <path d="M5 5.5h4M5 8h2.5" stroke="var(--purple-ink)" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          <span style={ap.subTitle}>Confession Notes</span>
-          {confNotes.length > 0 && <span style={ap.subBadge}>{confNotes.length}</span>}
-        </div>
-        {confNotes.length === 0 ? (
-          <p style={ap.emptyText}>No confession notes yet. Open the Confessions page and click Note on any paragraph.</p>
-        ) : (
-          <>
-            <div style={ap.cardList}>
-              {(showAllCNt ? confNotes : confNotes.slice(0, PREVIEW)).map(n => {
-                const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
-                return (
-                  <div key={n.key} style={ap.card} onClick={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}>
-                    <div style={ap.cardHead}>
-                      <span style={ap.refBadge}>{srcLabel} {n.itemKey}</span>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{marginLeft:'auto',opacity:.35}}>
-                        <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <p style={ap.cardPreview}>{n.note.slice(0, 120)}{n.note.length > 120 ? '…' : ''}</p>
-                  </div>
-                )
-              })}
-            </div>
-            {confNotes.length > PREVIEW && (
-              <button style={ap.showAll} onClick={() => setShowAllCNt(o => !o)}>
-                {showAllCNt ? 'Show less' : `Show all ${confNotes.length} confession notes`}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-    </div>
-  )
-}
-
-const ap = {
-  subHeader: { display:'flex', alignItems:'center', gap:6, marginBottom:10, flexWrap:'wrap' },
-  subTitle: { fontSize:13, fontWeight:700, color:'var(--ink)' },
-  subBadge: {
-    fontSize:9, fontWeight:700, background:'var(--teal-light)', color:'var(--teal)',
-    borderRadius:99, padding:'1px 6px',
-  },
-  empty: { display:'flex', flexDirection:'column', alignItems:'center', gap:10, padding:'12px 0' },
-  emptyText: { fontSize:12, color:'var(--ink-faint)', margin:0, lineHeight:1.6 },
-  showAll: {
-    fontSize:12, fontWeight:600, color:'var(--teal)', background:'none', border:'none',
-    cursor:'pointer', padding:'6px 0', textDecoration:'underline', textUnderlineOffset:2,
-    fontFamily:"'DM Sans',sans-serif", marginTop:4,
-  },
-  cardList: { display:'flex', flexDirection:'column', gap:6 },
-  card: {
-    background:'var(--surface)', border:'1px solid var(--border)',
-    borderRadius:'var(--radius-lg)', padding:'10px 12px',
-    cursor:'pointer', transition:'border-color 0.15s',
-  },
-  cardHead: { display:'flex', alignItems:'center', gap:6, marginBottom:3, flexWrap:'wrap' },
-  dayBadge: { fontSize:10, fontWeight:700, color:'var(--teal)' },
-  dateBadge: { fontSize:10, color:'var(--ink-faint)' },
-  refBadge: { fontSize:11, fontWeight:600, color:'var(--ink)' },
-  srcBadge: { fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:99, letterSpacing:'0.04em' },
-  removeBtn: {
-    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
-    fontSize:14, lineHeight:1, padding:'0 2px', marginLeft:'auto',
-  },
-  cardReading: { fontSize:12, fontWeight:600, color:'var(--ink)', margin:'0 0 2px', fontFamily:"'Cormorant Garamond',serif" },
-  cardPreview: { fontSize:11, color:'var(--ink-muted)', margin:0, lineHeight:1.55 },
-  hlGrid: { display:'flex', flexWrap:'wrap', gap:5 },
-  hlChip: {
-    display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:600,
-    padding:'4px 10px', borderRadius:99, border:'1px solid',
-    cursor:'pointer', fontFamily:"'DM Sans',sans-serif", transition:'opacity 0.1s',
-  },
-}
 
 /* ══════════════════════════════════════════════════════════════ */
 export default function AboutPage() {
@@ -743,7 +340,34 @@ export default function AboutPage() {
           badge={annotationTotal || undefined}
           defaultOpen={false}
         >
-          <AnnotationsPanel session={session} navigate={navigate} />
+          <button
+            onClick={() => navigate('/library')}
+            style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              width:'100%', background:'var(--teal-light)', border:'1.5px solid var(--teal)',
+              borderRadius:'var(--radius-lg)', padding:'14px 16px',
+              cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+              transition:'background 0.12s',
+            }}
+          >
+            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M5 3A1.5 1.5 0 016.5 1.5h7A1.5 1.5 0 0115 3V18l-5-3-5 3V3z"
+                  stroke="var(--teal)" strokeWidth="1.5" strokeLinejoin="round"
+                  fill="var(--teal)" fillOpacity="0.15"/>
+                <path d="M8 7h4M8 10h2.5" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <div style={{ textAlign:'left' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:'var(--teal)' }}>Open My Library</div>
+                <div style={{ fontSize:12, color:'var(--teal)', opacity:0.8, marginTop:2 }}>
+                  View and manage all your notes, bookmarks &amp; highlights
+                </div>
+              </div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0 }}>
+              <path d="M4 3l5 4-5 4" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </CollapseSection>
 
         {/* ════ 3. SETTINGS ════ */}

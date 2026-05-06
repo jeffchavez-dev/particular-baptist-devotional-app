@@ -93,18 +93,28 @@ export default function ScripturePage() {
   // changes when the header hides → no scroll-position side-effects, no
   // oscillation.  The distToBottom guard is a UX nicety: keep the header
   // visible near the chapter end so the "mark as read" button stays reachable.
-  const headerRef   = useRef(null)
-  const [headerH,   setHeaderH]   = useState(57)
-  const [chromeVis, setChromeVis] = useState(true)
+  const headerRef    = useRef(null)
+  const headerHRef   = useRef(57)           // mutable ref — read inside scroll handler
+  const [headerH,    setHeaderH]   = useState(57)   // state — used only for paddingTop
+  const [chromeVis,  setChromeVis] = useState(true)
+
   useEffect(() => {
-    if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
+    if (headerRef.current) {
+      const h = headerRef.current.offsetHeight
+      headerHRef.current = h
+      setHeaderH(h)
+    }
   }, [])
+
+  // Register the scroll-direction handler ONCE (empty deps).
+  // Uses headerHRef (not state) so re-renders never re-register the listener,
+  // and changing chromeVis never causes a layout shift that fires more scroll events.
   useEffect(() => {
     function handler(e) {
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
-        if (distToBottom < headerH + 40) return   // keep header near chapter end
+        if (distToBottom < headerHRef.current + 40) return   // keep header near chapter end
         setChromeVis(false)
       } else {
         setChromeVis(true)
@@ -112,7 +122,7 @@ export default function ScripturePage() {
     }
     window.addEventListener('pb-scroll-dir', handler)
     return () => window.removeEventListener('pb-scroll-dir', handler)
-  }, [headerH])
+  }, []) // intentionally empty — headerHRef is a ref, setChromeVis is stable
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
      If the link also specifies a version (e.g. from KjvModal), switch to it first. */
@@ -578,15 +588,17 @@ export default function ScripturePage() {
       </div>
 
       {/* ══ KJV / Greek / Hebrew Reader ══
-          Wrapper transitions paddingTop so the reader content slides smoothly
-          under the fixed header when it hides/shows — no layout gap, no scroll jump. */}
+          paddingTop is STATIC (always headerH) — never transitions.
+          The header slides over this fixed offset via transform-only, so the
+          scroll container height never changes → no layout-triggered scroll
+          events → no feedback loop / header oscillation. When the header is
+          hidden the parchment-coloured gap is invisible against the reader bg. */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        paddingTop: chromeVis ? headerH : 0,
-        transition: 'padding-top 0.28s ease',
+        paddingTop: headerH,
       }}>
         <KjvReader
           ref={kjvRef}
