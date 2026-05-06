@@ -97,7 +97,8 @@
       "Bash(powershell -Command \"Get-Item 'C:\\\\Users\\\\Jeff Chavez\\\\Claude\\\\devotional-app\\\\public\\\\nasb.json' | Select-Object Name, Length\")",
       "Bash(node -e \"const d = require\\('./public/nasb.json'\\); const v = d.genesis['1'][0]; console.log\\(JSON.stringify\\(v\\)\\); console.log\\('Books:', Object.keys\\(d\\).length\\); console.log\\('Rev last:', JSON.stringify\\(d.revelation['22'].slice\\(-1\\)\\)\\)\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
-      "Bash(npx react-scripts *)"
+      "Bash(npx react-scripts *)",
+      "Bash(npx --no-install tsc --noEmit)"
     ]
   }
 }

@@ -368,6 +368,39 @@ export function getAllConfNotes() {
     })
 }
 
+// ── Scripture chapter bookmarks ───────────────────────────────────────────────
+const SC_BM_KEY = 'pb-scripture-bookmarks'  // { "Book|ch": isoTimestamp }
+
+export function getScriptureBookmarks() {
+  try { return JSON.parse(localStorage.getItem(SC_BM_KEY) || '{}') } catch { return {} }
+}
+
+export function toggleScriptureBookmark(book, chapter) {
+  const all = getScriptureBookmarks()
+  const key = `${book}|${chapter}`
+  if (all[key]) delete all[key]
+  else all[key] = new Date().toISOString()
+  try { localStorage.setItem(SC_BM_KEY, JSON.stringify(all)) } catch {}
+  window.dispatchEvent(new CustomEvent('pb-sc-bookmark-changed', {
+    detail: { book, chapter, bookmarks: all },
+  }))
+  return all
+}
+
+export function isScriptureBookmarked(book, chapter) {
+  return !!(getScriptureBookmarks()[`${book}|${chapter}`])
+}
+
+export function getAllScriptureBookmarks() {
+  const all = getScriptureBookmarks()
+  return Object.entries(all)
+    .map(([k, ts]) => {
+      const [book, ch] = k.split('|')
+      return { key: k, book, chapter: parseInt(ch), savedAt: ts }
+    })
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt)) // newest first
+}
+
 // ── Clear all highlights and notes ───────────────────────────────────────────
 
 /** Clear all highlights from localStorage and Supabase (if userId provided) */

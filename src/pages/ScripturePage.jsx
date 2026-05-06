@@ -8,7 +8,7 @@ import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion } from '../lib/readerPrefs'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
-import { addSearchHistory, getSearchHistory, clearSearchHistory } from '../lib/annotations'
+import { addSearchHistory, getSearchHistory, clearSearchHistory, isScriptureBookmarked, toggleScriptureBookmark } from '../lib/annotations'
 import { isAuthor } from '../lib/authorContent'
 
 /* ══════════════════════════════════════════════════════════════════ */
@@ -52,6 +52,21 @@ export default function ScripturePage() {
   const [panelSearching,     setPanelSearching]     = useState(false)
   // Which book groups are expanded in the results list
   const [openBooks, setOpenBooks] = useState(new Set())
+  // Scripture chapter bookmark state
+  const [isBookmarked, setIsBookmarked] = useState(() => isScriptureBookmarked('Genesis', 1))
+  useEffect(() => {
+    setIsBookmarked(isScriptureBookmarked(readBook, readChapter))
+  }, [readBook, readChapter])
+  useEffect(() => {
+    const handler = e => {
+      if (e.detail.book === readBook && e.detail.chapter === readChapter) {
+        setIsBookmarked(!!e.detail.bookmarks[`${readBook}|${readChapter}`])
+      }
+    }
+    window.addEventListener('pb-sc-bookmark-changed', handler)
+    return () => window.removeEventListener('pb-sc-bookmark-changed', handler)
+  }, [readBook, readChapter])
+
   // Author-only edit mode for study notes / cross-refs
   const isAuthorUser = isAuthor(session)
   const [authorEditMode, setAuthorEditMode] = useState(false)
@@ -265,6 +280,28 @@ export default function ScripturePage() {
               <path d="M8.5 3V13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               <path d="M5 5.5C5 5.5 6.5 5.2 8.5 5.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
               <path d="M5 7.5C5 7.5 6.5 7.2 8.5 7.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+          </button>
+
+          {/* Bookmark chapter button */}
+          <button
+            style={{
+              ...s.menuBtn,
+              ...(isBookmarked ? { color: 'var(--teal)', borderColor: 'var(--teal)', background: 'var(--teal-light)' } : {}),
+            }}
+            onClick={() => {
+              const result = toggleScriptureBookmark(readBook, readChapter)
+              setIsBookmarked(!!result[`${readBook}|${readChapter}`])
+            }}
+            aria-label={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
+            title={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M4 2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V14l-4-2.5L4 14V2.5z"
+                stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+                fill={isBookmarked ? 'currentColor' : 'none'} fillOpacity={isBookmarked ? 0.25 : 0}
+              />
             </svg>
           </button>
 

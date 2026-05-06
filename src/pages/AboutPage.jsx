@@ -12,6 +12,7 @@ import BibleTrackerSection from '../components/BibleTrackerSection'
 import {
   getAllKjvHighlights, getAllKjvNotes,
   getAllConfHighlights, getAllConfNotes,
+  getAllScriptureBookmarks,
   HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
   clearAllHighlights, clearAllNotes,
@@ -68,6 +69,7 @@ const DEVOTIONAL_FEATURES = [
 
 const SCRIPTURE_FEATURES = [
   { title: 'King James Version', body: 'Full KJV Bible with continuous infinite-scroll reading. Tap any word to search it across the whole Bible instantly.' },
+  { title: 'New American Standard Bible 1995 (NASB)', body: 'Full NASB 1995 Bible with continuous reading, search, parallel mode, verse highlighting, notes, and chapter progress tracking — the same full feature set as KJV. The NASB is widely regarded for its literal accuracy and faithfulness to the original languages.' },
   { title: 'Greek New Testament (GNT)', body: 'Read the Translators Amalgamated GNT (TAGNT) word-by-word. Tap any word to see its Robinson morphology, Strong\'s number, gloss, and transliteration.' },
   { title: 'Hebrew Old Testament (HOT)', body: 'Read the TAHOT with full Masoretic pointing and cantillation. Each word displays ETCBC morphology — stem, aspect, person, gender, and number.' },
   { title: 'Greek Septuagint (LXX)', body: 'Read the Greek Old Testament (Septuagint) word-by-word. Tap any word to see its Strong\'s number and gloss in an inline strip. Enable LXX alongside the Hebrew OT in parallel mode to compare the two side-by-side. Jump to any LXX occurrence from the Strong\'s lexicon using "Find in LXX."' },
@@ -102,6 +104,12 @@ const DATA_SOURCES = [
     href: 'https://github.com/christos-c/bible-corpus',
     desc: 'Public domain KJV text used for the Scripture reader and all proof-text references throughout the devotional.',
     badge: 'Public Domain',
+  },
+  {
+    name: 'NASB 1995 Bible JSON — GitHub',
+    href: 'https://github.com/Amosamevor/Bible-json/tree/main/versions/en',
+    desc: 'NASB 1995 text in JSON format used for the in-app Scripture reader. The New American Standard Bible 1995 is © The Lockman Foundation.',
+    badge: 'Copyright',
   },
 ]
 
@@ -235,6 +243,34 @@ function AnnotationsPanel({ session, navigate }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+      {/* Library shortcut */}
+      <button
+        onClick={() => navigate('/library')}
+        style={{
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          width:'100%', background:'var(--teal-light)', border:'1.5px solid var(--teal)',
+          borderRadius:'var(--radius-lg)', padding:'12px 14px',
+          cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+          transition:'background 0.12s',
+        }}
+      >
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M4 3A1.5 1.5 0 015.5 1.5h7A1.5 1.5 0 0114 3V16l-5-3-5 3V3z"
+              stroke="var(--teal)" strokeWidth="1.5" strokeLinejoin="round"
+              fill="var(--teal)" fillOpacity="0.15"/>
+            <path d="M7 6h4M7 9h2.5" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          <div style={{ textAlign:'left' }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'var(--teal)' }}>Open My Library</div>
+            <div style={{ fontSize:11, color:'var(--teal)', opacity:0.8 }}>Manage all notes, bookmarks &amp; highlights in one place</div>
+          </div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0 }}>
+          <path d="M4 3l5 4-5 4" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
 
       {/* Devotional Notes */}
       <div>

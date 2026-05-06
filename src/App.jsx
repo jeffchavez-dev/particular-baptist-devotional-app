@@ -10,6 +10,7 @@ import QuizPage from './pages/QuizPage'
 import ScripturePage from './pages/ScripturePage'
 import ConfessionsPage from './pages/ConfessionsPage'
 import AboutPage from './pages/AboutPage'
+import LibraryPage from './pages/LibraryPage'
 import BottomNav from './components/BottomNav'
 import SplashScreen from './components/SplashScreen'
 
@@ -129,6 +130,7 @@ export default function App() {
             <Route path="/scripture"  element={<ScripturePage />} />
             <Route path="/confessions" element={<ConfessionsPage />} />
             <Route path="/about"   element={<AboutPage />} />
+            <Route path="/library" element={<LibraryPage />} />
             <Route path="*"        element={<Navigate to="/" />} />
           </Routes>
           <BottomNav />
