@@ -2643,26 +2643,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
                                   if (!bxrefs.length) return null
                                   return (
-                                    <span style={r.inlineBibleXrefs}>
-                                      <span style={r.inlineBibleXrefIcon}>→</span>
+                                    <div style={r.authorXrefRow}>
                                       {bxrefs.map((ref, i) => {
                                         const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
+                                        const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse || null, label }
                                         return (
                                           <button
                                             key={`bxref-${i}`}
-                                            style={r.inlineBibleXrefChip}
-                                            title={`Navigate to ${label}`}
-                                            onClick={e => {
-                                              e.stopPropagation()
-                                              navigate(ref.book, ref.chapter)
-                                              if (ref.verse) pendingVerseRef.current = { book: ref.book, chapter: ref.chapter, verse: ref.verse }
-                                            }}
+                                            style={r.xrefChip}
+                                            title={label}
+                                            onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                           >
                                             {label}
                                           </button>
                                         )
                                       })}
-                                    </span>
+                                    </div>
                                   )
                                 })()}
 
@@ -2676,17 +2672,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
                                   return (
                                     <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
-                                      <span style={r.authorXrefIcon}>↗</span>
                                       {xrefs.map(ref => {
                                         const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
                                         const chipLabel = ref.label ? ref.label.split(' - ')[0] : tgt
                                         return (
-                                          <span key={ref.id} style={r.authorXrefChipWrap}>
-                                            <button style={r.authorXrefChip}
+                                          <span key={ref.id} style={r.xrefChipWrap}>
+                                            <button style={canEdit ? r.xrefChipLeft : r.xrefChip}
                                               onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref }) }}
-                                              title={`Author link → ${tgt}`}>{chipLabel}</button>
+                                              title={tgt}>{chipLabel}</button>
                                             {canEdit && (
-                                              <button style={r.authorXrefDeleteBtn}
+                                              <button style={r.xrefChipDelete}
                                                 onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
                                                 title="Remove link">×</button>
                                             )}
@@ -2698,8 +2693,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         const chipLabel = ref.label ? ref.label.split(' - ')[0] : src
                                         const syntheticRef = { id: ref.id, tgt_book: ref.src_book, tgt_chapter: ref.src_chapter, tgt_verse: ref.src_verse, label: ref.label }
                                         return (
-                                          <span key={`back-${ref.id}`} style={r.authorXrefChipWrap}>
-                                            <button style={{ ...r.authorXrefChip, borderRadius: 99 }}
+                                          <span key={`back-${ref.id}`} style={r.xrefChipWrap}>
+                                            <button style={r.xrefChip}
                                               onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                               title={`Back-link from ${src}`}>↩ {chipLabel}</button>
                                           </span>
@@ -2983,26 +2978,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
                                   if (!bxrefs.length) return null
                                   return (
-                                    <span style={r.inlineBibleXrefs}>
-                                      <span style={r.inlineBibleXrefIcon}>→</span>
+                                    <div style={r.authorXrefRow}>
                                       {bxrefs.map((ref, i) => {
                                         const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
+                                        const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse || null, label }
                                         return (
                                           <button
                                             key={`bxref-${i}`}
-                                            style={r.inlineBibleXrefChip}
-                                            title={`Navigate to ${label}`}
-                                            onClick={e => {
-                                              e.stopPropagation()
-                                              navigate(ref.book, ref.chapter)
-                                              if (ref.verse) pendingVerseRef.current = { book: ref.book, chapter: ref.chapter, verse: ref.verse }
-                                            }}
+                                            style={r.xrefChip}
+                                            title={label}
+                                            onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                           >
                                             {label}
                                           </button>
                                         )
                                       })}
-                                    </span>
+                                    </div>
                                   )
                                 })()}
 
@@ -3323,40 +3314,32 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const backRefs = authorBackRefs[chKey]?.[verse]  || []
                               const avk      = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
-                              // Show row if: editing (canEdit), or study mode with refs to display
                               if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
-                                  <span style={r.authorXrefIcon}>↗</span>
                                   {/* Forward links (author-added from this verse) */}
                                   {xrefs.map(ref => {
                                     const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
-                                    const shortLabel = ref.label ? ref.label.split(' - ')[0] : null
-                                    const chipLabel = shortLabel || tgt
+                                    const chipLabel = ref.label ? ref.label.split(' - ')[0] : tgt
                                     return (
-                                      <span key={ref.id} style={r.authorXrefChipWrap}>
+                                      <span key={ref.id} style={r.xrefChipWrap}>
                                         <button
-                                          style={r.authorXrefChip}
-                                          onClick={e => {
-                                            e.stopPropagation()
-                                            // Show verse preview modal instead of navigating directly
-                                            setAuthorRefModal({ ref })
-                                          }}
-                                          title={`Author link → ${tgt}`}
+                                          style={canEdit ? r.xrefChipLeft : r.xrefChip}
+                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref }) }}
+                                          title={tgt}
                                         >{chipLabel}</button>
                                         {canEdit && (
-                                          <button style={r.authorXrefDeleteBtn}
+                                          <button style={r.xrefChipDelete}
                                             onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
                                             title="Remove link">×</button>
                                         )}
                                       </span>
                                     )
                                   })}
-                                  {/* Back-references — automatically shown when another passage links here */}
+                                  {/* Back-references */}
                                   {backRefs.map(ref => {
                                     const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
-                                    const shortLabel = ref.label ? ref.label.split(' - ')[0] : null
-                                    const chipLabel = shortLabel || src
+                                    const chipLabel = ref.label ? ref.label.split(' - ')[0] : src
                                     const syntheticRef = {
                                       id:          ref.id,
                                       tgt_book:    ref.src_book,
@@ -3365,13 +3348,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       label:       ref.label,
                                     }
                                     return (
-                                      <span key={`back-${ref.id}`} style={r.authorXrefChipWrap}>
+                                      <span key={`back-${ref.id}`} style={r.xrefChipWrap}>
                                         <button
-                                          style={{ ...r.authorXrefChip, borderRadius: 99 }}
-                                          onClick={e => {
-                                            e.stopPropagation()
-                                            setAuthorRefModal({ ref: syntheticRef })
-                                          }}
+                                          style={r.xrefChip}
+                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                           title={`Back-link from ${src}`}
                                         >↩ {chipLabel}</button>
                                       </span>
@@ -4279,23 +4259,32 @@ const r = {
     display:'flex', flexWrap:'wrap', alignItems:'center',
     gap:4, paddingLeft:28, paddingTop:4, paddingBottom:2,
   },
-  authorXrefIcon: {
-    fontSize:10, color:'var(--teal)', opacity:0.7, flexShrink:0,
+  /* ── Unified xref chip styles (Bible xrefs + author xrefs) ── */
+  xrefChip: {
+    display:'inline-flex', alignItems:'center',
+    padding:'1px 7px', border:'1px solid var(--border)',
+    borderRadius:99, cursor:'pointer', background:'var(--surface)',
+    fontFamily:"'DM Sans',sans-serif",
+    fontSize:9, fontWeight:600, lineHeight:1.6,
+    color:'var(--ink-muted)', whiteSpace:'nowrap',
+    transition:'opacity 0.12s, background 0.1s',
   },
-  authorXrefChipWrap: {
+  xrefChipLeft: {
+    display:'inline-flex', alignItems:'center',
+    padding:'1px 7px', border:'1px solid var(--border)',
+    borderRadius:'99px 0 0 99px', cursor:'pointer', background:'var(--surface)',
+    fontFamily:"'DM Sans',sans-serif",
+    fontSize:9, fontWeight:600, lineHeight:1.6,
+    color:'var(--ink-muted)', whiteSpace:'nowrap',
+    transition:'opacity 0.12s, background 0.1s',
+  },
+  xrefChipWrap: {
     display:'inline-flex', alignItems:'center', gap:0,
   },
-  authorXrefChip: {
-    fontSize:10, fontWeight:600,
-    background:'var(--teal-light)', color:'var(--teal)',
-    border:'1px solid var(--teal)', borderRadius:'99px 0 0 99px',
-    padding:'2px 7px', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
-  },
-  authorXrefDeleteBtn: {
+  xrefChipDelete: {
     fontSize:11, fontWeight:700,
-    background:'var(--teal-light)', color:'var(--teal)',
-    border:'1px solid var(--teal)', borderLeft:'none',
+    background:'var(--surface)', color:'var(--ink-muted)',
+    border:'1px solid var(--border)', borderLeft:'none',
     borderRadius:'0 99px 99px 0',
     padding:'2px 6px', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", lineHeight:1.5,
@@ -4362,23 +4351,6 @@ const r = {
   inlineCrossRefs: {
     display:'inline-flex', flexWrap:'wrap', gap:4,
     marginLeft:6, verticalAlign:'middle',
-  },
-  inlineBibleXrefs: {
-    display:'flex', flexWrap:'wrap', alignItems:'center', gap:4,
-    marginTop:4,
-  },
-  inlineBibleXrefIcon: {
-    fontSize:9, color:'var(--ink-muted)', opacity:0.6, flexShrink:0,
-    fontFamily:"'DM Sans',sans-serif", userSelect:'none',
-  },
-  inlineBibleXrefChip: {
-    display:'inline-flex', alignItems:'center',
-    padding:'1px 7px', border:'1px solid var(--border)',
-    borderRadius:99, cursor:'pointer', background:'var(--surface)',
-    fontFamily:"'DM Sans',sans-serif",
-    fontSize:9, fontWeight:600, lineHeight:1.6,
-    color:'var(--ink-muted)', transition:'opacity 0.12s, background 0.1s',
-    whiteSpace:'nowrap',
   },
   inlineChip: {
     display:'inline-flex', alignItems:'center', gap:4,

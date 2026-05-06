@@ -92,6 +92,86 @@ export function getFontCss(fontId) {
   return FONT_OPTIONS.find(f => f.id === fontId)?.css || FONT_OPTIONS[0].css
 }
 
+/* ── Custom dropdown — shows font name, sample rendered in that font ── */
+function FontDropdown({ value, options, onChange, sampleKey = 'sample' }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const active = options.find(f => f.id === value) || options[0]
+
+  useEffect(() => {
+    if (!open) return
+    function handler(e) {
+      if (!ref.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  return (
+    <div ref={ref} style={{ position:'relative', flex:1 }}>
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+          padding:'5px 9px', border:'1px solid var(--border)', borderRadius:'var(--radius)',
+          background: open ? 'var(--parchment-dark)' : 'var(--parchment)',
+          cursor:'pointer', gap:8,
+        }}
+      >
+        <span style={{ fontFamily: active.css, fontSize:13, color:'var(--ink)', lineHeight:1.2, flex:1, textAlign:'left' }}>
+          {active[sampleKey] ?? active.label}
+        </span>
+        <span style={{ fontSize:9, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif", fontWeight:600, flexShrink:0 }}>
+          {active.label}
+        </span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.5, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.15s' }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {/* Dropdown list */}
+      {open && (
+        <div style={{
+          position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
+          background:'white', border:'1px solid var(--border)',
+          borderRadius:'var(--radius)', boxShadow:'0 6px 20px rgba(0,0,0,0.12)',
+          zIndex:300, overflow:'hidden',
+        }}>
+          {options.map(f => {
+            const isActive = f.id === value
+            return (
+              <button
+                key={f.id}
+                onClick={() => { onChange(f.id); setOpen(false) }}
+                style={{
+                  width:'100%', display:'flex', alignItems:'center', gap:8,
+                  padding:'7px 10px', border:'none', cursor:'pointer',
+                  background: isActive ? 'var(--teal-light)' : 'none',
+                  borderBottom:'1px solid var(--border)',
+                  transition:'background 0.1s',
+                }}
+              >
+                <span style={{ fontFamily: f.css, fontSize:13, color: isActive ? 'var(--teal)' : 'var(--ink)', flex:1, textAlign:'left', lineHeight:1.2 }}>
+                  {f[sampleKey] ?? f.label}
+                </span>
+                <span style={{ fontSize:10, fontFamily:"'DM Sans',sans-serif", fontWeight:700, color: isActive ? 'var(--teal)' : 'var(--ink-faint)', flexShrink:0 }}>
+                  {f.label}
+                </span>
+                {isActive && (
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink:0 }}>
+                    <path d="M2 5.5L4.5 8L9 3" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Panel component ── */
 export default function FontPrefsPanel({ prefs, onUpdate }) {
   const [open, setOpen] = useState(false)
@@ -154,30 +234,15 @@ export default function FontPrefsPanel({ prefs, onUpdate }) {
 
           <div style={p.divider} />
 
-          {/* Font row */}
+          {/* Font dropdown */}
           <div style={p.row}>
             <span style={p.rowLabel}>Font</span>
-            <div style={{ display:'flex', flexDirection:'column', gap:4, flex:1 }}>
-              {FONT_OPTIONS.map(f => {
-                const active = prefs.fontId === f.id
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => set({ fontId: f.id })}
-                    style={{
-                      ...p.fontBtn,
-                      fontFamily: f.css,
-                      background: active ? 'var(--teal-light)' : 'none',
-                      color:      active ? 'var(--teal)'       : 'var(--ink)',
-                      borderColor: active ? 'var(--teal)'      : 'transparent',
-                    }}
-                  >
-                    <span style={{ fontSize: 14, lineHeight:1.1, flex:1 }}>{f.sample}</span>
-                    <span style={{ fontSize: 10, fontFamily:"'DM Sans',sans-serif", color: active ? 'var(--teal)' : 'var(--ink-faint)', fontWeight:600 }}>{f.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <FontDropdown
+              value={prefs.fontId}
+              options={FONT_OPTIONS}
+              onChange={id => set({ fontId: id })}
+              sampleKey="sample"
+            />
           </div>
 
           {/* Reset */}
@@ -207,10 +272,10 @@ const p = {
     padding:'14px 14px 10px', zIndex:200, width:240,
     display:'flex', flexDirection:'column', gap:12,
   },
-  row: { display:'flex', alignItems:'flex-start', gap:10 },
+  row: { display:'flex', alignItems:'center', gap:10 },
   rowLabel: {
     fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em',
-    color:'var(--ink-faint)', paddingTop:6, width:30, flexShrink:0,
+    color:'var(--ink-faint)', width:30, flexShrink:0,
   },
   sizeRow: { display:'flex', gap:6, flex:1, alignItems:'center' },
   sizeStepBtn: {
@@ -224,12 +289,6 @@ const p = {
   sizeCurrent: {
     flex:1, textAlign:'center', fontSize:11, color:'var(--ink-muted)',
     fontFamily:"'DM Sans',sans-serif", fontWeight:600,
-  },
-  fontBtn: {
-    display:'flex', alignItems:'baseline', gap:8, padding:'6px 10px',
-    border:'1.5px solid', borderRadius:'var(--radius)',
-    cursor:'pointer', transition:'all 0.12s', width:'100%',
-    textAlign:'left',
   },
   divider: { height:1, background:'var(--border)', margin:'0 -2px' },
   resetBtn: {

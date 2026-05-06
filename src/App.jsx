@@ -68,7 +68,13 @@ export default function App() {
 
   /* ── Font / reading prefs ── */
   const [prefs, setPrefsState] = useState(() => loadPrefs())
-  function updatePrefs(p) { setPrefsState(p); savePrefs(p) }
+  function updatePrefs(patch) {
+    setPrefsState(prev => {
+      const next = { ...prev, ...patch }
+      savePrefs(next)
+      return next
+    })
+  }
 
   /* ── Auth ── */
   useEffect(() => {
