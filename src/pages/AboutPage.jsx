@@ -1,16 +1,15 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
-import { supabase, getLocalProgress, getBookmarks, syncAll } from '../lib/supabase'
+import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
 import BibleTrackerSection from '../components/BibleTrackerSection'
 import {
-  loadHighlights, loadItemNotes,
   clearAllHighlights, clearAllNotes,
 } from '../lib/annotations'
 import {
@@ -259,11 +258,6 @@ export default function AboutPage() {
 
   const activeFont = FONT_OPTIONS.find(f => f.id === prefs.fontId) || FONT_OPTIONS[0]
 
-  /* total annotation count for badge */
-  const allHl    = useMemo(() => { const h = loadHighlights(); return Object.keys(h).length }, [])
-  const allNotes = useMemo(() => { const n = loadItemNotes();  return Object.keys(n).length }, [])
-  const bmCount  = useMemo(() => Object.keys(getBookmarks()).length, [])
-  const annotationTotal = allHl + allNotes + bmCount
 
   return (
     <div style={s.page}>
@@ -337,7 +331,6 @@ export default function AboutPage() {
             </svg>
           }
           title="Notes, Bookmarks &amp; Highlights"
-          badge={annotationTotal || undefined}
           defaultOpen={false}
         >
           <button

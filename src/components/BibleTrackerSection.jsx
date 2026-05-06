@@ -53,20 +53,7 @@ const NT_CATEGORIES = [
   { id:'general', label:'General Epistles', color:'#3e5a8c', bg:'#e8eefa', books:['James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation'] },
 ]
 
-/* ── Mini progress bar ── */
-function MiniBar({ done, total }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  return (
-    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-      <div style={{ height:5, borderRadius:99, background:'var(--border)', overflow:'hidden', width:60, flexShrink:0 }}>
-        <div style={{ height:'100%', borderRadius:99, background:'var(--teal)', width:`${pct}%`, transition:'width 0.3s' }} />
-      </div>
-      <span style={{ fontSize:10, color:'var(--ink-faint)', fontVariantNumeric:'tabular-nums' }}>{done}/{total}</span>
-    </div>
-  )
-}
-
-/* ── Big progress bar ── */
+/* ── Big progress bar (overall) ── */
 function ProgressBar({ done, total, label }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
@@ -80,6 +67,16 @@ function ProgressBar({ done, total, label }) {
       <div style={{ height:8, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
         <div style={{ height:'100%', borderRadius:99, background:'var(--teal)', width:`${pct}%`, transition:'width 0.3s' }} />
       </div>
+    </div>
+  )
+}
+
+/* ── Inline chapter progress bar ── */
+function ChBar({ done, total, color }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  return (
+    <div style={{ height:5, borderRadius:99, background:'rgba(0,0,0,0.08)', overflow:'hidden', flex:1 }}>
+      <div style={{ height:'100%', borderRadius:99, background: color, width:`${pct}%`, transition:'width 0.3s', opacity:0.85 }} />
     </div>
   )
 }
@@ -112,36 +109,52 @@ function CategoryBox({ cat, planByBook, bibBooks, progress, mode, onToggle, onNa
     ? cat.books.filter(b => planByBook[b])
     : cat.books.filter(b => bibBooks.find(bk => bk.name === b))
 
-  const { total, done } = bookNames.reduce((acc, name) => {
+  const { total, done, booksDone } = bookNames.reduce((acc, name) => {
     if (mode === 'plan') {
       const chs = planByBook[name] || []
       acc.total += chs.length
       acc.done  += chs.filter(ch => progress[`${name} ${ch}`]).length
+      if (chs.length > 0 && chs.every(ch => progress[`${name} ${ch}`])) acc.booksDone += 1
     } else {
       const bk = bibBooks.find(b => b.name === name)
       if (bk) {
+        const doneChs = Array.from({length: bk.chapters}, (_, i) => i + 1)
+          .filter(ch => progress[`${name} ${ch}`]).length
         acc.total += bk.chapters
-        acc.done  += Array.from({length: bk.chapters}, (_, i) => i + 1).filter(ch => progress[`${name} ${ch}`]).length
+        acc.done  += doneChs
+        if (doneChs === bk.chapters) acc.booksDone += 1
       }
     }
     return acc
-  }, { total:0, done:0 })
+  }, { total:0, done:0, booksDone:0 })
 
   if (total === 0) return null
 
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+
   return (
-    <div style={{...t.catBox, borderColor: isOpen ? cat.color : 'var(--border)'}}>
+    <div style={{...t.catBox, borderColor: isOpen ? cat.color : 'var(--border)', borderLeftColor: cat.color, borderLeftWidth: 3}}>
       <button style={{...t.catHeader, background: isOpen ? cat.bg : 'var(--surface)'}} onClick={onOpenToggle}>
-        <div style={{flex:1, minWidth:0}}>
-          <div style={{...t.catLabel, color: cat.color}}>{cat.label}</div>
-          <div style={{fontSize:10, color:'var(--ink-faint)', marginTop:2}}>{bookNames.length} book{bookNames.length !== 1 ? 's' : ''}</div>
-        </div>
-        <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
-          <MiniBar done={done} total={total} />
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
-            style={{flexShrink:0, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)', color:'var(--ink-faint)'}}>
-            <path d="M4 2.5l4.5 4.5L4 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
+        <div style={{ flex:1, minWidth:0 }}>
+          {/* Row 1: label + books count + arrow */}
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{...t.catLabel, color: cat.color}}>{cat.label}</span>
+            <span style={{ fontSize:10, color:'var(--ink-faint)', flexShrink:0 }}>
+              {bookNames.length} book{bookNames.length !== 1 ? 's' : ''}
+            </span>
+            <span style={{ fontSize:10, fontWeight:700, color: cat.color, flexShrink:0 }}>
+              · {booksDone}/{bookNames.length} completed
+            </span>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"
+              style={{ marginLeft:'auto', flexShrink:0, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)', color:'var(--ink-faint)' }}>
+              <path d="M4 2.5l4.5 4.5L4 11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          {/* Row 2: chapter progress bar */}
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
+            <ChBar done={done} total={total} color={cat.color} />
+            <span style={{ fontSize:9, color:'var(--ink-faint)', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>{pct}%</span>
+          </div>
         </div>
       </button>
 
@@ -198,6 +211,8 @@ function CategoryBox({ cat, planByBook, bibBooks, progress, mode, onToggle, onNa
 /* ── Testament section ── */
 function TestamentSection({ testament, categories, planByBook, bibBooks, progress, mode, onToggle, onNavigate, openCats, setOpenCat }) {
   const isOT = testament === 'OT'
+
+  /* Chapter counts */
   const { total, done } = mode === 'plan'
     ? Object.keys(planByBook)
         .filter(b => { const meta = bibBooks.find(bk => bk.name === b); return meta?.testament === testament })
@@ -214,17 +229,42 @@ function TestamentSection({ testament, categories, planByBook, bibBooks, progres
           return acc
         }, { total:0, done:0 })
 
+  /* Book counts */
+  const allBooks = bibBooks.filter(b => b.testament === testament)
+  const booksTotal = allBooks.length
+  const booksDone  = allBooks.reduce((n, bk) => {
+    const all = Array.from({length:bk.chapters},(_, i)=>i+1).every(ch=>progress[`${bk.name} ${ch}`])
+    return n + (all ? 1 : 0)
+  }, 0)
+
+  const chPct = total > 0 ? Math.round((done / total) * 100) : 0
+  const barColor = isOT ? 'var(--amber-ink)' : 'var(--purple-ink)'
+
   return (
     <div style={t.testamentSection}>
+      {/* Testament header */}
       <div style={t.testamentHeader}>
-        <span style={{
-          ...t.testBadge,
-          background: isOT ? 'var(--amber-soft)' : 'var(--purple-soft)',
-          color: isOT ? 'var(--amber-ink)' : 'var(--purple-ink)',
-        }}>{testament}</span>
-        <span style={t.testamentLabel}>{isOT ? 'Old Testament' : 'New Testament'}</span>
-        <MiniBar done={done} total={total} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+          <span style={{
+            ...t.testBadge,
+            background: isOT ? 'var(--amber-soft)' : 'var(--purple-soft)',
+            color: isOT ? 'var(--amber-ink)' : 'var(--purple-ink)',
+          }}>{testament}</span>
+          <span style={t.testamentLabel}>{isOT ? 'Old Testament' : 'New Testament'}</span>
+          <span style={{ fontSize:12, fontWeight:700, color: isOT ? 'var(--amber-ink)' : 'var(--purple-ink)' }}>
+            ({booksDone}/{booksTotal})
+          </span>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ flex:1, height:7, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
+            <div style={{ height:'100%', borderRadius:99, background:barColor, width:`${chPct}%`, transition:'width 0.3s', opacity:0.8 }} />
+          </div>
+          <span style={{ fontSize:10, color:'var(--ink-faint)', flexShrink:0, fontVariantNumeric:'tabular-nums' }}>
+            {done}/{total} ch.
+          </span>
+        </div>
       </div>
+
       <div style={t.catGrid}>
         {categories.map(cat => (
           <CategoryBox
@@ -317,26 +357,6 @@ export default function BibleTrackerSection() {
 const t = {
   wrap: { display:'flex', flexDirection:'column', gap:0 },
 
-  tabs: {
-    display:'flex', gap:6, padding:'0 0 12px',
-    borderBottom:'1px solid var(--border)', marginBottom:16,
-  },
-  tab: {
-    display:'flex', alignItems:'center', gap:7,
-    padding:'7px 14px', borderRadius:'var(--radius-lg)',
-    border:'1.5px solid var(--border)', background:'var(--parchment)',
-    fontSize:12, fontWeight:500, color:'var(--ink-muted)', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", transition:'all 0.15s',
-  },
-  tabActive: {
-    borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)', fontWeight:700,
-  },
-  tabBadge: {
-    fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:99,
-    background:'var(--border)', color:'var(--ink-faint)', transition:'all 0.15s',
-  },
-  tabBadgeActive: { background:'var(--teal)', color:'white' },
-
   section: { display:'flex', flexDirection:'column', gap:16 },
   progressCard: {
     background:'var(--parchment)', border:'1px solid var(--border)', borderRadius:'var(--radius-lg)',
@@ -348,24 +368,25 @@ const t = {
 
   testamentSection: { marginBottom:8 },
   testamentHeader: {
-    display:'flex', alignItems:'center', gap:10,
-    padding:'8px 0 6px', marginBottom:8,
+    padding:'10px 0 10px',
+    marginBottom:10,
     borderBottom:'2px solid var(--border)',
   },
-  testamentLabel: { fontSize:14, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)', flex:1 },
+  testamentLabel: { fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)', flex:1 },
   testBadge: { fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:99, letterSpacing:'0.06em', flexShrink:0 },
 
-  catGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))', gap:8 },
+  /* Categories — vertical list instead of grid */
+  catGrid: { display:'flex', flexDirection:'column', gap:8 },
   catBox: {
     background:'var(--surface)', border:'1.5px solid var(--border)',
     borderRadius:'var(--radius-lg)', overflow:'hidden', transition:'border-color 0.15s',
   },
   catHeader: {
-    display:'flex', alignItems:'center', gap:10,
+    display:'flex', alignItems:'stretch',
     padding:'10px 12px', width:'100%', textAlign:'left',
     border:'none', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", transition:'background 0.15s',
   },
-  catLabel: { fontSize:12, fontWeight:700, fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.01em' },
+  catLabel: { fontSize:13, fontWeight:700, fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.01em' },
   catBody: { padding:'8px 12px 12px', borderTop:'1px solid var(--border)', display:'flex', flexDirection:'column', gap:10 },
   catBookRow: { display:'flex', flexDirection:'column', gap:6 },
   catBookHead: { display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:8 },

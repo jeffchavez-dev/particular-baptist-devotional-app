@@ -58,6 +58,32 @@ function RemoveBtn({ onClick, label = 'Remove' }) {
   )
 }
 
+/* ── Clipped note with "See more" ── */
+const CLIP_CHARS = 220
+
+function NoteText({ text, query }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong   = text.length > CLIP_CHARS
+  // When actively searching, show full text so match is always visible
+  const showFull = !isLong || expanded || !!query
+  const display  = showFull ? text : text.slice(0, CLIP_CHARS).trimEnd() + '…'
+  return (
+    <>
+      <p style={s.noteBody}>
+        <Highlighted text={display} query={query} />
+      </p>
+      {isLong && !query && (
+        <button
+          onClick={e => { e.stopPropagation(); setExpanded(ex => !ex) }}
+          style={s.seeMoreBtn}
+        >
+          {expanded ? 'See less ↑' : 'See more ↓'}
+        </button>
+      )}
+    </>
+  )
+}
+
 /* ── Highlight matching text ── */
 function Highlighted({ text, query }) {
   if (!query) return <>{text}</>
@@ -496,8 +522,8 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                   </button>
                   <RemoveBtn onClick={() => onRemoveLibNote(n.key)} label="Delete note" />
                 </div>
-                {/* Full text, formatting preserved */}
-                <p style={s.noteBody}>{n.note}</p>
+                {/* Full text, formatting preserved — clips long notes */}
+                <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
               </div>
             ))
           }
@@ -539,9 +565,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                     style={s.openBtn}
                   >Open →</button>
                 </div>
-                <p style={s.noteBody}>
-                  <Highlighted text={n.note} query={isSearching ? searchQuery.trim() : ''} />
-                </p>
+                <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
               </div>
             ))
           }
@@ -587,9 +611,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 </svg>
               </div>
               <p style={s.cardReading}>{n.entry.reading}</p>
-              <p style={s.noteBody}>
-                <Highlighted text={n.notes} query={isSearching ? searchQuery.trim() : ''} />
-              </p>
+              <NoteText text={n.notes} query={isSearching ? searchQuery.trim() : ''} />
             </div>
           ))}
         </>
@@ -631,9 +653,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                       style={s.openBtn}
                     >Open →</button>
                   </div>
-                  <p style={s.noteBody}>
-                    <Highlighted text={n.note} query={isSearching ? searchQuery.trim() : ''} />
-                  </p>
+                  <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
                 </div>
               )
             })
@@ -1031,6 +1051,15 @@ const s = {
   refBadge:    { fontSize: 11, fontWeight: 600, color: 'var(--ink)' },
   srcBadge:    { fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 99, letterSpacing: '0.04em', flexShrink: 0 },
   cardReading: { fontSize: 12, fontWeight: 600, color: 'var(--ink)', margin: '0 0 4px', fontFamily: "'Cormorant Garamond', serif" },
+
+  /* "See more / See less" toggle */
+  seeMoreBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 11, fontWeight: 700, color: 'var(--teal)',
+    padding: '2px 0 0', fontFamily: "'DM Sans', sans-serif",
+    textDecoration: 'underline', textUnderlineOffset: 2,
+    display: 'block',
+  },
 
   /* Note body — preserves all formatting: indents, spaces, line breaks */
   noteBody: {
