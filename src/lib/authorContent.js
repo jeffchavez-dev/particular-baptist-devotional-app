@@ -53,7 +53,7 @@ function cacheSet(key, value) {
 //    _notesMap    – 'book:chapter'           → raw note rows[]
 // ─────────────────────────────────────────────
 
-const BULK_CACHE_KEY = 'authorContent:bulk_v1'
+const BULK_CACHE_KEY = 'authorContent:bulk_v2'
 
 let _xrefsMap    = null   // null = not yet loaded from storage
 let _backRefsMap = null
@@ -107,28 +107,52 @@ function loadBulkFromStorage() {
  */
 let _prefetchInFlight = false
 export async function prefetchAllAuthorContent() {
-  // Already loaded from storage OR network fetch is running → nothing to do
-  if (loadBulkFromStorage() || _prefetchInFlight) return
-  _prefetchInFlight = true
-  try {
-    const [xrefRes, noteRes] = await Promise.all([
-      supabase.from('author_cross_refs').select('*'),
-      supabase.from('author_scripture_notes').select('*'),
-    ])
-    if (xrefRes.error) throw xrefRes.error
-    if (noteRes.error) throw noteRes.error
+  // Load from localStorage cache immediately so existing data renders fast
+  const hadCache = loadBulkFromStorage()
 
-    const xrefs = xrefRes.data || []
-    const notes = noteRes.data || []
+  // Don't start a second network fetch if one is already in flight
+  if (_prefetchInFlight) return
+  _prefetchInFlight = true
+
+  // Always re-fetch from the network so newly-seeded data is picked up.
+  // If we already served from cache, this runs as a background revalidation.
+  try {
+    // Paginate to fetch ALL rows — Supabase caps at 1,000 per request by default.
+    const PAGE = 1000
+    async function fetchAll(table) {
+      const rows = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        rows.push(...(data || []))
+        if (!data || data.length < PAGE) break   // last page
+        from += PAGE
+      }
+      return rows
+    }
+
+    const [xrefs, notes] = await Promise.all([
+      fetchAll('author_cross_refs'),
+      fetchAll('author_scripture_notes'),
+    ])
     buildMaps(xrefs, notes)
 
     try {
       localStorage.setItem(BULK_CACHE_KEY, JSON.stringify({ xrefs, notes }))
     } catch { /* quota exceeded — ignore */ }
 
+    // Notify components to re-render with fresh data (important when cache was stale)
     window.dispatchEvent(new CustomEvent('pb-author-content-ready'))
   } catch (e) {
     console.warn('[authorContent] prefetch failed, will use per-chapter fallback:', e?.message)
+    // If we had no cache and network failed, try per-chapter fallback
+    if (!hadCache) {
+      _bulkReady = false
+    }
   } finally {
     _prefetchInFlight = false
   }

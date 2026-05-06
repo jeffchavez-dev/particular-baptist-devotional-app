@@ -95,7 +95,8 @@
       "Bash(node scripts/seed-gal-thru-heb-xrefs.mjs eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJobmZ1Z2tuaHdodXF4c3FvcGdqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjcwNTc3NCwiZXhwIjoyMDkyMjgxNzc0fQ.E635g82VvO4Nl8GaqUJqusPsIeqkYEMVFkw9iin6kQM)",
       "Bash(node scripts/seed-jas-thru-rev-xrefs.mjs eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJobmZ1Z2tuaHdodXF4c3FvcGdqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjcwNTc3NCwiZXhwIjoyMDkyMjgxNzc0fQ.E635g82VvO4Nl8GaqUJqusPsIeqkYEMVFkw9iin6kQM)",
       "Bash(powershell -Command \"Get-Item 'C:\\\\Users\\\\Jeff Chavez\\\\Claude\\\\devotional-app\\\\public\\\\nasb.json' | Select-Object Name, Length\")",
-      "Bash(node -e \"const d = require\\('./public/nasb.json'\\); const v = d.genesis['1'][0]; console.log\\(JSON.stringify\\(v\\)\\); console.log\\('Books:', Object.keys\\(d\\).length\\); console.log\\('Rev last:', JSON.stringify\\(d.revelation['22'].slice\\(-1\\)\\)\\)\")"
+      "Bash(node -e \"const d = require\\('./public/nasb.json'\\); const v = d.genesis['1'][0]; console.log\\(JSON.stringify\\(v\\)\\); console.log\\('Books:', Object.keys\\(d\\).length\\); console.log\\('Rev last:', JSON.stringify\\(d.revelation['22'].slice\\(-1\\)\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)"
     ]
   }
 }
