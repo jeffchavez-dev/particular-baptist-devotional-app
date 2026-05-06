@@ -517,8 +517,18 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               entry={entry}
               scriptFont={scriptFont}
               onBrowse={() => setView('browse')}
-              onFindInScripture={() => setView('scripture')}
-              onFindInLxx={lang === 'greek' ? () => setView('scripture-lxx') : undefined}
+              onFindInScripture={() => {
+                window.dispatchEvent(new CustomEvent('pb-strongs-find', {
+                  detail: { id: activeId, lang, corpus: lang === 'greek' ? 'GNT' : 'HOT', label: entry?.l }
+                }))
+                setView('scripture')
+              }}
+              onFindInLxx={lang === 'greek' ? () => {
+                window.dispatchEvent(new CustomEvent('pb-strongs-find', {
+                  detail: { id: activeId, lang: 'greek', corpus: 'LXX', label: entry?.l }
+                }))
+                setView('scripture-lxx')
+              } : undefined}
             />
           )}
 

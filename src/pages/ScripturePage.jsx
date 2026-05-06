@@ -44,6 +44,8 @@ export default function ScripturePage() {
   })
   // Search history (shared key with KjvReader via annotations lib)
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('kjv'))
+  // Lexicon (Strong's) find-in-GNT/HOT/LXX history
+  const [strongsHistory, setStrongsHistory] = useState(() => getSearchHistory('strongs'))
   // Search results shown in the side panel
   const [searchResults,      setSearchResults]      = useState(null)   // null=no search, []|[…]=results
   const [searchResultsTotal, setSearchResultsTotal] = useState(0)
@@ -66,6 +68,18 @@ export default function ScripturePage() {
     window.addEventListener('pb-sc-bookmark-changed', handler)
     return () => window.removeEventListener('pb-sc-bookmark-changed', handler)
   }, [readBook, readChapter])
+
+  // Listen for "Find in GNT/HOT/LXX" events from StrongsModal and save to strongs history
+  useEffect(() => {
+    function handler(e) {
+      const { id, lang, corpus, label } = e.detail || {}
+      if (!id) return
+      addSearchHistory('strongs', JSON.stringify({ id, lang, corpus, label }))
+      setStrongsHistory(getSearchHistory('strongs'))
+    }
+    window.addEventListener('pb-strongs-find', handler)
+    return () => window.removeEventListener('pb-strongs-find', handler)
+  }, [])
 
   // Author-only edit mode for study notes / cross-refs
   const isAuthorUser = isAuthor(session)
@@ -110,7 +124,8 @@ export default function ScripturePage() {
   }, [])
 
   // Register the scroll-direction handler ONCE (empty deps).
-  // headerHRef is a mutable ref so the listener never needs to be re-registered.
+  // Header hides when scrolling down; reappears ONLY when scrolled back to the very top.
+  // This avoids the oscillation caused by the old "show on scroll-up" approach.
   useEffect(() => {
     function handler(e) {
       if (Date.now() < suppressUntil.current) return   // eat the one post-snap event
@@ -119,10 +134,13 @@ export default function ScripturePage() {
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
         if (distToBottom < headerHRef.current + 40) return   // keep header near chapter end
         setChromeVis(false)
-        suppressUntil.current = Date.now() + 80   // suppress for 80 ms after hiding
+        suppressUntil.current = Date.now() + 80
       } else {
-        setChromeVis(true)
-        suppressUntil.current = Date.now() + 80   // suppress for 80 ms after showing
+        // Only reveal the header when the user has scrolled back to the very top
+        if (scrollTop <= 10) {
+          setChromeVis(true)
+          suppressUntil.current = Date.now() + 80
+        }
       }
     }
     window.addEventListener('pb-scroll-dir', handler)
@@ -295,28 +313,6 @@ export default function ScripturePage() {
               <path d="M8.5 3V13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
               <path d="M5 5.5C5 5.5 6.5 5.2 8.5 5.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
               <path d="M5 7.5C5 7.5 6.5 7.2 8.5 7.2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
-          </button>
-
-          {/* Bookmark chapter button */}
-          <button
-            style={{
-              ...s.menuBtn,
-              ...(isBookmarked ? { color: 'var(--teal)', borderColor: 'var(--teal)', background: 'var(--teal-light)' } : {}),
-            }}
-            onClick={() => {
-              const result = toggleScriptureBookmark(readBook, readChapter)
-              setIsBookmarked(!!result[`${readBook}|${readChapter}`])
-            }}
-            aria-label={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
-            title={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M4 2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V14l-4-2.5L4 14V2.5z"
-                stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
-                fill={isBookmarked ? 'currentColor' : 'none'} fillOpacity={isBookmarked ? 0.25 : 0}
-              />
             </svg>
           </button>
 
@@ -550,6 +546,39 @@ export default function ScripturePage() {
               </div>
             )}
 
+            {/* Lexicon searches — Find in GNT / HOT / LXX */}
+            {strongsHistory.length > 0 && (
+              <div style={{ ...sp.section, borderTop: searchHistory.length > 0 ? '1px solid var(--border)' : 'none', paddingTop: searchHistory.length > 0 ? 16 : 4 }}>
+                <div style={sp.sectionLabel}>Lexicon searches</div>
+                {strongsHistory.map((raw, i) => {
+                  let parsed = null
+                  try { parsed = JSON.parse(raw) } catch { return null }
+                  if (!parsed) return null
+                  const { id, lang, corpus, label } = parsed
+                  return (
+                    <button
+                      key={i}
+                      style={sp.histItem}
+                      onClick={() => kjvRef.current?.openStrongs(id, lang)}
+                      title={`Reopen ${corpus} search for ${id}`}
+                    >
+                      {/* Greek/Hebrew icon */}
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color:'var(--ink-faint)', flexShrink:0 }}>
+                        <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
+                        <path d="M3 4h2M3 6.5h5M6 4c0 0 1 0 1 1.5S6 7 6 7" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                      </svg>
+                      <span style={{ flex:1 }}>{id}{label ? ` — ${label}` : ''}</span>
+                      <span style={sp.histVersionBadge}>{corpus}</span>
+                    </button>
+                  )
+                })}
+                <button style={sp.clearHistBtn} onClick={() => {
+                  clearSearchHistory('strongs')
+                  setStrongsHistory([])
+                }}>Clear lexicon history</button>
+              </div>
+            )}
+
             {/* Chapter navigation history */}
             {navHistory.length > 0 && (
               <div style={{ ...sp.section, borderTop: searchHistory.length > 0 ? '1px solid var(--border)' : 'none', paddingTop: searchHistory.length > 0 ? 16 : 4 }}>
@@ -628,6 +657,11 @@ export default function ScripturePage() {
             setPanelQuery(q)
             setPanelSearching(false)
             setOpenBooks(new Set()) // always start collapsed on new search
+          }}
+          isBookmarked={isBookmarked}
+          onToggleBookmark={() => {
+            const result = toggleScriptureBookmark(readBook, readChapter)
+            setIsBookmarked(!!result[`${readBook}|${readChapter}`])
           }}
         />
       </div>
@@ -800,6 +834,11 @@ const sp = {
     marginTop:8, padding:'5px 10px', borderRadius:99, border:'1px solid var(--border)',
     background:'none', cursor:'pointer', fontSize:11, color:'var(--ink-faint)',
     fontFamily:"'DM Sans',sans-serif",
+  },
+  histVersionBadge: {
+    fontSize:9, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
+    color:'var(--teal)', background:'var(--teal-light)', borderRadius:99,
+    padding:'2px 6px', flexShrink:0,
   },
 
   /* Search box row (input + submit button) */

@@ -574,7 +574,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -827,6 +827,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     clearNavHistory:  () => clearNavHistory(),
     canGoBack:        histIdx > 0,
     canGoForward:     histIdx < navHistoryRef.current.length - 1,
+    /** Open Strong's lexicon modal directly to scripture results for a given id + lang */
+    openStrongs: (id, lang) => setStrongsModal({ strongsId: id, lang, initialView: 'scripture' }),
   }), [histIdx]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -3553,6 +3555,23 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 </svg>
               )}
             </button>
+
+            {/* Bookmark chapter — moved from top nav */}
+            {onToggleBookmark && (
+              <button
+                style={{ ...r.floatingBtn, ...(isBookmarked ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+                onClick={onToggleBookmark}
+                title={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M4 2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V14l-4-2.5L4 14V2.5z"
+                    stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+                    fill={isBookmarked ? 'currentColor' : 'none'} fillOpacity={isBookmarked ? 0.25 : 0}
+                  />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Color picker row — shown when highlight is tapped */}

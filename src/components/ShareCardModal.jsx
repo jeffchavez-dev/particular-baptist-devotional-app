@@ -147,7 +147,7 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
 
   /* Title */
   const titleSz = Math.round(refDim * 0.048)
-  const titleY  = sourceY + titleSz * 1.0
+  const titleY  = sourceY + refDim * 0.07
   ctx.fillStyle = textColor
   ctx.font = `600 ${titleSz}px 'Georgia','Times New Roman',serif`
   const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.25, 3)
