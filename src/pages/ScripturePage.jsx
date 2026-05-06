@@ -124,22 +124,28 @@ export default function ScripturePage() {
   }, [])
 
   // Register the scroll-direction handler ONCE (empty deps).
-  // Header hides when scrolling down; reappears ONLY when scrolled back to the very top.
-  // This avoids the oscillation caused by the old "show on scroll-up" approach.
+  // Header hides on scroll-down; reappears when the user scrolls back near the top.
+  //
+  // suppressUntil is ONLY set after HIDING — it eats the one stray layout-snap
+  // event that occurs right after paddingTop toggles to 0.  We never suppress
+  // after SHOWING because paddingTop going 0→headerH doesn't change scrollTop
+  // inside the reader container, so there's no feedback loop risk.
   useEffect(() => {
     function handler(e) {
-      if (Date.now() < suppressUntil.current) return   // eat the one post-snap event
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
+        // Only suppress events after we've just hidden the header
+        if (Date.now() < suppressUntil.current) return
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
         if (distToBottom < headerHRef.current + 40) return   // keep header near chapter end
         setChromeVis(false)
         suppressUntil.current = Date.now() + 80
       } else {
-        // Only reveal the header when the user has scrolled back to the very top
-        if (scrollTop <= 10) {
+        // Reveal the header as soon as the user scrolls back near the top.
+        // 60px threshold: reliable without feeling "too early".
+        // No suppressUntil here — showing the header can't cause a feedback loop.
+        if (scrollTop <= 60) {
           setChromeVis(true)
-          suppressUntil.current = Date.now() + 80
         }
       }
     }
