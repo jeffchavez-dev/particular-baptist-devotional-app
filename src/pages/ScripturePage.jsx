@@ -74,7 +74,8 @@ export default function ScripturePage() {
   }, [showVersionDropdown])
 
   // Auto-hide header on scroll-down, show on scroll-up
-  const headerRef   = useRef(null)
+  const headerRef        = useRef(null)
+  const reshowCooldownRef = useRef(0)   // epoch-ms — hide events are ignored until this time
   const [headerH,   setHeaderH]   = useState(57)
   const [chromeVis, setChromeVis] = useState(true)
   useEffect(() => {
@@ -84,16 +85,21 @@ export default function ScripturePage() {
     function handler(e) {
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
-        // Don't hide the header when the user is close to the bottom of a chapter.
-        // If we did, the marginBottom transition would grow the reader container,
-        // clamp scrollTop, fire an "up" scroll event, and re-show the header — a
-        // vibration loop.  The guard threshold (headerH + 40 px) ensures there is
-        // always enough overflow space that the clamp can't happen.
+        // Ignore hide requests during the reshow cooldown.  When the header
+        // slides back in its marginBottom transition causes a tiny layout
+        // shift that can fire a "down" event — without the cooldown this
+        // would immediately re-hide the header, making it appear unstable.
+        if (Date.now() < reshowCooldownRef.current) return
+        // Also don't hide near the chapter bottom (prevents the
+        // scroll-clamp → "up" event → show → loop vibration).
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
         if (distToBottom < headerH + 40) return
         setChromeVis(false)
       } else {
-        setChromeVis(scrollTop < 30 || direction === 'up')
+        // Arm a 400 ms cooldown every time we show the header so
+        // layout-shift-induced "down" events can't immediately re-hide it.
+        reshowCooldownRef.current = Date.now() + 400
+        setChromeVis(true)
       }
     }
     window.addEventListener('pb-scroll-dir', handler)

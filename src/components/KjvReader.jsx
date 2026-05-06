@@ -834,7 +834,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => {
     const el = readerRef.current
     if (!el) return
-    let lastY = 0
+    // Initialise lastY from the current scroll position (not 0) so that any
+    // programmatic scroll-restoration on mount doesn't produce a giant
+    // positive delta that looks like a "down" scroll and hides the header.
+    let lastY = el.scrollTop
     const handler = () => {
       const y = el.scrollTop
       const delta = y - lastY
