@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, useImperative
 import { useNavigate } from 'react-router-dom'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
+import { getBibleXrefs } from '../lib/bibleXrefs'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
@@ -2637,6 +2638,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   )
                                 })()}
 
+                                {/* ── Bible cross-refs (Matthew, static data) ── */}
+                                {studyMode && (() => {
+                                  const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
+                                  if (!bxrefs.length) return null
+                                  return (
+                                    <span style={r.inlineBibleXrefs}>
+                                      <span style={r.inlineBibleXrefIcon}>→</span>
+                                      {bxrefs.map((ref, i) => {
+                                        const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
+                                        return (
+                                          <button
+                                            key={`bxref-${i}`}
+                                            style={r.inlineBibleXrefChip}
+                                            title={`Navigate to ${label}`}
+                                            onClick={e => {
+                                              e.stopPropagation()
+                                              navigate(ref.book, ref.chapter)
+                                              if (ref.verse) pendingVerseRef.current = { book: ref.book, chapter: ref.chapter, verse: ref.verse }
+                                            }}
+                                          >
+                                            {label}
+                                          </button>
+                                        )
+                                      })}
+                                    </span>
+                                  )
+                                })()}
+
                                 {/* ── Author cross-refs (morph mode) ── */}
                                 {(() => {
                                   const chKey    = `${seg.book}:${seg.chapter}`
@@ -2948,6 +2977,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     })}
                                   </span>
                                 )}
+
+                                {/* ── Bible cross-refs (Matthew, static data) ── */}
+                                {studyMode && (() => {
+                                  const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
+                                  if (!bxrefs.length) return null
+                                  return (
+                                    <span style={r.inlineBibleXrefs}>
+                                      <span style={r.inlineBibleXrefIcon}>→</span>
+                                      {bxrefs.map((ref, i) => {
+                                        const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
+                                        return (
+                                          <button
+                                            key={`bxref-${i}`}
+                                            style={r.inlineBibleXrefChip}
+                                            title={`Navigate to ${label}`}
+                                            onClick={e => {
+                                              e.stopPropagation()
+                                              navigate(ref.book, ref.chapter)
+                                              if (ref.verse) pendingVerseRef.current = { book: ref.book, chapter: ref.chapter, verse: ref.verse }
+                                            }}
+                                          >
+                                            {label}
+                                          </button>
+                                        )
+                                      })}
+                                    </span>
+                                  )
+                                })()}
 
                               </span>
                             </div>
@@ -4305,6 +4362,23 @@ const r = {
   inlineCrossRefs: {
     display:'inline-flex', flexWrap:'wrap', gap:4,
     marginLeft:6, verticalAlign:'middle',
+  },
+  inlineBibleXrefs: {
+    display:'flex', flexWrap:'wrap', alignItems:'center', gap:4,
+    marginTop:4,
+  },
+  inlineBibleXrefIcon: {
+    fontSize:9, color:'var(--ink-muted)', opacity:0.6, flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif", userSelect:'none',
+  },
+  inlineBibleXrefChip: {
+    display:'inline-flex', alignItems:'center',
+    padding:'1px 7px', border:'1px solid var(--border)',
+    borderRadius:99, cursor:'pointer', background:'var(--surface)',
+    fontFamily:"'DM Sans',sans-serif",
+    fontSize:9, fontWeight:600, lineHeight:1.6,
+    color:'var(--ink-muted)', transition:'opacity 0.12s, background 0.1s',
+    whiteSpace:'nowrap',
   },
   inlineChip: {
     display:'inline-flex', alignItems:'center', gap:4,
