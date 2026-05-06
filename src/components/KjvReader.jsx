@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, useImperative
 import { useNavigate } from 'react-router-dom'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
-import { getBibleXrefs } from '../lib/bibleXrefs'
+import { getBibleXrefs, getBibleBackRefs } from '../lib/bibleXrefs'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
@@ -917,15 +917,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       const next = Math.round(Math.min(28, Math.max(12, pinch.startSize * (d / pinch.dist))))
       if (next !== prefsSizeRef.current) updatePrefs({ sizePx: next })
     }
-    function onTouchEnd() { pinch.active = false }
+    function onTouchEnd()    { pinch.active = false }
+    function onTouchCancel() { pinch.active = false }  // OS-cancel (notification, etc.)
 
-    el.addEventListener('touchstart', onTouchStart, { passive: true })
-    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
-    el.addEventListener('touchend',   onTouchEnd,   { passive: true })
+    el.addEventListener('touchstart',  onTouchStart,  { passive: true })
+    el.addEventListener('touchmove',   onTouchMove,   { passive: false })
+    el.addEventListener('touchend',    onTouchEnd,    { passive: true })
+    el.addEventListener('touchcancel', onTouchCancel, { passive: true })
     return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove',  onTouchMove)
-      el.removeEventListener('touchend',   onTouchEnd)
+      el.removeEventListener('touchstart',  onTouchStart)
+      el.removeEventListener('touchmove',   onTouchMove)
+      el.removeEventListener('touchend',    onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchCancel)
     }
   }, []) // eslint-disable-line
 
@@ -2664,12 +2667,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                 {/* ── Author cross-refs (morph mode) ── */}
                                 {(() => {
-                                  const chKey    = `${seg.book}:${seg.chapter}`
-                                  const xrefs    = authorCrossRefs[chKey]?.[verse] || []
-                                  const backRefs = authorBackRefs[chKey]?.[verse]  || []
-                                  const avk      = `${seg.book}:${seg.chapter}:${verse}`
+                                  const chKey     = `${seg.book}:${seg.chapter}`
+                                  const xrefs     = authorCrossRefs[chKey]?.[verse] || []
+                                  const backRefs  = authorBackRefs[chKey]?.[verse]  || []
+                                  const bbackRefs = getBibleBackRefs(seg.book, seg.chapter, verse)
+                                  const avk       = `${seg.book}:${seg.chapter}:${verse}`
                                   const isAddingHere = addingCrossRefTo === avk
-                                  if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
+                                  if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length && !bbackRefs.length))) return null
                                   return (
                                     <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
                                       {xrefs.map(ref => {
@@ -2697,6 +2701,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                             <button style={r.xrefChip}
                                               onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                               title={`Back-link from ${src}`}>↩ {chipLabel}</button>
+                                          </span>
+                                        )
+                                      })}
+                                      {studyMode && bbackRefs.map((ref, i) => {
+                                        const label = `${ref.book} ${ref.chapter}:${ref.verse}`
+                                        const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse, label }
+                                        return (
+                                          <span key={`bback-${i}`} style={r.xrefChipWrap}>
+                                            <button style={r.xrefChip}
+                                              onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
+                                              title={`Referenced by ${label}`}>↩ {label}</button>
                                           </span>
                                         )
                                       })}
@@ -3309,12 +3324,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                             {/* ── Author cross-refs (forward links + automatic back-refs) ── */}
                             {(() => {
-                              const chKey    = `${seg.book}:${seg.chapter}`
-                              const xrefs    = authorCrossRefs[chKey]?.[verse] || []
-                              const backRefs = authorBackRefs[chKey]?.[verse]  || []
-                              const avk      = `${seg.book}:${seg.chapter}:${verse}`
+                              const chKey     = `${seg.book}:${seg.chapter}`
+                              const xrefs     = authorCrossRefs[chKey]?.[verse] || []
+                              const backRefs  = authorBackRefs[chKey]?.[verse]  || []
+                              const bbackRefs = getBibleBackRefs(seg.book, seg.chapter, verse)
+                              const avk       = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
-                              if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length))) return null
+                              if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length && !bbackRefs.length))) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
                                   {/* Forward links (author-added from this verse) */}
@@ -3336,7 +3352,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       </span>
                                     )
                                   })}
-                                  {/* Back-references */}
+                                  {/* Author back-references */}
                                   {backRefs.map(ref => {
                                     const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
                                     const chipLabel = ref.label ? ref.label.split(' - ')[0] : src
@@ -3354,6 +3370,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
                                           title={`Back-link from ${src}`}
                                         >↩ {chipLabel}</button>
+                                      </span>
+                                    )
+                                  })}
+                                  {/* Static Bible back-references (e.g. Matthew → this verse) */}
+                                  {studyMode && bbackRefs.map((ref, i) => {
+                                    const label = `${ref.book} ${ref.chapter}:${ref.verse}`
+                                    const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse, label }
+                                    return (
+                                      <span key={`bback-${i}`} style={r.xrefChipWrap}>
+                                        <button
+                                          style={r.xrefChip}
+                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
+                                          title={`Referenced by ${label}`}
+                                        >↩ {label}</button>
                                       </span>
                                     )
                                   })}

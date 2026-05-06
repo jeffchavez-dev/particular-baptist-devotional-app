@@ -124,29 +124,28 @@ export default function ScripturePage() {
   }, [])
 
   // Register the scroll-direction handler ONCE (empty deps).
-  // Header hides on scroll-down; reappears when the user scrolls back near the top.
-  //
-  // suppressUntil is ONLY set after HIDING — it eats the one stray layout-snap
-  // event that occurs right after paddingTop toggles to 0.  We never suppress
-  // after SHOWING because paddingTop going 0→headerH doesn't change scrollTop
-  // inside the reader container, so there's no feedback loop risk.
+  // Header hides on scroll-down (past 80px); reappears on ANY upward scroll.
+  // paddingTop is now constant (= headerH), so there is no layout recalculation
+  // when the header hides — the reader scroll container never changes size.
+  // suppressUntil prevents an immediate re-hide right after the header becomes visible.
   useEffect(() => {
     function handler(e) {
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
-        // Only suppress events after we've just hidden the header
         if (Date.now() < suppressUntil.current) return
+        // Stay visible near the top and near the chapter end
+        if (scrollTop < 80) return
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
-        if (distToBottom < headerHRef.current + 40) return   // keep header near chapter end
+        if (distToBottom < headerHRef.current + 40) return
         setChromeVis(false)
-        suppressUntil.current = Date.now() + 80
+        suppressUntil.current = Date.now() + 150
       } else {
-        // Reveal the header as soon as the user scrolls back near the top.
-        // 60px threshold: reliable without feeling "too early".
-        // No suppressUntil here — showing the header can't cause a feedback loop.
-        if (scrollTop <= 60) {
-          setChromeVis(true)
-        }
+        // Reveal on ANY upward scroll — no scrollTop gate
+        setChromeVis(v => {
+          if (v) return v // already visible, skip re-render
+          suppressUntil.current = Date.now() + 150 // brief suppress so a flick-up doesn't instantly re-hide
+          return true
+        })
       }
     }
     window.addEventListener('pb-scroll-dir', handler)
@@ -628,17 +627,18 @@ export default function ScripturePage() {
       </div>
 
       {/* ══ KJV / Greek / Hebrew Reader ══
-          paddingTop toggles instantly (no CSS transition) between headerH and 0.
-          An instant snap produces at most one layout event and never changes
-          scrollTop, so the scroll-direction handler never fires spuriously.
-          The previous feedback loop was caused by a *animated* paddingTop
-          transition which fired dozens of scroll events over 280 ms. */}
+          paddingTop is constant (= headerH) so the scroll container never
+          changes size when the header hides or shows.  A changing size was
+          the root cause of iOS Safari freezing the scroll container and the
+          "stuck scroll" bug.  When the header slides off-screen the top
+          headerH px of content become visible through the vacated space — the
+          same standard mobile-chrome pattern used by most reading apps. */}
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        paddingTop: chromeVis ? headerH : 0,
+        paddingTop: headerH,
       }}>
         <KjvReader
           ref={kjvRef}
