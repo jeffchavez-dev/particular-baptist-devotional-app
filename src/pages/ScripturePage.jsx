@@ -73,9 +73,12 @@ export default function ScripturePage() {
     return () => document.removeEventListener('mousedown', onOutside)
   }, [showVersionDropdown])
 
-  // Auto-hide header on scroll-down, show on scroll-up
-  const headerRef        = useRef(null)
-  const reshowCooldownRef = useRef(0)   // epoch-ms — hide events are ignored until this time
+  // Auto-hide header on scroll-down, show on scroll-up.
+  // The header uses transform-only (no marginBottom) so the flex layout never
+  // changes when the header hides → no scroll-position side-effects, no
+  // oscillation.  The distToBottom guard is a UX nicety: keep the header
+  // visible near the chapter end so the "mark as read" button stays reachable.
+  const headerRef   = useRef(null)
   const [headerH,   setHeaderH]   = useState(57)
   const [chromeVis, setChromeVis] = useState(true)
   useEffect(() => {
@@ -85,20 +88,10 @@ export default function ScripturePage() {
     function handler(e) {
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
-        // Ignore hide requests during the reshow cooldown.  When the header
-        // slides back in its marginBottom transition causes a tiny layout
-        // shift that can fire a "down" event — without the cooldown this
-        // would immediately re-hide the header, making it appear unstable.
-        if (Date.now() < reshowCooldownRef.current) return
-        // Also don't hide near the chapter bottom (prevents the
-        // scroll-clamp → "up" event → show → loop vibration).
         const distToBottom = (scrollHeight ?? 0) - (clientHeight ?? 0) - scrollTop
-        if (distToBottom < headerH + 40) return
+        if (distToBottom < headerH + 40) return   // keep header near chapter end
         setChromeVis(false)
       } else {
-        // Arm a 400 ms cooldown every time we show the header so
-        // layout-shift-induced "down" events can't immediately re-hide it.
-        reshowCooldownRef.current = Date.now() + 400
         setChromeVis(true)
       }
     }
@@ -171,9 +164,8 @@ export default function ScripturePage() {
         ref={headerRef}
         style={{
           ...s.header,
-          transform:    chromeVis ? 'translateY(0)' : 'translateY(-100%)',
-          marginBottom: chromeVis ? 0 : -headerH,
-          transition:   'transform 0.28s ease, margin-bottom 0.28s ease',
+          transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
+          transition: 'transform 0.28s ease',
         }}
       >
         <div style={s.headerInner}>
