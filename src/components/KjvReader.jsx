@@ -679,6 +679,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Timestamp of the last explicit navigation — used to suppress scroll-spy
      for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
   const lastNavMsRef            = useRef(0)
+  /* Always-current book/chapter refs — updated synchronously in navigate() so that
+     rapid-tap on nav arrows always computes the correct next/prev chapter even if
+     React hasn't re-rendered yet (stale closure guard). */
+  const bookRef    = useRef(book)
+  const chapterRef = useRef(chapter)
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
 
@@ -942,11 +947,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       const allowed = version === 'greek' ? NT_BOOKS
         : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
         : null
+      // Use refs for current position so rapid swipes chain correctly.
+      const curBook = bookRef.current
+      const curCh   = chapterRef.current
       if (dx < 0) {
-        const next = getNextChapter(book, chapter)
+        const next = getNextChapter(curBook, curCh)
         if (next && (!allowed || allowed.has(next.book))) navigate(next.book, next.chapter)
       } else {
-        const prev = getPrevChapter(book, chapter)
+        const prev = getPrevChapter(curBook, curCh)
         if (prev && (!allowed || allowed.has(prev.book))) navigate(prev.book, prev.chapter)
       }
     }
@@ -957,7 +965,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchend',   onTouchEnd)
     }
-  }, [book, chapter, version]) // eslint-disable-line
+  }, [version]) // book/chapter read from refs — swipe handler re-registers on version change only
 
   /* Visible book/chapter — updated by explicit navigation AND by scroll-spy.
      Kept separate from book/chapter so updating it never resets segments. */
@@ -1964,6 +1972,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function navigate(newBook, newChapter) {
+    // Update refs immediately so rapid-tap closures see the correct current chapter
+    // even before React has scheduled a re-render.
+    bookRef.current    = newBook
+    chapterRef.current = newChapter
 
     lastNavMsRef.current = Date.now()
     pendingVisibleTargetRef.current = { book: newBook, chapter: newChapter }
@@ -1998,6 +2010,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const newIdx = histIdx - 1
     const entry  = navHistoryRef.current[newIdx]
     pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
+    bookRef.current    = entry.book
+    chapterRef.current = entry.chapter
     setHistIdx(newIdx)
     setBook(entry.book); setChapter(entry.chapter)
     setVisBook(entry.book); setVisChapter(entry.chapter)
@@ -2015,6 +2029,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const newIdx = histIdx + 1
     const entry  = navHistoryRef.current[newIdx]
     pendingVisibleTargetRef.current = { book: entry.book, chapter: entry.chapter }
+    bookRef.current    = entry.book
+    chapterRef.current = entry.chapter
     setHistIdx(newIdx)
     setBook(entry.book); setChapter(entry.chapter)
     setVisBook(entry.book); setVisChapter(entry.chapter)
@@ -2296,7 +2312,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           <>
             <button
               style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev ? 1 : 0, pointerEvents: hasPrev ? 'auto' : 'none' }}
-              onClick={() => hasPrev && navigate(prevCh.book, prevCh.chapter)}
+              onClick={() => {
+                // Always compute from bookRef/chapterRef (not render closure) so
+                // rapid taps see the most recent navigation target, not stale state.
+                const prev = getPrevChapter(bookRef.current, chapterRef.current)
+                if (prev && (!allowed || allowed.has(prev.book))) navigate(prev.book, prev.chapter)
+              }}
               title={hasPrev ? `${prevCh.book} ${prevCh.chapter}` : ''}
               aria-label="Previous chapter"
             >
@@ -2306,7 +2327,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             </button>
             <button
               style={{ ...r.chNavArrow, right: 6, opacity: hasNext ? 1 : 0, pointerEvents: hasNext ? 'auto' : 'none' }}
-              onClick={() => hasNext && navigate(nextCh.book, nextCh.chapter)}
+              onClick={() => {
+                // Same ref-based lookup for rapid-tap correctness.
+                const next = getNextChapter(bookRef.current, chapterRef.current)
+                if (next && (!allowed || allowed.has(next.book))) navigate(next.book, next.chapter)
+              }}
               title={hasNext ? `${nextCh.book} ${nextCh.chapter}` : ''}
               aria-label="Next chapter"
             >

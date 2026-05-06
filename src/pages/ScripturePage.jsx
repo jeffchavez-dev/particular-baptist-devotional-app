@@ -540,32 +540,43 @@ export default function ScripturePage() {
         )}
       </div>
 
-      {/* ══ KJV / Greek / Hebrew Reader ══ */}
-      <KjvReader
-        ref={kjvRef}
-        version={readVersion}
-        onVersionChange={v => {
-          setReadVersion(v)
-          try { localStorage.setItem('reader-version', v) } catch {}
-        }}
-        todayChapter={todayBibleChapter}
-        onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
-        onSearchChange={q => setReadSearch(q)}
-        onHistoryChange={({ entries, currentIdx }) => {
-          if (entries) setNavHistory([...entries])
-          if (currentIdx != null) setNavHistoryIdx(currentIdx)
-        }}
-        authorEditMode={authorEditMode}
-        studyMode={studyMode}
-        onSearchResults={(hits, total, capped, q) => {
-          setSearchResults(hits)
-          setSearchResultsTotal(total)
-          setSearchResultsCapped(capped)
-          setPanelQuery(q)
-          setPanelSearching(false)
-          setOpenBooks(new Set()) // always start collapsed on new search
-        }}
-      />
+      {/* ══ KJV / Greek / Hebrew Reader ══
+          Wrapper transitions paddingTop so the reader content slides smoothly
+          under the fixed header when it hides/shows — no layout gap, no scroll jump. */}
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        paddingTop: chromeVis ? headerH : 0,
+        transition: 'padding-top 0.28s ease',
+      }}>
+        <KjvReader
+          ref={kjvRef}
+          version={readVersion}
+          onVersionChange={v => {
+            setReadVersion(v)
+            try { localStorage.setItem('reader-version', v) } catch {}
+          }}
+          todayChapter={todayBibleChapter}
+          onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
+          onSearchChange={q => setReadSearch(q)}
+          onHistoryChange={({ entries, currentIdx }) => {
+            if (entries) setNavHistory([...entries])
+            if (currentIdx != null) setNavHistoryIdx(currentIdx)
+          }}
+          authorEditMode={authorEditMode}
+          studyMode={studyMode}
+          onSearchResults={(hits, total, capped, q) => {
+            setSearchResults(hits)
+            setSearchResultsTotal(total)
+            setSearchResultsCapped(capped)
+            setPanelQuery(q)
+            setPanelSearching(false)
+            setOpenBooks(new Set()) // always start collapsed on new search
+          }}
+        />
+      </div>
 
       {/* ── First-open version picker ── */}
       {showVersionPicker && (
@@ -605,9 +616,9 @@ const s = {
   /* Lock the page to viewport height so the sidebar never scrolls with bible content */
   page: { height:'100vh', overflow:'hidden', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", display:'flex', flexDirection:'column' },
 
-  /* header */
+  /* header — fixed so hiding it doesn't leave a gap in the flex layout */
   header: {
-    position:'sticky', top:0, zIndex:20, flexShrink:0,
+    position:'fixed', top:0, left:0, right:0, zIndex:20,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
