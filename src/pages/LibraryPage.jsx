@@ -161,6 +161,24 @@ const DEFAULT_LABELS = [
   'Eschatology', 'Prayer', 'Personal',
 ]
 
+/* ── Label colour palette — deterministic per label name ── */
+const LABEL_COLOR_PALETTE = [
+  { bg: 'var(--teal-light)',     color: 'var(--teal)',       border: 'var(--teal)' },
+  { bg: 'var(--purple-soft)',    color: 'var(--purple-ink)', border: 'var(--purple-ink)' },
+  { bg: 'var(--amber-soft)',     color: 'var(--amber-ink)',  border: 'var(--amber-ink)' },
+  { bg: 'var(--red-light)',      color: 'var(--red)',        border: 'var(--red)' },
+  { bg: 'var(--gold-faint)',     color: 'var(--gold)',       border: 'var(--gold)' },
+  { bg: 'var(--gray-soft)',      color: 'var(--gray-ink)',   border: 'var(--gray-ink)' },
+  { bg: 'rgba(59,130,246,0.13)', color: '#1d4ed8',          border: '#1d4ed8' },  // blue
+  { bg: 'rgba(236,72,153,0.11)', color: '#be185d',          border: '#be185d' },  // rose
+]
+
+function getLabelColor(label) {
+  let h = 0
+  for (let i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) >>> 0
+  return LABEL_COLOR_PALETTE[h % LABEL_COLOR_PALETTE.length]
+}
+
 function getStoredLabels() {
   try {
     const raw = localStorage.getItem(LABEL_STORAGE_KEY)
@@ -269,7 +287,14 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
         {title && <p style={s.richTitle}>{title}</p>}
         {labels.length > 0 && (
           <div style={s.noteLabelRow}>
-            {labels.map(lb => <span key={lb} style={s.noteLabelChip}>{lb}</span>)}
+            {labels.map(lb => {
+              const c = getLabelColor(lb)
+              return (
+                <span key={lb} style={{ ...s.noteLabelChip, background: c.bg, color: c.color, borderColor: c.border }}>
+                  {lb}
+                </span>
+              )
+            })}
           </div>
         )}
         {/* eslint-disable-next-line react/no-danger */}
@@ -814,12 +839,15 @@ function LabelDropdown({ selected, onChange }) {
       {/* Selected chips — shown below trigger */}
       {selected.length > 0 && (
         <div style={lp.selectedRow}>
-          {selected.map(l => (
-            <span key={l} style={lp.selectedChip}>
-              {l}
-              <button type="button" onClick={() => toggle(l)} style={lp.chipRemove}>×</button>
-            </span>
-          ))}
+          {selected.map(l => {
+            const c = getLabelColor(l)
+            return (
+              <span key={l} style={{ ...lp.selectedChip, background: c.bg, borderColor: c.border, color: c.color }}>
+                {l}
+                <button type="button" onClick={() => toggle(l)} style={{ ...lp.chipRemove, color: c.color }}>×</button>
+              </span>
+            )
+          })}
         </div>
       )}
 
@@ -1171,7 +1199,14 @@ function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick
       {/* Labels */}
       {labels?.length > 0 && (
         <div style={nc.labelRow}>
-          {labels.slice(0, 2).map(l => <span key={l} style={nc.labelChip}>{l}</span>)}
+          {labels.slice(0, 2).map(l => {
+            const c = getLabelColor(l)
+            return (
+              <span key={l} style={{ ...nc.labelChip, background: c.bg, color: c.color }}>
+                {l}
+              </span>
+            )
+          })}
           {labels.length > 2 && <span style={nc.labelMore}>+{labels.length - 2}</span>}
         </div>
       )}
@@ -1200,6 +1235,71 @@ function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick
               </svg>
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Note View Modal  (read-only, full-screen bottom sheet)
+══════════════════════════════════════════════════════════════ */
+function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }) {
+  const { note, badge, badgeStyle, title } = noteData
+
+  function handleScriptureClick(sc) {
+    onClose()
+    navigate('/scripture', { state: { book: sc.book, chapter: sc.chapter, verse: sc.verse } })
+  }
+
+  return (
+    <div style={nv.backdrop} onClick={onClose}>
+      <div style={nv.sheet} onClick={e => e.stopPropagation()}>
+        {/* Drag handle */}
+        <div style={nv.handle} />
+
+        {/* Header row */}
+        <div style={nv.header}>
+          <div style={nv.headerLeft}>
+            {badge
+              ? <span style={{ ...nc.badge, ...badgeStyle }}>{badge}</span>
+              : title
+                ? <span style={nv.titleText}>{title}</span>
+                : <span style={nv.titleFaint}>Untitled</span>
+            }
+          </div>
+          <div style={nv.headerActions}>
+            {onOpen && (
+              <button style={nv.openBtn} onClick={() => { onOpen(); onClose() }}>
+                Open →
+              </button>
+            )}
+            {onEdit && (
+              <button style={nv.editBtn} onClick={() => { onEdit(); onClose() }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M2 11l1.2-2.4 5.5-5.5 1.6 1.6-5.5 5.5L2 11Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                </svg>
+                Edit
+              </button>
+            )}
+            {onDelete && (
+              <button style={nv.deleteBtn} onClick={() => { onDelete(); onClose() }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M2 3h9M5 3V2h3v1M4 3l.5 8h4L9 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
+            <button style={nv.closeBtn} onClick={onClose} aria-label="Close">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Note content */}
+        <div style={nv.body}>
+          <NoteBody rawNote={note} clip={false} onScriptureClick={handleScriptureClick} />
         </div>
       </div>
     </div>
@@ -1247,6 +1347,7 @@ const SORT_OPTS = [
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingNote,    setEditingNote]    = useState(null)
+  const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [searchQuery,    setSearchQuery]    = useState('')
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
@@ -1441,7 +1542,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                       labels={labels}
                       preview={notePreviewText(n.note)}
                       date={new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      onCardClick={() => setEditingNote(n)}
+                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, title, type: 'lib' })}
                       onEdit={() => setEditingNote(n)}
                       onDelete={() => requestDelete(n.key, 'lib')}
                       query={isSearching ? searchQuery.trim() : ''}
@@ -1475,21 +1576,25 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             ? <EmptyMsg text="No scripture notes yet. Use the pencil icon on any verse, or tag a scripture when creating a new note above." />
             : (
               <div style={s.kanbanGrid}>
-                {filteredKjv.map(n => (
-                  <NoteCard
-                    key={n.key}
-                    badge={`${n.book} ${n.chapter}:${n.verse}`}
-                    badgeStyle={{ background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
-                    labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
-                    preview={notePreviewText(n.note)}
-                    date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                    onCardClick={() => setEditingNote({ key: n.key, note: n.note })}
-                    onEdit={() => setEditingNote({ key: n.key, note: n.note })}
-                    onDelete={() => requestDelete(n.key, 'kjv')}
-                    onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
-                    query={isSearching ? searchQuery.trim() : ''}
-                  />
-                ))}
+                {filteredKjv.map(n => {
+                  const badge = `${n.book} ${n.chapter}:${n.verse}`
+                  const badgeStyle = { background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                  return (
+                    <NoteCard
+                      key={n.key}
+                      badge={badge}
+                      badgeStyle={badgeStyle}
+                      labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
+                      preview={notePreviewText(n.note)}
+                      date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: 'kjv', extra: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                      onEdit={() => setEditingNote({ key: n.key, note: n.note })}
+                      onDelete={() => requestDelete(n.key, 'kjv')}
+                      onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                      query={isSearching ? searchQuery.trim() : ''}
+                    />
+                  )
+                })}
               </div>
             )
           }
@@ -1522,18 +1627,22 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
           ) : (
             <div style={s.kanbanGrid}>
-              {filteredDev.map(n => (
-                <NoteCard
-                  key={n.day_number}
-                  badge={`Day ${n.day_number}`}
-                  badgeStyle={{ background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
-                  preview={notePreviewText(n.notes)}
-                  date={n.entry.date}
-                  onCardClick={() => navigate(`/day/${n.day_number}`)}
-                  onOpen={() => navigate(`/day/${n.day_number}`)}
-                  query={isSearching ? searchQuery.trim() : ''}
-                />
-              ))}
+              {filteredDev.map(n => {
+                const badge = `Day ${n.day_number}`
+                const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                return (
+                  <NoteCard
+                    key={n.day_number}
+                    badge={badge}
+                    badgeStyle={badgeStyle}
+                    preview={notePreviewText(n.notes)}
+                    date={n.entry.date}
+                    onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
+                    onOpen={() => navigate(`/day/${n.day_number}`)}
+                    query={isSearching ? searchQuery.trim() : ''}
+                  />
+                )
+              })}
             </div>
           )}
         </>
@@ -1561,14 +1670,16 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               <div style={s.kanbanGrid}>
                 {filteredConf.map(n => {
                   const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
+                  const badge = `${srcLabel} ${n.itemKey}`
+                  const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', border: '1px solid var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
                   return (
                     <NoteCard
                       key={n.key}
-                      badge={`${srcLabel} ${n.itemKey}`}
-                      badgeStyle={{ background: 'var(--purple-soft)', color: 'var(--purple-ink)', border: '1px solid var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
+                      badge={badge}
+                      badgeStyle={badgeStyle}
                       labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
                       preview={notePreviewText(n.note)}
-                      onCardClick={() => setEditingNote({ key: n.key, note: n.note })}
+                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: 'conf', extra: { source: n.source, itemKey: n.itemKey } })}
                       onEdit={() => setEditingNote({ key: n.key, note: n.note })}
                       onDelete={() => requestDelete(n.key, 'conf')}
                       onOpen={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
@@ -1598,6 +1709,36 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         onClose={() => setScriptureModal(null)}
         onNavigate={(book, ch, vs) => navigate('/scripture', { state: { book, chapter: ch, verse: vs } })}
       />
+
+      {/* Note view modal */}
+      {viewingNote && (
+        <NoteViewModal
+          noteData={viewingNote}
+          navigate={navigate}
+          onClose={() => setViewingNote(null)}
+          onEdit={viewingNote.key ? () => {
+            if (viewingNote.type === 'lib') {
+              // Find the full lib note object to pass into edit form
+              const n = libNotes.find(x => x.key === viewingNote.key)
+              if (n) setEditingNote(n)
+            } else {
+              setEditingNote({ key: viewingNote.key, note: viewingNote.note })
+            }
+          } : null}
+          onDelete={viewingNote.key ? () => requestDelete(viewingNote.key, viewingNote.type) : null}
+          onOpen={viewingNote.extra ? () => {
+            if (viewingNote.type === 'kjv') {
+              const { book, chapter, verse } = viewingNote.extra
+              navigate('/scripture', { state: { book, chapter, verse } })
+            } else if (viewingNote.type === 'dev') {
+              navigate(`/day/${viewingNote.extra.dayNumber}`)
+            } else if (viewingNote.type === 'conf') {
+              const { source, itemKey } = viewingNote.extra
+              navigate(`/confessions?t=${source}`, { state: { itemKey, source } })
+            }
+          } : null}
+        />
+      )}
 
       {/* Delete confirmation modal */}
       {pendingDelete && (
@@ -2296,6 +2437,66 @@ const dc = {
     borderRadius: 10, padding: '10px 0', cursor: 'pointer',
     fontSize: 13, fontWeight: 700, color: '#fff',
     fontFamily: "'DM Sans', sans-serif",
+  },
+}
+
+/* ── Note view modal styles ── */
+const nv = {
+  backdrop: {
+    position: 'fixed', inset: 0, zIndex: 8500,
+    background: 'rgba(0,0,0,0.45)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  },
+  sheet: {
+    width: '100%', maxWidth: 640,
+    background: 'var(--parchment)', borderRadius: '18px 18px 0 0',
+    boxShadow: '0 -6px 30px rgba(0,0,0,0.18)',
+    maxHeight: '88vh', display: 'flex', flexDirection: 'column',
+    fontFamily: "'DM Sans', sans-serif",
+    paddingBottom: 'env(safe-area-inset-bottom)',
+  },
+  handle: {
+    width: 36, height: 4, borderRadius: 99, background: 'var(--border-strong)',
+    margin: '10px auto 0', flexShrink: 0,
+  },
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 16px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+    gap: 8,
+  },
+  headerLeft: { flex: 1, minWidth: 0 },
+  titleText: {
+    fontSize: 15, fontWeight: 700, color: 'var(--ink)',
+    fontFamily: "'Cormorant Garamond', serif",
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
+  },
+  titleFaint: {
+    fontSize: 13, color: 'var(--ink-faint)', fontStyle: 'italic',
+  },
+  headerActions: { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
+  openBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 11, fontWeight: 700, color: 'var(--teal)',
+    fontFamily: "'DM Sans', sans-serif", padding: '4px 6px',
+  },
+  editBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    background: 'var(--parchment-dark)', border: '1px solid var(--border)',
+    borderRadius: 7, padding: '5px 10px', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  deleteBtn: {
+    display: 'inline-flex', alignItems: 'center',
+    background: 'var(--red-light)', border: '1px solid var(--red)',
+    borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--red)',
+  },
+  closeBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--ink-faint)', padding: 4, display: 'flex', alignItems: 'center',
+  },
+  body: {
+    flex: 1, overflowY: 'auto', padding: '16px 20px 24px',
   },
 }
 

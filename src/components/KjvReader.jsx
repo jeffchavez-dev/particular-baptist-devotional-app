@@ -1,4 +1,22 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useImperativeHandle } from 'react'
+
+/* ── Strip RICH-note JSON to plain readable text for inline display ── */
+const RICH_NOTE_PREFIX = '<!RICH>'
+function parseNoteDisplay(raw) {
+  if (!raw) return ''
+  if (!raw.startsWith(RICH_NOTE_PREFIX)) return raw
+  try {
+    const { title, body } = JSON.parse(raw.slice(RICH_NOTE_PREFIX.length))
+    const bodyText = (body || '')
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/<\/p>/gi, ' ')
+      .replace(/<\/li>/gi, ' ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ').trim()
+    return title ? `${title} — ${bodyText}` : bodyText
+  } catch { return raw }
+}
 import { useNavigate } from 'react-router-dom'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
@@ -1534,7 +1552,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* ── Note handlers ── */
   function openNoteEditor(verseKey) {
     if (editingNote === verseKey) { setEditingNote(null); return }
-    setNoteDraft(itemNotes[verseKey] || '')
+    // Strip RICH prefix to plain text for the inline textarea editor
+    setNoteDraft(parseNoteDisplay(itemNotes[verseKey] || ''))
     setEditingNote(verseKey)
   }
 
@@ -1809,7 +1828,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function openNoteForSelection() {
     if (selectedVerses.size !== 1) return
     const [verseKey] = [...selectedVerses]
-    setNoteDraft(itemNotes[verseKey] || '')
+    setNoteDraft(parseNoteDisplay(itemNotes[verseKey] || ''))
     setEditingNote(verseKey)
     setColorBarOpen(false)
     setSelectedVerses(new Set())
@@ -2596,7 +2615,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                                       <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
                                     </svg>
-                                    <span style={{flex:1}}>{note}</span>
+                                    <span style={{flex:1}}>{parseNoteDisplay(note)}</span>
                                   </div>
                                 )}
 
