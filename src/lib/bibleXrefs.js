@@ -18,12 +18,14 @@
 
 import { MATTHEW_XREFS } from '../data/matthewCrossRefs'
 import { ROMANS_XREFS }  from '../data/romansCrossRefs'
+import { JOHN_XREFS }    from '../data/johnCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
 const XREF_SOURCES = [
   { book: 'Matthew', data: MATTHEW_XREFS },
   { book: 'Romans',  data: ROMANS_XREFS  },
+  { book: 'John',    data: JOHN_XREFS    },
 ]
 
 /* ── Forward cache: 'book:ch:v' → parsed ref array ── */
@@ -31,7 +33,7 @@ const _fwdCache = {}
 
 /**
  * Forward lookup — which passages does a verse reference?
- * Currently covers Matthew and Romans.
+ * Currently covers Matthew, Romans, and John.
  */
 export function getBibleXrefs(book, chapter, verse) {
   const source = XREF_SOURCES.find(s => s.book === book)
@@ -77,7 +79,7 @@ function buildReverseIndex() {
 
 /**
  * Reverse lookup — which static Bible xref passages point TO a given verse?
- * (Currently covers Matthew and Romans → rest of Bible.)
+ * (Currently covers Matthew, Romans, and John → rest of Bible.)
  *
  * @param {string} book    - book name, e.g. 'Genesis'
  * @param {number} chapter - chapter number

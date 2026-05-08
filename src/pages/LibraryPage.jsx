@@ -194,7 +194,7 @@ function saveStoredLabels(labels) {
 /* ══════════════════════════════════════════════════════════════
    Scripture Verse Modal  (shown when clicking a tagged @ref)
 ══════════════════════════════════════════════════════════════ */
-function ScriptureVerseModal({ sc, onClose, onNavigate }) {
+function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
   const [verses,  setVerses]  = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -219,7 +219,7 @@ function ScriptureVerseModal({ sc, onClose, onNavigate }) {
     : `${sc.book} ${sc.chapter}:${sc.verse}`
 
   return (
-    <div style={vm.backdrop} onClick={onClose}>
+    <div style={zOverride ? { ...vm.backdrop, zIndex: zOverride } : vm.backdrop} onClick={onClose}>
       <div style={vm.sheet} onClick={e => e.stopPropagation()}>
         <div style={vm.header}>
           <span style={vm.ref}>{refLabel}</span>
@@ -1246,10 +1246,10 @@ function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick
 ══════════════════════════════════════════════════════════════ */
 function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }) {
   const { note, badge, badgeStyle, title } = noteData
+  const [scripturePreview, setScripturePreview] = useState(null)
 
   function handleScriptureClick(sc) {
-    onClose()
-    navigate('/scripture', { state: { book: sc.book, chapter: sc.chapter, verse: sc.verse } })
+    setScripturePreview(sc)
   }
 
   return (
@@ -1302,6 +1302,18 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
           <NoteBody rawNote={note} clip={false} onScriptureClick={handleScriptureClick} />
         </div>
       </div>
+
+      {/* Verse preview — stacked above this modal */}
+      <ScriptureVerseModal
+        sc={scripturePreview}
+        zOverride={9200}
+        onClose={e => { e?.stopPropagation?.(); setScripturePreview(null) }}
+        onNavigate={(book, ch, vs) => {
+          setScripturePreview(null)
+          onClose()
+          navigate('/scripture', { state: { book, chapter: ch, verse: vs } })
+        }}
+      />
     </div>
   )
 }
