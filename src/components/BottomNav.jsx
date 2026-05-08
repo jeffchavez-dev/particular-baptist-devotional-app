@@ -33,14 +33,10 @@ const TABS = [
   {
     path: '/scripture',
     label: 'Scripture',
-    icon: (active) => (
+    icon: (_active) => (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path d="M4 4a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-          stroke="currentColor" strokeWidth="1.5"
-          fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.12 : 0}
-        />
-        <path d="M9 7h5M7 10.5h8M7 13.5h8M7 16.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-        <path d="M9 2v6l2-1.5L13 8V2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+        <path d="M11 2v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M4 7.5h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
       </svg>
     ),
   },
