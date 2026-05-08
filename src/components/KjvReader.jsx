@@ -1552,8 +1552,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* ── Note handlers ── */
   function openNoteEditor(verseKey) {
     if (editingNote === verseKey) { setEditingNote(null); return }
-    // Strip RICH prefix to plain text for the inline textarea editor
-    setNoteDraft(parseNoteDisplay(itemNotes[verseKey] || ''))
+    const raw = itemNotes[verseKey] || ''
+    // Rich notes under kjv| keys are library-tagged notes; skip inline editor for those
+    if (raw.startsWith('<!RICH>')) return
+    setNoteDraft(raw)
     setEditingNote(verseKey)
   }
 
@@ -2467,6 +2469,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             const hlColorId   = highlights[verseKey] || null
                             const hlSt        = hlColorId ? getHlStyle(hlColorId) : null
                             const note        = itemNotes[verseKey]
+                            /* Rich notes under kjv| keys are library-tagged notes — don't show inline */
+                            const displayNote = note && !note.startsWith('<!RICH>') ? note : null
                             const isEditing   = editingNote === verseKey
                             const isSelected  = selectedVerses.has(verseKey)
                             const isWordVerse = selectedWord?.verseKey === verseKey
@@ -2609,13 +2613,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 })()}
 
                                 {/* ── Note display ── */}
-                                {studyMode && note && !isEditing && (
+                                {studyMode && displayNote && !isEditing && (
                                   <div style={r.noteDisplay} onClick={e => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                                       <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                                       <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
                                     </svg>
-                                    <span style={{flex:1}}>{parseNoteDisplay(note)}</span>
+                                    <span style={{flex:1}}>{parseNoteDisplay(displayNote)}</span>
                                   </div>
                                 )}
 
@@ -2632,7 +2636,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     <div style={r.noteEditorActions}>
                                       <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
                                       <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
-                                      {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
+                                      {displayNote && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
                                     </div>
                                   </div>
                                 )}
@@ -2904,6 +2908,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const hlColorId     = highlights[verseKey] || null
                         const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
                         const note          = itemNotes[verseKey]
+                        /* Rich notes under kjv| keys are library-tagged notes — don't show inline */
+                        const displayNote   = note && !note.startsWith('<!RICH>') ? note : null
                         const isEditing     = editingNote === verseKey
                         const isSelected    = selectedVerses.has(verseKey)
                         const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
@@ -3306,14 +3312,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               )
                             })()}
 
-                            {studyMode && note && !isEditing && (
+                            {studyMode && displayNote && !isEditing && (
                               <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
                                   <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
                                   <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
                                 </svg>
-                                <span style={{flex:1}}>{note}</span>
-                                <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, note, text) }} style={r.noteShareBtn} title="Share note">
+                                <span style={{flex:1}}>{parseNoteDisplay(displayNote)}</span>
+                                <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, displayNote, text) }} style={r.noteShareBtn} title="Share note">
                                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                                     <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
                                     <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
@@ -3336,7 +3342,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 <div style={r.noteEditorActions}>
                                   <button onClick={() => saveNote(verseKey)} style={r.noteSaveBtn}>Save</button>
                                   <button onClick={() => setEditingNote(null)} style={r.noteCancelBtn}>Cancel</button>
-                                  {note && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
+                                  {displayNote && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
                                 </div>
                               </div>
                             )}

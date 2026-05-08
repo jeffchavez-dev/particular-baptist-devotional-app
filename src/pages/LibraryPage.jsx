@@ -11,7 +11,8 @@ import {
 } from '../lib/annotations'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
-import { loadBibleVersion } from '../lib/bibleVersions'
+import { loadBibleVersion, BIBLE_VERSIONS } from '../lib/bibleVersions'
+import { getDefaultReaderVersion, resolveVersion } from '../lib/readerPrefs'
 
 const SCHEDULE = buildSchedule()
 
@@ -23,14 +24,17 @@ function isRichNote(raw) { return typeof raw === 'string' && raw.startsWith(RICH
 function parseRichNote(raw) {
   try {
     const parsed = JSON.parse(raw.slice(RICH_PREFIX.length))
-    return { title: '', body: '', labels: [], ...parsed }
+    return { title: '', body: '', labels: [], verseTag: null, ...parsed }
   } catch {
-    return { title: '', body: '', labels: [] }
+    return { title: '', body: '', labels: [], verseTag: null }
   }
 }
 
-function encodeRichNote(title, body, labels = []) {
-  return RICH_PREFIX + JSON.stringify({ title, body, labels })
+/* verseTag: { book, chapter, verse } | null */
+function encodeRichNote(title, body, labels = [], verseTag = null) {
+  const obj = { title, body, labels }
+  if (verseTag) obj.verseTag = verseTag
+  return RICH_PREFIX + JSON.stringify(obj)
 }
 
 function richNoteSearchText(raw) {
@@ -102,10 +106,24 @@ function Highlighted({ text, query }) {
   )
 }
 
-/* ── Fetch a single KJV verse text ── */
-async function fetchVerseText(book, chapter, verse) {
+/* ── Resolve the effective text version (Greek/Hebrew need special rendering;
+       fall back to KJV for plain-text preview when 'original' is chosen) ── */
+function resolveTextVersion(pref, bookName) {
+  const resolved = resolveVersion(pref, bookName, BIBLE_BOOKS)
+  return ['greek', 'hebrew', 'lxx'].includes(resolved) ? 'kjv' : resolved
+}
+
+/* ── Version abbreviation label (KJV / ABAB / NASB / …) ── */
+function versionLabel(pref, bookName) {
+  const effectiveId = resolveTextVersion(pref, bookName)
+  return BIBLE_VERSIONS.find(v => v.id === effectiveId)?.abbreviation ?? 'KJV'
+}
+
+/* ── Fetch a single verse text in the given version ── */
+async function fetchVerseText(book, chapter, verse, version) {
   try {
-    const data = await loadBibleVersion('kjv')
+    const vid = resolveTextVersion(version ?? getDefaultReaderVersion(), book)
+    const data = await loadBibleVersion(vid)
     const slug = book.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
     const verses = data[slug]?.[chapter]
     if (!verses) return null
@@ -116,10 +134,11 @@ async function fetchVerseText(book, chapter, verse) {
   }
 }
 
-/* ── Fetch a range of KJV verses ── */
-async function fetchVerseRange(book, chapter, fromVerse, toVerse) {
+/* ── Fetch a range of verses in the given version ── */
+async function fetchVerseRange(book, chapter, fromVerse, toVerse, version) {
   try {
-    const data = await loadBibleVersion('kjv')
+    const vid = resolveTextVersion(version ?? getDefaultReaderVersion(), book)
+    const data = await loadBibleVersion(vid)
     const slug = book.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
     const verses = data[slug]?.[chapter]
     if (!verses) return []
@@ -197,15 +216,26 @@ function saveStoredLabels(labels) {
 function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
   const [verses,  setVerses]  = useState([])
   const [loading, setLoading] = useState(true)
+  const [version, setVersion] = useState(() => getDefaultReaderVersion())
+
+  /* Keep version in sync when the user changes it in Settings (same-tab storage event) */
+  useEffect(() => {
+    function onStorage() { setVersion(getDefaultReaderVersion()) }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   useEffect(() => {
     if (!sc) return
+    /* Re-read version on each open so a settings change before opening is reflected */
+    const ver = getDefaultReaderVersion()
+    setVersion(ver)
     setLoading(true)
     const { book, chapter, verse, verseTo } = sc
     if (verseTo && verseTo !== verse) {
-      fetchVerseRange(book, chapter, verse, verseTo).then(vs => { setVerses(vs); setLoading(false) })
+      fetchVerseRange(book, chapter, verse, verseTo, ver).then(vs => { setVerses(vs); setLoading(false) })
     } else {
-      fetchVerseText(book, chapter, verse).then(t => {
+      fetchVerseText(book, chapter, verse, ver).then(t => {
         setVerses(t ? [{ v: verse, t }] : [])
         setLoading(false)
       })
@@ -218,11 +248,13 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
     ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
     : `${sc.book} ${sc.chapter}:${sc.verse}`
 
+  const verLabel = versionLabel(version, sc.book ?? '')
+
   return (
     <div style={zOverride ? { ...vm.backdrop, zIndex: zOverride } : vm.backdrop} onClick={onClose}>
       <div style={vm.sheet} onClick={e => e.stopPropagation()}>
         <div style={vm.header}>
-          <span style={vm.ref}>{refLabel}</span>
+          <span style={vm.ref}>{refLabel} <span style={{ fontWeight: 400, fontSize: '0.82em', color: 'var(--ink-faint)', marginLeft: 4 }}>· {verLabel}</span></span>
           <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -336,7 +368,7 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
   const [step,      setStep]      = useState('book')  // 'book' | 'ref'
   const [book,      setBook]      = useState('')
   const [chapter,   setChapter]   = useState(1)
-  const [verse,     setVerse]     = useState(1)
+  const [verse,     setVerse]     = useState('1')     // string so user can clear & retype
   const [verseTo,   setVerseTo]   = useState('')      // '' = single verse
   const [forceEdit, setForceEdit] = useState(false)
   const ref = useRef(null)
@@ -426,7 +458,7 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
           <label style={am.refLabel}>Ch.</label>
           <select
             value={chapter}
-            onChange={e => { setChapter(Number(e.target.value)); setVerse(1); setVerseTo('') }}
+            onChange={e => { setChapter(Number(e.target.value)); setVerse('1'); setVerseTo('') }}
             style={am.refSelect}
           >
             {Array.from({ length: maxChapters }, (_, i) => i + 1).map(c => (
@@ -438,28 +470,40 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
           <label style={am.refLabel}>From</label>
           <input
             type="number" min={1} max={200} value={verse}
-            onChange={e => setVerse(Math.max(1, parseInt(e.target.value) || 1))}
+            onChange={e => setVerse(e.target.value)}
+            onBlur={() => setVerse(v => String(Math.max(1, parseInt(v) || 1)))}
             style={am.refInput}
           />
         </div>
         <div style={am.refGroup}>
           <label style={am.refLabel}>To (opt)</label>
           <input
-            type="number" min={verse} max={200} value={verseTo} placeholder="–"
-            onChange={e => setVerseTo(e.target.value === '' ? '' : Math.max(verse, parseInt(e.target.value) || verse))}
+            type="number" min={1} max={200} value={verseTo} placeholder="–"
+            onChange={e => setVerseTo(e.target.value)}
+            onBlur={() => {
+              if (verseTo === '') return
+              const v = Math.max(1, parseInt(verse) || 1)
+              setVerseTo(String(Math.max(v, parseInt(verseTo) || v)))
+            }}
             style={am.refInput}
           />
         </div>
       </div>
       <div style={am.insertRow}>
-        <button style={am.insertBtn}
-          onClick={() => onSelect({ book, chapter, verse, verseTo: verseTo === '' ? null : Number(verseTo), quoteMode: false })}>
-          Insert tag
-        </button>
-        <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
-          onClick={() => onSelect({ book, chapter, verse, verseTo: verseTo === '' ? null : Number(verseTo), quoteMode: true })}>
-          Quote verse{verseTo ? 's' : ''}
-        </button>
+        {(() => {
+          const vNum  = Math.max(1, parseInt(verse)  || 1)
+          const vtNum = verseTo === '' ? null : Math.max(vNum, parseInt(verseTo) || vNum)
+          return (<>
+            <button style={am.insertBtn}
+              onClick={() => onSelect({ book, chapter, verse: vNum, verseTo: vtNum, quoteMode: false })}>
+              Insert tag
+            </button>
+            <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
+              onClick={() => onSelect({ book, chapter, verse: vNum, verseTo: vtNum, quoteMode: true })}>
+              Quote verse{vtNum ? 's' : ''}
+            </button>
+          </>)
+        })()}
       </div>
     </div>
   )
@@ -575,13 +619,16 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
 
     const between = text.slice(idx + 1, range.startOffset)
 
-    // Allow spaces only if the query still starts with a known Bible book name
-    // (e.g. "@Genesis 1:1" — the space is part of the reference, not a word break)
+    // Allow spaces if:
+    //  (a) the query already starts with a complete book name  ("Genesis 1:1" — chapter/verse follows), OR
+    //  (b) the query is still a prefix of a numbered book name ("1 " → "1 Corinthians", "1 Kings", …)
     if (between.includes(' ')) {
-      const startsWithBook = BOOKS_BY_LENGTH.some(bk =>
-        between.toLowerCase().startsWith(bk.name.toLowerCase())
-      )
-      if (!startsWithBook) { setAtPopup(null); return }
+      const q = between.toLowerCase()
+      const valid = BOOKS_BY_LENGTH.some(bk => {
+        const bn = bk.name.toLowerCase()
+        return q.startsWith(bn) || bn.startsWith(q)
+      })
+      if (!valid) { setAtPopup(null); return }
     }
 
     // Compute popup anchor from the @ character
@@ -621,14 +668,15 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     const rangeAttrs = isRange ? ` data-sc-verse-to="${verseTo}"` : ''
 
     if (quoteMode) {
+      const quoteVer = getDefaultReaderVersion()
       let innerHtml
       if (isRange) {
-        const vrs = await fetchVerseRange(book, chapter, verse, verseTo)
+        const vrs = await fetchVerseRange(book, chapter, verse, verseTo, quoteVer)
         innerHtml = vrs.length > 0
           ? vrs.map(vr => `<sup style="font-size:0.7em;margin-right:2px">${vr.v}</sup>${vr.t}`).join(' ')
           : refLabel
       } else {
-        const text = await fetchVerseText(book, chapter, verse)
+        const text = await fetchVerseText(book, chapter, verse, quoteVer)
         innerHtml = text ? `"${text}"` : refLabel
       }
       document.execCommand('insertHTML', false,
@@ -887,7 +935,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
   const [tagEnabled, setTagEnabled] = useState(false)
   const [tagBook,    setTagBook]    = useState('Genesis')
   const [tagChapter, setTagChapter] = useState(1)
-  const [tagVerse,   setTagVerse]   = useState(1)
+  const [tagVerse,   setTagVerse]   = useState('1')  // string so user can clear & retype
   const [saving,     setSaving]     = useState(false)
 
   const selectedBook = BIBLE_BOOKS.find(b => b.name === tagBook) ?? BIBLE_BOOKS[0]
@@ -902,10 +950,9 @@ function CreateNoteForm({ onSave, onCancel, session }) {
     if (!hasContent) return
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels)
-      const key = tagEnabled
-        ? `kjv|${tagBook}|${tagChapter}|${tagVerse}`
-        : `lib|${new Date().toISOString()}`
+      const verseTag = tagEnabled ? { book: tagBook, chapter: tagChapter, verse: Math.max(1, parseInt(tagVerse) || 1) } : null
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
+      const key = `lib|${new Date().toISOString()}`
       setItemNote(key, raw, session?.user?.id)
       onSave()
     } finally {
@@ -953,7 +1000,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         </svg>
         {tagEnabled ? 'Scripture tagged' : 'Tag a scripture'}
         {tagEnabled && (
-          <span style={s.tagPreview}>{tagBook} {tagChapter}:{tagVerse}</span>
+          <span style={s.tagPreview}>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</span>
         )}
       </button>
 
@@ -963,7 +1010,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             <label style={s.pickerLabel}>Book</label>
             <select
               value={tagBook}
-              onChange={e => { setTagBook(e.target.value); setTagChapter(1); setTagVerse(1) }}
+              onChange={e => { setTagBook(e.target.value); setTagChapter(1); setTagVerse('1') }}
               style={s.pickerSelect}
             >
               <optgroup label="Old Testament">
@@ -982,7 +1029,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             <label style={s.pickerLabel}>Ch.</label>
             <select
               value={tagChapter}
-              onChange={e => { setTagChapter(Number(e.target.value)); setTagVerse(1) }}
+              onChange={e => { setTagChapter(Number(e.target.value)); setTagVerse('1') }}
               style={s.pickerSelectSmall}
             >
               {Array.from({ length: maxChapters }, (_, i) => i + 1).map(ch => (
@@ -994,7 +1041,8 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             <label style={s.pickerLabel}>Vs.</label>
             <input
               type="number" min={1} max={200} value={tagVerse}
-              onChange={e => setTagVerse(Math.max(1, parseInt(e.target.value) || 1))}
+              onChange={e => setTagVerse(e.target.value)}
+              onBlur={() => setTagVerse(v => String(Math.max(1, parseInt(v) || 1)))}
               style={s.pickerInput}
             />
           </div>
@@ -1002,7 +1050,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
       )}
       {tagEnabled && (
         <p style={s.tagHint}>
-          This note will be saved to <strong>{tagBook} {tagChapter}:{tagVerse}</strong> and will appear in Scripture Notes.
+          This note will be saved to <strong>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</strong> and will appear in Scripture Notes.
         </p>
       )}
 
@@ -1025,7 +1073,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 ══════════════════════════════════════════════════════════════ */
 function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const isRich = isRichNote(initialRaw)
-  const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '', labels: [] }
+  const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '', labels: [], verseTag: null }
 
   const [titleVal, setTitleVal] = useState(parsed.title || '')
   const [bodyHtml, setBodyHtml] = useState(
@@ -1034,10 +1082,13 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const [labels,   setLabels]   = useState(parsed.labels || [])
   const [saving,   setSaving]   = useState(false)
 
+  /* Preserve the original verseTag (if any) when re-saving */
+  const verseTag = parsed.verseTag ?? null
+
   async function handleSave() {
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
       setItemNote(noteKey, raw, session?.user?.id)
       onSave()
     } finally {
@@ -1361,6 +1412,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [editingNote,    setEditingNote]    = useState(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [searchOpen,     setSearchOpen]     = useState(false)
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
   const [scriptureModal, setScriptureModal] = useState(null)
@@ -1390,10 +1442,21 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     return [...set].sort()
   }, [libNotes, kjvNotes])
 
+  /* Split lib notes: free-form vs scripture-tagged (verseTag in JSON) */
+  const { libFreeNotes, libTaggedNotes } = useMemo(() => {
+    const free = [], tagged = []
+    libNotes.forEach(n => {
+      const vt = isRichNote(n.note) ? parseRichNote(n.note).verseTag : null
+      if (vt) tagged.push({ ...n, book: vt.book, chapter: vt.chapter, verse: vt.verse, isLibTagged: true })
+      else    free.push(n)
+    })
+    return { libFreeNotes: free, libTaggedNotes: tagged }
+  }, [libNotes])
+
   const filteredLib = useMemo(() => {
     let list = q
-      ? libNotes.filter(n => richNoteSearchText(n.note).toLowerCase().includes(q))
-      : [...libNotes]
+      ? libFreeNotes.filter(n => richNoteSearchText(n.note).toLowerCase().includes(q))
+      : [...libFreeNotes]
     if (filterLabel)
       list = list.filter(n => (isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []).includes(filterLabel))
     if      (sortBy === 'date-asc')  list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
@@ -1406,15 +1469,18 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
       })
     }
     return list
-  }, [libNotes, q, filterLabel, sortBy])
+  }, [libFreeNotes, q, filterLabel, sortBy])
+
+  /* Scripture notes = inline scripture-page notes (kjv|) + lib notes tagged to a verse (lib| with verseTag) */
+  const allScriptureNotes = useMemo(() => [...kjvNotes, ...libTaggedNotes], [kjvNotes, libTaggedNotes])
 
   const filteredKjv = useMemo(() => {
     let list = q
-      ? kjvNotes.filter(n =>
+      ? allScriptureNotes.filter(n =>
           richNoteSearchText(n.note).toLowerCase().includes(q) ||
           `${n.book} ${n.chapter}:${n.verse}`.toLowerCase().includes(q)
         )
-      : [...kjvNotes]
+      : [...allScriptureNotes]
     if (filterLabel)
       list = list.filter(n => (isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []).includes(filterLabel))
     if (sortBy === 'date-asc') list.sort((a, b) => new Date(a.createdAt ?? 0) - new Date(b.createdAt ?? 0))
@@ -1426,7 +1492,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
       })
     }
     return list
-  }, [kjvNotes, q, filterLabel, sortBy])
+  }, [allScriptureNotes, q, filterLabel, sortBy])
   const filteredConf = useMemo(() =>
     q ? confNotes.filter(n =>
       richNoteSearchText(n.note).toLowerCase().includes(q) ||
@@ -1467,7 +1533,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         />
       ) : (
         <>
-          {/* Compact control row: New Note + Sort dropdown + Label filter dropdown */}
+          {/* Compact control row: New Note + Sort + Label + Search icon */}
           <div style={s.controlRow}>
             <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1485,29 +1551,38 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 {allUsedLabels.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             )}
-          </div>
-
-          {/* Search bar */}
-          <div style={s.searchRow}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>
-              <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-            </svg>
-            <input
-              ref={searchRef}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search your notes…"
-              style={s.searchInput}
-            />
-            {searchQuery && (
+            {/* Search — collapses to icon when idle */}
+            {(searchOpen || searchQuery) ? (
+              <div style={s.searchInline}>
+                <input
+                  ref={searchRef}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search…"
+                  style={s.searchInlineInput}
+                  autoFocus
+                  onBlur={() => { if (!searchQuery) setSearchOpen(false) }}
+                />
+                <button
+                  onMouseDown={e => { e.preventDefault(); setSearchQuery(''); setSearchOpen(false) }}
+                  style={s.searchClear}
+                  aria-label="Clear search"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={() => { setSearchQuery(''); searchRef.current?.focus() }}
-                style={s.searchClear}
-                aria-label="Clear search"
+                onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 0) }}
+                style={s.searchIconBtn}
+                aria-label="Search notes"
+                title="Search notes"
               >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/>
+                  <path d="M10 10l2.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                 </svg>
               </button>
             )}
@@ -1580,7 +1655,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               </svg>
             }
             title="Scripture Notes"
-            count={kjvNotes.length}
+            count={allScriptureNotes.length}
             filtered={isSearching ? filteredKjv.length : null}
           />
           <p style={s.sectionHint}>Notes attached to specific Bible verses</p>
@@ -1591,6 +1666,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 {filteredKjv.map(n => {
                   const badge = `${n.book} ${n.chapter}:${n.verse}`
                   const badgeStyle = { background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                  const noteType = n.isLibTagged ? 'lib' : 'kjv'
                   return (
                     <NoteCard
                       key={n.key}
@@ -1599,9 +1675,9 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                       labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
                       preview={notePreviewText(n.note)}
                       date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: 'kjv', extra: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: noteType, extra: { book: n.book, chapter: n.chapter, verse: n.verse } })}
                       onEdit={() => setEditingNote({ key: n.key, note: n.note })}
-                      onDelete={() => requestDelete(n.key, 'kjv')}
+                      onDelete={() => requestDelete(n.key, noteType)}
                       onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
                       query={isSearching ? searchQuery.trim() : ''}
                     />
@@ -2078,28 +2154,33 @@ const s = {
   hlLegendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   hlLegendMeaning: { fontSize: 12, color: 'var(--ink)', fontWeight: 500 },
 
-  /* ── Search bar ── */
-  searchRow: {
-    display: 'flex', alignItems: 'center', gap: 8,
+  /* ── Search (inline in controlRow) ── */
+  searchInline: {
+    display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0,
     background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 10, padding: '8px 12px', marginBottom: 2,
+    borderRadius: 8, padding: '4px 8px',
   },
-  searchInput: {
-    flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontSize: 16, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+  searchInlineInput: {
+    flex: 1, background: 'none', border: 'none', outline: 'none', minWidth: 0,
+    fontSize: 13, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+  },
+  searchIconBtn: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+    padding: '5px 8px', cursor: 'pointer', color: 'var(--ink-muted)',
+    display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color 0.12s',
   },
   searchClear: {
     background: 'none', border: 'none', cursor: 'pointer',
-    color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 2, flexShrink: 0,
+    color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: '1px', flexShrink: 0,
   },
   searchMeta: {
     fontSize: 11, color: 'var(--teal)', fontWeight: 600,
     margin: '0 0 2px', lineHeight: 1.5,
   },
 
-  /* ── Compact control row (New Note + Sort + Filter) ── */
+  /* ── Compact control row (New Note + Sort + Filter + Search) ── */
   controlRow: {
-    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap',
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
   },
   newNoteBtnSmall: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
