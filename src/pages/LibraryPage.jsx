@@ -22,21 +22,22 @@ function isRichNote(raw) { return typeof raw === 'string' && raw.startsWith(RICH
 
 function parseRichNote(raw) {
   try {
-    return JSON.parse(raw.slice(RICH_PREFIX.length))
+    const parsed = JSON.parse(raw.slice(RICH_PREFIX.length))
+    return { title: '', body: '', labels: [], ...parsed }
   } catch {
-    return { title: '', body: '' }
+    return { title: '', body: '', labels: [] }
   }
 }
 
-function encodeRichNote(title, body) {
-  return RICH_PREFIX + JSON.stringify({ title, body })
+function encodeRichNote(title, body, labels = []) {
+  return RICH_PREFIX + JSON.stringify({ title, body, labels })
 }
 
 function richNoteSearchText(raw) {
   if (!isRichNote(raw)) return raw
-  const { title, body } = parseRichNote(raw)
+  const { title, body, labels = [] } = parseRichNote(raw)
   const stripped = (body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
-  return `${title || ''} ${stripped}`
+  return `${title || ''} ${stripped} ${labels.join(' ')}`
 }
 
 /* ── Shared helpers ────────────────────────────────────────────────────────── */
@@ -115,46 +116,119 @@ async function fetchVerseText(book, chapter, verse) {
   }
 }
 
+/* ── Fetch a range of KJV verses ── */
+async function fetchVerseRange(book, chapter, fromVerse, toVerse) {
+  try {
+    const data = await loadBibleVersion('kjv')
+    const slug = book.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+    const verses = data[slug]?.[chapter]
+    if (!verses) return []
+    return verses
+      .filter(v => v.v >= fromVerse && v.v <= (toVerse ?? fromVerse))
+      .map(v => ({ v: v.v, t: v.t }))
+  } catch {
+    return []
+  }
+}
+
+/* ── Parse a fully-typed @reference  e.g. "Genesis 1:1" or "Genesis 1:1-5" ── */
+const BOOKS_BY_LENGTH = [...BIBLE_BOOKS].sort((a, b) => b.name.length - a.name.length)
+
+function parseAtQuery(query) {
+  const q = query.trim()
+  for (const bk of BOOKS_BY_LENGTH) {
+    if (q.toLowerCase().startsWith(bk.name.toLowerCase())) {
+      const rest = q.slice(bk.name.length).trim()
+      const m    = rest.match(/^(\d+):(\d+)(?:-(\d+))?$/)
+      if (m) {
+        return {
+          book:    bk.name,
+          chapter: parseInt(m[1]),
+          verse:   parseInt(m[2]),
+          verseTo: m[3] ? parseInt(m[3]) : null,
+        }
+      }
+    }
+  }
+  return null
+}
+
+/* ── Label / category storage ── */
+const LABEL_STORAGE_KEY = 'pb-note-labels'
+const DEFAULT_LABELS = [
+  'Biblical Theology', 'Philosophy', 'Doctrines of Grace',
+  'Christology', 'Soteriology', 'Ecclesiology',
+  'Eschatology', 'Prayer', 'Personal',
+]
+
+function getStoredLabels() {
+  try {
+    const raw = localStorage.getItem(LABEL_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return [...DEFAULT_LABELS]
+}
+
+function saveStoredLabels(labels) {
+  try { localStorage.setItem(LABEL_STORAGE_KEY, JSON.stringify(labels)) } catch {}
+}
+
 /* ══════════════════════════════════════════════════════════════
    Scripture Verse Modal  (shown when clicking a tagged @ref)
 ══════════════════════════════════════════════════════════════ */
 function ScriptureVerseModal({ sc, onClose, onNavigate }) {
-  const [verseText, setVerseText] = useState(null)
-  const [loading,   setLoading]   = useState(true)
+  const [verses,  setVerses]  = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!sc) return
     setLoading(true)
-    fetchVerseText(sc.book, sc.chapter, sc.verse).then(t => {
-      setVerseText(t)
-      setLoading(false)
-    })
-  }, [sc?.book, sc?.chapter, sc?.verse]) // eslint-disable-line
+    const { book, chapter, verse, verseTo } = sc
+    if (verseTo && verseTo !== verse) {
+      fetchVerseRange(book, chapter, verse, verseTo).then(vs => { setVerses(vs); setLoading(false) })
+    } else {
+      fetchVerseText(book, chapter, verse).then(t => {
+        setVerses(t ? [{ v: verse, t }] : [])
+        setLoading(false)
+      })
+    }
+  }, [sc?.book, sc?.chapter, sc?.verse, sc?.verseTo]) // eslint-disable-line
 
   if (!sc) return null
+
+  const refLabel = (sc.verseTo && sc.verseTo !== sc.verse)
+    ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
+    : `${sc.book} ${sc.chapter}:${sc.verse}`
 
   return (
     <div style={vm.backdrop} onClick={onClose}>
       <div style={vm.sheet} onClick={e => e.stopPropagation()}>
-        {/* Header */}
         <div style={vm.header}>
-          <span style={vm.ref}>{sc.book} {sc.chapter}:{sc.verse}</span>
+          <span style={vm.ref}>{refLabel}</span>
           <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
-        {/* Verse */}
         <div style={vm.body}>
-          {loading
-            ? <p style={vm.loading}>Loading…</p>
-            : verseText
-              ? <p style={vm.verseText}>"{verseText}"</p>
-              : <p style={vm.loading}>Verse not found.</p>
-          }
+          {loading ? (
+            <p style={vm.loading}>Loading…</p>
+          ) : verses.length === 0 ? (
+            <p style={vm.loading}>Verse not found.</p>
+          ) : verses.length === 1 ? (
+            <p style={vm.verseText}>"{verses[0].t}"</p>
+          ) : (
+            <div>
+              {verses.map(vr => (
+                <p key={vr.v} style={{ ...vm.verseText, marginBottom: 6, fontStyle: 'normal' }}>
+                  <sup style={{ fontSize: '0.72em', fontWeight: 700, color: 'var(--teal)', marginRight: 3 }}>{vr.v}</sup>
+                  {vr.t}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
-        {/* Actions */}
         <div style={vm.actions}>
           <button style={vm.openBtn} onClick={() => { onNavigate(sc.book, sc.chapter, sc.verse); onClose() }}>
             Open in Scripture →
@@ -175,7 +249,7 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
 
   /* Rich note (HTML stored with RICH_PREFIX) */
   if (isRichNote(rawNote)) {
-    const { title, body } = parseRichNote(rawNote)
+    const { title, body, labels = [] } = parseRichNote(rawNote)
 
     function handleClick(e) {
       const el = e.target.closest('[data-sc-book]')
@@ -185,6 +259,7 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
           book:    el.dataset.scBook,
           chapter: parseInt(el.dataset.scChapter),
           verse:   parseInt(el.dataset.scVerse),
+          verseTo: el.dataset.scVerseTo ? parseInt(el.dataset.scVerseTo) : null,
         })
       }
     }
@@ -192,6 +267,11 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
     return (
       <div>
         {title && <p style={s.richTitle}>{title}</p>}
+        {labels.length > 0 && (
+          <div style={s.noteLabelRow}>
+            {labels.map(lb => <span key={lb} style={s.noteLabelChip}>{lb}</span>)}
+          </div>
+        )}
         {/* eslint-disable-next-line react/no-danger */}
         <div
           style={s.richBody}
@@ -227,17 +307,24 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
    @ Scripture Mention Popup
 ══════════════════════════════════════════════════════════════ */
 function AtMentionPopup({ pos, query, onSelect, onClose }) {
-  const [step,    setStep]    = useState('book')   // 'book' | 'ref'
-  const [book,    setBook]    = useState('')
-  const [chapter, setChapter] = useState(1)
-  const [verse,   setVerse]   = useState(1)
+  const [step,      setStep]      = useState('book')  // 'book' | 'ref'
+  const [book,      setBook]      = useState('')
+  const [chapter,   setChapter]   = useState(1)
+  const [verse,     setVerse]     = useState(1)
+  const [verseTo,   setVerseTo]   = useState('')      // '' = single verse
+  const [forceEdit, setForceEdit] = useState(false)
   const ref = useRef(null)
 
-  /* Filter books by query */
+  /* Detect fully-typed inline reference like "Genesis 1:1" or "Genesis 1:1-5" */
+  const resolved    = useMemo(() => parseAtQuery(query), [query])
+  const showResolved = resolved && !forceEdit
+
+  /* Filter books by query (only when not in resolved mode) */
   const filteredBooks = useMemo(() => {
+    if (showResolved) return BIBLE_BOOKS
     const q = (step === 'book' ? query : '').toLowerCase()
     return q ? BIBLE_BOOKS.filter(b => b.name.toLowerCase().startsWith(q)) : BIBLE_BOOKS
-  }, [query, step])
+  }, [query, step, showResolved])
 
   /* Click-outside to close */
   useEffect(() => {
@@ -254,13 +341,39 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
   const style = {
     ...am.popup,
     top: pos.bottom + 4,
-    left: Math.max(8, Math.min(pos.left, window.innerWidth - 260)),
+    left: Math.max(8, Math.min(pos.left, window.innerWidth - 270)),
   }
 
+  /* ── Resolved: user typed a complete reference ── */
+  if (showResolved) {
+    const { book: rb, chapter: rc, verse: rv, verseTo: rvt } = resolved
+    const label = rvt ? `${rb} ${rc}:${rv}–${rvt}` : `${rb} ${rc}:${rv}`
+    return (
+      <div ref={ref} style={style}>
+        <p style={am.label}>Detected reference</p>
+        <p style={am.resolvedRef}>{label}</p>
+        <div style={am.insertRow}>
+          <button style={am.insertBtn}
+            onClick={() => onSelect({ book: rb, chapter: rc, verse: rv, verseTo: rvt, quoteMode: false })}>
+            Insert tag
+          </button>
+          <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
+            onClick={() => onSelect({ book: rb, chapter: rc, verse: rv, verseTo: rvt, quoteMode: true })}>
+            Quote verse{rvt ? 's' : ''}
+          </button>
+        </div>
+        <button style={am.editRefBtn} onClick={() => setForceEdit(true)}>
+          ← Choose differently
+        </button>
+      </div>
+    )
+  }
+
+  /* ── Book picker ── */
   if (step === 'book') {
     return (
       <div ref={ref} style={style}>
-        <p style={am.label}>Select book</p>
+        <p style={am.label}>Select book  <span style={am.hintSmall}>or type @Book Ch:Vs</span></p>
         <div style={am.bookList}>
           {filteredBooks.slice(0, 12).map(b => (
             <button key={b.name} style={am.bookBtn} onClick={() => { setBook(b.name); setStep('ref') }}>
@@ -273,18 +386,17 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
     )
   }
 
+  /* ── Chapter / verse picker ── */
   return (
     <div ref={ref} style={style}>
-      <button style={am.backBtn} onClick={() => setStep('book')}>
-        ← {book}
-      </button>
+      <button style={am.backBtn} onClick={() => setStep('book')}>← {book}</button>
       <p style={am.label}>Chapter &amp; verse</p>
       <div style={am.refRow}>
         <div style={am.refGroup}>
           <label style={am.refLabel}>Ch.</label>
           <select
             value={chapter}
-            onChange={e => { setChapter(Number(e.target.value)); setVerse(1) }}
+            onChange={e => { setChapter(Number(e.target.value)); setVerse(1); setVerseTo('') }}
             style={am.refSelect}
           >
             {Array.from({ length: maxChapters }, (_, i) => i + 1).map(c => (
@@ -293,20 +405,30 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
           </select>
         </div>
         <div style={am.refGroup}>
-          <label style={am.refLabel}>Vs.</label>
+          <label style={am.refLabel}>From</label>
           <input
             type="number" min={1} max={200} value={verse}
             onChange={e => setVerse(Math.max(1, parseInt(e.target.value) || 1))}
             style={am.refInput}
           />
         </div>
+        <div style={am.refGroup}>
+          <label style={am.refLabel}>To (opt)</label>
+          <input
+            type="number" min={verse} max={200} value={verseTo} placeholder="–"
+            onChange={e => setVerseTo(e.target.value === '' ? '' : Math.max(verse, parseInt(e.target.value) || verse))}
+            style={am.refInput}
+          />
+        </div>
       </div>
       <div style={am.insertRow}>
-        <button style={am.insertBtn} onClick={() => onSelect({ book, chapter, verse, quoteMode: false })}>
+        <button style={am.insertBtn}
+          onClick={() => onSelect({ book, chapter, verse, verseTo: verseTo === '' ? null : Number(verseTo), quoteMode: false })}>
           Insert tag
         </button>
-        <button style={{ ...am.insertBtn, ...am.insertBtnAlt }} onClick={() => onSelect({ book, chapter, verse, quoteMode: true })}>
-          Quote verse
+        <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
+          onClick={() => onSelect({ book, chapter, verse, verseTo: verseTo === '' ? null : Number(verseTo), quoteMode: true })}>
+          Quote verse{verseTo ? 's' : ''}
         </button>
       </div>
     </div>
@@ -365,6 +487,18 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     onBodyChange(editorRef.current.innerHTML)
   }
 
+  function execUndo() {
+    editorRef.current?.focus()
+    document.execCommand('undo', false, null)
+    onBodyChange(editorRef.current.innerHTML)
+  }
+
+  function execRedo() {
+    editorRef.current?.focus()
+    document.execCommand('redo', false, null)
+    onBodyChange(editorRef.current.innerHTML)
+  }
+
   function handleInput() {
     onBodyChange(editorRef.current.innerHTML)
     checkAtMention()
@@ -400,7 +534,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     setAtPopup({ bottom: rect.bottom + window.scrollY, left: rect.left + window.scrollX })
   }
 
-  async function handleAtSelect({ book, chapter, verse, quoteMode }) {
+  async function handleAtSelect({ book, chapter, verse, verseTo, quoteMode }) {
     setAtPopup(null)
     editorRef.current?.focus()
 
@@ -412,26 +546,38 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
       document.execCommand('delete', false)
     }
 
+    const isRange  = verseTo && verseTo !== verse
+    const refLabel = isRange
+      ? `${book} ${chapter}:${verse}–${verseTo}`
+      : `${book} ${chapter}:${verse}`
+    const rangeAttrs = isRange ? ` data-sc-verse-to="${verseTo}"` : ''
+
     if (quoteMode) {
-      // Fetch verse text, insert as styled blockquote
-      const text = await fetchVerseText(book, chapter, verse)
-      const display = text ? `"${text}"` : `${book} ${chapter}:${verse}`
+      let innerHtml
+      if (isRange) {
+        const vrs = await fetchVerseRange(book, chapter, verse, verseTo)
+        innerHtml = vrs.length > 0
+          ? vrs.map(vr => `<sup style="font-size:0.7em;margin-right:2px">${vr.v}</sup>${vr.t}`).join(' ')
+          : refLabel
+      } else {
+        const text = await fetchVerseText(book, chapter, verse)
+        innerHtml = text ? `"${text}"` : refLabel
+      }
       document.execCommand('insertHTML', false,
-        `<blockquote class="sc-quote" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}" ` +
+        `<blockquote class="sc-quote" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}"${rangeAttrs} ` +
         `style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--teal);` +
         `background:var(--teal-light);border-radius:0 6px 6px 0;font-style:italic;` +
-        `font-size:0.92em;color:var(--ink-muted);">${display} ` +
-        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${book} ${chapter}:${verse}</em></blockquote>`
+        `font-size:0.92em;color:var(--ink-muted);">${innerHtml} ` +
+        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel}</em></blockquote>`
       )
     } else {
-      // Insert a small tag chip
       document.execCommand('insertHTML', false,
-        `<span class="sc-tag" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}" ` +
+        `<span class="sc-tag" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}"${rangeAttrs} ` +
         `contenteditable="false" style="display:inline-block;padding:1px 8px;margin:0 2px;` +
         `background:var(--teal-light);color:var(--teal);border:1px solid var(--teal);` +
         `border-radius:99px;font-size:0.82em;font-weight:700;cursor:pointer;` +
         `font-family:'DM Sans',sans-serif;user-select:none;">` +
-        `${book} ${chapter}:${verse}</span>&#8203;`
+        `${refLabel}</span>&#8203;`
       )
     }
     onBodyChange(editorRef.current.innerHTML)
@@ -476,6 +622,31 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
             {action.label}
           </button>
         ))}
+        <span style={re.toolDivider} />
+        <button
+          title="Undo"
+          aria-label="Undo"
+          onMouseDown={e => { e.preventDefault(); execUndo() }}
+          style={re.toolBtn}
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button
+          title="Redo"
+          aria-label="Redo"
+          onMouseDown={e => { e.preventDefault(); execRedo() }}
+          style={re.toolBtn}
+          type="button"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
         <span style={re.toolDivider} />
         <span style={re.atHint}>Type @ for scripture</span>
       </div>
@@ -563,11 +734,79 @@ function CopyShareBar({ rawNote }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   Label Picker
+══════════════════════════════════════════════════════════════ */
+function LabelPicker({ selected, onChange }) {
+  const [allLabels, setAllLabels] = useState(getStoredLabels)
+  const [adding,    setAdding]    = useState(false)
+  const [newLabel,  setNewLabel]  = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => { if (adding) inputRef.current?.focus() }, [adding])
+
+  function toggle(label) {
+    onChange(selected.includes(label)
+      ? selected.filter(l => l !== label)
+      : [...selected, label]
+    )
+  }
+
+  function addLabel() {
+    const trimmed = newLabel.trim()
+    if (!trimmed) { setAdding(false); return }
+    const updated = allLabels.includes(trimmed) ? allLabels : [...allLabels, trimmed]
+    saveStoredLabels(updated)
+    setAllLabels(updated)
+    if (!selected.includes(trimmed)) onChange([...selected, trimmed])
+    setNewLabel('')
+    setAdding(false)
+  }
+
+  return (
+    <div style={lp.wrap}>
+      <p style={lp.heading}>Labels</p>
+      <div style={lp.chipRow}>
+        {allLabels.map(label => {
+          const active = selected.includes(label)
+          return (
+            <button key={label} type="button" onClick={() => toggle(label)}
+              style={{ ...lp.chip, ...(active ? lp.chipActive : {}) }}>
+              {active && <span style={{ marginRight: 3, fontSize: 9 }}>✓</span>}
+              {label}
+            </button>
+          )
+        })}
+        {adding ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              ref={inputRef}
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); addLabel() }
+                if (e.key === 'Escape') { setAdding(false); setNewLabel('') }
+              }}
+              placeholder="New label…"
+              style={lp.addInput}
+            />
+            <button type="button" onClick={addLabel} style={lp.addConfirm}>Add</button>
+            <button type="button" onClick={() => { setAdding(false); setNewLabel('') }} style={lp.addCancel}>✕</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setAdding(true)} style={lp.addChip}>+ Add label</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
    Create Note Form  (rich editor)
 ══════════════════════════════════════════════════════════════ */
 function CreateNoteForm({ onSave, onCancel, session }) {
   const [titleVal,   setTitleVal]   = useState('')
   const [bodyHtml,   setBodyHtml]   = useState('')
+  const [labels,     setLabels]     = useState([])
   const [tagEnabled, setTagEnabled] = useState(false)
   const [tagBook,    setTagBook]    = useState('Genesis')
   const [tagChapter, setTagChapter] = useState(1)
@@ -586,7 +825,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
     if (!hasContent) return
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels)
       const key = tagEnabled
         ? `kjv|${tagBook}|${tagChapter}|${tagVerse}`
         : `lib|${new Date().toISOString()}`
@@ -620,6 +859,9 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
       />
+
+      {/* Labels */}
+      <LabelPicker selected={labels} onChange={setLabels} />
 
       {/* Scripture tag toggle */}
       <button
@@ -706,18 +948,19 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 ══════════════════════════════════════════════════════════════ */
 function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const isRich = isRichNote(initialRaw)
-  const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '' }
+  const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '', labels: [] }
 
   const [titleVal, setTitleVal] = useState(parsed.title || '')
   const [bodyHtml, setBodyHtml] = useState(
     isRich ? (parsed.body || '') : (initialRaw || '')
   )
-  const [saving, setSaving] = useState(false)
+  const [labels,   setLabels]   = useState(parsed.labels || [])
+  const [saving,   setSaving]   = useState(false)
 
   async function handleSave() {
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels)
       setItemNote(noteKey, raw, session?.user?.id)
       onSave()
     } finally {
@@ -745,6 +988,8 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
       />
+
+      <LabelPicker selected={labels} onChange={setLabels} />
 
       <div style={s.formActions}>
         <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
@@ -841,26 +1086,74 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
 /* ══════════════════════════════════════════════════════════════
    Notes Tab
 ══════════════════════════════════════════════════════════════ */
+const BOOK_ORDER = Object.fromEntries(BIBLE_BOOKS.map((b, i) => [b.name, i]))
+
+const SORT_OPTS = [
+  { id: 'date-desc', label: 'Newest' },
+  { id: 'date-asc',  label: 'Oldest' },
+  { id: 'chrono',    label: 'Chrono'  },
+  { id: 'label',     label: 'By label' },
+]
+
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingNote,    setEditingNote]    = useState(null)
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [sortBy,         setSortBy]         = useState('date-desc')
+  const [filterLabel,    setFilterLabel]    = useState('')
   const [scriptureModal, setScriptureModal] = useState(null)
   const searchRef = useRef(null)
 
   const q = searchQuery.trim().toLowerCase()
 
-  const filteredLib = useMemo(() =>
-    q ? libNotes.filter(n => richNoteSearchText(n.note).toLowerCase().includes(q)) : libNotes,
-    [libNotes, q]
-  )
-  const filteredKjv = useMemo(() =>
-    q ? kjvNotes.filter(n =>
-      richNoteSearchText(n.note).toLowerCase().includes(q) ||
-      `${n.book} ${n.chapter}:${n.verse}`.toLowerCase().includes(q)
-    ) : kjvNotes,
-    [kjvNotes, q]
-  )
+  /* All labels in use across lib + kjv notes */
+  const allUsedLabels = useMemo(() => {
+    const set = new Set()
+    ;[...libNotes, ...kjvNotes].forEach(n => {
+      if (isRichNote(n.note)) {
+        (parseRichNote(n.note).labels || []).forEach(l => set.add(l))
+      }
+    })
+    return [...set].sort()
+  }, [libNotes, kjvNotes])
+
+  const filteredLib = useMemo(() => {
+    let list = q
+      ? libNotes.filter(n => richNoteSearchText(n.note).toLowerCase().includes(q))
+      : [...libNotes]
+    if (filterLabel)
+      list = list.filter(n => (isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []).includes(filterLabel))
+    if      (sortBy === 'date-asc')  list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    else if (sortBy === 'date-desc') list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    else if (sortBy === 'label') {
+      list.sort((a, b) => {
+        const la = (isRichNote(a.note) ? parseRichNote(a.note).labels || [] : [])[0] ?? '￿'
+        const lb = (isRichNote(b.note) ? parseRichNote(b.note).labels || [] : [])[0] ?? '￿'
+        return la.localeCompare(lb)
+      })
+    }
+    return list
+  }, [libNotes, q, filterLabel, sortBy])
+
+  const filteredKjv = useMemo(() => {
+    let list = q
+      ? kjvNotes.filter(n =>
+          richNoteSearchText(n.note).toLowerCase().includes(q) ||
+          `${n.book} ${n.chapter}:${n.verse}`.toLowerCase().includes(q)
+        )
+      : [...kjvNotes]
+    if (filterLabel)
+      list = list.filter(n => (isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []).includes(filterLabel))
+    if (sortBy === 'date-asc') list.sort((a, b) => new Date(a.createdAt ?? 0) - new Date(b.createdAt ?? 0))
+    else if (sortBy === 'chrono') {
+      list.sort((a, b) => {
+        const oa = (BOOK_ORDER[a.book] ?? 999) * 1000 + (a.chapter ?? 0)
+        const ob = (BOOK_ORDER[b.book] ?? 999) * 1000 + (b.chapter ?? 0)
+        return oa - ob
+      })
+    }
+    return list
+  }, [kjvNotes, q, filterLabel, sortBy])
   const filteredConf = useMemo(() =>
     q ? confNotes.filter(n =>
       richNoteSearchText(n.note).toLowerCase().includes(q) ||
@@ -908,6 +1201,37 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             </svg>
             New Note
           </button>
+
+          {/* Sort controls */}
+          <div style={s.sortBar}>
+            <span style={s.sortLabel}>Sort:</span>
+            {SORT_OPTS.map(opt => (
+              <button key={opt.id} type="button"
+                style={{ ...s.sortBtn, ...(sortBy === opt.id ? s.sortBtnActive : {}) }}
+                onClick={() => setSortBy(opt.id)}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Label filter chips */}
+          {allUsedLabels.length > 0 && (
+            <div style={s.labelFilterRow}>
+              <span style={s.sortLabel}>Filter:</span>
+              <button type="button"
+                style={{ ...s.filterChip, ...(filterLabel === '' ? s.filterChipActive : {}) }}
+                onClick={() => setFilterLabel('')}>
+                All
+              </button>
+              {allUsedLabels.map(label => (
+                <button key={label} type="button"
+                  style={{ ...s.filterChip, ...(filterLabel === label ? s.filterChipActive : {}) }}
+                  onClick={() => setFilterLabel(filterLabel === label ? '' : label)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div style={s.searchRow}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>
@@ -1477,7 +1801,7 @@ const s = {
   },
   searchInput: {
     flex: 1, background: 'none', border: 'none', outline: 'none',
-    fontSize: 13, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+    fontSize: 16, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
   },
   searchClear: {
     background: 'none', border: 'none', cursor: 'pointer',
@@ -1526,9 +1850,9 @@ const s = {
   pickerRow:        { display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' },
   pickerGroup:      { display: 'flex', flexDirection: 'column', gap: 3 },
   pickerLabel:      { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  pickerSelect:     { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", maxWidth: 170 },
-  pickerSelectSmall:{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", width: 64 },
-  pickerInput:      { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', fontFamily: "'DM Sans', sans-serif", width: 56, outline: 'none' },
+  pickerSelect:     { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", maxWidth: 200 },
+  pickerSelectSmall:{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", width: 76 },
+  pickerInput:      { border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', fontFamily: "'DM Sans', sans-serif", width: 68, outline: 'none' },
   tagHint:          { fontSize: 11, color: 'var(--ink-faint)', margin: 0, lineHeight: 1.55 },
   formActions:      { display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 2 },
   cancelBtn: {
@@ -1608,6 +1932,40 @@ const s = {
     marginLeft: 'auto', flexShrink: 0,
   },
 
+  /* ── Note labels (view mode) ── */
+  noteLabelRow: { display: 'flex', flexWrap: 'wrap', gap: 4, margin: '0 0 6px' },
+  noteLabelChip: {
+    fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
+    padding: '2px 7px', borderRadius: 99,
+    background: 'var(--teal-light)', color: 'var(--teal)',
+    border: '1px solid var(--teal)', fontFamily: "'DM Sans', sans-serif",
+    textTransform: 'uppercase',
+  },
+
+  /* ── Sort bar ── */
+  sortBar: {
+    display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+    marginBottom: 4,
+  },
+  sortLabel: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', letterSpacing: '0.04em', flexShrink: 0 },
+  sortBtn: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 99,
+    padding: '3px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 600,
+    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.12s, color 0.12s',
+  },
+  sortBtnActive: { background: 'var(--teal)', borderColor: 'var(--teal)', color: '#fff' },
+
+  /* ── Label filter row ── */
+  labelFilterRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 4 },
+  filterChip: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 99,
+    padding: '3px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 600,
+    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.12s, color 0.12s',
+  },
+  filterChipActive: { background: 'var(--teal-light)', borderColor: 'var(--teal)', color: 'var(--teal)' },
+
   /* ── Highlights ── */
   hlGrid:      { display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 4 },
   hlChip:      { display: 'inline-flex', alignItems: 'center', border: '1px solid', borderRadius: 99, overflow: 'hidden' },
@@ -1648,7 +2006,7 @@ const re = {
     minHeight: 'calc(60vh - 200px)',
     border: '1px solid var(--border)', borderTop: 'none',
     borderRadius: '0 0 8px 8px',
-    padding: '10px 12px', fontSize: 14, lineHeight: 1.75,
+    padding: '10px 12px', fontSize: 16, lineHeight: 1.75,
     color: 'var(--ink)', background: 'var(--parchment)',
     fontFamily: "'DM Sans', sans-serif",
     outline: 'none', overflowY: 'auto', wordBreak: 'break-word',
@@ -1682,15 +2040,53 @@ const am = {
   refRow:   { display: 'flex', gap: 8, marginBottom: 10 },
   refGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
   refLabel: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' },
-  refSelect: { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', width: 60 },
-  refInput:  { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', width: 52, outline: 'none' },
+  refSelect: { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', width: 72 },
+  refInput:  { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', width: 64, outline: 'none' },
   insertRow: { display: 'flex', gap: 6 },
   insertBtn: {
     flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 7,
     padding: '7px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700,
     color: '#fff', fontFamily: "'DM Sans', sans-serif",
   },
-  insertBtnAlt: { background: 'var(--surface)', color: 'var(--teal)', border: '1.5px solid var(--teal)' },
+  insertBtnAlt:  { background: 'var(--surface)', color: 'var(--teal)', border: '1.5px solid var(--teal)' },
+  resolvedRef:   { fontSize: 14, fontWeight: 700, color: 'var(--teal)', fontFamily: "'Cormorant Garamond', serif", margin: '2px 0 10px' },
+  editRefBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)', padding: '6px 0 0', fontFamily: "'DM Sans', sans-serif" },
+  hintSmall:     { fontSize: 9, fontWeight: 400, color: 'var(--ink-faint)', textTransform: 'none', letterSpacing: 0 },
+}
+
+/* ── Label picker styles ── */
+const lp = {
+  wrap:    { borderTop: '1px solid var(--border)', paddingTop: 10 },
+  heading: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px' },
+  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
+  chip: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 99,
+    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+    display: 'inline-flex', alignItems: 'center',
+  },
+  chipActive: { background: 'var(--teal-light)', borderColor: 'var(--teal)', color: 'var(--teal)' },
+  addChip: {
+    background: 'none', border: '1px dashed var(--teal)', borderRadius: 99,
+    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+    color: 'var(--teal)', fontFamily: "'DM Sans', sans-serif",
+  },
+  addInput: {
+    border: '1px solid var(--teal)', borderRadius: 8, padding: '4px 8px',
+    fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)',
+    outline: 'none', fontFamily: "'DM Sans', sans-serif", width: 130,
+  },
+  addConfirm: {
+    background: 'var(--teal)', border: 'none', borderRadius: 7,
+    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+    color: '#fff', fontFamily: "'DM Sans', sans-serif",
+  },
+  addCancel: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 7,
+    padding: '4px 8px', cursor: 'pointer', fontSize: 11,
+    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+  },
 }
 
 /* ── Scripture verse modal styles ── */
