@@ -11,10 +11,35 @@ import {
 } from '../lib/annotations'
 import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
+import { loadBibleVersion } from '../lib/bibleVersions'
 
 const SCHEDULE = buildSchedule()
 
-/* ── Helpers ───────────────────────────────────────────────────────────────── */
+/* ── Rich-note storage marker ── */
+const RICH_PREFIX = '<!RICH>'
+
+function isRichNote(raw) { return typeof raw === 'string' && raw.startsWith(RICH_PREFIX) }
+
+function parseRichNote(raw) {
+  try {
+    return JSON.parse(raw.slice(RICH_PREFIX.length))
+  } catch {
+    return { title: '', body: '' }
+  }
+}
+
+function encodeRichNote(title, body) {
+  return RICH_PREFIX + JSON.stringify({ title, body })
+}
+
+function richNoteSearchText(raw) {
+  if (!isRichNote(raw)) return raw
+  const { title, body } = parseRichNote(raw)
+  const stripped = (body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ')
+  return `${title || ''} ${stripped}`
+}
+
+/* ── Shared helpers ────────────────────────────────────────────────────────── */
 function HlDot({ colorId, size = 9 }) {
   const c = getHlStyle(colorId)
   return (
@@ -58,33 +83,9 @@ function RemoveBtn({ onClick, label = 'Remove' }) {
   )
 }
 
-/* ── Clipped note with "See more" ── */
 const CLIP_CHARS = 220
 
-function NoteText({ text, query }) {
-  const [expanded, setExpanded] = useState(false)
-  const isLong   = text.length > CLIP_CHARS
-  // When actively searching, show full text so match is always visible
-  const showFull = !isLong || expanded || !!query
-  const display  = showFull ? text : text.slice(0, CLIP_CHARS).trimEnd() + '…'
-  return (
-    <>
-      <p style={s.noteBody}>
-        <Highlighted text={display} query={query} />
-      </p>
-      {isLong && !query && (
-        <button
-          onClick={e => { e.stopPropagation(); setExpanded(ex => !ex) }}
-          style={s.seeMoreBtn}
-        >
-          {expanded ? 'See less ↑' : 'See more ↓'}
-        </button>
-      )}
-    </>
-  )
-}
-
-/* ── Highlight matching text ── */
+/* ── Highlighted plain-text search ── */
 function Highlighted({ text, query }) {
   if (!query) return <>{text}</>
   const idx = text.toLowerCase().indexOf(query.toLowerCase())
@@ -100,21 +101,478 @@ function Highlighted({ text, query }) {
   )
 }
 
+/* ── Fetch a single KJV verse text ── */
+async function fetchVerseText(book, chapter, verse) {
+  try {
+    const data = await loadBibleVersion('kjv')
+    const slug = book.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+    const verses = data[slug]?.[chapter]
+    if (!verses) return null
+    const v = verses.find(v => v.v === parseInt(verse))
+    return v?.t ?? null
+  } catch {
+    return null
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
-   Create Note Form
+   Scripture Verse Modal  (shown when clicking a tagged @ref)
+══════════════════════════════════════════════════════════════ */
+function ScriptureVerseModal({ sc, onClose, onNavigate }) {
+  const [verseText, setVerseText] = useState(null)
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    if (!sc) return
+    setLoading(true)
+    fetchVerseText(sc.book, sc.chapter, sc.verse).then(t => {
+      setVerseText(t)
+      setLoading(false)
+    })
+  }, [sc?.book, sc?.chapter, sc?.verse]) // eslint-disable-line
+
+  if (!sc) return null
+
+  return (
+    <div style={vm.backdrop} onClick={onClose}>
+      <div style={vm.sheet} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={vm.header}>
+          <span style={vm.ref}>{sc.book} {sc.chapter}:{sc.verse}</span>
+          <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+        {/* Verse */}
+        <div style={vm.body}>
+          {loading
+            ? <p style={vm.loading}>Loading…</p>
+            : verseText
+              ? <p style={vm.verseText}>"{verseText}"</p>
+              : <p style={vm.loading}>Verse not found.</p>
+          }
+        </div>
+        {/* Actions */}
+        <div style={vm.actions}>
+          <button style={vm.openBtn} onClick={() => { onNavigate(sc.book, sc.chapter, sc.verse); onClose() }}>
+            Open in Scripture →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Note Body — renders plain OR rich note; intercepts @ref clicks
+══════════════════════════════════════════════════════════════ */
+function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (!rawNote) return null
+
+  /* Rich note (HTML stored with RICH_PREFIX) */
+  if (isRichNote(rawNote)) {
+    const { title, body } = parseRichNote(rawNote)
+
+    function handleClick(e) {
+      const el = e.target.closest('[data-sc-book]')
+      if (el) {
+        e.preventDefault()
+        onScriptureClick?.({
+          book:    el.dataset.scBook,
+          chapter: parseInt(el.dataset.scChapter),
+          verse:   parseInt(el.dataset.scVerse),
+        })
+      }
+    }
+
+    return (
+      <div>
+        {title && <p style={s.richTitle}>{title}</p>}
+        {/* eslint-disable-next-line react/no-danger */}
+        <div
+          style={s.richBody}
+          dangerouslySetInnerHTML={{ __html: body || '' }}
+          onClick={handleClick}
+        />
+      </div>
+    )
+  }
+
+  /* Plain text note */
+  const isLong  = rawNote.length > CLIP_CHARS
+  const showFull = !isLong || expanded || !!query || !clip
+  const display  = showFull ? rawNote : rawNote.slice(0, CLIP_CHARS).trimEnd() + '…'
+  return (
+    <>
+      <p style={s.noteBody}>
+        <Highlighted text={display} query={query} />
+      </p>
+      {isLong && !query && clip && (
+        <button
+          onClick={e => { e.stopPropagation(); setExpanded(ex => !ex) }}
+          style={s.seeMoreBtn}
+        >
+          {expanded ? 'See less ↑' : 'See more ↓'}
+        </button>
+      )}
+    </>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   @ Scripture Mention Popup
+══════════════════════════════════════════════════════════════ */
+function AtMentionPopup({ pos, query, onSelect, onClose }) {
+  const [step,    setStep]    = useState('book')   // 'book' | 'ref'
+  const [book,    setBook]    = useState('')
+  const [chapter, setChapter] = useState(1)
+  const [verse,   setVerse]   = useState(1)
+  const ref = useRef(null)
+
+  /* Filter books by query */
+  const filteredBooks = useMemo(() => {
+    const q = (step === 'book' ? query : '').toLowerCase()
+    return q ? BIBLE_BOOKS.filter(b => b.name.toLowerCase().startsWith(q)) : BIBLE_BOOKS
+  }, [query, step])
+
+  /* Click-outside to close */
+  useEffect(() => {
+    function onDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+
+  const selectedBook = BIBLE_BOOKS.find(b => b.name === book) ?? BIBLE_BOOKS[0]
+  const maxChapters  = selectedBook.chapters
+
+  const style = {
+    ...am.popup,
+    top: pos.bottom + 4,
+    left: Math.max(8, Math.min(pos.left, window.innerWidth - 260)),
+  }
+
+  if (step === 'book') {
+    return (
+      <div ref={ref} style={style}>
+        <p style={am.label}>Select book</p>
+        <div style={am.bookList}>
+          {filteredBooks.slice(0, 12).map(b => (
+            <button key={b.name} style={am.bookBtn} onClick={() => { setBook(b.name); setStep('ref') }}>
+              {b.name}
+            </button>
+          ))}
+          {filteredBooks.length === 0 && <p style={am.empty}>No books match</p>}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={ref} style={style}>
+      <button style={am.backBtn} onClick={() => setStep('book')}>
+        ← {book}
+      </button>
+      <p style={am.label}>Chapter &amp; verse</p>
+      <div style={am.refRow}>
+        <div style={am.refGroup}>
+          <label style={am.refLabel}>Ch.</label>
+          <select
+            value={chapter}
+            onChange={e => { setChapter(Number(e.target.value)); setVerse(1) }}
+            style={am.refSelect}
+          >
+            {Array.from({ length: maxChapters }, (_, i) => i + 1).map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div style={am.refGroup}>
+          <label style={am.refLabel}>Vs.</label>
+          <input
+            type="number" min={1} max={200} value={verse}
+            onChange={e => setVerse(Math.max(1, parseInt(e.target.value) || 1))}
+            style={am.refInput}
+          />
+        </div>
+      </div>
+      <div style={am.insertRow}>
+        <button style={am.insertBtn} onClick={() => onSelect({ book, chapter, verse, quoteMode: false })}>
+          Insert tag
+        </button>
+        <button style={{ ...am.insertBtn, ...am.insertBtnAlt }} onClick={() => onSelect({ book, chapter, verse, quoteMode: true })}>
+          Quote verse
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Rich Text Editor Toolbar
+══════════════════════════════════════════════════════════════ */
+const TOOLBAR_ACTIONS = [
+  { id: 'h1',     label: 'H1',   title: 'Heading 1', cmd: 'formatBlock', val: 'H1' },
+  { id: 'h2',     label: 'H2',   title: 'Heading 2', cmd: 'formatBlock', val: 'H2' },
+  { id: 'bold',   label: <b>B</b>,   title: 'Bold',   cmd: 'bold' },
+  { id: 'italic', label: <em>I</em>, title: 'Italic', cmd: 'italic' },
+  { id: 'ul',     label: '•',    title: 'Bullet list', cmd: 'insertUnorderedList' },
+  { id: 'ol',     label: '1.',   title: 'Numbered list', cmd: 'insertOrderedList' },
+]
+
+/* ══════════════════════════════════════════════════════════════
+   Rich Note Editor Component
+══════════════════════════════════════════════════════════════ */
+function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, onBodyChange }) {
+  const editorRef  = useRef(null)
+  const savedRange = useRef(null)
+
+  /* Initialise editor HTML once */
+  useEffect(() => {
+    if (editorRef.current && initialBody) {
+      editorRef.current.innerHTML = initialBody
+    }
+  }, []) // eslint-disable-line
+
+  /* @ mention state */
+  const [atPopup,   setAtPopup]   = useState(null) // { bottom, left } | null
+  const [atQuery,   setAtQuery]   = useState('')
+  const atRangeRef = useRef(null)  // saved Range at the @ sign
+
+  function saveSelection() {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      savedRange.current = sel.getRangeAt(0).cloneRange()
+    }
+  }
+
+  function restoreSelection() {
+    if (!savedRange.current) return
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(savedRange.current)
+  }
+
+  function execCmd(cmd, val) {
+    restoreSelection()
+    document.execCommand(cmd, false, val ?? null)
+    editorRef.current?.focus()
+    onBodyChange(editorRef.current.innerHTML)
+  }
+
+  function handleInput() {
+    onBodyChange(editorRef.current.innerHTML)
+    checkAtMention()
+  }
+
+  function checkAtMention() {
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) { setAtPopup(null); return }
+    const range = sel.getRangeAt(0)
+    const node  = range.startContainer
+    if (node.nodeType !== Node.TEXT_NODE) { setAtPopup(null); return }
+    const text = node.textContent || ''
+    const idx  = text.lastIndexOf('@', range.startOffset - 1)
+    if (idx === -1) { setAtPopup(null); return }
+
+    // Make sure no whitespace between @ and cursor (i.e., it's a continuous word)
+    const between = text.slice(idx + 1, range.startOffset)
+    if (between.includes(' ')) { setAtPopup(null); return }
+
+    // Compute popup position from the @ character
+    const atRange = range.cloneRange()
+    atRange.setStart(node, idx)
+    atRange.setEnd(node, idx + 1)
+    const rect = atRange.getBoundingClientRect()
+
+    // Save the range at @ so we can delete it when inserting
+    const deleteRange = range.cloneRange()
+    deleteRange.setStart(node, idx)
+    deleteRange.setEnd(node, range.startOffset)
+    atRangeRef.current = deleteRange
+
+    setAtQuery(between)
+    setAtPopup({ bottom: rect.bottom + window.scrollY, left: rect.left + window.scrollX })
+  }
+
+  async function handleAtSelect({ book, chapter, verse, quoteMode }) {
+    setAtPopup(null)
+    editorRef.current?.focus()
+
+    // Delete the "@query" text the user typed
+    if (atRangeRef.current) {
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(atRangeRef.current)
+      document.execCommand('delete', false)
+    }
+
+    if (quoteMode) {
+      // Fetch verse text, insert as styled blockquote
+      const text = await fetchVerseText(book, chapter, verse)
+      const display = text ? `"${text}"` : `${book} ${chapter}:${verse}`
+      document.execCommand('insertHTML', false,
+        `<blockquote class="sc-quote" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}" ` +
+        `style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--teal);` +
+        `background:var(--teal-light);border-radius:0 6px 6px 0;font-style:italic;` +
+        `font-size:0.92em;color:var(--ink-muted);">${display} ` +
+        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${book} ${chapter}:${verse}</em></blockquote>`
+      )
+    } else {
+      // Insert a small tag chip
+      document.execCommand('insertHTML', false,
+        `<span class="sc-tag" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}" ` +
+        `contenteditable="false" style="display:inline-block;padding:1px 8px;margin:0 2px;` +
+        `background:var(--teal-light);color:var(--teal);border:1px solid var(--teal);` +
+        `border-radius:99px;font-size:0.82em;font-weight:700;cursor:pointer;` +
+        `font-family:'DM Sans',sans-serif;user-select:none;">` +
+        `${book} ${chapter}:${verse}</span>&#8203;`
+      )
+    }
+    onBodyChange(editorRef.current.innerHTML)
+    atRangeRef.current = null
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Escape') { setAtPopup(null); return }
+    // Prevent Enter from creating a <div> in some browsers
+    if (e.key === 'Enter' && !e.shiftKey) {
+      // Let browser default handle it for block elements
+    }
+    saveSelection()
+  }
+
+  function handleKeyUp() {
+    saveSelection()
+    checkAtMention()
+  }
+
+  return (
+    <div style={re.wrap}>
+      {/* Title input */}
+      <input
+        type="text"
+        placeholder="Title (optional)"
+        defaultValue={initialTitle}
+        onChange={e => onTitleChange(e.target.value)}
+        style={re.titleInput}
+      />
+
+      {/* Toolbar */}
+      <div style={re.toolbar}>
+        {TOOLBAR_ACTIONS.map(action => (
+          <button
+            key={action.id}
+            title={action.title}
+            onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
+            style={re.toolBtn}
+            type="button"
+          >
+            {action.label}
+          </button>
+        ))}
+        <span style={re.toolDivider} />
+        <span style={re.atHint}>Type @ for scripture</span>
+      </div>
+
+      {/* Editable area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+        onMouseUp={saveSelection}
+        style={re.editor}
+        data-placeholder="Write your note here…"
+      />
+
+      {/* @ picker popup */}
+      {atPopup && (
+        <AtMentionPopup
+          pos={atPopup}
+          query={atQuery}
+          onSelect={handleAtSelect}
+          onClose={() => setAtPopup(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Share / Copy helpers
+══════════════════════════════════════════════════════════════ */
+function noteToPlainText(rawNote) {
+  if (!isRichNote(rawNote)) return rawNote
+  const { title, body } = parseRichNote(rawNote)
+  const stripped = (body || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return title ? `${title}\n\n${stripped}` : stripped
+}
+
+function CopyShareBar({ rawNote }) {
+  const [copied, setCopied] = useState(false)
+
+  async function doCopy() {
+    try {
+      await navigator.clipboard.writeText(noteToPlainText(rawNote))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {}
+  }
+
+  async function doShare() {
+    const text = noteToPlainText(rawNote)
+    if (navigator.share) {
+      try { await navigator.share({ text }) } catch {}
+    } else {
+      doCopy()
+    }
+  }
+
+  return (
+    <div style={s.copyShareBar}>
+      <button style={s.copyBtn} onClick={doCopy}>
+        {copied
+          ? <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg> Copied</>
+          : <><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="3" width="7" height="8" rx="1" stroke="currentColor" strokeWidth="1.3"/><path d="M4 1h7a1 1 0 011 1v8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg> Copy</>
+        }
+      </button>
+      <button style={s.copyBtn} onClick={doShare}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="9.5" cy="2" r="1.5" stroke="currentColor" strokeWidth="1.2"/><circle cx="2" cy="6" r="1.5" stroke="currentColor" strokeWidth="1.2"/><circle cx="9.5" cy="10" r="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M3.5 5.2L8 3M3.5 6.8L8 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        Share
+      </button>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Create Note Form  (rich editor)
 ══════════════════════════════════════════════════════════════ */
 function CreateNoteForm({ onSave, onCancel, session }) {
-  const [noteText,   setNoteText]   = useState('')
+  const [titleVal,   setTitleVal]   = useState('')
+  const [bodyHtml,   setBodyHtml]   = useState('')
   const [tagEnabled, setTagEnabled] = useState(false)
   const [tagBook,    setTagBook]    = useState('Genesis')
   const [tagChapter, setTagChapter] = useState(1)
   const [tagVerse,   setTagVerse]   = useState(1)
   const [saving,     setSaving]     = useState(false)
-  const textareaRef = useRef(null)
-
-  useEffect(() => {
-    setTimeout(() => textareaRef.current?.focus(), 60)
-  }, [])
 
   const selectedBook = BIBLE_BOOKS.find(b => b.name === tagBook) ?? BIBLE_BOOKS[0]
   const maxChapters  = selectedBook.chapters
@@ -124,14 +582,15 @@ function CreateNoteForm({ onSave, onCancel, session }) {
   }, [tagBook, maxChapters, tagChapter])
 
   async function handleSave() {
-    const text = noteText.trim()
-    if (!text) return
+    const hasContent = titleVal.trim() || bodyHtml.replace(/<[^>]*>/g, '').trim()
+    if (!hasContent) return
     setSaving(true)
     try {
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml)
       const key = tagEnabled
         ? `kjv|${tagBook}|${tagChapter}|${tagVerse}`
         : `lib|${new Date().toISOString()}`
-      setItemNote(key, text, session?.user?.id)
+      setItemNote(key, raw, session?.user?.id)
       onSave()
     } finally {
       setSaving(false)
@@ -140,7 +599,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 
   return (
     <div style={s.createForm}>
-      {/* Title row */}
+      {/* Form header */}
       <div style={s.createFormHeader}>
         <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
           <rect x="1.5" y="1.5" width="12" height="12" rx="2" stroke="var(--teal)" strokeWidth="1.4"/>
@@ -154,13 +613,12 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         </button>
       </div>
 
-      {/* Large textarea — ~70% of screen height */}
-      <textarea
-        ref={textareaRef}
-        value={noteText}
-        onChange={e => setNoteText(e.target.value)}
-        placeholder="Write your note here…&#10;&#10;Indentation, line breaks, and spacing are all preserved exactly as you type them."
-        style={s.textarea}
+      {/* Rich editor */}
+      <RichNoteEditor
+        initialTitle={titleVal}
+        initialBody={bodyHtml}
+        onTitleChange={setTitleVal}
+        onBodyChange={setBodyHtml}
       />
 
       {/* Scripture tag toggle */}
@@ -180,7 +638,6 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         )}
       </button>
 
-      {/* Scripture pickers */}
       {tagEnabled && (
         <div style={s.pickerRow}>
           <div style={s.pickerGroup}>
@@ -226,17 +683,16 @@ function CreateNoteForm({ onSave, onCancel, session }) {
       )}
       {tagEnabled && (
         <p style={s.tagHint}>
-          This note will be saved to <strong>{tagBook} {tagChapter}:{tagVerse}</strong> and will appear in Scripture Notes when you open that verse.
+          This note will be saved to <strong>{tagBook} {tagChapter}:{tagVerse}</strong> and will appear in Scripture Notes.
         </p>
       )}
 
-      {/* Actions */}
       <div style={s.formActions}>
         <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
         <button
           onClick={handleSave}
-          disabled={!noteText.trim() || saving}
-          style={{ ...s.saveBtn, opacity: (!noteText.trim() || saving) ? 0.5 : 1 }}
+          disabled={saving}
+          style={{ ...s.saveBtn, opacity: saving ? 0.5 : 1 }}
         >
           {saving ? 'Saving…' : 'Save Note'}
         </button>
@@ -246,21 +702,23 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Edit Note Form
+   Edit Note Form  (rich editor)
 ══════════════════════════════════════════════════════════════ */
-function EditNoteForm({ noteKey, initialText, onSave, onCancel, session }) {
-  const [noteText, setNoteText] = useState(initialText)
-  const [saving,   setSaving]   = useState(false)
-  const textareaRef = useRef(null)
+function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
+  const isRich = isRichNote(initialRaw)
+  const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '' }
 
-  useEffect(() => {
-    setTimeout(() => textareaRef.current?.focus(), 60)
-  }, [])
+  const [titleVal, setTitleVal] = useState(parsed.title || '')
+  const [bodyHtml, setBodyHtml] = useState(
+    isRich ? (parsed.body || '') : (initialRaw || '')
+  )
+  const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     setSaving(true)
     try {
-      setItemNote(noteKey, noteText.trim() || null, session?.user?.id)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml)
+      setItemNote(noteKey, raw, session?.user?.id)
       onSave()
     } finally {
       setSaving(false)
@@ -280,13 +738,14 @@ function EditNoteForm({ noteKey, initialText, onSave, onCancel, session }) {
           </svg>
         </button>
       </div>
-      <textarea
-        ref={textareaRef}
-        value={noteText}
-        onChange={e => setNoteText(e.target.value)}
-        placeholder="Note text…"
-        style={s.textarea}
+
+      <RichNoteEditor
+        initialTitle={titleVal}
+        initialBody={bodyHtml}
+        onTitleChange={setTitleVal}
+        onBodyChange={setBodyHtml}
       />
+
       <div style={s.formActions}>
         <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
         <button
@@ -386,25 +845,25 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingNote,    setEditingNote]    = useState(null)
   const [searchQuery,    setSearchQuery]    = useState('')
+  const [scriptureModal, setScriptureModal] = useState(null)
   const searchRef = useRef(null)
 
   const q = searchQuery.trim().toLowerCase()
 
-  // Filter each section by query
   const filteredLib = useMemo(() =>
-    q ? libNotes.filter(n => n.note.toLowerCase().includes(q)) : libNotes,
+    q ? libNotes.filter(n => richNoteSearchText(n.note).toLowerCase().includes(q)) : libNotes,
     [libNotes, q]
   )
   const filteredKjv = useMemo(() =>
     q ? kjvNotes.filter(n =>
-      n.note.toLowerCase().includes(q) ||
+      richNoteSearchText(n.note).toLowerCase().includes(q) ||
       `${n.book} ${n.chapter}:${n.verse}`.toLowerCase().includes(q)
     ) : kjvNotes,
     [kjvNotes, q]
   )
   const filteredConf = useMemo(() =>
     q ? confNotes.filter(n =>
-      n.note.toLowerCase().includes(q) ||
+      richNoteSearchText(n.note).toLowerCase().includes(q) ||
       n.source.toLowerCase().includes(q) ||
       n.itemKey.toLowerCase().includes(q)
     ) : confNotes,
@@ -429,14 +888,13 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   return (
     <div style={s.tabContent}>
 
-      {/* ── New Note / Form ── */}
       {showCreateForm ? (
         <CreateNoteForm session={session} onSave={handleSaved} onCancel={() => setShowCreateForm(false)} />
       ) : editingNote ? (
         <EditNoteForm
           key={editingNote.key}
           noteKey={editingNote.key}
-          initialText={editingNote.note}
+          initialRaw={editingNote.note}
           session={session}
           onSave={handleSaved}
           onCancel={() => setEditingNote(null)}
@@ -451,7 +909,6 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             New Note
           </button>
 
-          {/* ── Search bar ── */}
           <div style={s.searchRow}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>
               <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
@@ -477,7 +934,6 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             )}
           </div>
 
-          {/* Search summary */}
           {isSearching && (
             <p style={s.searchMeta}>
               {totalResults === 0
@@ -521,9 +977,13 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                     Edit
                   </button>
                   <RemoveBtn onClick={() => onRemoveLibNote(n.key)} label="Delete note" />
+                  <CopyShareBar rawNote={n.note} />
                 </div>
-                {/* Full text, formatting preserved — clips long notes */}
-                <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
+                <NoteBody
+                  rawNote={n.note}
+                  query={isSearching ? searchQuery.trim() : ''}
+                  onScriptureClick={setScriptureModal}
+                />
               </div>
             ))
           }
@@ -565,7 +1025,12 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                     style={s.openBtn}
                   >Open →</button>
                 </div>
-                <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
+                <NoteBody
+                  rawNote={n.note}
+                  query={isSearching ? searchQuery.trim() : ''}
+                  onScriptureClick={setScriptureModal}
+                />
+                <CopyShareBar rawNote={n.note} />
               </div>
             ))
           }
@@ -611,7 +1076,11 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 </svg>
               </div>
               <p style={s.cardReading}>{n.entry.reading}</p>
-              <NoteText text={n.notes} query={isSearching ? searchQuery.trim() : ''} />
+              <NoteBody
+                rawNote={n.notes}
+                query={isSearching ? searchQuery.trim() : ''}
+                onScriptureClick={setScriptureModal}
+              />
             </div>
           ))}
         </>
@@ -653,7 +1122,11 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                       style={s.openBtn}
                     >Open →</button>
                   </div>
-                  <NoteText text={n.note} query={isSearching ? searchQuery.trim() : ''} />
+                  <NoteBody
+                    rawNote={n.note}
+                    query={isSearching ? searchQuery.trim() : ''}
+                    onScriptureClick={setScriptureModal}
+                  />
                 </div>
               )
             })
@@ -661,7 +1134,6 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         </>
       )}
 
-      {/* No results at all */}
       {isSearching && totalResults === 0 && (
         <div style={{ textAlign: 'center', padding: '32px 0' }}>
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ opacity: 0.25, margin: '0 auto 8px', display: 'block' }}>
@@ -672,16 +1144,46 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         </div>
       )}
 
+      {/* Scripture verse modal */}
+      <ScriptureVerseModal
+        sc={scriptureModal}
+        onClose={() => setScriptureModal(null)}
+        onNavigate={(book, ch, vs) => navigate('/scripture', { state: { book, chapter: ch, verse: vs } })}
+      />
     </div>
   )
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Highlights Tab
+   Highlights Tab  — with legend
 ══════════════════════════════════════════════════════════════ */
+const HL_LEGEND = [
+  { id: 'yellow',  meaning: 'Remember'       },
+  { id: 'green',   meaning: 'Study further'  },
+  { id: 'blue',    meaning: 'Meditation'     },
+  { id: 'pink',    meaning: 'Christological' },
+  { id: 'purple',  meaning: 'Question?'      },
+]
+
 function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHighlight, onRemoveConfHighlight }) {
   return (
     <div style={s.tabContent}>
+
+      {/* ── Legend ── */}
+      <div style={s.hlLegend}>
+        <p style={s.hlLegendTitle}>Highlight key</p>
+        <div style={s.hlLegendGrid}>
+          {HL_LEGEND.map(item => {
+            const c = getHlStyle(item.id)
+            return (
+              <div key={item.id} style={s.hlLegendItem}>
+                <span style={{ ...s.hlLegendDot, background: c.dot }} />
+                <span style={s.hlLegendMeaning}>{item.meaning}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       <SectionHeader
         icon={
@@ -849,14 +1351,18 @@ export default function LibraryPage() {
   return (
     <div style={s.page}>
 
+      {/* ── Header (no back button — BottomNav handles navigation) ── */}
       <header style={s.header}>
         <div style={s.headerInner}>
-          <button style={s.backBtn} onClick={() => navigate(-1)} aria-label="Go back">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M13 5l-5 5 5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          <span style={s.headerTitle}>My Library</span>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, color: 'var(--teal)' }}>
+            <rect x="2" y="2" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.1"/>
+            <path d="M5.5 6h7M5.5 9.5h5M5.5 13h5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            <path d="M12 2v4l-1.5-1-1.5 1V2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+          </svg>
+          <div>
+            <span style={s.headerTitle}>My Library</span>
+            <span style={s.headerSub}>Notes, bookmarks, highlights &amp; more</span>
+          </div>
         </div>
         <div style={s.tabBar}>
           {TABS.map(tab => (
@@ -927,11 +1433,8 @@ const s = {
     paddingTop: 'env(safe-area-inset-top)',
   },
   headerInner: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 8px' },
-  backBtn: {
-    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink)',
-    padding: 4, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  headerTitle: { fontSize: 16, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', serif" },
+  headerTitle: { fontSize: 16, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', serif", display: 'block' },
+  headerSub:   { fontSize: 11, color: 'var(--ink-faint)', display: 'block', marginTop: 1 },
   tabBar: { display: 'flex', borderTop: '1px solid var(--border)' },
   tab: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -951,6 +1454,20 @@ const s = {
   sectionBadge:   { fontSize: 9, fontWeight: 700, background: 'var(--teal-light)', color: 'var(--teal)', borderRadius: 99, padding: '1px 6px' },
   sectionHint:    { fontSize: 11, color: 'var(--ink-faint)', margin: '-2px 0 6px', lineHeight: 1.5 },
   emptyText:      { fontSize: 12, color: 'var(--ink-faint)', margin: '0 0 4px', lineHeight: 1.6 },
+
+  /* ── Highlight legend ── */
+  hlLegend: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)', padding: '10px 14px', marginBottom: 12,
+  },
+  hlLegendTitle: {
+    fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)',
+    textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px',
+  },
+  hlLegendGrid: { display: 'flex', flexWrap: 'wrap', gap: '6px 16px' },
+  hlLegendItem: { display: 'flex', alignItems: 'center', gap: 6 },
+  hlLegendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
+  hlLegendMeaning: { fontSize: 12, color: 'var(--ink)', fontWeight: 500 },
 
   /* ── Search bar ── */
   searchRow: {
@@ -991,20 +1508,6 @@ const s = {
     marginLeft: 'auto', background: 'none', border: 'none',
     cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, borderRadius: 6,
     display: 'flex', alignItems: 'center',
-  },
-
-  /* Large textarea — close to 70% of screen height */
-  textarea: {
-    width: '100%',
-    minHeight: 'calc(70vh - 180px)',   // generous writing area
-    resize: 'vertical',
-    border: '1px solid var(--border)', borderRadius: 8,
-    padding: '12px 14px', fontSize: 14, lineHeight: 1.7,
-    color: 'var(--ink)', background: 'var(--parchment)',
-    fontFamily: "'DM Sans', sans-serif",
-    boxSizing: 'border-box', outline: 'none',
-    /* Preserve tab/space/newline formatting while typing */
-    whiteSpace: 'pre-wrap',
   },
 
   /* ── Scripture tag toggle ── */
@@ -1061,15 +1564,30 @@ const s = {
     display: 'block',
   },
 
-  /* Note body — preserves all formatting: indents, spaces, line breaks */
+  /* Plain note body */
   noteBody: {
-    fontSize: 13,
-    color: 'var(--ink)',
-    margin: 0,
-    lineHeight: 1.7,
-    whiteSpace: 'pre-wrap',   // honour newlines and leading spaces
-    wordBreak: 'break-word',  // prevent long words from overflowing
+    fontSize: 13, color: 'var(--ink)', margin: 0, lineHeight: 1.7,
+    whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     fontFamily: "'DM Sans', sans-serif",
+  },
+
+  /* Rich note display */
+  richTitle: {
+    fontSize: 14, fontWeight: 700, color: 'var(--ink)',
+    margin: '0 0 6px', fontFamily: "'Cormorant Garamond', serif",
+  },
+  richBody: {
+    fontSize: 13, color: 'var(--ink)', lineHeight: 1.7,
+    fontFamily: "'DM Sans', sans-serif", wordBreak: 'break-word',
+  },
+
+  /* copy/share bar */
+  copyShareBar: { display: 'flex', gap: 6, marginTop: 6 },
+  copyBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    background: 'none', border: '1px solid var(--border)', borderRadius: 6,
+    padding: '3px 8px', cursor: 'pointer', fontSize: 10, fontWeight: 600,
+    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
   },
 
   removeBtn: {
@@ -1095,4 +1613,119 @@ const s = {
   hlChip:      { display: 'inline-flex', alignItems: 'center', border: '1px solid', borderRadius: 99, overflow: 'hidden' },
   hlChipInner: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '4px 8px 4px 10px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" },
   hlRemoveBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '2px 8px 2px 2px', opacity: 0.7 },
+}
+
+/* ── Rich editor styles ── */
+const re = {
+  wrap: { display: 'flex', flexDirection: 'column', gap: 8 },
+  titleInput: {
+    width: '100%', border: 'none', borderBottom: '1.5px solid var(--border)',
+    background: 'transparent', outline: 'none',
+    fontSize: 16, fontWeight: 700, color: 'var(--ink)',
+    fontFamily: "'Cormorant Garamond', serif",
+    padding: '4px 2px 8px', boxSizing: 'border-box',
+  },
+  toolbar: {
+    display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+    background: 'var(--parchment)', border: '1px solid var(--border)',
+    borderRadius: '8px 8px 0 0', padding: '4px 6px',
+  },
+  toolBtn: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    minWidth: 28, height: 26, borderRadius: 5, border: 'none',
+    background: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+    color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.1s',
+  },
+  toolDivider: {
+    width: 1, height: 18, background: 'var(--border)', margin: '0 4px', flexShrink: 0,
+  },
+  atHint: {
+    fontSize: 10, color: 'var(--ink-faint)', fontStyle: 'italic',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  editor: {
+    minHeight: 'calc(60vh - 200px)',
+    border: '1px solid var(--border)', borderTop: 'none',
+    borderRadius: '0 0 8px 8px',
+    padding: '10px 12px', fontSize: 14, lineHeight: 1.75,
+    color: 'var(--ink)', background: 'var(--parchment)',
+    fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', overflowY: 'auto', wordBreak: 'break-word',
+    boxSizing: 'border-box',
+  },
+}
+
+/* ── @ mention popup styles ── */
+const am = {
+  popup: {
+    position: 'fixed', zIndex: 9000,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)', boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
+    padding: 10, width: 240,
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  label: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 6px' },
+  bookList: { display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto' },
+  bookBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    textAlign: 'left', padding: '6px 8px', borderRadius: 6,
+    fontSize: 13, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.1s',
+  },
+  empty: { fontSize: 12, color: 'var(--ink-faint)', textAlign: 'center', padding: 8 },
+  backBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700, color: 'var(--teal)',
+    padding: '4px 0 6px', fontFamily: "'DM Sans', sans-serif",
+  },
+  refRow:   { display: 'flex', gap: 8, marginBottom: 10 },
+  refGroup: { display: 'flex', flexDirection: 'column', gap: 3 },
+  refLabel: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  refSelect: { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', cursor: 'pointer', width: 60 },
+  refInput:  { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)', width: 52, outline: 'none' },
+  insertRow: { display: 'flex', gap: 6 },
+  insertBtn: {
+    flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 7,
+    padding: '7px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700,
+    color: '#fff', fontFamily: "'DM Sans', sans-serif",
+  },
+  insertBtnAlt: { background: 'var(--surface)', color: 'var(--teal)', border: '1.5px solid var(--teal)' },
+}
+
+/* ── Scripture verse modal styles ── */
+const vm = {
+  backdrop: {
+    position: 'fixed', inset: 0, zIndex: 8000,
+    background: 'rgba(0,0,0,0.45)',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    padding: '0 0 env(safe-area-inset-bottom)',
+  },
+  sheet: {
+    width: '100%', maxWidth: 560,
+    background: 'var(--surface)', borderRadius: '16px 16px 0 0',
+    boxShadow: '0 -6px 30px rgba(0,0,0,0.15)',
+    padding: '20px 20px 28px',
+    fontFamily: "'DM Sans', sans-serif",
+    maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+  },
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  ref: { fontSize: 14, fontWeight: 700, color: 'var(--teal)', fontFamily: "'Cormorant Garamond', serif" },
+  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, display: 'flex' },
+  body: { flex: 1, overflowY: 'auto' },
+  loading: { fontSize: 13, color: 'var(--ink-faint)', textAlign: 'center', padding: '1rem 0' },
+  verseText: {
+    fontSize: 15, color: 'var(--ink)', lineHeight: 1.8,
+    margin: 0, fontFamily: "'Georgia', serif",
+    fontStyle: 'italic',
+  },
+  actions: { marginTop: 16, display: 'flex', justifyContent: 'flex-end' },
+  openBtn: {
+    background: 'var(--teal)', border: 'none', borderRadius: 8,
+    padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+    color: '#fff', fontFamily: "'DM Sans', sans-serif",
+  },
 }

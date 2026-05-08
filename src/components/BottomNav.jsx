@@ -45,6 +45,20 @@ const TABS = [
     ),
   },
   {
+    path: '/library',
+    label: 'My Library',
+    icon: (active) => (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <rect x="3" y="3" width="16" height="16" rx="2"
+          stroke="currentColor" strokeWidth="1.5"
+          fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.12 : 0}
+        />
+        <path d="M7 8h8M7 11.5h5M7 15h6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+        <path d="M15 3v4l-1.5-1-1.5 1V3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
     path: '/about',
     label: 'Settings',
     icon: (active) => (
@@ -88,6 +102,7 @@ export default function BottomNav() {
     if (pathname === '/' || pathname.startsWith('/day/')) return '/'
     if (pathname.startsWith('/confessions')) return '/confessions'
     if (pathname.startsWith('/scripture'))  return '/scripture'
+    if (pathname.startsWith('/library'))    return '/library'
     if (pathname.startsWith('/about'))      return '/about'
     return null
   }

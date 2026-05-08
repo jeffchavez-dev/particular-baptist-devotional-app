@@ -17,24 +17,33 @@
  */
 
 import { MATTHEW_XREFS } from '../data/matthewCrossRefs'
+import { ROMANS_XREFS }  from '../data/romansCrossRefs'
 import { parseRefs } from './parseRefs'
 
-/* ── Forward cache: 'matthew:ch:v' → parsed ref array ── */
+/* ── Source books with bundled xref data ── */
+const XREF_SOURCES = [
+  { book: 'Matthew', data: MATTHEW_XREFS },
+  { book: 'Romans',  data: ROMANS_XREFS  },
+]
+
+/* ── Forward cache: 'book:ch:v' → parsed ref array ── */
 const _fwdCache = {}
 
 /**
- * Forward lookup — which passages does a Matthew verse reference?
+ * Forward lookup — which passages does a verse reference?
+ * Currently covers Matthew and Romans.
  */
 export function getBibleXrefs(book, chapter, verse) {
-  if (book !== 'Matthew') return []
+  const source = XREF_SOURCES.find(s => s.book === book)
+  if (!source) return []
 
   const key = `${chapter}:${verse}`
-  if (!MATTHEW_XREFS[key]) return []
+  if (!source.data[key]) return []
 
-  const cacheKey = `matthew:${key}`
+  const cacheKey = `${book}:${key}`
   if (_fwdCache[cacheKey]) return _fwdCache[cacheKey]
 
-  const parsed = parseRefs(MATTHEW_XREFS[key])
+  const parsed = parseRefs(source.data[key])
   _fwdCache[cacheKey] = parsed
   return parsed
 }
@@ -46,18 +55,20 @@ function buildReverseIndex() {
   if (_reverseIndex) return _reverseIndex
   _reverseIndex = {}
 
-  for (const [key, refStr] of Object.entries(MATTHEW_XREFS)) {
-    const [chStr, vStr] = key.split(':')
-    const matChapter = parseInt(chStr, 10)
-    const matVerse   = parseInt(vStr,  10)
+  for (const { book: srcBook, data } of XREF_SOURCES) {
+    for (const [key, refStr] of Object.entries(data)) {
+      const [chStr, vStr] = key.split(':')
+      const srcChapter = parseInt(chStr, 10)
+      const srcVerse   = parseInt(vStr,  10)
 
-    const refs = parseRefs(refStr)
-    for (const ref of refs) {
-      // Only index verse-exact back-refs (skip chapter-only refs to avoid noise)
-      if (!ref.book || !ref.chapter || !ref.verse) continue
-      const tgtKey = `${ref.book}:${ref.chapter}:${ref.verse}`
-      if (!_reverseIndex[tgtKey]) _reverseIndex[tgtKey] = []
-      _reverseIndex[tgtKey].push({ book: 'Matthew', chapter: matChapter, verse: matVerse })
+      const refs = parseRefs(refStr)
+      for (const ref of refs) {
+        // Only index verse-exact back-refs (skip chapter-only refs to avoid noise)
+        if (!ref.book || !ref.chapter || !ref.verse) continue
+        const tgtKey = `${ref.book}:${ref.chapter}:${ref.verse}`
+        if (!_reverseIndex[tgtKey]) _reverseIndex[tgtKey] = []
+        _reverseIndex[tgtKey].push({ book: srcBook, chapter: srcChapter, verse: srcVerse })
+      }
     }
   }
 
@@ -66,7 +77,7 @@ function buildReverseIndex() {
 
 /**
  * Reverse lookup — which static Bible xref passages point TO a given verse?
- * (Currently covers Matthew → rest of Bible.)
+ * (Currently covers Matthew and Romans → rest of Bible.)
  *
  * @param {string} book    - book name, e.g. 'Genesis'
  * @param {number} chapter - chapter number
