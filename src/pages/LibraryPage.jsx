@@ -275,6 +275,7 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
         {/* eslint-disable-next-line react/no-danger */}
         <div
           style={s.richBody}
+          className="rich-content"
           dangerouslySetInnerHTML={{ __html: body || '' }}
           onClick={handleClick}
         />
@@ -661,6 +662,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         onKeyUp={handleKeyUp}
         onMouseUp={saveSelection}
         style={re.editor}
+        className="rich-content"
         data-placeholder="Write your note here…"
       />
 
@@ -1084,6 +1086,32 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
 }
 
 /* ══════════════════════════════════════════════════════════════
+   Delete Confirmation Modal
+══════════════════════════════════════════════════════════════ */
+function DeleteConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div style={dc.backdrop} onClick={onCancel}>
+      <div style={dc.sheet} onClick={e => e.stopPropagation()}>
+        {/* Warning icon */}
+        <div style={dc.iconWrap}>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <circle cx="14" cy="14" r="13" stroke="var(--red)" strokeWidth="1.5" fill="var(--red-light)"/>
+            <path d="M14 8v7" stroke="var(--red)" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="14" cy="19.5" r="1.2" fill="var(--red)"/>
+          </svg>
+        </div>
+        <p style={dc.title}>Delete this note?</p>
+        <p style={dc.body}>Deleted notes cannot be recovered.</p>
+        <div style={dc.actions}>
+          <button style={dc.cancelBtn} onClick={onCancel}>Keep note</button>
+          <button style={dc.deleteBtn} onClick={onConfirm}>Delete permanently</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
    Notes Tab
 ══════════════════════════════════════════════════════════════ */
 const BOOK_ORDER = Object.fromEntries(BIBLE_BOOKS.map((b, i) => [b.name, i]))
@@ -1102,7 +1130,18 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
   const [scriptureModal, setScriptureModal] = useState(null)
+  const [pendingDelete,  setPendingDelete]  = useState(null) // { key, type }
   const searchRef = useRef(null)
+
+  function requestDelete(key, type) { setPendingDelete({ key, type }) }
+  function confirmDelete() {
+    if (!pendingDelete) return
+    const { key, type } = pendingDelete
+    if (type === 'lib')  onRemoveLibNote(key)
+    if (type === 'kjv')  onRemoveKjvNote(key)
+    if (type === 'conf') onRemoveConfNote(key)
+    setPendingDelete(null)
+  }
 
   const q = searchQuery.trim().toLowerCase()
 
@@ -1300,7 +1339,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                     </svg>
                     Edit
                   </button>
-                  <RemoveBtn onClick={() => onRemoveLibNote(n.key)} label="Delete note" />
+                  <RemoveBtn onClick={() => requestDelete(n.key, 'lib')} label="Delete note" />
                   <CopyShareBar rawNote={n.note} />
                 </div>
                 <NoteBody
@@ -1343,7 +1382,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                     </svg>
                     Edit
                   </button>
-                  <RemoveBtn onClick={() => onRemoveKjvNote(n.key)} label="Delete note" />
+                  <RemoveBtn onClick={() => requestDelete(n.key, 'kjv')} label="Delete note" />
                   <button
                     onClick={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
                     style={s.openBtn}
@@ -1440,7 +1479,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                       </svg>
                       Edit
                     </button>
-                    <RemoveBtn onClick={() => onRemoveConfNote(n.key)} label="Delete note" />
+                    <RemoveBtn onClick={() => requestDelete(n.key, 'conf')} label="Delete note" />
                     <button
                       onClick={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
                       style={s.openBtn}
@@ -1474,6 +1513,14 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         onClose={() => setScriptureModal(null)}
         onNavigate={(book, ch, vs) => navigate('/scripture', { state: { book, chapter: ch, verse: vs } })}
       />
+
+      {/* Delete confirmation modal */}
+      {pendingDelete && (
+        <DeleteConfirmModal
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   )
 }
@@ -2086,6 +2133,40 @@ const lp = {
     background: 'none', border: '1px solid var(--border)', borderRadius: 7,
     padding: '4px 8px', cursor: 'pointer', fontSize: 11,
     color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+  },
+}
+
+/* ── Delete confirm modal styles ── */
+const dc = {
+  backdrop: {
+    position: 'fixed', inset: 0, zIndex: 9100,
+    background: 'rgba(0,0,0,0.5)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 24px',
+  },
+  sheet: {
+    width: '100%', maxWidth: 340,
+    background: 'var(--surface)', borderRadius: 16,
+    boxShadow: '0 8px 40px rgba(0,0,0,0.22)',
+    padding: '28px 24px 24px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  iconWrap: { marginBottom: 4 },
+  title: { fontSize: 16, fontWeight: 700, color: 'var(--ink)', textAlign: 'center' },
+  body:  { fontSize: 13, color: 'var(--ink-muted)', textAlign: 'center', lineHeight: 1.6, margin: '2px 0 12px' },
+  actions: { display: 'flex', gap: 10, width: '100%' },
+  cancelBtn: {
+    flex: 1, background: 'none', border: '1px solid var(--border-strong)',
+    borderRadius: 10, padding: '10px 0', cursor: 'pointer',
+    fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  deleteBtn: {
+    flex: 1, background: 'var(--red)', border: 'none',
+    borderRadius: 10, padding: '10px 0', cursor: 'pointer',
+    fontSize: 13, fontWeight: 700, color: '#fff',
+    fontFamily: "'DM Sans', sans-serif",
   },
 }
 

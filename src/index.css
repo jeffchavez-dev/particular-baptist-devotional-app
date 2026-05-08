@@ -2,6 +2,8 @@
 
 :root {
   --parchment: #faf7f2;
+  --red:       #c0392b;
+  --red-light: #fdecea;
   --parchment-dark: #f0ebe0;
   --surface: white;
   --ink: #1a1611;
@@ -53,6 +55,8 @@
   --gray-ink:       #b0a898;
   --border:         rgba(240,235,224,0.12);
   --border-strong:  rgba(240,235,224,0.22);
+  --red:            #e57373;
+  --red-light:      #2a1010;
   color-scheme: dark;
 }
 /* Structural elements get surface background in dark mode */
@@ -240,4 +244,35 @@ input, textarea, select {
 /* But keep labels / badges / small text unaffected */
 input[type="checkbox"], input[type="radio"] {
   font-size: inherit !important;
+}
+
+/* ── Rich text content: editor + view mode ──
+   The global * reset removes padding from ul/ol, so bullets and numbers
+   render at x=0 and fall outside the visible area. Restore indentation
+   for any element with the rich-content class. ── */
+.rich-content ul,
+.rich-content ol {
+  padding-left: 1.4em;
+  margin: 0.3em 0;
+}
+.rich-content li {
+  margin: 0.15em 0;
+  padding-left: 0.2em;
+}
+.rich-content h1 {
+  font-size: 1.35em;
+  font-weight: 700;
+  margin: 0.4em 0 0.2em;
+  font-family: 'Cormorant Garamond', serif;
+}
+.rich-content h2 {
+  font-size: 1.1em;
+  font-weight: 700;
+  margin: 0.4em 0 0.15em;
+}
+.rich-content p {
+  margin: 0.2em 0;
+}
+.rich-content blockquote {
+  margin: 6px 0;
 }
