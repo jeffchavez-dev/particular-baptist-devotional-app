@@ -1551,9 +1551,9 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 {allUsedLabels.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             )}
-            {/* Search — collapses to icon when idle */}
+            {/* Search — collapses to icon when idle; pushed to right end */}
             {(searchOpen || searchQuery) ? (
-              <div style={s.searchInline}>
+              <div style={{ ...s.searchInline, marginLeft: 'auto' }}>
                 <input
                   ref={searchRef}
                   value={searchQuery}
@@ -1576,7 +1576,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             ) : (
               <button
                 onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 0) }}
-                style={s.searchIconBtn}
+                style={{ ...s.searchIconBtn, marginLeft: 'auto' }}
                 aria-label="Search notes"
                 title="Search notes"
               >
@@ -1612,12 +1612,14 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               </svg>
             }
             title="Personal Notes"
-            count={libNotes.length}
+            count={libFreeNotes.length}
             filtered={isSearching ? filteredLib.length : null}
           />
           <p style={s.sectionHint}>Notes created directly in My Library</p>
           {filteredLib.length === 0 && !isSearching
-            ? <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
+            ? libTaggedNotes.length > 0
+              ? <EmptyMsg text='Scripture-tagged notes are shown in "Scripture Notes" below.' />
+              : <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
             : (
               <div style={s.kanbanGrid}>
                 {filteredLib.map(n => {
@@ -2180,7 +2182,7 @@ const s = {
 
   /* ── Compact control row (New Note + Sort + Filter + Search) ── */
   controlRow: {
-    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap',
   },
   newNoteBtnSmall: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
