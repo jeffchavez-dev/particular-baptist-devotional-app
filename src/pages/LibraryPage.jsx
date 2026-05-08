@@ -1407,17 +1407,14 @@ const SORT_OPTS = [
   { id: 'label',     label: 'By label' },
 ]
 
-function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote }) {
+function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingNote,    setEditingNote]    = useState(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
-  const [searchQuery,    setSearchQuery]    = useState('')
-  const [searchOpen,     setSearchOpen]     = useState(false)
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
   const [scriptureModal, setScriptureModal] = useState(null)
   const [pendingDelete,  setPendingDelete]  = useState(null) // { key, type }
-  const searchRef = useRef(null)
 
   function requestDelete(key, type) { setPendingDelete({ key, type }) }
   function confirmDelete() {
@@ -1533,7 +1530,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         />
       ) : (
         <>
-          {/* Compact control row: New Note + Sort + Label + Search icon */}
+          {/* Compact control row: New Note + Sort + Label */}
           <div style={s.controlRow}>
             <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1550,41 +1547,6 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 <option value="">All labels</option>
                 {allUsedLabels.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
-            )}
-            {/* Search — collapses to icon when idle; pushed to right end */}
-            {(searchOpen || searchQuery) ? (
-              <div style={{ ...s.searchInline, marginLeft: 'auto' }}>
-                <input
-                  ref={searchRef}
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search…"
-                  style={s.searchInlineInput}
-                  autoFocus
-                  onBlur={() => { if (!searchQuery) setSearchOpen(false) }}
-                />
-                <button
-                  onMouseDown={e => { e.preventDefault(); setSearchQuery(''); setSearchOpen(false) }}
-                  style={s.searchClear}
-                  aria-label="Clear search"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                  </svg>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 0) }}
-                style={{ ...s.searchIconBtn, marginLeft: 'auto' }}
-                aria-label="Search notes"
-                title="Search notes"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.4"/>
-                  <path d="M10 10l2.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                </svg>
-              </button>
             )}
           </div>
 
@@ -1952,6 +1914,9 @@ export default function LibraryPage() {
   const { session } = useAuth()
 
   const [activeTab, setActiveTab] = useState('notes')
+  const [libSearch,     setLibSearch]     = useState('')
+  const [libSearchOpen, setLibSearchOpen] = useState(false)
+  const libSearchRef = useRef(null)
 
   const [devNotes,       setDevNotes]       = useState([])
   const [savedDays,      setSavedDays]      = useState(() => getBookmarks())
@@ -2046,10 +2011,52 @@ export default function LibraryPage() {
             <path d="M5.5 6h7M5.5 9.5h5M5.5 13h5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
             <path d="M12 2v4l-1.5-1-1.5 1V2" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
           </svg>
-          <div>
-            <span style={s.headerTitle}>My Library</span>
-            <span style={s.headerSub}>Notes, bookmarks, highlights &amp; more</span>
-          </div>
+          {(libSearchOpen || libSearch) ? (
+            /* Expanded search input — replaces title text */
+            <div style={s.headerSearchRow}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>
+                <circle cx="5.5" cy="5.5" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <input
+                ref={libSearchRef}
+                value={libSearch}
+                onChange={e => setLibSearch(e.target.value)}
+                placeholder="Search notes…"
+                style={s.headerSearchInput}
+                autoFocus
+                onBlur={() => { if (!libSearch) setLibSearchOpen(false) }}
+              />
+              <button
+                onMouseDown={e => { e.preventDefault(); setLibSearch(''); setLibSearchOpen(false) }}
+                style={s.headerSearchClear}
+                aria-label="Close search"
+              >
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <path d="M1.5 1.5l8 8M9.5 1.5l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+          ) : (
+            /* Default: title + search icon */
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={s.headerTitle}>My Library</span>
+                <span style={s.headerSub}>Notes, bookmarks, highlights &amp; more</span>
+              </div>
+              <button
+                onClick={() => { setLibSearchOpen(true); setActiveTab('notes'); setTimeout(() => libSearchRef.current?.focus(), 0) }}
+                style={s.headerSearchBtn}
+                aria-label="Search notes"
+                title="Search notes"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+                  <path d="M11.5 11.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </>
+          )}
         </div>
         <div style={s.tabBar}>
           {TABS.map(tab => (
@@ -2081,6 +2088,7 @@ export default function LibraryPage() {
             onRemoveKjvNote={handleRemoveKjvNote}
             onRemoveConfNote={handleRemoveConfNote}
             onRemoveLibNote={handleRemoveLibNote}
+            searchQuery={libSearch}
           />
         )}
         {activeTab === 'bookmarks' && (
@@ -2122,6 +2130,23 @@ const s = {
   headerInner: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 8px' },
   headerTitle: { fontSize: 16, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', serif", display: 'block' },
   headerSub:   { fontSize: 11, color: 'var(--ink-faint)', display: 'block', marginTop: 1 },
+  headerSearchBtn: {
+    marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--ink-muted)', display: 'flex', alignItems: 'center', padding: 4, flexShrink: 0,
+    borderRadius: 8, transition: 'color 0.12s',
+  },
+  headerSearchRow: {
+    flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+    background: 'var(--parchment-dark)', borderRadius: 8, padding: '5px 10px',
+  },
+  headerSearchInput: {
+    flex: 1, background: 'none', border: 'none', outline: 'none',
+    fontSize: 14, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+  },
+  headerSearchClear: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: 1, flexShrink: 0,
+  },
   tabBar: { display: 'flex', borderTop: '1px solid var(--border)' },
   tab: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -2156,21 +2181,6 @@ const s = {
   hlLegendDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   hlLegendMeaning: { fontSize: 12, color: 'var(--ink)', fontWeight: 500 },
 
-  /* ── Search (inline in controlRow) ── */
-  searchInline: {
-    display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0,
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 8, padding: '4px 8px',
-  },
-  searchInlineInput: {
-    flex: 1, background: 'none', border: 'none', outline: 'none', minWidth: 0,
-    fontSize: 13, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
-  },
-  searchIconBtn: {
-    background: 'none', border: '1px solid var(--border)', borderRadius: 8,
-    padding: '5px 8px', cursor: 'pointer', color: 'var(--ink-muted)',
-    display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color 0.12s',
-  },
   searchClear: {
     background: 'none', border: 'none', cursor: 'pointer',
     color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', padding: '1px', flexShrink: 0,
@@ -2192,12 +2202,12 @@ const s = {
     flexShrink: 0, transition: 'opacity 0.12s',
   },
   controlSelect: {
-    border: '1px solid var(--border)', borderRadius: 8, padding: '5px 8px',
-    fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)',
+    border: '1px solid var(--border)', borderRadius: 8, padding: '4px 6px',
+    fontSize: 11, color: 'var(--ink)', background: 'var(--parchment)',
     cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
     appearance: 'none',
-    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235c5448' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: 26,
+    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%235c5448' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 22,
   },
 
   /* ── Kanban 2-column grid ── */
