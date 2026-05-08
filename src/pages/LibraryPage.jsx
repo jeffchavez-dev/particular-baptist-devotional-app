@@ -339,10 +339,14 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
   const selectedBook = BIBLE_BOOKS.find(b => b.name === book) ?? BIBLE_BOOKS[0]
   const maxChapters  = selectedBook.chapters
 
+  // Flip popup above the cursor when it would go off the bottom of the viewport
+  const POPUP_MAX_H = 320
+  const fitsBelow   = (pos.bottom + 4 + POPUP_MAX_H) <= window.innerHeight
   const style = {
     ...am.popup,
-    top: pos.bottom + 4,
-    left: Math.max(8, Math.min(pos.left, window.innerWidth - 270)),
+    top:    fitsBelow ? pos.bottom + 4 : undefined,
+    bottom: fitsBelow ? undefined : window.innerHeight - pos.top + 6,
+    left:   Math.max(8, Math.min(pos.left, window.innerWidth - 270)),
   }
 
   /* ── Resolved: user typed a complete reference ── */
@@ -515,24 +519,33 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     const idx  = text.lastIndexOf('@', range.startOffset - 1)
     if (idx === -1) { setAtPopup(null); return }
 
-    // Make sure no whitespace between @ and cursor (i.e., it's a continuous word)
     const between = text.slice(idx + 1, range.startOffset)
-    if (between.includes(' ')) { setAtPopup(null); return }
 
-    // Compute popup position from the @ character
+    // Allow spaces only if the query still starts with a known Bible book name
+    // (e.g. "@Genesis 1:1" — the space is part of the reference, not a word break)
+    if (between.includes(' ')) {
+      const startsWithBook = BOOKS_BY_LENGTH.some(bk =>
+        between.toLowerCase().startsWith(bk.name.toLowerCase())
+      )
+      if (!startsWithBook) { setAtPopup(null); return }
+    }
+
+    // Compute popup anchor from the @ character
+    // Use viewport-relative coords (popup is position:fixed — do NOT add scrollY)
     const atRange = range.cloneRange()
     atRange.setStart(node, idx)
     atRange.setEnd(node, idx + 1)
     const rect = atRange.getBoundingClientRect()
 
-    // Save the range at @ so we can delete it when inserting
+    // Save the range at @ so we can delete "@query" when inserting
     const deleteRange = range.cloneRange()
     deleteRange.setStart(node, idx)
     deleteRange.setEnd(node, range.startOffset)
     atRangeRef.current = deleteRange
 
     setAtQuery(between)
-    setAtPopup({ bottom: rect.bottom + window.scrollY, left: rect.left + window.scrollX })
+    // Store both top and bottom so the popup can flip above the cursor if needed
+    setAtPopup({ top: rect.top, bottom: rect.bottom, left: rect.left })
   }
 
   async function handleAtSelect({ book, chapter, verse, verseTo, quoteMode }) {
@@ -610,48 +623,6 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         style={re.titleInput}
       />
 
-      {/* Toolbar */}
-      <div style={re.toolbar}>
-        {TOOLBAR_ACTIONS.map(action => (
-          <button
-            key={action.id}
-            title={action.title}
-            onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
-            style={re.toolBtn}
-            type="button"
-          >
-            {action.label}
-          </button>
-        ))}
-        <span style={re.toolDivider} />
-        <button
-          title="Undo"
-          aria-label="Undo"
-          onMouseDown={e => { e.preventDefault(); execUndo() }}
-          style={re.toolBtn}
-          type="button"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <button
-          title="Redo"
-          aria-label="Redo"
-          onMouseDown={e => { e.preventDefault(); execRedo() }}
-          style={re.toolBtn}
-          type="button"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <span style={re.toolDivider} />
-        <span style={re.atHint}>Type @ for scripture</span>
-      </div>
-
       {/* Editable area */}
       <div
         ref={editorRef}
@@ -665,6 +636,36 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         className="rich-content"
         data-placeholder="Write your note here…"
       />
+
+      {/* Toolbar — sits below the editor so it's always reachable on long notes */}
+      <div style={re.toolbar}>
+        {TOOLBAR_ACTIONS.map(action => (
+          <button
+            key={action.id}
+            title={action.title}
+            onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
+            style={re.toolBtn}
+            type="button"
+          >
+            {action.label}
+          </button>
+        ))}
+        <span style={re.toolDivider} />
+        <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <span style={re.toolDivider} />
+        <span style={re.atHint}>@ scripture</span>
+      </div>
 
       {/* @ picker popup */}
       {atPopup && (
@@ -736,68 +737,85 @@ function CopyShareBar({ rawNote }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Label Picker
+   Label Dropdown  (replaces chip-row LabelPicker)
 ══════════════════════════════════════════════════════════════ */
-function LabelPicker({ selected, onChange }) {
+function LabelDropdown({ selected, onChange }) {
+  const [open,      setOpen]      = useState(false)
   const [allLabels, setAllLabels] = useState(getStoredLabels)
   const [adding,    setAdding]    = useState(false)
   const [newLabel,  setNewLabel]  = useState('')
+  const wrapRef  = useRef(null)
   const inputRef = useRef(null)
 
   useEffect(() => { if (adding) inputRef.current?.focus() }, [adding])
 
+  useEffect(() => {
+    function onDown(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
   function toggle(label) {
-    onChange(selected.includes(label)
-      ? selected.filter(l => l !== label)
-      : [...selected, label]
-    )
+    onChange(selected.includes(label) ? selected.filter(l => l !== label) : [...selected, label])
   }
 
   function addLabel() {
-    const trimmed = newLabel.trim()
-    if (!trimmed) { setAdding(false); return }
-    const updated = allLabels.includes(trimmed) ? allLabels : [...allLabels, trimmed]
+    const t = newLabel.trim()
+    if (!t) { setAdding(false); return }
+    const updated = allLabels.includes(t) ? allLabels : [...allLabels, t]
     saveStoredLabels(updated)
     setAllLabels(updated)
-    if (!selected.includes(trimmed)) onChange([...selected, trimmed])
-    setNewLabel('')
-    setAdding(false)
+    if (!selected.includes(t)) onChange([...selected, t])
+    setNewLabel(''); setAdding(false)
   }
 
+  const label = selected.length === 0 ? 'Add labels' : selected.length === 1 ? selected[0] : `${selected.length} labels`
+
   return (
-    <div style={lp.wrap}>
-      <p style={lp.heading}>Labels</p>
-      <div style={lp.chipRow}>
-        {allLabels.map(label => {
-          const active = selected.includes(label)
-          return (
-            <button key={label} type="button" onClick={() => toggle(label)}
-              style={{ ...lp.chip, ...(active ? lp.chipActive : {}) }}>
-              {active && <span style={{ marginRight: 3, fontSize: 9 }}>✓</span>}
-              {label}
-            </button>
-          )
-        })}
-        {adding ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <input
-              ref={inputRef}
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); addLabel() }
-                if (e.key === 'Escape') { setAdding(false); setNewLabel('') }
-              }}
-              placeholder="New label…"
-              style={lp.addInput}
-            />
-            <button type="button" onClick={addLabel} style={lp.addConfirm}>Add</button>
-            <button type="button" onClick={() => { setAdding(false); setNewLabel('') }} style={lp.addCancel}>✕</button>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setAdding(true)} style={lp.addChip}>+ Add label</button>
-        )}
-      </div>
+    <div style={{ position: 'relative' }} ref={wrapRef}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={lp.trigger}>
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M1 2h4.5l4 4-3.5 3.5-4-4V2Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+          <circle cx="3" cy="3.8" r="0.7" fill="currentColor"/>
+        </svg>
+        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
+        <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 3l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+      </button>
+
+      {/* Selected chips — shown below trigger */}
+      {selected.length > 0 && (
+        <div style={lp.selectedRow}>
+          {selected.map(l => (
+            <span key={l} style={lp.selectedChip}>
+              {l}
+              <button type="button" onClick={() => toggle(l)} style={lp.chipRemove}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Dropdown panel */}
+      {open && (
+        <div style={lp.panel}>
+          {allLabels.map(l => (
+            <label key={l} style={lp.item}>
+              <input type="checkbox" checked={selected.includes(l)} onChange={() => toggle(l)} style={{ accentColor: 'var(--teal)', width: 14, height: 14, flexShrink: 0, cursor: 'pointer' }} />
+              <span style={{ fontSize: 12, color: 'var(--ink)' }}>{l}</span>
+            </label>
+          ))}
+          <div style={lp.panelDivider} />
+          {adding ? (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 0' }}>
+              <input ref={inputRef} value={newLabel} onChange={e => setNewLabel(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addLabel() } if (e.key === 'Escape') { setAdding(false); setNewLabel('') } }}
+                placeholder="New label…" style={lp.addInput} />
+              <button type="button" onClick={addLabel} style={lp.addConfirm}>Add</button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAdding(true)} style={lp.addBtn}>+ Add label</button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -863,7 +881,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
       />
 
       {/* Labels */}
-      <LabelPicker selected={labels} onChange={setLabels} />
+      <LabelDropdown selected={labels} onChange={setLabels} />
 
       {/* Scripture tag toggle */}
       <button
@@ -991,7 +1009,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
         onBodyChange={setBodyHtml}
       />
 
-      <LabelPicker selected={labels} onChange={setLabels} />
+      <LabelDropdown selected={labels} onChange={setLabels} />
 
       <div style={s.formActions}>
         <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
@@ -1081,6 +1099,80 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
           </div>
         ))
       }
+    </div>
+  )
+}
+
+/* ── Plain-text preview from any note type ── */
+function notePreviewText(rawNote) {
+  if (!rawNote) return ''
+  if (isRichNote(rawNote)) {
+    const { body } = parseRichNote(rawNote)
+    return (body || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ').trim()
+  }
+  return rawNote.trim()
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Note Card  (kanban tile)
+══════════════════════════════════════════════════════════════ */
+function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick, onEdit, onDelete, onOpen, query }) {
+  const displayPreview = preview
+    ? (query
+        ? preview
+        : preview
+      )
+    : ''
+
+  return (
+    <div style={nc.card} onClick={onCardClick}>
+      {/* Top: badge OR title */}
+      <div style={nc.top}>
+        {badge
+          ? <span style={{ ...nc.badge, ...badgeStyle }}>{badge}</span>
+          : title
+            ? <p style={nc.title}>{title || 'Untitled'}</p>
+            : <p style={nc.titleFaint}>Untitled</p>
+        }
+      </div>
+
+      {/* Labels */}
+      {labels?.length > 0 && (
+        <div style={nc.labelRow}>
+          {labels.slice(0, 2).map(l => <span key={l} style={nc.labelChip}>{l}</span>)}
+          {labels.length > 2 && <span style={nc.labelMore}>+{labels.length - 2}</span>}
+        </div>
+      )}
+
+      {/* Preview — clamped to 3 lines */}
+      <p style={nc.preview}>{displayPreview || <span style={{ color: 'var(--ink-faint)', fontStyle: 'italic' }}>No content</span>}</p>
+
+      {/* Footer */}
+      <div style={nc.footer} onClick={e => e.stopPropagation()}>
+        {date && <span style={nc.date}>{date}</span>}
+        <div style={nc.actions}>
+          {onOpen && (
+            <button style={nc.openBtn} onClick={onOpen}>Open →</button>
+          )}
+          {onEdit && (
+            <button style={nc.iconBtn} onClick={onEdit} title="Edit" aria-label="Edit note">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 10l1.2-2.4 4.8-4.8 1.4 1.4-4.8 4.8L2 10Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+          {onDelete && (
+            <button style={{ ...nc.iconBtn, color: 'var(--red)' }} onClick={onDelete} title="Delete" aria-label="Delete note">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1233,45 +1325,27 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         />
       ) : (
         <>
-          <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtn}>
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" strokeWidth="1.4"/>
-              <path d="M7.5 4.5v6M4.5 7.5h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            New Note
-          </button>
-
-          {/* Sort controls */}
-          <div style={s.sortBar}>
-            <span style={s.sortLabel}>Sort:</span>
-            {SORT_OPTS.map(opt => (
-              <button key={opt.id} type="button"
-                style={{ ...s.sortBtn, ...(sortBy === opt.id ? s.sortBtnActive : {}) }}
-                onClick={() => setSortBy(opt.id)}>
-                {opt.label}
-              </button>
-            ))}
+          {/* Compact control row: New Note + Sort dropdown + Label filter dropdown */}
+          <div style={s.controlRow}>
+            <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle cx="6" cy="6" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M6 3.5v5M3.5 6h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              New Note
+            </button>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={s.controlSelect}>
+              {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            </select>
+            {allUsedLabels.length > 0 && (
+              <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)} style={s.controlSelect}>
+                <option value="">All labels</option>
+                {allUsedLabels.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            )}
           </div>
 
-          {/* Label filter chips */}
-          {allUsedLabels.length > 0 && (
-            <div style={s.labelFilterRow}>
-              <span style={s.sortLabel}>Filter:</span>
-              <button type="button"
-                style={{ ...s.filterChip, ...(filterLabel === '' ? s.filterChipActive : {}) }}
-                onClick={() => setFilterLabel('')}>
-                All
-              </button>
-              {allUsedLabels.map(label => (
-                <button key={label} type="button"
-                  style={{ ...s.filterChip, ...(filterLabel === label ? s.filterChipActive : {}) }}
-                  onClick={() => setFilterLabel(filterLabel === label ? '' : label)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
+          {/* Search bar */}
           <div style={s.searchRow}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--ink-faint)', flexShrink: 0 }}>
               <circle cx="6" cy="6" r="4" stroke="currentColor" strokeWidth="1.3"/>
@@ -1310,7 +1384,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
       <div style={s.divider} />
 
-      {/* ── Personal Library Notes ── */}
+      {/* ── Personal Library Notes — kanban grid ── */}
       {(!isSearching || filteredLib.length > 0) && (
         <>
           <SectionHeader
@@ -1327,35 +1401,33 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           <p style={s.sectionHint}>Notes created directly in My Library</p>
           {filteredLib.length === 0 && !isSearching
             ? <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
-            : filteredLib.map(n => (
-              <div key={n.key} style={s.card}>
-                <div style={s.cardHead}>
-                  <span style={s.dateBadge}>
-                    {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                  <button onClick={() => setEditingNote(n)} style={s.editBtn} title="Edit note">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 9l1.2-2.4 4.8-4.8 1.5 1.5-4.8 4.8L2 9Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                    </svg>
-                    Edit
-                  </button>
-                  <RemoveBtn onClick={() => requestDelete(n.key, 'lib')} label="Delete note" />
-                  <CopyShareBar rawNote={n.note} />
-                </div>
-                <NoteBody
-                  rawNote={n.note}
-                  query={isSearching ? searchQuery.trim() : ''}
-                  onScriptureClick={setScriptureModal}
-                />
+            : (
+              <div style={s.kanbanGrid}>
+                {filteredLib.map(n => {
+                  const { title, labels } = isRichNote(n.note) ? parseRichNote(n.note) : { title: '', labels: [] }
+                  return (
+                    <NoteCard
+                      key={n.key}
+                      title={title}
+                      labels={labels}
+                      preview={notePreviewText(n.note)}
+                      date={new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      onCardClick={() => setEditingNote(n)}
+                      onEdit={() => setEditingNote(n)}
+                      onDelete={() => requestDelete(n.key, 'lib')}
+                      query={isSearching ? searchQuery.trim() : ''}
+                    />
+                  )
+                })}
               </div>
-            ))
+            )
           }
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Scripture Notes ── */}
+      {/* ── Scripture Notes — kanban grid ── */}
       {(!isSearching || filteredKjv.length > 0) && (
         <>
           <SectionHeader
@@ -1372,37 +1444,32 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           <p style={s.sectionHint}>Notes attached to specific Bible verses</p>
           {filteredKjv.length === 0 && !isSearching
             ? <EmptyMsg text="No scripture notes yet. Use the pencil icon on any verse, or tag a scripture when creating a new note above." />
-            : filteredKjv.map(n => (
-              <div key={n.key} style={s.card}>
-                <div style={s.cardHead}>
-                  <span style={s.refBadge}>{n.book} {n.chapter}:{n.verse}</span>
-                  <button onClick={() => setEditingNote({ key: n.key, note: n.note })} style={s.editBtn} title="Edit note">
-                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 9l1.2-2.4 4.8-4.8 1.5 1.5-4.8 4.8L2 9Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                    </svg>
-                    Edit
-                  </button>
-                  <RemoveBtn onClick={() => requestDelete(n.key, 'kjv')} label="Delete note" />
-                  <button
-                    onClick={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
-                    style={s.openBtn}
-                  >Open →</button>
-                </div>
-                <NoteBody
-                  rawNote={n.note}
-                  query={isSearching ? searchQuery.trim() : ''}
-                  onScriptureClick={setScriptureModal}
-                />
-                <CopyShareBar rawNote={n.note} />
+            : (
+              <div style={s.kanbanGrid}>
+                {filteredKjv.map(n => (
+                  <NoteCard
+                    key={n.key}
+                    badge={`${n.book} ${n.chapter}:${n.verse}`}
+                    badgeStyle={{ background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
+                    labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
+                    preview={notePreviewText(n.note)}
+                    date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                    onCardClick={() => setEditingNote({ key: n.key, note: n.note })}
+                    onEdit={() => setEditingNote({ key: n.key, note: n.note })}
+                    onDelete={() => requestDelete(n.key, 'kjv')}
+                    onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                    query={isSearching ? searchQuery.trim() : ''}
+                  />
+                ))}
               </div>
-            ))
+            )
           }
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Devotional Notes ── */}
+      {/* ── Devotional Notes — kanban grid ── */}
       {(!isSearching || filteredDev.length > 0) && (
         <>
           <SectionHeader
@@ -1424,34 +1491,28 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             </div>
           ) : filteredDev.length === 0 && !isSearching ? (
             <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
-          ) : filteredDev.map(n => (
-            <div key={n.day_number} style={s.card} onClick={() => navigate(`/day/${n.day_number}`)}>
-              <div style={s.cardHead}>
-                <span style={s.dayBadge}>Day {n.day_number}</span>
-                <span style={s.dateBadge}>{n.entry.date}</span>
-                <span style={{
-                  ...s.srcBadge,
-                  background: n.entry.src === '2LBCF' ? 'var(--purple-soft)' : n.entry.src === 'Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
-                  color:      n.entry.src === '2LBCF' ? 'var(--purple-ink)' : n.entry.src === 'Catechism' ? 'var(--teal)'       : 'var(--amber-ink)',
-                }}>{n.entry.src}</span>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft: 'auto', opacity: .35, flexShrink: 0 }}>
-                  <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <p style={s.cardReading}>{n.entry.reading}</p>
-              <NoteBody
-                rawNote={n.notes}
-                query={isSearching ? searchQuery.trim() : ''}
-                onScriptureClick={setScriptureModal}
-              />
+          ) : (
+            <div style={s.kanbanGrid}>
+              {filteredDev.map(n => (
+                <NoteCard
+                  key={n.day_number}
+                  badge={`Day ${n.day_number}`}
+                  badgeStyle={{ background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
+                  preview={notePreviewText(n.notes)}
+                  date={n.entry.date}
+                  onCardClick={() => navigate(`/day/${n.day_number}`)}
+                  onOpen={() => navigate(`/day/${n.day_number}`)}
+                  query={isSearching ? searchQuery.trim() : ''}
+                />
+              ))}
             </div>
-          ))}
+          )}
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Confession Notes ── */}
+      {/* ── Confession Notes — kanban grid ── */}
       {(!isSearching || filteredConf.length > 0) && (
         <>
           <SectionHeader
@@ -1467,32 +1528,27 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           />
           {filteredConf.length === 0 && !isSearching
             ? <EmptyMsg text="No confession notes yet. Open any confession paragraph and tap Note." />
-            : filteredConf.map(n => {
-              const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
-              return (
-                <div key={n.key} style={s.card}>
-                  <div style={s.cardHead}>
-                    <span style={s.refBadge}>{srcLabel} {n.itemKey}</span>
-                    <button onClick={() => setEditingNote({ key: n.key, note: n.note })} style={s.editBtn} title="Edit note">
-                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                        <path d="M2 9l1.2-2.4 4.8-4.8 1.5 1.5-4.8 4.8L2 9Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                      </svg>
-                      Edit
-                    </button>
-                    <RemoveBtn onClick={() => requestDelete(n.key, 'conf')} label="Delete note" />
-                    <button
-                      onClick={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
-                      style={s.openBtn}
-                    >Open →</button>
-                  </div>
-                  <NoteBody
-                    rawNote={n.note}
-                    query={isSearching ? searchQuery.trim() : ''}
-                    onScriptureClick={setScriptureModal}
-                  />
-                </div>
-              )
-            })
+            : (
+              <div style={s.kanbanGrid}>
+                {filteredConf.map(n => {
+                  const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
+                  return (
+                    <NoteCard
+                      key={n.key}
+                      badge={`${srcLabel} ${n.itemKey}`}
+                      badgeStyle={{ background: 'var(--purple-soft)', color: 'var(--purple-ink)', border: '1px solid var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }}
+                      labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
+                      preview={notePreviewText(n.note)}
+                      onCardClick={() => setEditingNote({ key: n.key, note: n.note })}
+                      onEdit={() => setEditingNote({ key: n.key, note: n.note })}
+                      onDelete={() => requestDelete(n.key, 'conf')}
+                      onOpen={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
+                      query={isSearching ? searchQuery.trim() : ''}
+                    />
+                  )
+                })}
+              </div>
+            )
           }
         </>
       )}
@@ -1859,7 +1915,32 @@ const s = {
     margin: '0 0 2px', lineHeight: 1.5,
   },
 
-  /* ── New Note button ── */
+  /* ── Compact control row (New Note + Sort + Filter) ── */
+  controlRow: {
+    display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap',
+  },
+  newNoteBtnSmall: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: 'var(--teal)', border: 'none', borderRadius: 8,
+    padding: '7px 12px', cursor: 'pointer', color: '#fff',
+    fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
+    flexShrink: 0, transition: 'opacity 0.12s',
+  },
+  controlSelect: {
+    border: '1px solid var(--border)', borderRadius: 8, padding: '5px 8px',
+    fontSize: 12, color: 'var(--ink)', background: 'var(--parchment)',
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+    appearance: 'none',
+    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235c5448' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: 26,
+  },
+
+  /* ── Kanban 2-column grid ── */
+  kanbanGrid: {
+    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4,
+  },
+
+  /* ── New Note button (legacy — kept for safety) ── */
   newNoteBtn: {
     display: 'flex', alignItems: 'center', gap: 8,
     width: '100%', background: 'var(--teal-light)', border: '1.5px dashed var(--teal)',
@@ -2033,7 +2114,7 @@ const re = {
   toolbar: {
     display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
     background: 'var(--parchment)', border: '1px solid var(--border)',
-    borderRadius: '8px 8px 0 0', padding: '4px 6px',
+    borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '4px 6px',
   },
   toolBtn: {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -2051,8 +2132,8 @@ const re = {
   },
   editor: {
     minHeight: 'calc(60vh - 200px)',
-    border: '1px solid var(--border)', borderTop: 'none',
-    borderRadius: '0 0 8px 8px',
+    border: '1px solid var(--border)', borderBottom: 'none',
+    borderRadius: '8px 8px 0 0',
     padding: '10px 12px', fontSize: 16, lineHeight: 1.75,
     color: 'var(--ink)', background: 'var(--parchment)',
     fontFamily: "'DM Sans', sans-serif",
@@ -2101,38 +2182,54 @@ const am = {
   hintSmall:     { fontSize: 9, fontWeight: 400, color: 'var(--ink-faint)', textTransform: 'none', letterSpacing: 0 },
 }
 
-/* ── Label picker styles ── */
+/* ── Label dropdown styles ── */
 const lp = {
-  wrap:    { borderTop: '1px solid var(--border)', paddingTop: 10 },
-  heading: { fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 8px' },
-  chipRow: { display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
-  chip: {
-    background: 'none', border: '1px solid var(--border)', borderRadius: 99,
-    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
-    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
-    display: 'inline-flex', alignItems: 'center',
+  /* LabelDropdown trigger button */
+  trigger: {
+    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+    background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+    padding: '7px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--ink-muted)',
+    fontFamily: "'DM Sans', sans-serif", fontWeight: 500, textAlign: 'left',
   },
-  chipActive: { background: 'var(--teal-light)', borderColor: 'var(--teal)', color: 'var(--teal)' },
-  addChip: {
-    background: 'none', border: '1px dashed var(--teal)', borderRadius: 99,
-    padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+  /* Row of selected label chips below trigger */
+  selectedRow: { display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  selectedChip: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    background: 'var(--teal-light)', border: '1px solid var(--teal)',
+    borderRadius: 99, padding: '2px 8px', fontSize: 10, fontWeight: 700,
     color: 'var(--teal)', fontFamily: "'DM Sans', sans-serif",
   },
+  chipRemove: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 14, color: 'var(--teal)', lineHeight: 1, padding: 0, opacity: 0.7,
+  },
+  /* Dropdown panel */
+  panel: {
+    position: 'absolute', zIndex: 5000, top: 'calc(100% + 4px)', left: 0, right: 0,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+    padding: '6px 8px', maxHeight: 240, overflowY: 'auto',
+    display: 'flex', flexDirection: 'column', gap: 2,
+  },
+  item: {
+    display: 'flex', alignItems: 'center', gap: 8, padding: '5px 4px',
+    cursor: 'pointer', borderRadius: 6,
+  },
+  panelDivider: { height: 1, background: 'var(--border)', margin: '4px 0' },
+  addBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 600, color: 'var(--teal)',
+    fontFamily: "'DM Sans', sans-serif", textAlign: 'left', padding: '4px 2px',
+  },
   addInput: {
-    border: '1px solid var(--teal)', borderRadius: 8, padding: '4px 8px',
+    flex: 1, border: '1px solid var(--teal)', borderRadius: 7, padding: '4px 8px',
     fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)',
-    outline: 'none', fontFamily: "'DM Sans', sans-serif", width: 130,
+    outline: 'none', fontFamily: "'DM Sans', sans-serif",
   },
   addConfirm: {
     background: 'var(--teal)', border: 'none', borderRadius: 7,
     padding: '4px 10px', cursor: 'pointer', fontSize: 11, fontWeight: 700,
-    color: '#fff', fontFamily: "'DM Sans', sans-serif",
-  },
-  addCancel: {
-    background: 'none', border: '1px solid var(--border)', borderRadius: 7,
-    padding: '4px 8px', cursor: 'pointer', fontSize: 11,
-    color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif",
+    color: '#fff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0,
   },
 }
 
@@ -2167,6 +2264,67 @@ const dc = {
     borderRadius: 10, padding: '10px 0', cursor: 'pointer',
     fontSize: 13, fontWeight: 700, color: '#fff',
     fontFamily: "'DM Sans', sans-serif",
+  },
+}
+
+/* ── Note card (kanban tile) styles ── */
+const nc = {
+  card: {
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)', padding: '10px 12px',
+    cursor: 'pointer', display: 'flex', flexDirection: 'column',
+    gap: 6, minHeight: 130, transition: 'border-color 0.15s, box-shadow 0.15s',
+    boxSizing: 'border-box',
+  },
+  top: { display: 'flex', alignItems: 'flex-start', minHeight: 22 },
+  badge: {
+    fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+    display: 'inline-block', maxWidth: '100%',
+    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    fontFamily: "'DM Sans', sans-serif", lineHeight: 1.6,
+  },
+  title: {
+    fontSize: 13, fontWeight: 700, color: 'var(--ink)', margin: 0,
+    fontFamily: "'Cormorant Garamond', serif", lineHeight: 1.3,
+    overflow: 'hidden', display: '-webkit-box',
+    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+  },
+  titleFaint: {
+    fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic', margin: 0,
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  labelRow: { display: 'flex', flexWrap: 'wrap', gap: 3 },
+  labelChip: {
+    fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 99,
+    background: 'var(--teal-light)', color: 'var(--teal)', letterSpacing: '0.04em',
+    textTransform: 'uppercase', fontFamily: "'DM Sans', sans-serif",
+  },
+  labelMore: {
+    fontSize: 9, color: 'var(--ink-faint)', fontWeight: 600,
+    fontFamily: "'DM Sans', sans-serif", alignSelf: 'center',
+  },
+  preview: {
+    flex: 1, fontSize: 12, color: 'var(--ink-muted)', margin: 0,
+    lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box',
+    WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+    fontFamily: "'DM Sans', sans-serif", wordBreak: 'break-word',
+  },
+  footer: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 'auto', paddingTop: 6, borderTop: '1px solid var(--border)',
+  },
+  date: { fontSize: 9, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif" },
+  actions: { display: 'flex', gap: 2, alignItems: 'center', marginLeft: 'auto' },
+  openBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontSize: 9, fontWeight: 700, color: 'var(--teal)',
+    fontFamily: "'DM Sans', sans-serif", padding: '2px 4px',
+  },
+  iconBtn: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 22, height: 22, borderRadius: 5, border: 'none',
+    background: 'none', cursor: 'pointer', color: 'var(--ink-faint)',
+    transition: 'color 0.12s, background 0.12s',
   },
 }
 
