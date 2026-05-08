@@ -322,38 +322,7 @@ export default function AboutPage() {
           <AchievementsSection supabaseProgress={session ? progressData : null} hideHeader />
         </CollapseSection>
 
-        {/* ════ 2. MY LIBRARY — direct link, no expand needed ════ */}
-        <button
-          onClick={() => navigate('/library')}
-          style={{
-            display:'flex', alignItems:'center', justifyContent:'space-between',
-            width:'100%', background:'var(--teal-light)', border:'1.5px solid var(--teal)',
-            borderRadius:'var(--radius-lg)', padding:'14px 16px',
-            cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
-            transition:'background 0.12s',
-          }}
-        >
-          <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="2" width="16" height="16" rx="2.5"
-                stroke="var(--teal)" strokeWidth="1.5"
-                fill="var(--teal)" fillOpacity="0.15"/>
-              <path d="M6 7h8M6 10.5h5M6 14h6" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
-              <path d="M13 2v4l-1.5-1-1.5 1V2" stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"/>
-            </svg>
-            <div style={{ textAlign:'left' }}>
-              <div style={{ fontSize:14, fontWeight:700, color:'var(--teal)' }}>My Library</div>
-              <div style={{ fontSize:12, color:'var(--teal)', opacity:0.8, marginTop:2 }}>
-                Access notes, bookmarks, highlights &amp; more
-              </div>
-            </div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink:0 }}>
-            <path d="M4 3l5 4-5 4" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-
-        {/* ════ 3. SETTINGS ════ */}
+        {/* ════ 2. SETTINGS ════ */}
         <CollapseSection
           id="settings"
           icon={

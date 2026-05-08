@@ -444,10 +444,11 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
    Rich Text Editor Toolbar
 ══════════════════════════════════════════════════════════════ */
 const TOOLBAR_ACTIONS = [
-  { id: 'h1',     label: 'H1',   title: 'Heading 1', cmd: 'formatBlock', val: 'H1' },
-  { id: 'h2',     label: 'H2',   title: 'Heading 2', cmd: 'formatBlock', val: 'H2' },
-  { id: 'bold',   label: <b>B</b>,   title: 'Bold',   cmd: 'bold' },
-  { id: 'italic', label: <em>I</em>, title: 'Italic', cmd: 'italic' },
+  { id: 'p',      label: 'P',    title: 'Paragraph',   cmd: 'formatBlock', val: 'P' },
+  { id: 'h1',     label: 'H1',   title: 'Heading 1',   cmd: 'formatBlock', val: 'H1' },
+  { id: 'h2',     label: 'H2',   title: 'Heading 2',   cmd: 'formatBlock', val: 'H2' },
+  { id: 'bold',   label: <b>B</b>,   title: 'Bold',    cmd: 'bold' },
+  { id: 'italic', label: <em>I</em>, title: 'Italic',  cmd: 'italic' },
   { id: 'ul',     label: '•',    title: 'Bullet list', cmd: 'insertUnorderedList' },
   { id: 'ol',     label: '1.',   title: 'Numbered list', cmd: 'insertOrderedList' },
 ]
@@ -464,6 +465,34 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     if (editorRef.current && initialBody) {
       editorRef.current.innerHTML = initialBody
     }
+  }, []) // eslint-disable-line
+
+  /* ── Active format state (bold, italic, h1, h2, p, ul, ol) ── */
+  const [activeFormats, setActiveFormats] = useState({})
+
+  function checkFormats() {
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) { setActiveFormats({}); return }
+    const node = sel.getRangeAt(0).commonAncestorContainer
+    if (!editorRef.current?.contains(node)) return
+    try {
+      const blockVal = document.queryCommandValue('formatBlock').toLowerCase()
+      setActiveFormats({
+        bold:   document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        ul:     document.queryCommandState('insertUnorderedList'),
+        ol:     document.queryCommandState('insertOrderedList'),
+        h1:     blockVal === 'h1',
+        h2:     blockVal === 'h2',
+        p:      blockVal === 'p' || blockVal === '',
+      })
+    } catch { setActiveFormats({}) }
+  }
+
+  /* Listen to selection changes to update active states */
+  useEffect(() => {
+    document.addEventListener('selectionchange', checkFormats)
+    return () => document.removeEventListener('selectionchange', checkFormats)
   }, []) // eslint-disable-line
 
   /* @ mention state */
@@ -644,7 +673,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
             key={action.id}
             title={action.title}
             onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
-            style={re.toolBtn}
+            style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
             type="button"
           >
             {action.label}
@@ -2122,6 +2151,9 @@ const re = {
     background: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
     color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
     transition: 'background 0.1s',
+  },
+  toolBtnActive: {
+    background: 'var(--teal-light)', color: 'var(--teal)',
   },
   toolDivider: {
     width: 1, height: 18, background: 'var(--border)', margin: '0 4px', flexShrink: 0,

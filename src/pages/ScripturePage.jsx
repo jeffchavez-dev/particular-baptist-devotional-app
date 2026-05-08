@@ -160,6 +160,10 @@ export default function ScripturePage() {
     const { book: b, chapter: ch, verse: v, version: ver } = pendingDeepLinkRef.current
     pendingDeepLinkRef.current = null
 
+    // Auto-enable study mode when deep-linked to a specific verse
+    // (so the user's note on that verse is immediately visible)
+    if (v) setStudyMode(true)
+
     // Resolve 'original' → 'hebrew' (OT) or 'greek' (NT) from the target book
     const resolvedVer = ver === 'original'
       ? originalVersionForBook(b, BIBLE_BOOKS)
