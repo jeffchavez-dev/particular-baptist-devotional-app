@@ -13,6 +13,10 @@ import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { loadBibleVersion, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { getDefaultReaderVersion, resolveVersion } from '../lib/readerPrefs'
+import { LBCF2 } from '../data/lbcf2'
+import { LBCF1 } from '../data/lbcf1'
+import { CATECHISM } from '../data/catechism'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 
 const SCHEDULE = buildSchedule()
 
@@ -253,6 +257,87 @@ function parseAtQueryWithChapterTag(query, chapterTag) {
   return parseAtQuery(query)
 }
 
+/* ════════════════════════════════════════════════════════════════
+   Confession / Catechism reference helpers
+════════════════════════════════════════════════════════════════ */
+
+/* Metadata about each confession/catechism type */
+const CONF_TYPES = {
+  '2lbcf':   { label: '2LBCF',   fullName: '2nd London Baptist Confession', route: '2lbcf',    color: 'var(--purple-ink)', bg: 'var(--purple-soft)',    border: 'var(--purple-ink)', hasParagraphs: true,  maxItems: null },
+  '1lbcf':   { label: '1LBCF',   fullName: '1st London Baptist Confession', route: '1lbcf',    color: 'var(--amber-ink)',  bg: 'var(--amber-soft)',     border: 'var(--amber-ink)',  hasParagraphs: false, maxItems: 52   },
+  'orthodox': { label: 'Orthodox', fullName: 'An Orthodox Catechism',         route: 'orthodox', color: '#0c4a6e',           bg: 'rgba(12,74,110,0.12)', border: '#0c4a6e',           hasParagraphs: false, maxItems: 196  },
+  'keach':    { label: 'Keach',   fullName: "Keach's Baptist Catechism",      route: 'catechism',color: 'var(--teal)',       bg: 'var(--teal-light)',     border: 'var(--teal)',       hasParagraphs: false, maxItems: 114  },
+}
+
+/** Parse a query like "2LBCF 1:2", "1LBCF 52", "Orthodox1", "Keach 3"
+ *  Returns { confType, chapter, para, complete } or null */
+function parseAtQueryConfession(query) {
+  const q = query.trim()
+  // 2LBCF Chapter.Para or Chapter:Para  (e.g. "2LBCF 1:1" or "2LBCF 1.1")
+  const m2 = q.match(/^2LBCF\s+(\d+)[.:](\d+)$/i)
+  if (m2) return { confType: '2lbcf', chapter: parseInt(m2[1]), para: parseInt(m2[2]), complete: true }
+  if (/^2LBCF(\s+\d*[.:]?\d*)?$/i.test(q)) return { confType: '2lbcf', complete: false }
+  // 1LBCF Article  (e.g. "1LBCF 52")
+  const m1 = q.match(/^1LBCF\s+(\d+)$/i)
+  if (m1) return { confType: '1lbcf', chapter: null, para: parseInt(m1[1]), complete: true }
+  if (/^1LBCF(\s+\d*)?$/i.test(q)) return { confType: '1lbcf', complete: false }
+  // Orthodox question  (e.g. "Orthodox1", "Orthodox 1", "OrthodoxQ1")
+  const mo = q.match(/^Orthodox\s*(?:Q\.?\s*)?(\d+)$/i)
+  if (mo) return { confType: 'orthodox', chapter: null, para: parseInt(mo[1]), complete: true }
+  if (/^Orthodox(\s.*)?$/i.test(q)) return { confType: 'orthodox', complete: false }
+  // Keach question  (e.g. "Keach2", "Keach 2", "KeachQ2")
+  const mk = q.match(/^Keach\s*(?:Q\.?\s*)?(\d+)$/i)
+  if (mk) return { confType: 'keach', chapter: null, para: parseInt(mk[1]), complete: true }
+  if (/^Keach(\s.*)?$/i.test(q)) return { confType: 'keach', complete: false }
+  return null
+}
+
+/** Display label for a confession tag */
+function confRefLabel(confType, chapter, para) {
+  switch (confType) {
+    case '2lbcf':    return `2LBCF ${chapter}.${para}`
+    case '1lbcf':    return `1LBCF ${para}`
+    case 'orthodox': return `Orthodox Q.${para}`
+    case 'keach':    return `Keach Q.${para}`
+    default:         return `Conf. ${para}`
+  }
+}
+
+/** Synchronous entry lookup from static data */
+function getConfEntry(confType, chapter, para) {
+  switch (confType) {
+    case '2lbcf':    return LBCF2[`${chapter}.${para}`] ?? null
+    case '1lbcf':    return LBCF1[para]                 ?? null
+    case 'orthodox': return ORTHODOX_CATECHISM[para]    ?? null
+    case 'keach':    return CATECHISM[para]              ?? null
+    default:         return null
+  }
+}
+
+/** Short preview text for a confession entry */
+function getConfPreviewText(confType, chapter, para, maxLen = 120) {
+  const entry = getConfEntry(confType, chapter, para)
+  if (!entry) return null
+  const raw = (confType === '2lbcf' || confType === '1lbcf') ? entry.text : entry.q
+  if (!raw) return null
+  return raw.length > maxLen ? raw.slice(0, maxLen) + '…' : raw
+}
+
+/** Full text for quote-mode insertion */
+function getConfFullText(confType, chapter, para) {
+  const entry = getConfEntry(confType, chapter, para)
+  if (!entry) return null
+  if (confType === '2lbcf' || confType === '1lbcf') return entry.text ?? null
+  if (entry.a) return entry.a
+  return null
+}
+
+/** Check whether a query fragment contains a space that is valid for conf refs
+ *  (so checkAtMention doesn't close the popup on space) */
+function isConfQueryWithSpace(q) {
+  return parseAtQueryConfession(q) !== null
+}
+
 /* ── Label / category storage ── */
 const LABEL_STORAGE_KEY = 'pb-note-labels'
 const DEFAULT_LABELS = [
@@ -363,6 +448,59 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
         <div style={vm.actions}>
           <button style={vm.openBtn} onClick={() => { onNavigate(sc.book, sc.chapter, sc.verse); onClose() }}>
             Open in Scripture →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Confession / Catechism View Modal  (read-only, from NoteBody)
+══════════════════════════════════════════════════════════════ */
+function ConfessionModal({ conf, onClose, onNavigate, zOverride }) {
+  if (!conf) return null
+  const { confType, chapter, para } = conf
+  const label = confRefLabel(confType, chapter, para)
+  const entry = getConfEntry(confType, chapter, para)
+  const ct    = CONF_TYPES[confType] ?? CONF_TYPES['2lbcf']
+  const isCatechism = confType === 'orthodox' || confType === 'keach'
+
+  return (
+    <div style={zOverride ? { ...vm.backdrop, zIndex: zOverride } : vm.backdrop} onClick={onClose}>
+      <div style={vm.sheet} onClick={e => e.stopPropagation()}>
+        <div style={vm.header}>
+          <span style={{ ...vm.ref, color: ct.color }}>{label}</span>
+          <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+        <div style={vm.body}>
+          {!entry ? (
+            <p style={vm.loading}>Entry not found.</p>
+          ) : isCatechism ? (
+            <>
+              <p style={{ fontSize: '0.88em', fontWeight: 700, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>
+                Q. {entry.q}
+              </p>
+              <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.7, fontSize: '0.88em' }}>
+                A. {entry.a}
+              </p>
+            </>
+          ) : (
+            <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>
+              {entry.text}
+            </p>
+          )}
+        </div>
+        <div style={vm.actions}>
+          <button
+            style={{ ...vm.openBtn, background: ct.bg, color: ct.color, border: `1px solid ${ct.border}` }}
+            onClick={() => { onNavigate(confType, chapter, para); onClose() }}
+          >
+            Open in {ct.label} →
           </button>
         </div>
       </div>
@@ -544,9 +682,118 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   Conf Tag Action Popup  (shown in EDIT MODE when clicking a conf tag)
+══════════════════════════════════════════════════════════════ */
+function ConfTagActionPopup({ conf, anchorRect, onClose, onDelete, onEdit }) {
+  const [mode,        setMode]        = useState('view')
+  const [editType,    setEditType]    = useState(conf.confType)
+  const [editChapter, setEditChapter] = useState(conf.chapter ?? 1)
+  const [editPara,    setEditPara]    = useState(String(conf.para))
+  const ref = useRef(null)
+
+  const ct      = CONF_TYPES[conf.confType] ?? CONF_TYPES['2lbcf']
+  const editCt  = CONF_TYPES[editType]      ?? CONF_TYPES['2lbcf']
+  const label   = confRefLabel(conf.confType, conf.chapter, conf.para)
+  const preview = getConfPreviewText(conf.confType, conf.chapter, conf.para)
+
+  useEffect(() => {
+    function onDown(e) { if (ref.current && !ref.current.contains(e.target)) onClose() }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+
+  const POPUP_H   = mode === 'edit' ? 270 : 185
+  const spaceAbove = anchorRect.top - 6
+  const showAbove  = spaceAbove >= POPUP_H
+  const top  = showAbove ? anchorRect.top - POPUP_H - 6 : anchorRect.bottom + 6
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 260))
+
+  function handleUpdate() {
+    const pNum = Math.max(1, parseInt(editPara) || 1)
+    const chNum = editType === '2lbcf' ? Math.max(1, parseInt(editChapter) || 1) : null
+    onEdit({ confType: editType, chapter: chNum, para: pNum })
+    onClose()
+  }
+
+  const baseStyle  = { position: 'fixed', zIndex: 9500, left, top, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '12px', width: 256, fontFamily: "'DM Sans', sans-serif" }
+  const labelStyle = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
+  const inputStyle = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif" }
+
+  return (
+    <div ref={ref} data-sctag-popup="1" onMouseDown={e => { e.preventDefault(); e.stopPropagation() }} style={baseStyle}>
+      {mode === 'view' ? (
+        <>
+          <p style={{ fontSize: 13, fontWeight: 700, color: ct.color, margin: '0 0 5px', fontFamily: "'Cormorant Garamond', serif" }}>
+            {label}
+          </p>
+          {preview ? (
+            <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 64, overflow: 'hidden' }}>
+              "{preview}"
+            </p>
+          ) : (
+            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px' }}>Entry not found.</p>
+          )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setMode('edit') }}
+              style={{ flex: 1, background: 'var(--parchment-dark)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
+            >Edit ref</button>
+            <button
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
+              style={{ flex: 1, background: 'var(--red-light)', border: '1px solid var(--red)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--red)', fontFamily: "'DM Sans', sans-serif" }}
+            >Remove</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
+            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 12, fontWeight: 700, padding: 0, fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginLeft: 'auto' }}>Edit reference</span>
+          </div>
+
+          {/* Confession type */}
+          <div style={{ marginBottom: 8 }}>
+            <p style={labelStyle}>Confession / Catechism</p>
+            <select value={editType} onChange={e => { setEditType(e.target.value); setEditChapter(1); setEditPara('1') }} style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
+              {Object.entries(CONF_TYPES).map(([id, info]) => (
+                <option key={id} value={id}>{info.label} — {info.fullName}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chapter (2LBCF only) + Para/Question */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {editType === '2lbcf' && (
+              <div style={{ flex: 1 }}>
+                <p style={labelStyle}>Ch.</p>
+                <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditPara('1') }} style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
+                  {Array.from({ length: 32 }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>{editCt.hasParagraphs ? 'Para.' : 'Q.'}</p>
+              <input type="number" min={1} max={editCt.maxItems ?? 999} value={editPara}
+                onChange={e => setEditPara(e.target.value)}
+                onBlur={() => setEditPara(v => String(Math.max(1, parseInt(v) || 1)))}
+                style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+            <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }} style={{ flex: 1, background: editCt.bg, border: `1px solid ${editCt.border}`, borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: editCt.color, fontFamily: "'DM Sans', sans-serif" }}>Update tag</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
    Note Body — renders plain OR rich note; intercepts @ref clicks
 ══════════════════════════════════════════════════════════════ */
-function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
+function NoteBody({ rawNote, query, onScriptureClick, onConfessionClick, clip = true }) {
   const [expanded, setExpanded] = useState(false)
 
   if (!rawNote) return null
@@ -556,14 +803,24 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
     const { title, body, labels = [] } = parseRichNote(rawNote)
 
     function handleClick(e) {
-      const el = e.target.closest('[data-sc-book]')
-      if (el) {
+      const scEl = e.target.closest('[data-sc-book]')
+      if (scEl) {
         e.preventDefault()
         onScriptureClick?.({
-          book:    el.dataset.scBook,
-          chapter: parseInt(el.dataset.scChapter),
-          verse:   parseInt(el.dataset.scVerse),
-          verseTo: el.dataset.scVerseTo ? parseInt(el.dataset.scVerseTo) : null,
+          book:    scEl.dataset.scBook,
+          chapter: parseInt(scEl.dataset.scChapter),
+          verse:   parseInt(scEl.dataset.scVerse),
+          verseTo: scEl.dataset.scVerseTo ? parseInt(scEl.dataset.scVerseTo) : null,
+        })
+        return
+      }
+      const confEl = e.target.closest('[data-conf-type]')
+      if (confEl) {
+        e.preventDefault()
+        onConfessionClick?.({
+          confType: confEl.dataset.confType,
+          chapter:  confEl.dataset.confChapter ? parseInt(confEl.dataset.confChapter) : null,
+          para:     parseInt(confEl.dataset.confPara),
         })
       }
     }
@@ -619,31 +876,47 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
    @ Scripture Mention Popup
 ══════════════════════════════════════════════════════════════ */
 function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
-  const [step,      setStep]      = useState('book')  // 'book' | 'ref'
+  const [step,      setStep]      = useState('book')  // 'book' | 'ref' | 'conf'
   const [book,      setBook]      = useState('')
   const [chapter,   setChapter]   = useState(1)
   const [verse,     setVerse]     = useState('1')     // string so user can clear & retype
   const [verseTo,   setVerseTo]   = useState('')      // '' = single verse
   const [forceEdit, setForceEdit] = useState(false)
   const [versePreview, setVersePreview] = useState(null)
+  // Confession picker state
+  const [confPickType,    setConfPickType]    = useState('2lbcf')
+  const [confPickChapter, setConfPickChapter] = useState(1)
+  const [confPickPara,    setConfPickPara]    = useState('1')
   const ref = useRef(null)
 
-  /* Detect fully-typed inline reference (supports chapter shorthand when chapterTag is set) */
+  /* Detect fully-typed inline scripture reference */
   const resolved    = useMemo(() => parseAtQueryWithChapterTag(query, chapterTag), [query, chapterTag])
-  const showResolved = resolved && !forceEdit
+  /* Detect confession reference (complete or partial) */
+  const confResolved = useMemo(() => parseAtQueryConfession(query), [query])
+  const showScResolved  = resolved    && !forceEdit
+  const showConfResolved = confResolved?.complete && !forceEdit
 
-  /* Fetch verse text for preview when reference is resolved */
+  /* Fetch verse text for preview when scripture reference is resolved */
   useEffect(() => {
-    if (!showResolved || !resolved) { setVersePreview(null); return }
+    if (!showScResolved || !resolved) { setVersePreview(null); return }
     let cancelled = false
     fetchVerseText(resolved.book, resolved.chapter, resolved.verse, getDefaultReaderVersion())
       .then(t => { if (!cancelled) setVersePreview(t) })
     return () => { cancelled = true }
-  }, [showResolved, resolved?.book, resolved?.chapter, resolved?.verse]) // eslint-disable-line
+  }, [showScResolved, resolved?.book, resolved?.chapter, resolved?.verse]) // eslint-disable-line
+
+  /* Sync confession picker defaults when conf type is detected in query */
+  useEffect(() => {
+    if (confResolved && !confResolved.complete) {
+      setConfPickType(confResolved.confType)
+      setConfPickChapter(1)
+      setConfPickPara('1')
+    }
+  }, [confResolved?.confType]) // eslint-disable-line
 
   /* Filter books by query (only when not in resolved mode) */
   const filteredBooks = useMemo(() => {
-    if (showResolved) return BIBLE_BOOKS
+    if (showScResolved || showConfResolved) return BIBLE_BOOKS
     const q = (step === 'book' ? query : '').toLowerCase()
     if (!q) return BIBLE_BOOKS
     const qNorm = stripAbbrevPeriods(q)
@@ -685,15 +958,14 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
     overflowY: 'auto',
   }
 
-  /* ── Resolved: user typed a complete reference ── */
-  if (showResolved) {
+  /* ── Resolved scripture reference ── */
+  if (showScResolved) {
     const { book: rb, chapter: rc, verse: rv, verseTo: rvt } = resolved
     const label = rvt ? `${rb} ${rc}:${rv}–${rvt}` : `${rb} ${rc}:${rv}`
     return (
       <div ref={ref} style={style}>
         <p style={am.label}>Detected reference</p>
         <p style={am.resolvedRef}>{label}</p>
-        {/* Verse preview — first line so user can confirm they have the right passage */}
         {versePreview && (
           <p style={am.versePreview}>
             "{versePreview.length > 130 ? versePreview.slice(0, 130) + '…' : versePreview}"
@@ -709,15 +981,98 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
             Quote verse{rvt ? 's' : ''}
           </button>
         </div>
-        {/* Keyboard hint — shown on non-touch devices */}
         {'ontouchstart' in window ? null : (
           <p style={am.kbHint}>
             <kbd style={am.kbd}>Space</kbd> or <kbd style={am.kbd}>↵</kbd> to insert tag
           </p>
         )}
-        <button style={am.editRefBtn} onClick={() => setForceEdit(true)}>
-          ← Choose differently
-        </button>
+        <button style={am.editRefBtn} onClick={() => setForceEdit(true)}>← Choose differently</button>
+      </div>
+    )
+  }
+
+  /* ── Resolved confession reference ── */
+  if (showConfResolved) {
+    const { confType, chapter: cc, para: cp } = confResolved
+    const ct      = CONF_TYPES[confType] ?? CONF_TYPES['2lbcf']
+    const refLbl  = confRefLabel(confType, cc, cp)
+    const preview = getConfPreviewText(confType, cc, cp, 130)
+    const isCatechism = confType === 'orthodox' || confType === 'keach'
+    return (
+      <div ref={ref} style={style}>
+        <p style={am.label}>Detected confession reference</p>
+        <p style={{ ...am.resolvedRef, color: ct.color }}>{refLbl}</p>
+        {preview && (
+          <p style={am.versePreview}>
+            "{preview}"
+          </p>
+        )}
+        <div style={am.insertRow}>
+          <button style={{ ...am.insertBtn, background: ct.bg, color: ct.color, border: `1px solid ${ct.border}` }}
+            onClick={() => onSelect({ confType, chapter: cc, para: cp, quoteMode: false })}>
+            Insert tag
+          </button>
+          <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
+            onClick={() => onSelect({ confType, chapter: cc, para: cp, quoteMode: true })}>
+            Quote {isCatechism ? 'answer' : 'paragraph'}
+          </button>
+        </div>
+        {'ontouchstart' in window ? null : (
+          <p style={am.kbHint}>
+            <kbd style={am.kbd}>Space</kbd> or <kbd style={am.kbd}>↵</kbd> to insert tag
+          </p>
+        )}
+        <button style={am.editRefBtn} onClick={() => setForceEdit(true)}>← Choose differently</button>
+      </div>
+    )
+  }
+
+  /* ── Confession picker (partial conf query detected, or 'conf' step) ── */
+  if ((confResolved && !confResolved.complete && !forceEdit) || step === 'conf') {
+    const activeType = confResolved?.confType ?? confPickType
+    const ct         = CONF_TYPES[activeType] ?? CONF_TYPES['2lbcf']
+    const isCatechism = activeType === 'orthodox' || activeType === 'keach'
+    const pNum = Math.max(1, parseInt(confPickPara) || 1)
+    const chNum = activeType === '2lbcf' ? Math.max(1, parseInt(confPickChapter) || 1) : null
+    const inputStyleConf = { border: '1px solid var(--border-strong)', borderRadius: 5, padding: '5px 8px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: '100%' }
+    return (
+      <div ref={ref} style={style}>
+        {step === 'conf' && (
+          <button style={am.backBtn} onClick={() => setStep('book')}>← Back</button>
+        )}
+        <p style={am.label}>{ct.label} — {ct.fullName}</p>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+          {activeType === '2lbcf' && (
+            <div style={{ flex: 1 }}>
+              <label style={am.refLabel}>Ch.</label>
+              <select value={confPickChapter} onChange={e => setConfPickChapter(Number(e.target.value))} style={{ ...inputStyleConf, cursor: 'pointer' }}>
+                {Array.from({ length: 32 }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <label style={am.refLabel}>{isCatechism ? 'Q.' : 'Para.'}</label>
+            <input type="number" min={1} max={ct.maxItems ?? 999} value={confPickPara}
+              onChange={e => setConfPickPara(e.target.value)}
+              onBlur={() => setConfPickPara(v => String(Math.max(1, parseInt(v) || 1)))}
+              style={inputStyleConf} />
+          </div>
+        </div>
+        {/* Live preview of the selected entry */}
+        {(() => {
+          const prev = getConfPreviewText(activeType, chNum, pNum, 90)
+          return prev ? <p style={am.versePreview}>"{prev}"</p> : null
+        })()}
+        <div style={am.insertRow}>
+          <button style={{ ...am.insertBtn, background: ct.bg, color: ct.color, border: `1px solid ${ct.border}` }}
+            onClick={() => onSelect({ confType: activeType, chapter: chNum, para: pNum, quoteMode: false })}>
+            Insert tag
+          </button>
+          <button style={{ ...am.insertBtn, ...am.insertBtnAlt }}
+            onClick={() => onSelect({ confType: activeType, chapter: chNum, para: pNum, quoteMode: true })}>
+            Quote {isCatechism ? 'answer' : 'paragraph'}
+          </button>
+        </div>
       </div>
     )
   }
@@ -726,7 +1081,17 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
   if (step === 'book') {
     return (
       <div ref={ref} style={style}>
-        <p style={am.label}>Select book  <span style={am.hintSmall}>or type @Book Ch:Vs</span></p>
+        <p style={am.label}>Select book  <span style={am.hintSmall}>or type @Book Ch:Vs · @2LBCF 1:1 · @Keach1</span></p>
+        {/* Confession quick-pick buttons */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
+          {Object.entries(CONF_TYPES).map(([id, info]) => (
+            <button key={id}
+              style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 99, border: `1px solid ${info.border}`, background: info.bg, color: info.color, cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+              onClick={() => { setConfPickType(id); setConfPickChapter(1); setConfPickPara('1'); setStep('conf') }}>
+              {info.label}
+            </button>
+          ))}
+        </div>
         <div style={am.bookList}>
           {filteredBooks.slice(0, 12).map(b => (
             <button key={b.name} style={am.bookBtn} onClick={() => { setBook(b.name); setStep('ref') }}>
@@ -861,12 +1226,12 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
   const atRangeRef = useRef(null)  // saved Range at the @ sign
 
   /* sc-tag click popup (edit mode) */
-  const [scTagPopup, setScTagPopup] = useState(null) // { book, chapter, verse, verseTo, anchorRect, el } | null
+  const [scTagPopup,   setScTagPopup]   = useState(null) // scripture tag popup
+  const [confTagPopup, setConfTagPopup] = useState(null) // confession tag popup
 
   function handleEditorClick(e) {
     const tagEl = e.target.closest('[data-sc-book]')
     if (tagEl && editorRef.current?.contains(tagEl)) {
-      // Prevent the click from also propagating into the contenteditable cursor placement
       e.stopPropagation()
       const rect = tagEl.getBoundingClientRect()
       const isQuote = tagEl.tagName === 'BLOCKQUOTE' || tagEl.classList.contains('sc-quote')
@@ -875,18 +1240,33 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         chapter: parseInt(tagEl.dataset.scChapter),
         verse:   parseInt(tagEl.dataset.scVerse),
         verseTo: tagEl.dataset.scVerseTo ? parseInt(tagEl.dataset.scVerseTo) : null,
-        anchorRect: rect,
-        el: tagEl,
-        isQuote,
+        anchorRect: rect, el: tagEl, isQuote,
       })
-    } else if (!e.target.closest('[data-sctag-popup]')) {
+      setConfTagPopup(null)
+      return
+    }
+    const confEl = e.target.closest('[data-conf-type]')
+    if (confEl && editorRef.current?.contains(confEl)) {
+      e.stopPropagation()
+      const rect = confEl.getBoundingClientRect()
+      const isQuote = confEl.tagName === 'BLOCKQUOTE' || confEl.classList.contains('sc-quote')
+      setConfTagPopup({
+        confType: confEl.dataset.confType,
+        chapter:  confEl.dataset.confChapter ? parseInt(confEl.dataset.confChapter) : null,
+        para:     parseInt(confEl.dataset.confPara),
+        anchorRect: rect, el: confEl, isQuote,
+      })
       setScTagPopup(null)
+      return
+    }
+    if (!e.target.closest('[data-sctag-popup]')) {
+      setScTagPopup(null)
+      setConfTagPopup(null)
     }
   }
 
   function deleteScTag(el) {
     if (!el || !editorRef.current?.contains(el)) return
-    // For blockquotes (.sc-quote), remove the whole block element
     const blockEl = el.closest('blockquote') ?? el
     blockEl.parentNode?.removeChild(blockEl)
     onBodyChange(editorRef.current.innerHTML)
@@ -895,7 +1275,6 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
   function editScTag(el, newSc, isQuote) {
     if (!el || !editorRef.current?.contains(el)) return
     if (!isQuote) {
-      // Inline span — update data attributes and label text in place
       const newLabel = newSc.verseTo
         ? `${newSc.book} ${newSc.chapter}:${newSc.verse}–${newSc.verseTo}`
         : `${newSc.book} ${newSc.chapter}:${newSc.verse}`
@@ -907,9 +1286,36 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
       el.textContent = newLabel
       onBodyChange(editorRef.current.innerHTML)
     } else {
-      // Blockquote — delete old and re-insert fresh (verse text needs to reload)
       el.parentNode?.removeChild(el)
       handleAtSelect({ ...newSc, quoteMode: true })
+    }
+  }
+
+  function deleteConfTag(el) {
+    if (!el || !editorRef.current?.contains(el)) return
+    const blockEl = el.closest('blockquote') ?? el
+    blockEl.parentNode?.removeChild(blockEl)
+    onBodyChange(editorRef.current.innerHTML)
+  }
+
+  function editConfTag(el, newConf, isQuote) {
+    if (!el || !editorRef.current?.contains(el)) return
+    if (!isQuote) {
+      const newLabel = confRefLabel(newConf.confType, newConf.chapter, newConf.para)
+      const ct = CONF_TYPES[newConf.confType] ?? CONF_TYPES['2lbcf']
+      el.dataset.confType    = newConf.confType
+      if (newConf.chapter != null) el.dataset.confChapter = String(newConf.chapter)
+      else delete el.dataset.confChapter
+      el.dataset.confPara    = String(newConf.para)
+      el.textContent         = newLabel
+      // Update colours in place
+      el.style.background    = ct.bg
+      el.style.color         = ct.color
+      el.style.borderColor   = ct.border
+      onBodyChange(editorRef.current.innerHTML)
+    } else {
+      el.parentNode?.removeChild(el)
+      handleAtSelect({ ...newConf, quoteMode: true })
     }
   }
 
@@ -983,7 +1389,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
                qNorm.startsWith(bn) || bn.startsWith(qNorm)
       }) || Object.keys(BOOK_ABBREVS).some(abbr => {
         return qNorm.startsWith(abbr) || abbr.startsWith(qNorm.split(' ')[0])
-      })
+      }) || isConfQueryWithSpace(between)  // also allow conf prefixes like "2LBCF 1:2"
       if (!valid) { setAtPopup(null); return }
     }
 
@@ -1005,7 +1411,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     setAtPopup({ top: rect.top, bottom: rect.bottom, left: rect.left })
   }
 
-  async function handleAtSelect({ book, chapter, verse, verseTo, quoteMode }) {
+  async function handleAtSelect({ book, chapter, verse, verseTo, quoteMode, confType, para }) {
     setAtPopup(null)
     editorRef.current?.focus()
 
@@ -1017,6 +1423,38 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
       document.execCommand('delete', false)
     }
 
+    /* ── Confession / Catechism tag ── */
+    if (confType) {
+      const ct       = CONF_TYPES[confType] ?? CONF_TYPES['2lbcf']
+      const refLbl   = confRefLabel(confType, chapter, para)
+      const chAttr   = chapter != null ? ` data-conf-chapter="${chapter}"` : ''
+      if (quoteMode) {
+        const text = getConfFullText(confType, chapter, para)
+        const innerHtml = text ? text.replace(/</g, '&lt;').replace(/>/g, '&gt;') : refLbl
+        document.execCommand('insertHTML', false,
+          `<blockquote class="sc-quote" data-conf-type="${confType}"${chAttr} data-conf-para="${para}" ` +
+          `contenteditable="false" ` +
+          `style="margin:6px 0;padding:8px 12px;border-left:3px solid ${ct.border};` +
+          `background:${ct.bg};border-radius:0 6px 6px 0;font-style:normal;` +
+          `font-size:0.9em;color:var(--ink-muted);cursor:pointer;line-height:1.65;">${innerHtml} ` +
+          `<em style="display:block;margin-top:5px;font-style:normal;font-weight:700;font-size:0.82em;color:${ct.color};">— ${refLbl}</em></blockquote>&#8203;`
+        )
+      } else {
+        document.execCommand('insertHTML', false,
+          `<span class="sc-tag" data-conf-type="${confType}"${chAttr} data-conf-para="${para}" ` +
+          `contenteditable="false" style="display:inline-block;padding:1px 8px;margin:0 2px;` +
+          `background:${ct.bg};color:${ct.color};border:1px solid ${ct.border};` +
+          `border-radius:99px;font-size:0.82em;font-weight:700;cursor:pointer;` +
+          `font-family:'DM Sans',sans-serif;user-select:none;">` +
+          `${refLbl}</span>&#8203;`
+        )
+      }
+      onBodyChange(editorRef.current.innerHTML)
+      atRangeRef.current = null
+      return
+    }
+
+    /* ── Scripture tag ── */
     const isRange  = verseTo && verseTo !== verse
     const refLabel = isRange
       ? `${book} ${chapter}:${verse}–${verseTo}`
@@ -1024,7 +1462,8 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     const rangeAttrs = isRange ? ` data-sc-verse-to="${verseTo}"` : ''
 
     if (quoteMode) {
-      const quoteVer = getDefaultReaderVersion()
+      const quoteVer  = getDefaultReaderVersion()
+      const verAbbrev = versionLabel(quoteVer, book)
       let innerHtml
       if (isRange) {
         const vrs = await fetchVerseRange(book, chapter, verse, verseTo, quoteVer)
@@ -1041,7 +1480,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         `style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--teal);` +
         `background:var(--teal-light);border-radius:0 6px 6px 0;font-style:italic;` +
         `font-size:0.92em;color:var(--ink-muted);cursor:pointer;">${innerHtml} ` +
-        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel}</em></blockquote>&#8203;`
+        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel} <span style="font-weight:400;opacity:0.7;">${verAbbrev}</span></em></blockquote>&#8203;`
       )
     } else {
       document.execCommand('insertHTML', false,
@@ -1063,17 +1502,18 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
      isBackspace=false → look at what's after  the cursor                        */
   function findScElement(range, isBackspace) {
     function isScNode(n) {
-      return n && n.nodeType === Node.ELEMENT_NODE && n.dataset && n.dataset.scBook
+      return n && n.nodeType === Node.ELEMENT_NODE && n.dataset &&
+        (n.dataset.scBook || n.dataset.confType)
     }
 
-    /* Non-collapsed selection: check if any sc element overlaps with it */
+    /* Non-collapsed selection: check if any sc/conf element overlaps with it */
     if (!range.collapsed) {
       try {
         const ancestor = range.commonAncestorContainer
         const container = ancestor.nodeType === Node.ELEMENT_NODE
           ? ancestor : ancestor.parentElement
         if (container) {
-          for (const el of container.querySelectorAll('[data-sc-book]')) {
+          for (const el of container.querySelectorAll('[data-sc-book], [data-conf-type]')) {
             if (range.intersectsNode(el)) return el
           }
         }
@@ -1109,49 +1549,60 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     return null
   }
 
-  function showScPopupForEl(el) {
-    const rect = el.getBoundingClientRect()
-    setScTagPopup({
-      book:    el.dataset.scBook,
-      chapter: parseInt(el.dataset.scChapter),
-      verse:   parseInt(el.dataset.scVerse),
-      verseTo: el.dataset.scVerseTo ? parseInt(el.dataset.scVerseTo) : null,
-      anchorRect: rect,
-      el,
-      isQuote: el.tagName === 'BLOCKQUOTE' || el.classList.contains('sc-quote'),
-    })
+  function showTagPopupForEl(el) {
+    const rect    = el.getBoundingClientRect()
+    const isQuote = el.tagName === 'BLOCKQUOTE' || el.classList.contains('sc-quote')
+    if (el.dataset.confType) {
+      setConfTagPopup({
+        confType: el.dataset.confType,
+        chapter:  el.dataset.confChapter ? parseInt(el.dataset.confChapter) : null,
+        para:     parseInt(el.dataset.confPara),
+        anchorRect: rect, el, isQuote,
+      })
+      setScTagPopup(null)
+    } else {
+      setScTagPopup({
+        book:    el.dataset.scBook,
+        chapter: parseInt(el.dataset.scChapter),
+        verse:   parseInt(el.dataset.scVerse),
+        verseTo: el.dataset.scVerseTo ? parseInt(el.dataset.scVerseTo) : null,
+        anchorRect: rect, el, isQuote,
+      })
+      setConfTagPopup(null)
+    }
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Escape') { setAtPopup(null); setScTagPopup(null); return }
+    if (e.key === 'Escape') { setAtPopup(null); setScTagPopup(null); setConfTagPopup(null); return }
 
-    /* ── Backspace / Delete: intercept if it would hit an sc element ── */
+    /* ── Backspace / Delete: intercept if it would hit a tag element ── */
     if (e.key === 'Backspace' || e.key === 'Delete') {
       const sel = window.getSelection()
       if (sel && sel.rangeCount) {
-        const range  = sel.getRangeAt(0)
-        const scEl   = findScElement(range, e.key === 'Backspace')
+        const range = sel.getRangeAt(0)
+        const scEl  = findScElement(range, e.key === 'Backspace')
         if (scEl && editorRef.current?.contains(scEl)) {
           e.preventDefault()
-          showScPopupForEl(scEl)
+          showTagPopupForEl(scEl)
           return
         }
       }
     }
 
     // ── Auto-insert tag on Space or Enter when a full reference is detected ──
-    // Space always triggers; Enter triggers on non-touch devices (desktop).
     if (atPopup && (e.key === ' ' || (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)))) {
+      // Try scripture ref first
       const resolved = parseAtQueryWithChapterTag(atQuery, chapterTag)
       if (resolved) {
         e.preventDefault()
-        handleAtSelect({
-          book:    resolved.book,
-          chapter: resolved.chapter,
-          verse:   resolved.verse,
-          verseTo: resolved.verseTo,
-          quoteMode: false,
-        })
+        handleAtSelect({ book: resolved.book, chapter: resolved.chapter, verse: resolved.verse, verseTo: resolved.verseTo, quoteMode: false })
+        return
+      }
+      // Try confession ref
+      const confResolved = parseAtQueryConfession(atQuery)
+      if (confResolved?.complete) {
+        e.preventDefault()
+        handleAtSelect({ confType: confResolved.confType, chapter: confResolved.chapter, para: confResolved.para, quoteMode: false })
         return
       }
     }
@@ -1225,7 +1676,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
           </svg>
         </button>
         <span style={re.toolDivider} />
-        <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand)` : '@ scripture'}</span>
+        <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand) · @2LBCF 1:1 · @Keach1` : '@ scripture · @2LBCF 1:1 · @Keach1'}</span>
       </div>
 
       {/* @ picker popup */}
@@ -1248,6 +1699,17 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
           onClose={() => setScTagPopup(null)}
           onDelete={() => deleteScTag(scTagPopup.el)}
           onEdit={newSc => editScTag(scTagPopup.el, newSc, scTagPopup.isQuote)}
+        />
+      )}
+
+      {/* conf-tag action popup (edit mode) */}
+      {confTagPopup && (
+        <ConfTagActionPopup
+          conf={confTagPopup}
+          anchorRect={confTagPopup.anchorRect}
+          onClose={() => setConfTagPopup(null)}
+          onDelete={() => deleteConfTag(confTagPopup.el)}
+          onEdit={newConf => editConfTag(confTagPopup.el, newConf, confTagPopup.isQuote)}
         />
       )}
     </div>
@@ -1826,11 +2288,11 @@ function NoteCard({ badge, badgeStyle, title, labels, chapterBadge, chapterBadge
 ══════════════════════════════════════════════════════════════ */
 function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }) {
   const { note, badge, badgeStyle, title } = noteData
-  const [scripturePreview, setScripturePreview] = useState(null)
+  const [scripturePreview,  setScripturePreview]  = useState(null)
+  const [confessionPreview, setConfessionPreview] = useState(null)
 
-  function handleScriptureClick(sc) {
-    setScripturePreview(sc)
-  }
+  function handleScriptureClick(sc)   { setScripturePreview(sc) }
+  function handleConfessionClick(c)   { setConfessionPreview(c) }
 
   return (
     <div style={nv.backdrop} onClick={onClose}>
@@ -1879,7 +2341,7 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
 
         {/* Note content */}
         <div style={nv.body}>
-          <NoteBody rawNote={note} clip={false} onScriptureClick={handleScriptureClick} />
+          <NoteBody rawNote={note} clip={false} onScriptureClick={handleScriptureClick} onConfessionClick={handleConfessionClick} />
         </div>
       </div>
 
@@ -1892,6 +2354,17 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
           setScripturePreview(null)
           onClose()
           navigate('/scripture', { state: { book, chapter: ch, verse: vs } })
+        }}
+      />
+      {/* Confession preview — stacked above this modal */}
+      <ConfessionModal
+        conf={confessionPreview}
+        zOverride={9200}
+        onClose={e => { e?.stopPropagation?.(); setConfessionPreview(null) }}
+        onNavigate={(confType) => {
+          setConfessionPreview(null)
+          onClose()
+          navigate('/confessions', { state: { tab: confType } })
         }}
       />
     </div>
@@ -2009,8 +2482,9 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [filterOpen,     setFilterOpen]     = useState(false)
   const sortRef   = useRef(null)
   const filterRef = useRef(null)
-  const [scriptureModal, setScriptureModal] = useState(null)
-  const [pendingDelete,  setPendingDelete]  = useState(null) // { key, type }
+  const [scriptureModal,  setScriptureModal]  = useState(null)
+  const [confessionModal, setConfessionModal] = useState(null)
+  const [pendingDelete,   setPendingDelete]   = useState(null) // { key, type }
 
   /* Close dropdowns on outside click */
   useEffect(() => {
@@ -2468,6 +2942,16 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         sc={scriptureModal}
         onClose={() => setScriptureModal(null)}
         onNavigate={(book, ch, vs) => navigate('/scripture', { state: { book, chapter: ch, verse: vs } })}
+      />
+
+      {/* Confession / catechism view modal */}
+      <ConfessionModal
+        conf={confessionModal}
+        onClose={() => setConfessionModal(null)}
+        onNavigate={(confType) => {
+          setConfessionModal(null)
+          navigate('/confessions', { state: { tab: confType } })
+        }}
       />
 
       {/* Note view modal */}
