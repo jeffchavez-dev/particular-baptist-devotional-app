@@ -1419,6 +1419,7 @@ const SORT_OPTS = [
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingNote,    setEditingNote]    = useState(null)
+  const formAreaRef = useRef(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
@@ -1523,9 +1524,19 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     setEditingNote(null)
   }
 
+  /* Scroll the form into view whenever it opens */
+  useEffect(() => {
+    if (!showCreateForm && !editingNote) return
+    const t = setTimeout(() => {
+      formAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 60)
+    return () => clearTimeout(t)
+  }, [showCreateForm, editingNote?.key]) // eslint-disable-line
+
   return (
     <div style={s.tabContent}>
 
+      <div ref={formAreaRef}>
       {showCreateForm ? (
         <CreateNoteForm session={session} onSave={handleSaved} onCancel={() => setShowCreateForm(false)} />
       ) : editingNote ? (
@@ -1569,6 +1580,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           )}
         </>
       )}
+      </div>{/* /formAreaRef */}
 
       <div style={s.divider} />
 
