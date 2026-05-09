@@ -155,8 +155,54 @@ async function fetchVerseRange(book, chapter, fromVerse, toVerse, version) {
 /* ── Parse a fully-typed @reference  e.g. "Genesis 1:1" or "Genesis 1:1-5" ── */
 const BOOKS_BY_LENGTH = [...BIBLE_BOOKS].sort((a, b) => b.name.length - a.name.length)
 
+/* ── Book abbreviation map (abbr → full name, keyed in lowercase without periods) ── */
+const BOOK_ABBREVS = {
+  /* OT */
+  'gen':'Genesis','exo':'Exodus','lev':'Leviticus','num':'Numbers',
+  'deut':'Deuteronomy','josh':'Joshua','judg':'Judges','ruth':'Ruth',
+  '1 sam':'1 Samuel','2 sam':'2 Samuel','1 kgs':'1 Kings','2 kgs':'2 Kings',
+  '1 chr':'1 Chronicles','2 chr':'2 Chronicles','ezra':'Ezra','neh':'Nehemiah',
+  'esth':'Esther','job':'Job','ps':'Psalms','psa':'Psalms','prov':'Proverbs',
+  'eccl':'Ecclesiastes','song':'Song of Solomon','isa':'Isaiah','jer':'Jeremiah',
+  'lam':'Lamentations','ezek':'Ezekiel','dan':'Daniel','hos':'Hosea','joel':'Joel',
+  'amos':'Amos','obad':'Obadiah','jon':'Jonah','mic':'Micah','nah':'Nahum',
+  'hab':'Habakkuk','zeph':'Zephaniah','hag':'Haggai','zech':'Zechariah','mal':'Malachi',
+  /* NT */
+  'matt':'Matthew','mk':'Mark','lk':'Luke','jn':'John','acts':'Acts',
+  'rom':'Romans','1 cor':'1 Corinthians','2 cor':'2 Corinthians',
+  'gal':'Galatians','eph':'Ephesians','phil':'Philippians','col':'Colossians',
+  '1 thess':'1 Thessalonians','2 thess':'2 Thessalonians',
+  '1 tim':'1 Timothy','2 tim':'2 Timothy','tit':'Titus','philem':'Philemon',
+  'heb':'Hebrews','jas':'James','1 pet':'1 Peter','2 pet':'2 Peter',
+  '1 jn':'1 John','2 jn':'2 John','3 jn':'3 John','jude':'Jude','rev':'Revelation',
+}
+
+/* Strip periods from abbreviated query and look up full book name.
+   e.g. "Gen. 1:1" → strips periods → "Gen 1:1", looks up "gen" → "Genesis 1:1" */
+function stripAbbrevPeriods(q) { return q.replace(/\./g, '').replace(/\s{2,}/g, ' ').trim() }
+
+/** Try to resolve an abbreviation prefix in a query and return the full book name,
+ *  or null if nothing matches. The returned object contains the full book name
+ *  and the remainder of the query after the abbreviation. */
+function resolveAbbrev(qNorm) {
+  const lower = qNorm.toLowerCase()
+  // Sort abbrevs by length desc so longest match wins (e.g. "1 thess" before "1 th")
+  const abbrs = Object.keys(BOOK_ABBREVS).sort((a, b) => b.length - a.length)
+  for (const abbr of abbrs) {
+    if (lower.startsWith(abbr)) {
+      const rest = qNorm.slice(abbr.length)
+      // After the abbreviation there must be nothing or whitespace + reference
+      if (rest === '' || rest.startsWith(' ')) {
+        return { book: BOOK_ABBREVS[abbr], rest: rest.trim() }
+      }
+    }
+  }
+  return null
+}
+
 function parseAtQuery(query) {
   const q = query.trim()
+  // 1. Try full book name match (original behaviour)
   for (const bk of BOOKS_BY_LENGTH) {
     if (q.toLowerCase().startsWith(bk.name.toLowerCase())) {
       const rest = q.slice(bk.name.length).trim()
@@ -168,6 +214,20 @@ function parseAtQuery(query) {
           verse:   parseInt(m[2]),
           verseTo: m[3] ? parseInt(m[3]) : null,
         }
+      }
+    }
+  }
+  // 2. Strip periods and try abbreviation lookup
+  const qNorm = stripAbbrevPeriods(q)
+  const abbrev = resolveAbbrev(qNorm)
+  if (abbrev) {
+    const m = abbrev.rest.match(/^(\d+):(\d+)(?:-(\d+))?$/)
+    if (m) {
+      return {
+        book:    abbrev.book,
+        chapter: parseInt(m[1]),
+        verse:   parseInt(m[2]),
+        verseTo: m[3] ? parseInt(m[3]) : null,
       }
     }
   }
@@ -373,17 +433,36 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
   const [verse,     setVerse]     = useState('1')     // string so user can clear & retype
   const [verseTo,   setVerseTo]   = useState('')      // '' = single verse
   const [forceEdit, setForceEdit] = useState(false)
+  const [versePreview, setVersePreview] = useState(null)
   const ref = useRef(null)
 
   /* Detect fully-typed inline reference like "Genesis 1:1" or "Genesis 1:1-5" */
   const resolved    = useMemo(() => parseAtQuery(query), [query])
   const showResolved = resolved && !forceEdit
 
+  /* Fetch verse text for preview when reference is resolved */
+  useEffect(() => {
+    if (!showResolved || !resolved) { setVersePreview(null); return }
+    let cancelled = false
+    fetchVerseText(resolved.book, resolved.chapter, resolved.verse, getDefaultReaderVersion())
+      .then(t => { if (!cancelled) setVersePreview(t) })
+    return () => { cancelled = true }
+  }, [showResolved, resolved?.book, resolved?.chapter, resolved?.verse]) // eslint-disable-line
+
   /* Filter books by query (only when not in resolved mode) */
   const filteredBooks = useMemo(() => {
     if (showResolved) return BIBLE_BOOKS
     const q = (step === 'book' ? query : '').toLowerCase()
-    return q ? BIBLE_BOOKS.filter(b => b.name.toLowerCase().startsWith(q)) : BIBLE_BOOKS
+    if (!q) return BIBLE_BOOKS
+    const qNorm = stripAbbrevPeriods(q)
+    return BIBLE_BOOKS.filter(b => {
+      const bn = b.name.toLowerCase()
+      if (bn.startsWith(qNorm)) return true
+      // Also match if any abbreviation for this book starts with qNorm
+      return Object.entries(BOOK_ABBREVS).some(([abbr, full]) =>
+        full === b.name && abbr.startsWith(qNorm.split(' ')[0])
+      )
+    })
   }, [query, step, showResolved])
 
   /* Click-outside to close */
@@ -416,6 +495,12 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
       <div ref={ref} style={style}>
         <p style={am.label}>Detected reference</p>
         <p style={am.resolvedRef}>{label}</p>
+        {/* Verse preview — first line so user can confirm they have the right passage */}
+        {versePreview && (
+          <p style={am.versePreview}>
+            "{versePreview.length > 130 ? versePreview.slice(0, 130) + '…' : versePreview}"
+          </p>
+        )}
         <div style={am.insertRow}>
           <button style={am.insertBtn}
             onClick={() => onSelect({ book: rb, chapter: rc, verse: rv, verseTo: rvt, quoteMode: false })}>
@@ -586,10 +671,17 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
   }
 
   function execCmd(cmd, val) {
-    restoreSelection()
-    document.execCommand(cmd, false, val ?? null)
+    // Only restore saved range if the editor doesn't already have an active selection.
+    // Calling restoreSelection() when text is highlighted overwrites the live selection
+    // with a stale saved range, which breaks bold/italic on highlighted text.
+    const sel = window.getSelection()
+    const inEditor = sel?.rangeCount > 0 &&
+      editorRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer)
+    if (!inEditor) restoreSelection()
     editorRef.current?.focus()
-    onBodyChange(editorRef.current.innerHTML)
+    document.execCommand(cmd, false, val ?? null)
+    checkFormats()
+    onBodyChange(editorRef.current?.innerHTML || '')
   }
 
   function execUndo() {
@@ -624,11 +716,16 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     // Allow spaces if:
     //  (a) the query already starts with a complete book name  ("Genesis 1:1" — chapter/verse follows), OR
     //  (b) the query is still a prefix of a numbered book name ("1 " → "1 Corinthians", "1 Kings", …)
+    //  (c) the query matches an abbreviated form with or without trailing period ("Gen.", "1 Cor.", "2 Kgs.")
     if (between.includes(' ')) {
-      const q = between.toLowerCase()
+      const q     = between.toLowerCase()
+      const qNorm = stripAbbrevPeriods(q)          // strip periods for abbrev matching
       const valid = BOOKS_BY_LENGTH.some(bk => {
         const bn = bk.name.toLowerCase()
-        return q.startsWith(bn) || bn.startsWith(q)
+        return q.startsWith(bn) || bn.startsWith(q) ||
+               qNorm.startsWith(bn) || bn.startsWith(qNorm)
+      }) || Object.keys(BOOK_ABBREVS).some(abbr => {
+        return qNorm.startsWith(abbr) || abbr.startsWith(qNorm.split(' ')[0])
       })
       if (!valid) { setAtPopup(null); return }
     }
@@ -717,7 +814,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
   }
 
   return (
-    <div style={re.wrap}>
+    <div style={re.wrap} data-note-editor-wrap="1">
       {/* Title input */}
       <input
         type="text"
@@ -736,6 +833,14 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         onMouseUp={saveSelection}
+        onFocus={() => window.dispatchEvent(new CustomEvent('pb-note-editor-focus'))}
+        onBlur={e => {
+          // Only fire blur if focus truly left the editor wrap (not just moved to toolbar)
+          const wrap = e.currentTarget.closest('[data-note-editor-wrap]')
+          if (wrap && !wrap.contains(e.relatedTarget)) {
+            window.dispatchEvent(new CustomEvent('pb-note-editor-blur'))
+          }
+        }}
         style={re.editor}
         className="rich-content"
         data-placeholder="Write your note here…"
@@ -930,15 +1035,27 @@ function LabelDropdown({ selected, onChange }) {
 /* ══════════════════════════════════════════════════════════════
    Create Note Form  (rich editor)
 ══════════════════════════════════════════════════════════════ */
+const CREATE_DRAFT_KEY = 'pb-lib-draft'
+
+function readCreateDraft() {
+  try {
+    const raw = localStorage.getItem(CREATE_DRAFT_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
 function CreateNoteForm({ onSave, onCancel, session }) {
-  const [titleVal,   setTitleVal]   = useState('')
-  const [bodyHtml,   setBodyHtml]   = useState('')
-  const [labels,     setLabels]     = useState([])
-  const [tagEnabled, setTagEnabled] = useState(false)
-  const [tagBook,    setTagBook]    = useState('Genesis')
-  const [tagChapter, setTagChapter] = useState(1)
-  const [tagVerse,   setTagVerse]   = useState('1')  // string so user can clear & retype
+  const draft = useMemo(readCreateDraft, []) // read once on mount
+
+  const [titleVal,   setTitleVal]   = useState(draft?.titleVal   ?? '')
+  const [bodyHtml,   setBodyHtml]   = useState(draft?.bodyHtml   ?? '')
+  const [labels,     setLabels]     = useState(draft?.labels     ?? [])
+  const [tagEnabled, setTagEnabled] = useState(draft?.tagEnabled ?? false)
+  const [tagBook,    setTagBook]    = useState(draft?.tagBook    ?? 'Genesis')
+  const [tagChapter, setTagChapter] = useState(draft?.tagChapter ?? 1)
+  const [tagVerse,   setTagVerse]   = useState(draft?.tagVerse   ?? '1')
   const [saving,     setSaving]     = useState(false)
+  const draftTimer = useRef(null)
 
   const selectedBook = BIBLE_BOOKS.find(b => b.name === tagBook) ?? BIBLE_BOOKS[0]
   const maxChapters  = selectedBook.chapters
@@ -946,6 +1063,17 @@ function CreateNoteForm({ onSave, onCancel, session }) {
   useEffect(() => {
     if (tagChapter > maxChapters) setTagChapter(maxChapters)
   }, [tagBook, maxChapters, tagChapter])
+
+  /* Persist draft to localStorage 500 ms after every change */
+  useEffect(() => {
+    if (draftTimer.current) clearTimeout(draftTimer.current)
+    draftTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter, tagVerse }))
+      } catch {}
+    }, 500)
+    return () => clearTimeout(draftTimer.current)
+  }, [titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter, tagVerse])
 
   async function handleSave() {
     const hasContent = titleVal.trim() || bodyHtml.replace(/<[^>]*>/g, '').trim()
@@ -956,16 +1084,20 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         ? { book: tagBook, chapter: tagChapter, verse: Math.max(1, parseInt(tagVerse) || 1) }
         : null
       const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
-      /* Tagged notes save under the verse's kjv| key so they appear in the
-         scripture reader. Un-tagged notes keep the lib|timestamp key. */
-      const key = verseTag
-        ? `kjv|${verseTag.book}|${verseTag.chapter}|${verseTag.verse}`
-        : `lib|${new Date().toISOString()}`
+      /* Always use a lib|timestamp key so multiple notes can exist per passage.
+         KjvReader finds tagged lib notes via the verseTag in the JSON payload. */
+      const key = `lib|${new Date().toISOString()}`
       setItemNote(key, raw, session?.user?.id)
+      localStorage.removeItem(CREATE_DRAFT_KEY)
       onSave()
     } finally {
       setSaving(false)
     }
+  }
+
+  function handleCancel() {
+    localStorage.removeItem(CREATE_DRAFT_KEY)
+    onCancel()
   }
 
   return (
@@ -977,7 +1109,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
           <path d="M4.5 5.5h6M4.5 8h4" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
         </svg>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>New Note</span>
-        <button onClick={onCancel} style={s.formCloseBtn} aria-label="Cancel">
+        <button onClick={handleCancel} style={s.formCloseBtn} aria-label="Cancel">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
           </svg>
@@ -986,6 +1118,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 
       {/* Rich editor */}
       <RichNoteEditor
+        key={draft?.bodyHtml ? 'draft' : 'new'}
         initialTitle={titleVal}
         initialBody={bodyHtml}
         onTitleChange={setTitleVal}
@@ -1058,12 +1191,12 @@ function CreateNoteForm({ onSave, onCancel, session }) {
       )}
       {tagEnabled && (
         <p style={s.tagHint}>
-          This note will be saved to <strong>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</strong> and will appear in Scripture Notes.
+          This note is tagged to <strong>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</strong>. It appears in Scripture Notes and a chip shows on the verse in the reader.
         </p>
       )}
 
       <div style={s.formActions}>
-        <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
+        <button onClick={handleCancel} style={s.cancelBtn}>Cancel</button>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -1087,14 +1220,31 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const [bodyHtml, setBodyHtml] = useState(
     isRich ? (parsed.body || '') : (initialRaw || '')
   )
-  const [labels,   setLabels]   = useState(parsed.labels || [])
-  const [saving,   setSaving]   = useState(false)
+  const [labels,      setLabels]      = useState(parsed.labels || [])
+  const [saving,      setSaving]      = useState(false)
+  const [autoSaved,   setAutoSaved]   = useState(false)
+  const autoSaveTimer = useRef(null)
+  const isFirstRender = useRef(true)
 
   /* Preserve the original verseTag and createdAt when re-saving */
   const verseTag  = parsed.verseTag  ?? null
   const createdAt = parsed.createdAt ?? null
 
+  /* Auto-save: debounced 1.5 s after each edit (skip first render) */
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt)
+      setItemNote(noteKey, raw, session?.user?.id)
+      setAutoSaved(true)
+      setTimeout(() => setAutoSaved(false), 2000)
+    }, 1500)
+    return () => clearTimeout(autoSaveTimer.current)
+  }, [titleVal, bodyHtml, labels]) // eslint-disable-line
+
   async function handleSave() {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setSaving(true)
     try {
       const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt)
@@ -1112,6 +1262,9 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
           <path d="M3 12l1.5-3 6-6 2 2-6 6-3.5.5Z" stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"/>
         </svg>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Edit Note</span>
+        {autoSaved && (
+          <span style={s.autoSavedTag}>✓ Saved</span>
+        )}
         <button onClick={onCancel} style={s.formCloseBtn} aria-label="Cancel">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -1522,13 +1675,16 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     ) : confNotes,
     [confNotes, q]
   )
-  const filteredDev = useMemo(() =>
-    q ? enrichedDevNotes.filter(n =>
+  const filteredDev = useMemo(() => {
+    // Devotional notes are plain text — they carry no labels,
+    // so hide them when a label filter is active (they can't match).
+    if (filterLabel) return []
+    if (!q) return enrichedDevNotes
+    return enrichedDevNotes.filter(n =>
       n.notes.toLowerCase().includes(q) ||
       n.entry?.reading?.toLowerCase().includes(q)
-    ) : enrichedDevNotes,
-    [enrichedDevNotes, q]
-  )
+    )
+  }, [enrichedDevNotes, q, filterLabel])
 
   const totalResults = filteredLib.length + filteredKjv.length + filteredConf.length + filteredDev.length
   const isSearching  = q.length > 0
@@ -2030,6 +2186,8 @@ export default function LibraryPage() {
   const [libSearch,     setLibSearch]     = useState('')
   const [libSearchOpen, setLibSearchOpen] = useState(false)
   const libSearchRef = useRef(null)
+  /* Track whether the note editor is focused (for nav-hide / Done bar) */
+  const [isEditingNote, setIsEditingNote] = useState(false)
 
   const [devNotes,       setDevNotes]       = useState([])
   const [savedDays,      setSavedDays]      = useState(() => getBookmarks())
@@ -2079,6 +2237,25 @@ export default function LibraryPage() {
     return () => window.removeEventListener('pb-sc-bookmark-changed', handler)
   }, [])
 
+  /* Show/hide nav & header when note editor is focused */
+  useEffect(() => {
+    const onFocus = () => {
+      setIsEditingNote(true)
+      document.body.dataset.noteEditing = '1'
+    }
+    const onBlur = () => {
+      setIsEditingNote(false)
+      delete document.body.dataset.noteEditing
+    }
+    window.addEventListener('pb-note-editor-focus', onFocus)
+    window.addEventListener('pb-note-editor-blur',  onBlur)
+    return () => {
+      window.removeEventListener('pb-note-editor-focus', onFocus)
+      window.removeEventListener('pb-note-editor-blur',  onBlur)
+      delete document.body.dataset.noteEditing
+    }
+  }, [])
+
   const enrichedDevNotes = useMemo(() =>
     devNotes
       .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
@@ -2117,8 +2294,21 @@ export default function LibraryPage() {
     <div style={s.page}>
 
       {/* ── Header (no back button — BottomNav handles navigation) ── */}
-      <header style={s.header}>
-        <div style={s.headerInner}>
+      <header style={{ ...s.header, ...(isEditingNote ? s.headerEditing : {}) }}>
+        {/* Editing mode: minimal "Note editing · Done" bar */}
+        {isEditingNote && (
+          <div style={s.editingBar}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ color: 'var(--teal)', flexShrink: 0 }}>
+              <path d="M2 11l1.2-2.4 6-6 2 2-6 6L2 11Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+            </svg>
+            <span style={s.editingBarText}>Note editor</span>
+            <button
+              style={s.editingDoneBtn}
+              onClick={() => document.activeElement?.blur()}
+            >Done</button>
+          </div>
+        )}
+        <div style={{ ...s.headerInner, ...(isEditingNote ? { display: 'none' } : {}) }}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0, color: 'var(--teal)' }}>
             <rect x="2" y="2" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.5" fill="currentColor" fillOpacity="0.1"/>
             <path d="M5.5 6h7M5.5 9.5h5M5.5 13h5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
@@ -2171,7 +2361,7 @@ export default function LibraryPage() {
             </>
           )}
         </div>
-        <div style={s.tabBar}>
+        <div style={{ ...s.tabBar, ...(isEditingNote ? { display: 'none' } : {}) }}>
           {TABS.map(tab => (
             <button
               key={tab.id}
@@ -2241,6 +2431,17 @@ const s = {
     paddingTop: 'env(safe-area-inset-top)',
   },
   headerInner: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px 8px' },
+  headerEditing: { transition: 'all 0.15s' },
+  editingBar: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    padding: '8px 16px', minHeight: 42,
+  },
+  editingBarText: { flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)' },
+  editingDoneBtn: {
+    background: 'var(--teal)', border: 'none', borderRadius: 8,
+    color: '#fff', fontSize: 13, fontWeight: 700, padding: '5px 14px',
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+  },
   headerTitle: { fontSize: 16, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', serif", display: 'block' },
   headerSub:   { fontSize: 11, color: 'var(--ink-faint)', display: 'block', marginTop: 1 },
   headerSearchBtn: {
@@ -2385,6 +2586,11 @@ const s = {
     display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4,
   },
   createFormHeader: { display: 'flex', alignItems: 'center', gap: 8 },
+  autoSavedTag: {
+    fontSize: 10, fontWeight: 700, color: 'var(--teal)',
+    background: 'var(--teal-light)', borderRadius: 4,
+    padding: '2px 6px', flexShrink: 0,
+  },
   formCloseBtn: {
     marginLeft: 'auto', background: 'none', border: 'none',
     cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, borderRadius: 6,
@@ -2609,7 +2815,8 @@ const am = {
     color: '#fff', fontFamily: "'DM Sans', sans-serif",
   },
   insertBtnAlt:  { background: 'var(--surface)', color: 'var(--teal)', border: '1.5px solid var(--teal)' },
-  resolvedRef:   { fontSize: 14, fontWeight: 700, color: 'var(--teal)', fontFamily: "'Cormorant Garamond', serif", margin: '2px 0 10px' },
+  resolvedRef:   { fontSize: 14, fontWeight: 700, color: 'var(--teal)', fontFamily: "'Cormorant Garamond', serif", margin: '2px 0 6px' },
+  versePreview:  { fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.5, margin: '0 0 10px', padding: '6px 8px', background: 'var(--teal-light)', borderRadius: 4 },
   editRefBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)', padding: '6px 0 0', fontFamily: "'DM Sans', sans-serif" },
   hintSmall:     { fontSize: 9, fontWeight: 400, color: 'var(--ink-faint)', textTransform: 'none', letterSpacing: 0 },
 }

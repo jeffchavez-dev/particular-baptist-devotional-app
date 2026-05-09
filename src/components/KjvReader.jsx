@@ -669,6 +669,23 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [highlights, setHighlights] = useState(() => loadHighlights())
   const [itemNotes,  setItemNotes]  = useState(() => loadItemNotes())
 
+  /* Index lib| notes that have a verseTag — maps "Book|ch|v" → count */
+  const libNoteIndex = useMemo(() => {
+    const idx = {}
+    for (const [k, raw] of Object.entries(itemNotes)) {
+      if (!k.startsWith('lib|')) continue
+      if (!raw || !raw.startsWith('<!RICH>')) continue
+      try {
+        const { verseTag } = JSON.parse(raw.slice(7))
+        if (verseTag?.book && verseTag.chapter && verseTag.verse) {
+          const vk = `${verseTag.book}|${verseTag.chapter}|${verseTag.verse}`
+          idx[vk] = (idx[vk] || 0) + 1
+        }
+      } catch {}
+    }
+    return idx
+  }, [itemNotes])
+
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
@@ -2478,6 +2495,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             const isEditing   = editingNote === verseKey && !isLibNote
                             const isSelected  = selectedVerses.has(verseKey)
                             const isWordVerse = selectedWord?.verseKey === verseKey
+                            /* Count of library notes (lib| keys) tagged to this verse */
+                            const libNoteCount = libNoteIndex[`${seg.book}|${seg.chapter}|${verse}`] || 0
 
                             return (
                               <React.Fragment key={verse}>
@@ -2662,6 +2681,21 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       {displayNote && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
                                     </div>
                                   </div>
+                                )}
+
+                                {/* ── Library notes chip (lib| tagged notes) ── */}
+                                {studyMode && libNoteCount > 0 && (
+                                  <button
+                                    style={r.libNoteChip}
+                                    onClick={e => { e.stopPropagation(); routerNavigate('/library') }}
+                                    title="View library notes for this verse"
+                                  >
+                                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ flexShrink:0 }}>
+                                      <rect x="0.5" y="0.5" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.1"/>
+                                      <path d="M2.5 3h4M2.5 5h2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                                    </svg>
+                                    {libNoteCount} library note{libNoteCount !== 1 ? 's' : ''} · View →
+                                  </button>
                                 )}
 
                                 {/* ── Confession cross-refs (morph mode) ── */}
@@ -2937,6 +2971,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const isEditing     = editingNote === verseKey && !isLibNote
                         const isSelected    = selectedVerses.has(verseKey)
                         const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
+                        /* Count of library notes (lib| keys) tagged to this verse */
+                        const libNoteCount  = libNoteIndex[`${seg.book}|${seg.chapter}|${verse}`] || 0
                         const isActiveSegment = seg.book === book && seg.chapter === chapter
                         const isSearchMatch = isActiveSegment && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
                         const isFocusMatch  = isActiveSegment && !bibleResults && chapterMatches[searchFocus]?.verse === verse
@@ -3389,6 +3425,21 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   {displayNote && <button onClick={() => deleteNote(verseKey)} style={r.noteDeleteBtn}>Delete</button>}
                                 </div>
                               </div>
+                            )}
+
+                            {/* ── Library notes chip (lib| tagged notes) ── */}
+                            {studyMode && libNoteCount > 0 && (
+                              <button
+                                style={r.libNoteChip}
+                                onClick={e => { e.stopPropagation(); routerNavigate('/library') }}
+                                title="View library notes for this verse"
+                              >
+                                <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ flexShrink:0 }}>
+                                  <rect x="0.5" y="0.5" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.1"/>
+                                  <path d="M2.5 3h4M2.5 5h2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                                </svg>
+                                {libNoteCount} library note{libNoteCount !== 1 ? 's' : ''} · View →
+                              </button>
                             )}
 
                             {/* ── Author cross-refs (forward links + automatic back-refs) ── */}
@@ -4329,6 +4380,17 @@ const r = {
     color:'var(--teal)', fontSize:11, fontWeight:600,
     padding:'2px 4px', borderRadius:4, flexShrink:0,
     fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
+    transition:'opacity 0.12s',
+  },
+  /* Chip shown when there are lib| notes tagged to a verse */
+  libNoteChip: {
+    display:'inline-flex', alignItems:'center', gap:4,
+    marginLeft:34, marginTop:3, marginBottom:4,
+    background:'var(--teal-light)', color:'var(--teal)',
+    border:'1px solid rgba(29,107,90,0.3)',
+    borderRadius:99, padding:'2px 8px',
+    fontSize:10, fontWeight:700, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
     transition:'opacity 0.12s',
   },
 

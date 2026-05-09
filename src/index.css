@@ -221,6 +221,15 @@ select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(154,124,63,
   border-top-color: var(--gold-light);
 }
 
+/* ── Hide bottom nav when note editor is focused ── */
+body[data-note-editing] nav[data-bottom-nav] {
+  transform: translateY(110%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+nav[data-bottom-nav] {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* ── Bottom navigation — visible on all screen sizes ── */
 @media (min-width: 769px) {
   /* On desktop, cap width and center so it doesn't stretch across ultra-wide screens */
