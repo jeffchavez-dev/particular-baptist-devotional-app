@@ -373,11 +373,23 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
 /* ══════════════════════════════════════════════════════════════
    ScTag Action Popup  (shown in EDIT MODE when clicking a tag)
 ══════════════════════════════════════════════════════════════ */
-function ScTagActionPopup({ sc, anchorRect, onClose, onDelete }) {
-  const [verseText, setVerseText] = useState(null)
-  const [loading,   setLoading]   = useState(true)
+function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
+  const [verseText,   setVerseText]   = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [mode,        setMode]        = useState('view')  // 'view' | 'edit'
+
+  /* Edit form state — seeded from current tag values */
+  const [editBook,    setEditBook]    = useState(sc.book)
+  const [editChapter, setEditChapter] = useState(sc.chapter)
+  const [editVerse,   setEditVerse]   = useState(String(sc.verse))
+  const [editVerseTo, setEditVerseTo] = useState(sc.verseTo ? String(sc.verseTo) : '')
+
   const ref = useRef(null)
 
+  const editSelectedBook = BIBLE_BOOKS.find(b => b.name === editBook) ?? BIBLE_BOOKS[0]
+  const maxEditChapters  = editSelectedBook.chapters
+
+  /* Fetch verse preview */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -386,6 +398,7 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete }) {
     return () => { cancelled = true }
   }, [sc.book, sc.chapter, sc.verse]) // eslint-disable-line
 
+  /* Close on outside click */
   useEffect(() => {
     function onDown(e) {
       if (ref.current && !ref.current.contains(e.target)) onClose()
@@ -398,47 +411,134 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete }) {
     ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
     : `${sc.book} ${sc.chapter}:${sc.verse}`
 
-  /* Position below the tag, flipping up if too close to bottom */
-  const POPUP_H = 150
-  const fitsBelow = anchorRect.bottom + 6 + POPUP_H <= window.innerHeight
-  const top  = fitsBelow ? anchorRect.bottom + 6 : anchorRect.top - POPUP_H - 6
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 252))
+  /* Prefer showing ABOVE the tag (same rationale as @ popup) */
+  const POPUP_H  = mode === 'edit' ? 230 : 170
+  const spaceAbove = anchorRect.top - 6
+  const showAbove  = spaceAbove >= POPUP_H
+  const top  = showAbove ? anchorRect.top - POPUP_H - 6 : anchorRect.bottom + 6
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 256))
+
+  function handleUpdate() {
+    const vNum  = Math.max(1, parseInt(editVerse)  || 1)
+    const vtNum = editVerseTo === ''
+      ? null
+      : Math.max(vNum, parseInt(editVerseTo) || vNum)
+    onEdit({ book: editBook, chapter: editChapter, verse: vNum, verseTo: vtNum })
+    onClose()
+  }
+
+  const baseStyle = {
+    position: 'fixed', zIndex: 9500, left, top,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+    padding: '12px', width: 252,
+    fontFamily: "'DM Sans', sans-serif",
+  }
+
+  const labelStyle  = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
+  const inputStyle  = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif" }
+  const selectStyle = { ...inputStyle, cursor: 'pointer' }
 
   return (
-    <div
-      ref={ref}
-      onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
-      style={{
-        position: 'fixed', zIndex: 9500, left, top,
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-        padding: '10px 12px', width: 240,
-        fontFamily: "'DM Sans', sans-serif",
-      }}
-    >
-      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 6px', fontFamily: "'Cormorant Garamond', serif" }}>
-        {label}
-      </p>
-      {loading ? (
-        <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 8px', fontStyle: 'italic' }}>Loading…</p>
-      ) : verseText ? (
-        <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 72, overflow: 'hidden' }}>
-          "{verseText.length > 120 ? verseText.slice(0, 120) + '…' : verseText}"
-        </p>
+    <div ref={ref} onMouseDown={e => { e.preventDefault(); e.stopPropagation() }} style={baseStyle}>
+
+      {mode === 'view' ? (
+        <>
+          {/* Reference label */}
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 5px', fontFamily: "'Cormorant Garamond', serif" }}>
+            {label}
+          </p>
+
+          {/* Verse preview */}
+          {loading ? (
+            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px', fontStyle: 'italic' }}>Loading…</p>
+          ) : verseText ? (
+            <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 68, overflow: 'hidden' }}>
+              "{verseText.length > 110 ? verseText.slice(0, 110) + '…' : verseText}"
+            </p>
+          ) : (
+            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px' }}>Verse not found.</p>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setMode('edit') }}
+              style={{ flex: 1, background: 'var(--parchment-dark)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Edit ref
+            </button>
+            <button
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
+              style={{ flex: 1, background: 'var(--red-light)', border: '1px solid var(--red)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--red)', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Remove
+            </button>
+          </div>
+        </>
       ) : (
-        <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 8px' }}>Verse not found.</p>
+        <>
+          {/* Edit mode header */}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
+            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 12, fontWeight: 700, padding: 0, fontFamily: "'DM Sans', sans-serif" }}>
+              ← Back
+            </button>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginLeft: 'auto' }}>Edit reference</span>
+          </div>
+
+          {/* Book */}
+          <div style={{ marginBottom: 8 }}>
+            <p style={labelStyle}>Book</p>
+            <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
+              <optgroup label="Old Testament">
+                {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </optgroup>
+              <optgroup label="New Testament">
+                {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Chapter + Verse + VerseTo row */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>Ch.</p>
+              <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
+                {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>Vs.</p>
+              <input type="number" min={1} max={200} value={editVerse}
+                onChange={e => setEditVerse(e.target.value)}
+                onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
+                style={{ ...inputStyle, width: '100%' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={labelStyle}>To (opt)</p>
+              <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
+                onChange={e => setEditVerseTo(e.target.value)}
+                style={{ ...inputStyle, width: '100%' }} />
+            </div>
+          </div>
+
+          {/* Confirm / Cancel */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onMouseDown={e => { e.preventDefault(); setMode('view') }}
+              style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Cancel
+            </button>
+            <button
+              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }}
+              style={{ flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
+            >
+              Update tag
+            </button>
+          </div>
+        </>
       )}
-      <button
-        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
-        style={{
-          width: '100%', background: 'var(--red-light)', border: '1px solid var(--red)',
-          borderRadius: 6, padding: '6px 0', cursor: 'pointer',
-          fontSize: 12, fontWeight: 700, color: 'var(--red)',
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        Remove this tag
-      </button>
     </div>
   )
 }
@@ -569,14 +669,20 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
   const selectedBook = BIBLE_BOOKS.find(b => b.name === book) ?? BIBLE_BOOKS[0]
   const maxChapters  = selectedBook.chapters
 
-  // Flip popup above the cursor when it would go off the bottom of the viewport
+  // Prefer showing ABOVE the cursor so the popup never covers what the user is typing.
+  // Fall back to below only when there isn't enough vertical room above.
   const POPUP_MAX_H = 320
-  const fitsBelow   = (pos.bottom + 4 + POPUP_MAX_H) <= window.innerHeight
+  const spaceAbove  = pos.top - 6
+  const spaceBelow  = window.innerHeight - pos.bottom - 4
+  const showAbove   = spaceAbove >= 160 // at least 160 px above → show above
   const style = {
     ...am.popup,
-    top:    fitsBelow ? pos.bottom + 4 : undefined,
-    bottom: fitsBelow ? undefined : window.innerHeight - pos.top + 6,
+    top:    showAbove ? undefined       : pos.bottom + 4,
+    bottom: showAbove ? window.innerHeight - pos.top + 6 : undefined,
     left:   Math.max(8, Math.min(pos.left, window.innerWidth - 270)),
+    // Cap height so it doesn't overflow on small screens
+    maxHeight: showAbove ? Math.min(POPUP_MAX_H, spaceAbove) : Math.min(POPUP_MAX_H, spaceBelow),
+    overflowY: 'auto',
   }
 
   /* ── Resolved: user typed a complete reference ── */
@@ -763,6 +869,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
       // Prevent the click from also propagating into the contenteditable cursor placement
       e.stopPropagation()
       const rect = tagEl.getBoundingClientRect()
+      const isQuote = tagEl.tagName === 'BLOCKQUOTE' || tagEl.classList.contains('sc-quote')
       setScTagPopup({
         book:    tagEl.dataset.scBook,
         chapter: parseInt(tagEl.dataset.scChapter),
@@ -770,6 +877,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         verseTo: tagEl.dataset.scVerseTo ? parseInt(tagEl.dataset.scVerseTo) : null,
         anchorRect: rect,
         el: tagEl,
+        isQuote,
       })
     } else if (!e.target.closest('[data-sctag-popup]')) {
       setScTagPopup(null)
@@ -782,6 +890,27 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     const blockEl = el.closest('blockquote') ?? el
     blockEl.parentNode?.removeChild(blockEl)
     onBodyChange(editorRef.current.innerHTML)
+  }
+
+  function editScTag(el, newSc, isQuote) {
+    if (!el || !editorRef.current?.contains(el)) return
+    if (!isQuote) {
+      // Inline span — update data attributes and label text in place
+      const newLabel = newSc.verseTo
+        ? `${newSc.book} ${newSc.chapter}:${newSc.verse}–${newSc.verseTo}`
+        : `${newSc.book} ${newSc.chapter}:${newSc.verse}`
+      el.dataset.scBook    = newSc.book
+      el.dataset.scChapter = String(newSc.chapter)
+      el.dataset.scVerse   = String(newSc.verse)
+      if (newSc.verseTo) el.dataset.scVerseTo = String(newSc.verseTo)
+      else delete el.dataset.scVerseTo
+      el.textContent = newLabel
+      onBodyChange(editorRef.current.innerHTML)
+    } else {
+      // Blockquote — delete old and re-insert fresh (verse text needs to reload)
+      el.parentNode?.removeChild(el)
+      handleAtSelect({ ...newSc, quoteMode: true })
+    }
   }
 
   function saveSelection() {
@@ -908,10 +1037,11 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
       }
       document.execCommand('insertHTML', false,
         `<blockquote class="sc-quote" data-sc-book="${book}" data-sc-chapter="${chapter}" data-sc-verse="${verse}"${rangeAttrs} ` +
+        `contenteditable="false" ` +
         `style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--teal);` +
         `background:var(--teal-light);border-radius:0 6px 6px 0;font-style:italic;` +
-        `font-size:0.92em;color:var(--ink-muted);">${innerHtml} ` +
-        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel}</em></blockquote>`
+        `font-size:0.92em;color:var(--ink-muted);cursor:pointer;">${innerHtml} ` +
+        `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel}</em></blockquote>&#8203;`
       )
     } else {
       document.execCommand('insertHTML', false,
@@ -927,12 +1057,90 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     atRangeRef.current = null
   }
 
+  /* ── Find the sc-tag/sc-quote element that a Backspace or Delete would hit ──
+     Returns the element node if found, null otherwise.
+     isBackspace=true  → look at what's before the cursor
+     isBackspace=false → look at what's after  the cursor                        */
+  function findScElement(range, isBackspace) {
+    function isScNode(n) {
+      return n && n.nodeType === Node.ELEMENT_NODE && n.dataset && n.dataset.scBook
+    }
+
+    /* Non-collapsed selection: check if any sc element overlaps with it */
+    if (!range.collapsed) {
+      try {
+        const ancestor = range.commonAncestorContainer
+        const container = ancestor.nodeType === Node.ELEMENT_NODE
+          ? ancestor : ancestor.parentElement
+        if (container) {
+          for (const el of container.querySelectorAll('[data-sc-book]')) {
+            if (range.intersectsNode(el)) return el
+          }
+        }
+      } catch {}
+      return null
+    }
+
+    const node   = range.startContainer
+    const offset = range.startOffset
+
+    if (isBackspace) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        // At position 0 → previous sibling may be an sc element
+        if (offset === 0) return isScNode(node.previousSibling) ? node.previousSibling : null
+        // Position 1 and the only character is a zero-width space → same check
+        if (offset === 1 && node.textContent[0] === "​")
+          return isScNode(node.previousSibling) ? node.previousSibling : null
+      } else if (node.nodeType === Node.ELEMENT_NODE && offset > 0) {
+        const child = node.childNodes[offset - 1]
+        return isScNode(child) ? child : null
+      }
+    } else { // Delete
+      if (node.nodeType === Node.TEXT_NODE && offset === node.textContent.length) {
+        return isScNode(node.nextSibling) ? node.nextSibling : null
+      } else if (node.nodeType === Node.TEXT_NODE && offset === node.textContent.length - 1 && node.textContent[offset] === "​") {
+        // Cursor is just before a trailing zero-width space, next sibling is sc
+        return isScNode(node.nextSibling) ? node.nextSibling : null
+      } else if (node.nodeType === Node.ELEMENT_NODE && offset < node.childNodes.length) {
+        const child = node.childNodes[offset]
+        return isScNode(child) ? child : null
+      }
+    }
+    return null
+  }
+
+  function showScPopupForEl(el) {
+    const rect = el.getBoundingClientRect()
+    setScTagPopup({
+      book:    el.dataset.scBook,
+      chapter: parseInt(el.dataset.scChapter),
+      verse:   parseInt(el.dataset.scVerse),
+      verseTo: el.dataset.scVerseTo ? parseInt(el.dataset.scVerseTo) : null,
+      anchorRect: rect,
+      el,
+      isQuote: el.tagName === 'BLOCKQUOTE' || el.classList.contains('sc-quote'),
+    })
+  }
+
   function handleKeyDown(e) {
-    if (e.key === 'Escape') { setAtPopup(null); return }
+    if (e.key === 'Escape') { setAtPopup(null); setScTagPopup(null); return }
+
+    /* ── Backspace / Delete: intercept if it would hit an sc element ── */
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const sel = window.getSelection()
+      if (sel && sel.rangeCount) {
+        const range  = sel.getRangeAt(0)
+        const scEl   = findScElement(range, e.key === 'Backspace')
+        if (scEl && editorRef.current?.contains(scEl)) {
+          e.preventDefault()
+          showScPopupForEl(scEl)
+          return
+        }
+      }
+    }
 
     // ── Auto-insert tag on Space or Enter when a full reference is detected ──
     // Space always triggers; Enter triggers on non-touch devices (desktop).
-    // The popup remains open (for "Quote verse") — Space just fires the default "Insert tag" action.
     if (atPopup && (e.key === ' ' || (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)))) {
       const resolved = parseAtQueryWithChapterTag(atQuery, chapterTag)
       if (resolved) {
@@ -1036,8 +1244,10 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         <ScTagActionPopup
           sc={scTagPopup}
           anchorRect={scTagPopup.anchorRect}
+          isQuote={scTagPopup.isQuote}
           onClose={() => setScTagPopup(null)}
           onDelete={() => deleteScTag(scTagPopup.el)}
+          onEdit={newSc => editScTag(scTagPopup.el, newSc, scTagPopup.isQuote)}
         />
       )}
     </div>
@@ -1726,10 +1936,22 @@ const SORT_OPTS = [
   { id: 'label',     label: 'By label' },
 ]
 
-const SESSION_EDIT_KEY = 'pb-lib-editing-note'
+const SESSION_EDIT_KEY   = 'pb-lib-editing-note'
+const SESSION_CREATE_KEY = 'pb-lib-creating-note'
 
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  /* Persist create-form open state across navigation */
+  const [showCreateForm, setShowCreateFormRaw] = useState(() => {
+    try { return sessionStorage.getItem(SESSION_CREATE_KEY) === '1' } catch { return false }
+  })
+
+  function setShowCreateForm(val) {
+    setShowCreateFormRaw(val)
+    try {
+      if (val) sessionStorage.setItem(SESSION_CREATE_KEY, '1')
+      else     sessionStorage.removeItem(SESSION_CREATE_KEY)
+    } catch {}
+  }
 
   /* Persist editingNote to sessionStorage so it survives navigation */
   const [editingNote, setEditingNoteRaw] = useState(() => {
@@ -1880,8 +2102,8 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const isSearching  = q.length > 0
 
   function handleSaved() {
-    setShowCreateForm(false)
-    setEditingNote(null) // also clears sessionStorage via our wrapper
+    setShowCreateForm(false) // clears SESSION_CREATE_KEY via wrapper
+    setEditingNote(null)     // clears SESSION_EDIT_KEY via wrapper
   }
 
   /* Scroll the form into view whenever it opens */
