@@ -1938,6 +1938,8 @@ const SORT_OPTS = [
 
 const SESSION_EDIT_KEY   = 'pb-lib-editing-note'
 const SESSION_CREATE_KEY = 'pb-lib-creating-note'
+const SESSION_SORT_KEY   = 'pb-lib-sort'
+const SESSION_FILTER_KEY = 'pb-lib-filter-label'
 
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   /* Persist create-form open state across navigation */
@@ -1982,8 +1984,27 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
   const formAreaRef = useRef(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
-  const [sortBy,         setSortBy]         = useState('date-desc')
-  const [filterLabel,    setFilterLabel]    = useState('')
+  const [sortBy, setSortByRaw] = useState(() => {
+    try { return sessionStorage.getItem(SESSION_SORT_KEY) || 'date-desc' } catch { return 'date-desc' }
+  })
+  function setSortBy(val) {
+    setSortByRaw(val)
+    try {
+      if (val && val !== 'date-desc') sessionStorage.setItem(SESSION_SORT_KEY, val)
+      else sessionStorage.removeItem(SESSION_SORT_KEY)
+    } catch {}
+  }
+
+  const [filterLabel, setFilterLabelRaw] = useState(() => {
+    try { return sessionStorage.getItem(SESSION_FILTER_KEY) || '' } catch { return '' }
+  })
+  function setFilterLabel(val) {
+    setFilterLabelRaw(val)
+    try {
+      if (val) sessionStorage.setItem(SESSION_FILTER_KEY, val)
+      else sessionStorage.removeItem(SESSION_FILTER_KEY)
+    } catch {}
+  }
   const [sortOpen,       setSortOpen]       = useState(false)
   const [filterOpen,     setFilterOpen]     = useState(false)
   const sortRef   = useRef(null)
