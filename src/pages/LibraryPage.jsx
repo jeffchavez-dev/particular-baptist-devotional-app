@@ -1550,7 +1550,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         />
       ) : (
         <>
-          {/* Compact control row: New Note + Sort + Label */}
+          {/* Compact control row: New Note + Sort */}
           <div style={s.controlRow}>
             <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1562,19 +1562,45 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={s.controlSelect}>
               {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
             </select>
-            {allUsedLabels.length > 0 && (
-              <select value={filterLabel} onChange={e => setFilterLabel(e.target.value)} style={s.controlSelect}>
-                <option value="">All labels</option>
-                {allUsedLabels.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            )}
           </div>
 
-          {isSearching && (
+          {/* Label filter chips */}
+          {allUsedLabels.length > 0 && (
+            <div style={s.labelFilterRow}>
+              <span style={s.labelFilterTitle}>Filter:</span>
+              {allUsedLabels.map(l => {
+                const c = getLabelColor(l)
+                const isActive = filterLabel === l
+                return (
+                  <button
+                    key={l}
+                    onClick={() => setFilterLabel(isActive ? '' : l)}
+                    style={{
+                      ...s.labelFilterChip,
+                      background:  isActive ? c.bg        : 'transparent',
+                      color:       isActive ? c.color     : 'var(--ink-faint)',
+                      borderColor: isActive ? c.border    : 'var(--border)',
+                      fontWeight:  isActive ? 700         : 500,
+                    }}
+                  >
+                    {l}
+                    {isActive && <span style={{ marginLeft: 3, opacity: 0.7 }}>×</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Active filter / search meta */}
+          {(filterLabel || isSearching) && (
             <p style={s.searchMeta}>
-              {totalResults === 0
-                ? 'No notes match your search'
-                : `${totalResults} note${totalResults !== 1 ? 's' : ''} match "${searchQuery.trim()}"`
+              {isSearching && totalResults === 0
+                ? `No notes match "${searchQuery.trim()}"${filterLabel ? ` · ${filterLabel}` : ''}`
+                : isSearching
+                  ? `${totalResults} note${totalResults !== 1 ? 's' : ''} match "${searchQuery.trim()}"${filterLabel ? ` · ${filterLabel}` : ''}`
+                  : filterLabel
+                    ? <>Filtered by label: <strong>{filterLabel}</strong> — <button onClick={() => setFilterLabel('')} style={s.clearFilterBtn}>clear</button></>
+                    : null
               }
             </p>
           )}
@@ -2229,6 +2255,30 @@ const s = {
     appearance: 'none',
     backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%235c5448' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
     backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 22,
+  },
+
+  /* ── Label filter chips ── */
+  labelFilterRow: {
+    display: 'flex', flexWrap: 'wrap', alignItems: 'center',
+    gap: '5px', marginTop: 2, marginBottom: 2,
+  },
+  labelFilterTitle: {
+    fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)',
+    textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0,
+    marginRight: 2,
+  },
+  labelFilterChip: {
+    display: 'inline-flex', alignItems: 'center',
+    padding: '3px 9px', borderRadius: 99,
+    border: '1px solid', fontSize: 11, lineHeight: 1.5,
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+    transition: 'all 0.12s', whiteSpace: 'nowrap',
+  },
+  clearFilterBtn: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--teal)', fontSize: 11, fontWeight: 600,
+    padding: 0, fontFamily: "'DM Sans', sans-serif",
+    textDecoration: 'underline',
   },
 
   /* ── Kanban 2-column grid ── */
