@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
@@ -165,6 +165,53 @@ export default function AboutPage() {
   const { prefs, updatePrefs } = usePrefs()
 
   const [defaultVersion, setDefaultVersion] = useState(() => getDefaultReaderVersion())
+
+  /* ── Wake Lock ("Keep screen on") ── */
+  const WAKE_LOCK_KEY = 'pb-keep-awake'
+  const [keepAwake, setKeepAwakeRaw] = useState(() => {
+    try { return localStorage.getItem(WAKE_LOCK_KEY) === '1' } catch { return false }
+  })
+  const wakeLockRef = useRef(null)
+  const wakeLockSupported = typeof navigator !== 'undefined' && 'wakeLock' in navigator
+
+  function setKeepAwake(val) {
+    setKeepAwakeRaw(val)
+    try {
+      if (val) localStorage.setItem(WAKE_LOCK_KEY, '1')
+      else     localStorage.removeItem(WAKE_LOCK_KEY)
+    } catch {}
+  }
+
+  useEffect(() => {
+    if (!wakeLockSupported) return
+
+    async function acquireLock() {
+      if (!keepAwake) return
+      try {
+        if (wakeLockRef.current) { try { await wakeLockRef.current.release() } catch {} }
+        wakeLockRef.current = await navigator.wakeLock.request('screen')
+        wakeLockRef.current.addEventListener('release', () => { wakeLockRef.current = null })
+      } catch {}
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible' && keepAwake) acquireLock()
+    }
+
+    if (keepAwake) {
+      acquireLock()
+      document.addEventListener('visibilitychange', onVisibilityChange)
+    } else {
+      if (wakeLockRef.current) {
+        try { wakeLockRef.current.release() } catch {}
+        wakeLockRef.current = null
+      }
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [keepAwake, wakeLockSupported])
 
   const [exportOpen,   setExportOpen]   = useState(false)
   const [resetDone,    setResetDone]    = useState(false)
@@ -351,6 +398,25 @@ export default function AboutPage() {
                 <span style={{ ...s.toggleKnob, transform: dark ? 'translateX(20px)' : 'translateX(2px)' }} />
               </button>
             </div>
+
+            {/* Keep Screen On */}
+            {wakeLockSupported && (
+              <div style={s.settingRow}>
+                <div style={s.settingLabel}>
+                  <span style={s.settingName}>Keep Screen On</span>
+                  <span style={s.settingHint}>Prevents the screen from sleeping while reading — uses more battery</span>
+                </div>
+                <button
+                  onClick={() => setKeepAwake(!keepAwake)}
+                  style={{ ...s.toggle, background: keepAwake ? 'var(--teal)' : 'var(--border-strong)' }}
+                  aria-pressed={keepAwake}
+                  role="switch"
+                  title={keepAwake ? 'Disable keep screen on' : 'Enable keep screen on'}
+                >
+                  <span style={{ ...s.toggleKnob, transform: keepAwake ? 'translateX(20px)' : 'translateX(2px)' }} />
+                </button>
+              </div>
+            )}
 
             {/* Notifications */}
             <NotificationSettings userId={session?.user?.id} />
