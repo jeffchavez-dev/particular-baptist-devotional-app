@@ -334,14 +334,21 @@ export function getAllKjvHighlights() {
     .sort((a, b) => a.book.localeCompare(b.book) || a.chapter - b.chapter || a.verse - b.verse)
 }
 
-/** Return all KJV notes as [{ key, note, book, chapter, verse }] */
+/** Return all KJV notes as [{ key, note, book, chapter, verse, createdAt }]
+ *  createdAt is extracted from rich-note JSON when present (library-tagged notes),
+ *  or null for plain inline scripture notes. */
 export function getAllKjvNotes() {
   const all = loadItemNotes()
   return Object.entries(all)
     .filter(([k]) => k.startsWith('kjv|'))
     .map(([k, note]) => {
       const [, book, chapter, verse] = k.split('|')
-      return { key: k, note, book, chapter: parseInt(chapter), verse: parseInt(verse) }
+      let createdAt = null
+      try {
+        if (note && note.startsWith('<!RICH>'))
+          createdAt = JSON.parse(note.slice(7)).createdAt || null
+      } catch {}
+      return { key: k, note, book, chapter: parseInt(chapter), verse: parseInt(verse), createdAt }
     })
     .sort((a, b) => a.book.localeCompare(b.book) || a.chapter - b.chapter || a.verse - b.verse)
 }

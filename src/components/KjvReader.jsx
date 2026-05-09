@@ -1830,7 +1830,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function openNoteForSelection() {
     if (selectedVerses.size !== 1) return
     const [verseKey] = [...selectedVerses]
-    setNoteDraft(parseNoteDisplay(itemNotes[verseKey] || ''))
+    const raw = itemNotes[verseKey] || ''
+    // Library rich notes can't be edited inline — navigate to Library instead
+    if (raw.startsWith('<!RICH>')) { routerNavigate('/library'); return }
+    setNoteDraft(parseNoteDisplay(raw))
     setEditingNote(verseKey)
     setColorBarOpen(false)
     setSelectedVerses(new Set())
@@ -2469,9 +2472,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             const hlColorId   = highlights[verseKey] || null
                             const hlSt        = hlColorId ? getHlStyle(hlColorId) : null
                             const note        = itemNotes[verseKey]
-                            /* Rich notes under kjv| keys are library-tagged notes — don't show inline */
-                            const displayNote = note && !note.startsWith('<!RICH>') ? note : null
-                            const isEditing   = editingNote === verseKey
+                            const isLibNote   = note && note.startsWith('<!RICH>')
+                            /* Library-tagged notes shown read-only; plain notes shown editable */
+                            const displayNote = note ? parseNoteDisplay(note) : null
+                            const isEditing   = editingNote === verseKey && !isLibNote
                             const isSelected  = selectedVerses.has(verseKey)
                             const isWordVerse = selectedWord?.verseKey === verseKey
 
@@ -2614,17 +2618,36 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                 {/* ── Note display ── */}
                                 {studyMode && displayNote && !isEditing && (
-                                  <div style={r.noteDisplay} onClick={e => { e.stopPropagation(); openNoteEditor(verseKey) }}>
-                                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
-                                      <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                                      <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
-                                    </svg>
-                                    <span style={{flex:1}}>{parseNoteDisplay(displayNote)}</span>
+                                  <div
+                                    style={{ ...r.noteDisplay, ...(isLibNote ? r.libNoteDisplay : {}) }}
+                                    onClick={e => { e.stopPropagation(); if (!isLibNote) openNoteEditor(verseKey) }}
+                                  >
+                                    {isLibNote ? (
+                                      /* Book icon for library notes */
+                                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, color:'var(--teal)', opacity:0.8 }}>
+                                        <rect x="1" y="1" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                                        <path d="M3 3.5h4M3 5.5h2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                                      </svg>
+                                    ) : (
+                                      /* Pencil icon for plain notes */
+                                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                                        <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                        <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                                      </svg>
+                                    )}
+                                    <span style={{flex:1}}>{displayNote}</span>
+                                    {isLibNote && (
+                                      <button
+                                        onClick={e => { e.stopPropagation(); routerNavigate('/library') }}
+                                        style={r.libNoteEditBtn}
+                                        title="Edit in My Library"
+                                      >Edit →</button>
+                                    )}
                                   </div>
                                 )}
 
-                                {/* ── Note editor ── */}
-                                {isEditing && (
+                                {/* ── Note editor (plain notes only) ── */}
+                                {isEditing && !isLibNote && (
                                   <div style={r.noteEditorWrap} onClick={e => e.stopPropagation()}>
                                     <textarea
                                       value={noteDraft}
@@ -2908,9 +2931,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const hlColorId     = highlights[verseKey] || null
                         const hlStyle       = hlColorId ? getHlStyle(hlColorId) : null
                         const note          = itemNotes[verseKey]
-                        /* Rich notes under kjv| keys are library-tagged notes — don't show inline */
-                        const displayNote   = note && !note.startsWith('<!RICH>') ? note : null
-                        const isEditing     = editingNote === verseKey
+                        const isLibNote     = note && note.startsWith('<!RICH>')
+                        /* Library-tagged notes shown read-only; plain notes shown editable */
+                        const displayNote   = note ? parseNoteDisplay(note) : null
+                        const isEditing     = editingNote === verseKey && !isLibNote
                         const isSelected    = selectedVerses.has(verseKey)
                         const verseRefs     = getCrossRefs(seg.book, seg.chapter, verse)
                         const isActiveSegment = seg.book === book && seg.chapter === chapter
@@ -3313,24 +3337,44 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             })()}
 
                             {studyMode && displayNote && !isEditing && (
-                              <div style={r.noteDisplay} onClick={(e) => { e.stopPropagation(); openNoteEditor(verseKey) }}>
-                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
-                                  <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                                  <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
-                                </svg>
-                                <span style={{flex:1}}>{parseNoteDisplay(displayNote)}</span>
-                                <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, displayNote, text) }} style={r.noteShareBtn} title="Share note">
-                                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                                    <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                    <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                    <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
-                                    <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                              <div
+                                style={{ ...r.noteDisplay, ...(isLibNote ? r.libNoteDisplay : {}) }}
+                                onClick={(e) => { e.stopPropagation(); if (!isLibNote) openNoteEditor(verseKey) }}
+                              >
+                                {isLibNote ? (
+                                  /* Book icon for library notes */
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, color:'var(--teal)', opacity:0.8 }}>
+                                    <rect x="1" y="1" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                                    <path d="M3 3.5h4M3 5.5h2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
                                   </svg>
-                                </button>
+                                ) : (
+                                  /* Pencil icon for plain notes */
+                                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, marginTop:2, opacity:0.5 }}>
+                                    <path d="M1 9l.5-2L6 2.5l2 2L3.5 9 1 9Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                                    <line x1="5.5" y1="3" x2="7.5" y2="5" stroke="currentColor" strokeWidth="1.2"/>
+                                  </svg>
+                                )}
+                                <span style={{flex:1}}>{displayNote}</span>
+                                {isLibNote ? (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); routerNavigate('/library') }}
+                                    style={r.libNoteEditBtn}
+                                    title="Edit in My Library"
+                                  >Edit →</button>
+                                ) : (
+                                  <button onClick={e => { e.stopPropagation(); handleShareNote(verseKey, displayNote, text) }} style={r.noteShareBtn} title="Share note">
+                                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                                      <circle cx="8.5" cy="2" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                      <circle cx="8.5" cy="9" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                      <circle cx="2.5" cy="5.5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+                                      <path d="M3.8 4.9l3.5-2.4M3.8 6.1l3.5 2.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                                    </svg>
+                                  </button>
+                                )}
                               </div>
                             )}
 
-                            {isEditing && (
+                            {isEditing && !isLibNote && (
                               <div style={r.noteEditorWrap} onClick={(e) => e.stopPropagation()}>
                                 <textarea
                                   value={noteDraft}
@@ -4273,6 +4317,19 @@ const r = {
     color:'var(--ink-faint)', display:'flex', alignItems:'center',
     padding:'2px 4px', borderRadius:4, flexShrink:0,
     transition:'color 0.12s',
+  },
+  /* Library-tagged note overrides — teal accent, non-editable cursor */
+  libNoteDisplay: {
+    background:'rgba(29,107,90,0.07)',
+    borderLeft:'2px solid rgba(29,107,90,0.4)',
+    cursor:'default',
+  },
+  libNoteEditBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--teal)', fontSize:11, fontWeight:600,
+    padding:'2px 4px', borderRadius:4, flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
+    transition:'opacity 0.12s',
   },
 
   /* ── Inline note editor ── */

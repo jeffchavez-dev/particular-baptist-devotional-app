@@ -24,16 +24,18 @@ function isRichNote(raw) { return typeof raw === 'string' && raw.startsWith(RICH
 function parseRichNote(raw) {
   try {
     const parsed = JSON.parse(raw.slice(RICH_PREFIX.length))
-    return { title: '', body: '', labels: [], verseTag: null, ...parsed }
+    return { title: '', body: '', labels: [], verseTag: null, createdAt: null, ...parsed }
   } catch {
-    return { title: '', body: '', labels: [], verseTag: null }
+    return { title: '', body: '', labels: [], verseTag: null, createdAt: null }
   }
 }
 
-/* verseTag: { book, chapter, verse } | null */
-function encodeRichNote(title, body, labels = [], verseTag = null) {
+/* verseTag: { book, chapter, verse } | null
+   createdAt: ISO string — pass the existing value when editing (preserves creation date) */
+function encodeRichNote(title, body, labels = [], verseTag = null, createdAt = null) {
   const obj = { title, body, labels }
   if (verseTag) obj.verseTag = verseTag
+  obj.createdAt = createdAt || new Date().toISOString()
   return RICH_PREFIX + JSON.stringify(obj)
 }
 
@@ -950,9 +952,15 @@ function CreateNoteForm({ onSave, onCancel, session }) {
     if (!hasContent) return
     setSaving(true)
     try {
-      const verseTag = tagEnabled ? { book: tagBook, chapter: tagChapter, verse: Math.max(1, parseInt(tagVerse) || 1) } : null
+      const verseTag = tagEnabled
+        ? { book: tagBook, chapter: tagChapter, verse: Math.max(1, parseInt(tagVerse) || 1) }
+        : null
       const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
-      const key = `lib|${new Date().toISOString()}`
+      /* Tagged notes save under the verse's kjv| key so they appear in the
+         scripture reader. Un-tagged notes keep the lib|timestamp key. */
+      const key = verseTag
+        ? `kjv|${verseTag.book}|${verseTag.chapter}|${verseTag.verse}`
+        : `lib|${new Date().toISOString()}`
       setItemNote(key, raw, session?.user?.id)
       onSave()
     } finally {
@@ -1082,13 +1090,14 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const [labels,   setLabels]   = useState(parsed.labels || [])
   const [saving,   setSaving]   = useState(false)
 
-  /* Preserve the original verseTag (if any) when re-saving */
-  const verseTag = parsed.verseTag ?? null
+  /* Preserve the original verseTag and createdAt when re-saving */
+  const verseTag  = parsed.verseTag  ?? null
+  const createdAt = parsed.createdAt ?? null
 
   async function handleSave() {
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt)
       setItemNote(noteKey, raw, session?.user?.id)
       onSave()
     } finally {
