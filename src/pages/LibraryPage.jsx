@@ -1423,8 +1423,22 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [sortBy,         setSortBy]         = useState('date-desc')
   const [filterLabel,    setFilterLabel]    = useState('')
+  const [sortOpen,       setSortOpen]       = useState(false)
+  const [filterOpen,     setFilterOpen]     = useState(false)
+  const sortRef   = useRef(null)
+  const filterRef = useRef(null)
   const [scriptureModal, setScriptureModal] = useState(null)
   const [pendingDelete,  setPendingDelete]  = useState(null) // { key, type }
+
+  /* Close dropdowns on outside click */
+  useEffect(() => {
+    function onOut(e) {
+      if (sortRef.current   && !sortRef.current.contains(e.target))   setSortOpen(false)
+      if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false)
+    }
+    document.addEventListener('mousedown', onOut)
+    return () => document.removeEventListener('mousedown', onOut)
+  }, [])
 
   function requestDelete(key, type) { setPendingDelete({ key, type }) }
   function confirmDelete() {
@@ -1550,7 +1564,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         />
       ) : (
         <>
-          {/* Compact control row: New Note + Sort */}
+          {/* Control row: New Note + Sort icon + Filter icon */}
           <div style={s.controlRow}>
             <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -1559,48 +1573,100 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               </svg>
               New Note
             </button>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={s.controlSelect}>
-              {SORT_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-            </select>
+
+            {/* ── Sort dropdown ── */}
+            <div ref={sortRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setSortOpen(o => !o); setFilterOpen(false) }}
+                style={{ ...s.iconDropBtn, ...(sortOpen ? s.iconDropBtnOpen : {}) }}
+                title="Sort notes"
+                aria-label="Sort notes"
+              >
+                {/* Sort icon: lines of decreasing length */}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 4h10M2 7h7M2 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+                <span style={s.iconDropLabel}>{SORT_OPTS.find(o => o.id === sortBy)?.label ?? 'Sort'}</span>
+                <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ opacity: 0.5 }}>
+                  <path d="M2 3.5l2.5 2.5 2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                </svg>
+              </button>
+              {sortOpen && (
+                <div style={s.dropPanel}>
+                  {SORT_OPTS.map(o => (
+                    <button
+                      key={o.id}
+                      style={{ ...s.dropOption, ...(sortBy === o.id ? s.dropOptionActive : {}) }}
+                      onClick={() => { setSortBy(o.id); setSortOpen(false) }}
+                    >
+                      <span style={s.dropOptionCheck}>{sortBy === o.id ? '✓' : ''}</span>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Filter by label dropdown ── */}
+            {allUsedLabels.length > 0 && (
+              <div ref={filterRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => { setFilterOpen(o => !o); setSortOpen(false) }}
+                  style={{ ...s.iconDropBtn, ...(filterOpen || filterLabel ? s.iconDropBtnOpen : {}) }}
+                  title="Filter by label"
+                  aria-label="Filter by label"
+                >
+                  {/* Funnel / filter icon */}
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M1.5 2.5h10l-3.5 4v3.5l-3-1.5V6.5L1.5 2.5Z"
+                      stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"
+                      fill={filterLabel ? 'currentColor' : 'none'} fillOpacity={filterLabel ? 0.25 : 0}/>
+                  </svg>
+                  <span style={s.iconDropLabel}>{filterLabel || 'Label'}</span>
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ opacity: 0.5 }}>
+                    <path d="M2 3.5l2.5 2.5 2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  {filterLabel && <span style={s.iconDropActiveDot} />}
+                </button>
+                {filterOpen && (
+                  <div style={s.dropPanel}>
+                    <button
+                      style={{ ...s.dropOption, ...(!filterLabel ? s.dropOptionActive : {}) }}
+                      onClick={() => { setFilterLabel(''); setFilterOpen(false) }}
+                    >
+                      <span style={s.dropOptionCheck}>{!filterLabel ? '✓' : ''}</span>
+                      All labels
+                    </button>
+                    <div style={s.dropDivider} />
+                    {allUsedLabels.map(l => {
+                      const c = getLabelColor(l)
+                      const isActive = filterLabel === l
+                      return (
+                        <button
+                          key={l}
+                          style={{ ...s.dropOption, ...(isActive ? s.dropOptionActive : {}) }}
+                          onClick={() => { setFilterLabel(isActive ? '' : l); setFilterOpen(false) }}
+                        >
+                          <span style={s.dropOptionCheck}>{isActive ? '✓' : ''}</span>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, display: 'inline-block' }} />
+                          {l}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Label filter chips */}
-          {allUsedLabels.length > 0 && (
-            <div style={s.labelFilterRow}>
-              <span style={s.labelFilterTitle}>Filter:</span>
-              {allUsedLabels.map(l => {
-                const c = getLabelColor(l)
-                const isActive = filterLabel === l
-                return (
-                  <button
-                    key={l}
-                    onClick={() => setFilterLabel(isActive ? '' : l)}
-                    style={{
-                      ...s.labelFilterChip,
-                      background:  isActive ? c.bg        : 'transparent',
-                      color:       isActive ? c.color     : 'var(--ink-faint)',
-                      borderColor: isActive ? c.border    : 'var(--border)',
-                      fontWeight:  isActive ? 700         : 500,
-                    }}
-                  >
-                    {l}
-                    {isActive && <span style={{ marginLeft: 3, opacity: 0.7 }}>×</span>}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Active filter / search meta */}
+          {/* Active-state meta line */}
           {(filterLabel || isSearching) && (
             <p style={s.searchMeta}>
               {isSearching && totalResults === 0
-                ? `No notes match "${searchQuery.trim()}"${filterLabel ? ` · ${filterLabel}` : ''}`
+                ? `No results${filterLabel ? ` for label "${filterLabel}"` : ''} matching "${searchQuery.trim()}"`
                 : isSearching
                   ? `${totalResults} note${totalResults !== 1 ? 's' : ''} match "${searchQuery.trim()}"${filterLabel ? ` · ${filterLabel}` : ''}`
-                  : filterLabel
-                    ? <>Filtered by label: <strong>{filterLabel}</strong> — <button onClick={() => setFilterLabel('')} style={s.clearFilterBtn}>clear</button></>
-                    : null
+                  : <>Label: <strong>{filterLabel}</strong> &nbsp;·&nbsp; <button onClick={() => setFilterLabel('')} style={s.clearFilterBtn}>clear ×</button></>
               }
             </p>
           )}
@@ -2248,37 +2314,54 @@ const s = {
     fontSize: 12, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
     flexShrink: 0, transition: 'opacity 0.12s',
   },
-  controlSelect: {
-    border: '1px solid var(--border)', borderRadius: 8, padding: '4px 6px',
-    fontSize: 11, color: 'var(--ink)', background: 'var(--parchment)',
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-    appearance: 'none',
-    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='6' viewBox='0 0 9 6'%3E%3Cpath d='M1 1l3.5 3.5L8 1' stroke='%235c5448' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\")",
-    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', paddingRight: 22,
+  /* ── Icon dropdown buttons (Sort / Filter) ── */
+  iconDropBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    background: 'var(--parchment-dark)', border: '1px solid var(--border)',
+    borderRadius: 8, padding: '5px 10px', cursor: 'pointer',
+    color: 'var(--ink-muted)', fontSize: 12, fontWeight: 500,
+    fontFamily: "'DM Sans', sans-serif", transition: 'all 0.12s',
+    position: 'relative',
   },
-
-  /* ── Label filter chips ── */
-  labelFilterRow: {
-    display: 'flex', flexWrap: 'wrap', alignItems: 'center',
-    gap: '5px', marginTop: 2, marginBottom: 2,
+  iconDropBtnOpen: {
+    background: 'var(--teal-light)', borderColor: 'var(--teal)', color: 'var(--teal)',
   },
-  labelFilterTitle: {
-    fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)',
-    textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0,
-    marginRight: 2,
+  iconDropLabel: {
+    maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
-  labelFilterChip: {
-    display: 'inline-flex', alignItems: 'center',
-    padding: '3px 9px', borderRadius: 99,
-    border: '1px solid', fontSize: 11, lineHeight: 1.5,
-    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
-    transition: 'all 0.12s', whiteSpace: 'nowrap',
+  iconDropActiveDot: {
+    position: 'absolute', top: 4, right: 4,
+    width: 6, height: 6, borderRadius: '50%',
+    background: 'var(--teal)', border: '1.5px solid var(--surface)',
+  },
+  /* ── Dropdown panel ── */
+  dropPanel: {
+    position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 200,
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 10, boxShadow: '0 4px 16px rgba(26,22,17,0.13)',
+    minWidth: 160, overflow: 'hidden',
+    animation: 'fadeIn 0.12s ease',
+  },
+  dropOption: {
+    display: 'flex', alignItems: 'center', gap: 8,
+    width: '100%', background: 'none', border: 'none',
+    padding: '9px 14px', cursor: 'pointer', textAlign: 'left',
+    fontSize: 13, color: 'var(--ink)', fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.1s',
+  },
+  dropOptionActive: {
+    background: 'var(--teal-light)', color: 'var(--teal)', fontWeight: 600,
+  },
+  dropOptionCheck: {
+    width: 14, fontSize: 11, color: 'var(--teal)', flexShrink: 0, fontWeight: 700,
+  },
+  dropDivider: {
+    height: 1, background: 'var(--border)', margin: '2px 0',
   },
   clearFilterBtn: {
     background: 'none', border: 'none', cursor: 'pointer',
     color: 'var(--teal)', fontSize: 11, fontWeight: 600,
     padding: 0, fontFamily: "'DM Sans', sans-serif",
-    textDecoration: 'underline',
   },
 
   /* ── Kanban 2-column grid ── */
