@@ -24,17 +24,19 @@ function isRichNote(raw) { return typeof raw === 'string' && raw.startsWith(RICH
 function parseRichNote(raw) {
   try {
     const parsed = JSON.parse(raw.slice(RICH_PREFIX.length))
-    return { title: '', body: '', labels: [], verseTag: null, createdAt: null, ...parsed }
+    return { title: '', body: '', labels: [], verseTag: null, chapterTag: null, createdAt: null, ...parsed }
   } catch {
-    return { title: '', body: '', labels: [], verseTag: null, createdAt: null }
+    return { title: '', body: '', labels: [], verseTag: null, chapterTag: null, createdAt: null }
   }
 }
 
-/* verseTag: { book, chapter, verse } | null
-   createdAt: ISO string — pass the existing value when editing (preserves creation date) */
-function encodeRichNote(title, body, labels = [], verseTag = null, createdAt = null) {
+/* verseTag:   { book, chapter, verse }    | null — verse-exact note (goes to Scripture Notes)
+   chapterTag: { book, chapter }           | null — chapter-scoped note (goes to Personal Notes)
+   createdAt:  ISO string — pass existing value when editing (preserves creation date) */
+function encodeRichNote(title, body, labels = [], verseTag = null, createdAt = null, chapterTag = null) {
   const obj = { title, body, labels }
-  if (verseTag) obj.verseTag = verseTag
+  if (verseTag)    obj.verseTag    = verseTag
+  if (chapterTag)  obj.chapterTag  = chapterTag
   obj.createdAt = createdAt || new Date().toISOString()
   return RICH_PREFIX + JSON.stringify(obj)
 }
@@ -234,6 +236,23 @@ function parseAtQuery(query) {
   return null
 }
 
+/** Extend parseAtQuery to also handle chapter-shorthand when a chapterTag is active.
+ *  e.g. if chapterTag = { book: 'Genesis', chapter: 1 } and query = "1:3" → Genesis 1:3 */
+function parseAtQueryWithChapterTag(query, chapterTag) {
+  if (chapterTag) {
+    const m = query.trim().match(/^(\d+):(\d+)(?:-(\d+))?$/)
+    if (m) {
+      return {
+        book:    chapterTag.book,
+        chapter: parseInt(m[1]),
+        verse:   parseInt(m[2]),
+        verseTo: m[3] ? parseInt(m[3]) : null,
+      }
+    }
+  }
+  return parseAtQuery(query)
+}
+
 /* ── Label / category storage ── */
 const LABEL_STORAGE_KEY = 'pb-note-labels'
 const DEFAULT_LABELS = [
@@ -352,6 +371,79 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   ScTag Action Popup  (shown in EDIT MODE when clicking a tag)
+══════════════════════════════════════════════════════════════ */
+function ScTagActionPopup({ sc, anchorRect, onClose, onDelete }) {
+  const [verseText, setVerseText] = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetchVerseText(sc.book, sc.chapter, sc.verse, getDefaultReaderVersion())
+      .then(t => { if (!cancelled) { setVerseText(t); setLoading(false) } })
+    return () => { cancelled = true }
+  }, [sc.book, sc.chapter, sc.verse]) // eslint-disable-line
+
+  useEffect(() => {
+    function onDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+
+  const label = sc.verseTo
+    ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
+    : `${sc.book} ${sc.chapter}:${sc.verse}`
+
+  /* Position below the tag, flipping up if too close to bottom */
+  const POPUP_H = 150
+  const fitsBelow = anchorRect.bottom + 6 + POPUP_H <= window.innerHeight
+  const top  = fitsBelow ? anchorRect.bottom + 6 : anchorRect.top - POPUP_H - 6
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 252))
+
+  return (
+    <div
+      ref={ref}
+      onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+      style={{
+        position: 'fixed', zIndex: 9500, left, top,
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+        padding: '10px 12px', width: 240,
+        fontFamily: "'DM Sans', sans-serif",
+      }}
+    >
+      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 6px', fontFamily: "'Cormorant Garamond', serif" }}>
+        {label}
+      </p>
+      {loading ? (
+        <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 8px', fontStyle: 'italic' }}>Loading…</p>
+      ) : verseText ? (
+        <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 72, overflow: 'hidden' }}>
+          "{verseText.length > 120 ? verseText.slice(0, 120) + '…' : verseText}"
+        </p>
+      ) : (
+        <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 8px' }}>Verse not found.</p>
+      )}
+      <button
+        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
+        style={{
+          width: '100%', background: 'var(--red-light)', border: '1px solid var(--red)',
+          borderRadius: 6, padding: '6px 0', cursor: 'pointer',
+          fontSize: 12, fontWeight: 700, color: 'var(--red)',
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        Remove this tag
+      </button>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
    Note Body — renders plain OR rich note; intercepts @ref clicks
 ══════════════════════════════════════════════════════════════ */
 function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
@@ -426,7 +518,7 @@ function NoteBody({ rawNote, query, onScriptureClick, clip = true }) {
 /* ══════════════════════════════════════════════════════════════
    @ Scripture Mention Popup
 ══════════════════════════════════════════════════════════════ */
-function AtMentionPopup({ pos, query, onSelect, onClose }) {
+function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
   const [step,      setStep]      = useState('book')  // 'book' | 'ref'
   const [book,      setBook]      = useState('')
   const [chapter,   setChapter]   = useState(1)
@@ -436,8 +528,8 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
   const [versePreview, setVersePreview] = useState(null)
   const ref = useRef(null)
 
-  /* Detect fully-typed inline reference like "Genesis 1:1" or "Genesis 1:1-5" */
-  const resolved    = useMemo(() => parseAtQuery(query), [query])
+  /* Detect fully-typed inline reference (supports chapter shorthand when chapterTag is set) */
+  const resolved    = useMemo(() => parseAtQueryWithChapterTag(query, chapterTag), [query, chapterTag])
   const showResolved = resolved && !forceEdit
 
   /* Fetch verse text for preview when reference is resolved */
@@ -511,6 +603,12 @@ function AtMentionPopup({ pos, query, onSelect, onClose }) {
             Quote verse{rvt ? 's' : ''}
           </button>
         </div>
+        {/* Keyboard hint — shown on non-touch devices */}
+        {'ontouchstart' in window ? null : (
+          <p style={am.kbHint}>
+            <kbd style={am.kbd}>Space</kbd> or <kbd style={am.kbd}>↵</kbd> to insert tag
+          </p>
+        )}
         <button style={am.editRefBtn} onClick={() => setForceEdit(true)}>
           ← Choose differently
         </button>
@@ -612,7 +710,7 @@ const TOOLBAR_ACTIONS = [
 /* ══════════════════════════════════════════════════════════════
    Rich Note Editor Component
 ══════════════════════════════════════════════════════════════ */
-function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, onBodyChange }) {
+function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, onBodyChange, chapterTag }) {
   const editorRef  = useRef(null)
   const savedRange = useRef(null)
 
@@ -655,6 +753,36 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
   const [atPopup,   setAtPopup]   = useState(null) // { bottom, left } | null
   const [atQuery,   setAtQuery]   = useState('')
   const atRangeRef = useRef(null)  // saved Range at the @ sign
+
+  /* sc-tag click popup (edit mode) */
+  const [scTagPopup, setScTagPopup] = useState(null) // { book, chapter, verse, verseTo, anchorRect, el } | null
+
+  function handleEditorClick(e) {
+    const tagEl = e.target.closest('[data-sc-book]')
+    if (tagEl && editorRef.current?.contains(tagEl)) {
+      // Prevent the click from also propagating into the contenteditable cursor placement
+      e.stopPropagation()
+      const rect = tagEl.getBoundingClientRect()
+      setScTagPopup({
+        book:    tagEl.dataset.scBook,
+        chapter: parseInt(tagEl.dataset.scChapter),
+        verse:   parseInt(tagEl.dataset.scVerse),
+        verseTo: tagEl.dataset.scVerseTo ? parseInt(tagEl.dataset.scVerseTo) : null,
+        anchorRect: rect,
+        el: tagEl,
+      })
+    } else if (!e.target.closest('[data-sctag-popup]')) {
+      setScTagPopup(null)
+    }
+  }
+
+  function deleteScTag(el) {
+    if (!el || !editorRef.current?.contains(el)) return
+    // For blockquotes (.sc-quote), remove the whole block element
+    const blockEl = el.closest('blockquote') ?? el
+    blockEl.parentNode?.removeChild(blockEl)
+    onBodyChange(editorRef.current.innerHTML)
+  }
 
   function saveSelection() {
     const sel = window.getSelection()
@@ -801,10 +929,25 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
 
   function handleKeyDown(e) {
     if (e.key === 'Escape') { setAtPopup(null); return }
-    // Prevent Enter from creating a <div> in some browsers
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Let browser default handle it for block elements
+
+    // ── Auto-insert tag on Space or Enter when a full reference is detected ──
+    // Space always triggers; Enter triggers on non-touch devices (desktop).
+    // The popup remains open (for "Quote verse") — Space just fires the default "Insert tag" action.
+    if (atPopup && (e.key === ' ' || (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)))) {
+      const resolved = parseAtQueryWithChapterTag(atQuery, chapterTag)
+      if (resolved) {
+        e.preventDefault()
+        handleAtSelect({
+          book:    resolved.book,
+          chapter: resolved.chapter,
+          verse:   resolved.verse,
+          verseTo: resolved.verseTo,
+          quoteMode: false,
+        })
+        return
+      }
     }
+
     saveSelection()
   }
 
@@ -830,6 +973,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        onClick={handleEditorClick}
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
         onMouseUp={saveSelection}
@@ -873,7 +1017,7 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
           </svg>
         </button>
         <span style={re.toolDivider} />
-        <span style={re.atHint}>@ scripture</span>
+        <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand)` : '@ scripture'}</span>
       </div>
 
       {/* @ picker popup */}
@@ -883,6 +1027,17 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
           query={atQuery}
           onSelect={handleAtSelect}
           onClose={() => setAtPopup(null)}
+          chapterTag={chapterTag}
+        />
+      )}
+
+      {/* sc-tag action popup (edit mode) */}
+      {scTagPopup && (
+        <ScTagActionPopup
+          sc={scTagPopup}
+          anchorRect={scTagPopup.anchorRect}
+          onClose={() => setScTagPopup(null)}
+          onDelete={() => deleteScTag(scTagPopup.el)}
         />
       )}
     </div>
@@ -1053,7 +1208,6 @@ function CreateNoteForm({ onSave, onCancel, session }) {
   const [tagEnabled, setTagEnabled] = useState(draft?.tagEnabled ?? false)
   const [tagBook,    setTagBook]    = useState(draft?.tagBook    ?? 'Genesis')
   const [tagChapter, setTagChapter] = useState(draft?.tagChapter ?? 1)
-  const [tagVerse,   setTagVerse]   = useState(draft?.tagVerse   ?? '1')
   const [saving,     setSaving]     = useState(false)
   const draftTimer = useRef(null)
 
@@ -1069,23 +1223,20 @@ function CreateNoteForm({ onSave, onCancel, session }) {
     if (draftTimer.current) clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(() => {
       try {
-        localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter, tagVerse }))
+        localStorage.setItem(CREATE_DRAFT_KEY, JSON.stringify({ titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter }))
       } catch {}
     }, 500)
     return () => clearTimeout(draftTimer.current)
-  }, [titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter, tagVerse])
+  }, [titleVal, bodyHtml, labels, tagEnabled, tagBook, tagChapter])
 
   async function handleSave() {
     const hasContent = titleVal.trim() || bodyHtml.replace(/<[^>]*>/g, '').trim()
     if (!hasContent) return
     setSaving(true)
     try {
-      const verseTag = tagEnabled
-        ? { book: tagBook, chapter: tagChapter, verse: Math.max(1, parseInt(tagVerse) || 1) }
-        : null
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag)
-      /* Always use a lib|timestamp key so multiple notes can exist per passage.
-         KjvReader finds tagged lib notes via the verseTag in the JSON payload. */
+      const chapterTag = tagEnabled ? { book: tagBook, chapter: tagChapter } : null
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, null, null, chapterTag)
+      /* Always use a lib|timestamp key so multiple notes can exist per passage. */
       const key = `lib|${new Date().toISOString()}`
       setItemNote(key, raw, session?.user?.id)
       localStorage.removeItem(CREATE_DRAFT_KEY)
@@ -1123,12 +1274,13 @@ function CreateNoteForm({ onSave, onCancel, session }) {
         initialBody={bodyHtml}
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
+        chapterTag={tagEnabled ? { book: tagBook, chapter: tagChapter } : null}
       />
 
       {/* Labels */}
       <LabelDropdown selected={labels} onChange={setLabels} />
 
-      {/* Scripture tag toggle */}
+      {/* Chapter tag toggle */}
       <button
         style={{ ...s.tagToggleBtn, ...(tagEnabled ? s.tagToggleBtnActive : {}) }}
         onClick={() => setTagEnabled(t => !t)}
@@ -1139,9 +1291,9 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.3"/>
           <path d="M4 4.5h5M4 7h3" stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.2" strokeLinecap="round"/>
         </svg>
-        {tagEnabled ? 'Scripture tagged' : 'Tag a scripture'}
+        {tagEnabled ? 'Chapter tagged' : 'Tag a chapter'}
         {tagEnabled && (
-          <span style={s.tagPreview}>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</span>
+          <span style={s.tagPreview}>{tagBook} {tagChapter}</span>
         )}
       </button>
 
@@ -1151,7 +1303,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             <label style={s.pickerLabel}>Book</label>
             <select
               value={tagBook}
-              onChange={e => { setTagBook(e.target.value); setTagChapter(1); setTagVerse('1') }}
+              onChange={e => { setTagBook(e.target.value); setTagChapter(1) }}
               style={s.pickerSelect}
             >
               <optgroup label="Old Testament">
@@ -1170,7 +1322,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
             <label style={s.pickerLabel}>Ch.</label>
             <select
               value={tagChapter}
-              onChange={e => { setTagChapter(Number(e.target.value)); setTagVerse('1') }}
+              onChange={e => setTagChapter(Number(e.target.value))}
               style={s.pickerSelectSmall}
             >
               {Array.from({ length: maxChapters }, (_, i) => i + 1).map(ch => (
@@ -1178,20 +1330,11 @@ function CreateNoteForm({ onSave, onCancel, session }) {
               ))}
             </select>
           </div>
-          <div style={s.pickerGroup}>
-            <label style={s.pickerLabel}>Vs.</label>
-            <input
-              type="number" min={1} max={200} value={tagVerse}
-              onChange={e => setTagVerse(e.target.value)}
-              onBlur={() => setTagVerse(v => String(Math.max(1, parseInt(v) || 1)))}
-              style={s.pickerInput}
-            />
-          </div>
         </div>
       )}
       {tagEnabled && (
         <p style={s.tagHint}>
-          This note is tagged to <strong>{tagBook} {tagChapter}:{Math.max(1, parseInt(tagVerse) || 1)}</strong>. It appears in Scripture Notes and a chip shows on the verse in the reader.
+          Tagged to <strong>{tagBook} {tagChapter}</strong>. In the editor, type <code style={{ fontSize: 10, background: 'var(--parchment-dark)', padding: '1px 4px', borderRadius: 3 }}>@1:1</code> to quickly tag verse 1 of this chapter.
         </p>
       )}
 
@@ -1226,16 +1369,17 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const autoSaveTimer = useRef(null)
   const isFirstRender = useRef(true)
 
-  /* Preserve the original verseTag and createdAt when re-saving */
-  const verseTag  = parsed.verseTag  ?? null
-  const createdAt = parsed.createdAt ?? null
+  /* Preserve the original verseTag, chapterTag, and createdAt when re-saving */
+  const verseTag   = parsed.verseTag   ?? null
+  const chapterTag = parsed.chapterTag ?? null
+  const createdAt  = parsed.createdAt  ?? null
 
   /* Auto-save: debounced 1.5 s after each edit (skip first render) */
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(() => {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt, chapterTag)
       setItemNote(noteKey, raw, session?.user?.id)
       setAutoSaved(true)
       setTimeout(() => setAutoSaved(false), 2000)
@@ -1247,7 +1391,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     setSaving(true)
     try {
-      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt)
+      const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt, chapterTag)
       setItemNote(noteKey, raw, session?.user?.id)
       onSave()
     } finally {
@@ -1277,7 +1421,17 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
         initialBody={bodyHtml}
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
+        chapterTag={chapterTag}
       />
+
+      {/* Show chapter tag badge if the note has one */}
+      {chapterTag && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chapter tag:</span>
+          <span style={{ ...s.tagPreview }}>{chapterTag.book} {chapterTag.chapter}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>· Use @{chapterTag.chapter}:1 to reference a verse</span>
+        </div>
+      )}
 
       <LabelDropdown selected={labels} onChange={setLabels} />
 
@@ -1389,7 +1543,7 @@ function notePreviewText(rawNote) {
 /* ══════════════════════════════════════════════════════════════
    Note Card  (kanban tile)
 ══════════════════════════════════════════════════════════════ */
-function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick, onEdit, onDelete, onOpen, query }) {
+function NoteCard({ badge, badgeStyle, title, labels, chapterBadge, chapterBadgeStyle, preview, date, onCardClick, onEdit, onDelete, onOpen, query }) {
   const displayPreview = preview
     ? (query
         ? preview
@@ -1409,10 +1563,13 @@ function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick
         }
       </div>
 
-      {/* Labels */}
-      {labels?.length > 0 && (
+      {/* Labels + optional chapter badge */}
+      {(labels?.length > 0 || chapterBadge) && (
         <div style={nc.labelRow}>
-          {labels.slice(0, 2).map(l => {
+          {chapterBadge && (
+            <span style={{ ...nc.labelChip, ...chapterBadgeStyle }}>{chapterBadge}</span>
+          )}
+          {labels?.slice(0, 2).map(l => {
             const c = getLabelColor(l)
             return (
               <span key={l} style={{ ...nc.labelChip, background: c.bg, color: c.color }}>
@@ -1420,7 +1577,7 @@ function NoteCard({ badge, badgeStyle, title, labels, preview, date, onCardClick
               </span>
             )
           })}
-          {labels.length > 2 && <span style={nc.labelMore}>+{labels.length - 2}</span>}
+          {labels?.length > 2 && <span style={nc.labelMore}>+{labels.length - 2}</span>}
         </div>
       )}
 
@@ -1569,9 +1726,38 @@ const SORT_OPTS = [
   { id: 'label',     label: 'By label' },
 ]
 
+const SESSION_EDIT_KEY = 'pb-lib-editing-note'
+
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [editingNote,    setEditingNote]    = useState(null)
+
+  /* Persist editingNote to sessionStorage so it survives navigation */
+  const [editingNote, setEditingNoteRaw] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_EDIT_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  })
+
+  function setEditingNote(n) {
+    setEditingNoteRaw(n)
+    try {
+      if (n) sessionStorage.setItem(SESSION_EDIT_KEY, JSON.stringify(n))
+      else   sessionStorage.removeItem(SESSION_EDIT_KEY)
+    } catch {}
+  }
+
+  /* When libNotes refreshes (e.g. auto-save finished), keep editingNote in sync */
+  useEffect(() => {
+    if (!editingNote?.key) return
+    const fresh = libNotes.find(n => n.key === editingNote.key)
+    // Only sync if content differs (avoid infinite loop)
+    if (fresh && fresh.note !== editingNote.note) {
+      setEditingNoteRaw(fresh) // update state without re-writing sessionStorage
+      try { sessionStorage.setItem(SESSION_EDIT_KEY, JSON.stringify(fresh)) } catch {}
+    }
+  }, [libNotes]) // eslint-disable-line
+
   const formAreaRef = useRef(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [sortBy,         setSortBy]         = useState('date-desc')
@@ -1616,13 +1802,17 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     return [...set].sort()
   }, [libNotes, kjvNotes])
 
-  /* Split lib notes: free-form vs scripture-tagged (verseTag in JSON) */
+  /* Split lib notes:
+     - libFreeNotes:   no verseTag (includes chapter-tagged notes → Personal Notes)
+     - libTaggedNotes: has verseTag (verse-exact → Scripture Notes) */
   const { libFreeNotes, libTaggedNotes } = useMemo(() => {
     const free = [], tagged = []
     libNotes.forEach(n => {
-      const vt = isRichNote(n.note) ? parseRichNote(n.note).verseTag : null
+      const parsed = isRichNote(n.note) ? parseRichNote(n.note) : {}
+      const vt = parsed.verseTag ?? null
+      const ct = parsed.chapterTag ?? null
       if (vt) tagged.push({ ...n, book: vt.book, chapter: vt.chapter, verse: vt.verse, isLibTagged: true })
-      else    free.push(n)
+      else    free.push({ ...n, chapterTag: ct })  // carry chapterTag for badge display
     })
     return { libFreeNotes: free, libTaggedNotes: tagged }
   }, [libNotes])
@@ -1691,7 +1881,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
   function handleSaved() {
     setShowCreateForm(false)
-    setEditingNote(null)
+    setEditingNote(null) // also clears sessionStorage via our wrapper
   }
 
   /* Scroll the form into view whenever it opens */
@@ -1855,13 +2045,19 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               <div style={s.kanbanGrid}>
                 {filteredLib.map(n => {
                   const { title, labels } = isRichNote(n.note) ? parseRichNote(n.note) : { title: '', labels: [] }
+                  const chTagBadge = n.chapterTag
+                    ? `${n.chapterTag.book} ${n.chapterTag.chapter}`
+                    : null
+                  const chTagBadgeStyle = { background: 'var(--amber-soft)', color: 'var(--amber-ink)', border: '1px solid var(--amber-ink)', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, display: 'inline-block', marginLeft: 4 }
                   return (
                     <NoteCard
                       key={n.key}
                       title={title}
                       labels={labels}
+                      chapterBadge={chTagBadge}
+                      chapterBadgeStyle={chTagBadgeStyle}
                       preview={notePreviewText(n.note)}
-                      date={new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
                       onCardClick={() => setViewingNote({ note: n.note, key: n.key, title, type: 'lib' })}
                       onEdit={() => setEditingNote(n)}
                       onDelete={() => requestDelete(n.key, 'lib')}
@@ -2819,6 +3015,13 @@ const am = {
   versePreview:  { fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.5, margin: '0 0 10px', padding: '6px 8px', background: 'var(--teal-light)', borderRadius: 4 },
   editRefBtn:    { background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)', padding: '6px 0 0', fontFamily: "'DM Sans', sans-serif" },
   hintSmall:     { fontSize: 9, fontWeight: 400, color: 'var(--ink-faint)', textTransform: 'none', letterSpacing: 0 },
+  kbHint:        { fontSize: 10, color: 'var(--ink-faint)', margin: '6px 0 0', display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' },
+  kbd: {
+    display: 'inline-block', fontSize: 9, fontWeight: 700,
+    background: 'var(--parchment-dark)', border: '1px solid var(--border-strong)',
+    borderRadius: 4, padding: '1px 5px', fontFamily: "'DM Sans', sans-serif",
+    color: 'var(--ink-muted)', boxShadow: '0 1px 0 var(--border-strong)',
+  },
 }
 
 /* ── Label dropdown styles ── */
@@ -3012,7 +3215,7 @@ const nc = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     marginTop: 'auto', paddingTop: 6, borderTop: '1px solid var(--border)',
   },
-  date: { fontSize: 9, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif" },
+  date: { fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif" },
   actions: { display: 'flex', gap: 2, alignItems: 'center', marginLeft: 'auto' },
   openBtn: {
     background: 'none', border: 'none', cursor: 'pointer',
