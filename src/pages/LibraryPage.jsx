@@ -241,16 +241,43 @@ function parseAtQuery(query) {
 }
 
 /** Extend parseAtQuery to also handle chapter-shorthand when a chapterTag is active.
- *  e.g. if chapterTag = { book: 'Genesis', chapter: 1 } and query = "1:3" → Genesis 1:3 */
+ *
+ *  @3       → tagged book + chapter, verse 3          (verse-only shorthand — NEW)
+ *  @3-5     → tagged book + chapter, verses 3–5       (verse range shorthand — NEW)
+ *  @1:3     → tagged book, explicit chapter 1 verse 3 (existing cross-chapter shorthand)
+ *  @Gen 1:3 → full reference (falls through to parseAtQuery)
+ */
 function parseAtQueryWithChapterTag(query, chapterTag) {
   if (chapterTag) {
-    const m = query.trim().match(/^(\d+):(\d+)(?:-(\d+))?$/)
-    if (m) {
+    const q = query.trim()
+    // @3 — bare verse number → use the tagged chapter
+    const mVerse = q.match(/^(\d+)$/)
+    if (mVerse) {
       return {
         book:    chapterTag.book,
-        chapter: parseInt(m[1]),
-        verse:   parseInt(m[2]),
-        verseTo: m[3] ? parseInt(m[3]) : null,
+        chapter: chapterTag.chapter,
+        verse:   parseInt(mVerse[1]),
+        verseTo: null,
+      }
+    }
+    // @3-5 — bare verse range → use the tagged chapter
+    const mRange = q.match(/^(\d+)-(\d+)$/)
+    if (mRange) {
+      return {
+        book:    chapterTag.book,
+        chapter: chapterTag.chapter,
+        verse:   parseInt(mRange[1]),
+        verseTo: parseInt(mRange[2]),
+      }
+    }
+    // @1:3 — explicit chapter:verse within the tagged book
+    const mChVerse = q.match(/^(\d+):(\d+)(?:-(\d+))?$/)
+    if (mChVerse) {
+      return {
+        book:    chapterTag.book,
+        chapter: parseInt(mChVerse[1]),
+        verse:   parseInt(mChVerse[2]),
+        verseTo: mChVerse[3] ? parseInt(mChVerse[3]) : null,
       }
     }
   }
@@ -1270,6 +1297,22 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
     }
   }
 
+  /* Prevents the cursor from landing inside a tag/quote element on mousedown.
+     Also blocks all editor interaction while a tag popup is open so nothing
+     bleeds through behind the popup. onClick still fires normally. */
+  function handleEditorMouseDown(e) {
+    // While a tag popup is open: block cursor/focus changes entirely
+    if (scTagPopup || confTagPopup) {
+      e.preventDefault()
+      return
+    }
+    // Clicking on a tag or quote: prevent cursor placement; let onClick handle the popup
+    const tagEl = e.target.closest('[data-sc-book],[data-conf-type]')
+    if (tagEl && editorRef.current?.contains(tagEl)) {
+      e.preventDefault()
+    }
+  }
+
   function deleteScTag(el) {
     if (!el || !editorRef.current?.contains(el)) return
     const blockEl = el.closest('blockquote') ?? el
@@ -1649,6 +1692,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
+        onMouseDown={handleEditorMouseDown}
         onClick={handleEditorClick}
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}
@@ -1694,7 +1738,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
             </svg>
           </button>
           <span style={re.toolDivider} />
-          <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand) · @2LBCF 1:1 · @Keach1` : '@ scripture · @2LBCF 1:1 · @Keach1'}</span>
+          <span style={re.atHint}>{chapterTag ? `@ tag · @3 = verse 3 · @1:3 = ch.1 v.3 · @2LBCF 1:1 · @Keach1` : '@ scripture · @2LBCF 1:1 · @Keach1'}</span>
         </div>
       )}
 
@@ -1743,7 +1787,8 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
   const [toolbarHidden, setToolbarHidden] = useState(false)
 
   /* Track visual viewport height only — top is always 0 for a fixed overlay.
-     Using offsetTop here creates a downward shift that gaps the toolbar from the keyboard. */
+     Only listen to 'resize' (keyboard open/close). The 'scroll' event fires whenever
+     the page scrolls (browser chrome shows/hides) and causes the toolbar to jump. */
   const [vpHeight, setVpHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
 
   useEffect(() => {
@@ -1751,16 +1796,34 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
     if (!vv) return
     function update() { setVpHeight(Math.round(vv.height)) }
     vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
     update()
+    return () => vv.removeEventListener('resize', update)
+  }, [])
+
+  /* Lock background scroll while overlay is open.
+     iOS ignores overflow:hidden on body alone — the position:fixed trick is required. */
+  useEffect(() => {
+    const body = document.body
+    const scrollY = window.scrollY
+    const prevOverflow = body.style.overflow
+    const prevPosition = body.style.position
+    const prevTop      = body.style.top
+    const prevWidth    = body.style.width
+    body.style.overflow  = 'hidden'
+    body.style.position  = 'fixed'
+    body.style.top       = `-${scrollY}px`
+    body.style.width     = '100%'
     return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
+      body.style.overflow  = prevOverflow
+      body.style.position  = prevPosition
+      body.style.top       = prevTop
+      body.style.width     = prevWidth
+      window.scrollTo(0, scrollY)
     }
   }, [])
 
   const atHint = chapterTag
-    ? `@ tag · @${chapterTag.chapter}:1 shorthand · @2LBCF 1:1 · @Keach1`
+    ? `@ tag · @3 = verse 3 · @1:3 = ch.1 v.3 · @2LBCF 1:1 · @Keach1`
     : '@ scripture tag · @2LBCF 1:1 · @Keach1'
 
   function execCmd(cmd, val) { editorRef.current?.execCmd(cmd, val) }
@@ -3855,13 +3918,13 @@ const re = {
 
 /* ── Note Edit Overlay styles ── */
 const eo = {
-  overlay:          { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" },
+  overlay:          { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", overscrollBehavior: 'none' },
   topBar:           { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', paddingTop: 'max(10px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   backBtn:          { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", padding: '4px', flexShrink: 0 },
   topTitle:         { fontSize: 13, fontWeight: 600, color: 'var(--ink)' },
   autoSavedChip:    { fontSize: 10, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-light)', borderRadius: 4, padding: '2px 6px', flexShrink: 0 },
   saveTopBtn:       { background: 'var(--teal)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 16px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
-  scrollArea:       { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  scrollArea:       { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
   contentPad:       { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   toolbarWrap:      { flexShrink: 0, background: 'var(--surface)', borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' },
   toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap', overflowX: 'auto' },
