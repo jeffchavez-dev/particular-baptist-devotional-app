@@ -928,7 +928,7 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
         full === b.name && abbr.startsWith(qNorm.split(' ')[0])
       )
     })
-  }, [query, step, showResolved])
+  }, [query, step, showScResolved, showConfResolved])
 
   /* Click-outside to close */
   useEffect(() => {

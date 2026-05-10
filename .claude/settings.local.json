@@ -185,7 +185,10 @@
       "Bash(git -C \"C:/Users/Jeff Chavez/Desktop/realcrm\" commit -m \"Fix seed: clear all data before re-seeding, use create with fixed IDs\")",
       "Bash(curl -s \"https://realcrm.up.railway.app\")",
       "Bash(grep -v \"//\")",
-      "Bash(git -C \"C:/Users/Jeff Chavez/Desktop/realcrm\" commit -m \"Fix: escape apostrophe in CRMLS description causing Vite build failure\")"
+      "Bash(git -C \"C:/Users/Jeff Chavez/Desktop/realcrm\" commit -m \"Fix: escape apostrophe in CRMLS description causing Vite build failure\")",
+      "Bash(node --input-type=module --experimental-vm-modules)",
+      "Bash(npx --yes eslint src/pages/LibraryPage.jsx --no-eslintrc --rule '{\"no-undef\": \"error\", \"no-unused-vars\": \"warn\"}' --env browser,es2020 --parser-options=ecmaVersion:2020,ecmaFeatures:{jsx:true})",
+      "Bash(npx eslint *)"
     ]
   }
 }
