@@ -2711,7 +2711,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                           onClick={() => { setFilterLabel(isActive ? '' : l); setFilterOpen(false) }}
                         >
                           <span style={s.dropOptionCheck}>{isActive ? '✓' : ''}</span>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.dot, flexShrink: 0, display: 'inline-block' }} />
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, flexShrink: 0, display: 'inline-block' }} />
                           {l}
                         </button>
                       )
@@ -2971,7 +2971,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           } : null}
           onDelete={viewingNote.key ? () => requestDelete(viewingNote.key, viewingNote.type) : null}
           onOpen={viewingNote.extra ? () => {
-            if (viewingNote.type === 'kjv') {
+            if (viewingNote.type === 'kjv' || (viewingNote.type === 'lib' && viewingNote.extra.book)) {
               const { book, chapter, verse } = viewingNote.extra
               navigate('/scripture', { state: { book, chapter, verse } })
             } else if (viewingNote.type === 'dev') {
