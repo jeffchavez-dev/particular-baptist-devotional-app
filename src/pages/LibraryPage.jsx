@@ -563,13 +563,17 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
     return () => { cancelled = true }
   }, [sc.book, sc.chapter, sc.verse]) // eslint-disable-line
 
-  /* Close on outside click */
+  /* Close on outside click/tap */
   useEffect(() => {
     function onDown(e) {
       if (ref.current && !ref.current.contains(e.target)) onClose()
     }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
   }, [onClose])
 
   const label = sc.verseTo
@@ -726,7 +730,11 @@ function ConfTagActionPopup({ conf, anchorRect, onClose, onDelete, onEdit }) {
   useEffect(() => {
     function onDown(e) { if (ref.current && !ref.current.contains(e.target)) onClose() }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('touchstart', onDown, { passive: true })
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('touchstart', onDown)
+    }
   }, [onClose])
 
   const POPUP_H   = mode === 'edit' ? 270 : 185
@@ -1753,6 +1761,21 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
         />
       )}
 
+      {/* Full-screen backdrop — blocks ALL pointer/touch events behind the popup.
+          Sits at zIndex 9000 (below popup's 9500, above everything else).
+          Tapping the backdrop (outside the popup) closes it. */}
+      {(scTagPopup || confTagPopup) && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9000,
+            background: 'transparent', WebkitTapHighlightColor: 'transparent',
+          }}
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+          onTouchStart={e => e.stopPropagation()}
+          onClick={() => { setScTagPopup(null); setConfTagPopup(null) }}
+        />
+      )}
+
       {/* sc-tag action popup (edit mode) */}
       {scTagPopup && (
         <ScTagActionPopup
@@ -1786,6 +1809,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
 function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, navigate, children }) {
   const [toolbarHidden, setToolbarHidden] = useState(false)
   const scrollAreaRef = useRef(null)
+  const overlayRef    = useRef(null)
 
   /* Unique sessionStorage key — defaults to isCreate flag if not provided */
   const _scrollKey = scrollKey || (isCreate ? 'pb-overlay-scroll:create' : 'pb-overlay-scroll:edit')
@@ -1826,6 +1850,21 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
     }
   }, [])
 
+  /* Block touchmove events that originate outside the scroll area.
+     This prevents iOS from rubber-banding the fixed overlay and revealing
+     the library behind when the user drags on the toolbar or title bar.
+     Must be non-passive so e.preventDefault() is effective. */
+  useEffect(() => {
+    const overlayEl = overlayRef.current
+    if (!overlayEl) return
+    function blockOutsideScrollMove(e) {
+      if (scrollAreaRef.current?.contains(e.target)) return // let scroll area handle its own scrolling
+      if (e.cancelable) e.preventDefault()
+    }
+    overlayEl.addEventListener('touchmove', blockOutsideScrollMove, { passive: false })
+    return () => overlayEl.removeEventListener('touchmove', blockOutsideScrollMove)
+  }, [])
+
   /* Restore scroll position on mount; save on unmount */
   useEffect(() => {
     const el = scrollAreaRef.current
@@ -1854,7 +1893,7 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   const overlayStyle = { ...eo.overlay, height: vpHeight, bottom: 'auto' }
 
   return (
-    <div style={overlayStyle}>
+    <div ref={overlayRef} style={overlayStyle}>
 
       {/* ── Top bar ── */}
       <div style={eo.topBar}>
