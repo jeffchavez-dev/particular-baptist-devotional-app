@@ -1742,6 +1742,26 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
 function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, children }) {
   const [toolbarHidden, setToolbarHidden] = useState(false)
 
+  /* Track visual viewport so the overlay shrinks to stay above the soft keyboard */
+  const [vpTop,    setVpTop]    = useState(0)
+  const [vpHeight, setVpHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    function update() {
+      setVpTop(Math.round(vv.offsetTop))
+      setVpHeight(Math.round(vv.height))
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
+
   const atHint = chapterTag
     ? `@ tag · @${chapterTag.chapter}:1 shorthand · @2LBCF 1:1 · @Keach1`
     : '@ scripture tag · @2LBCF 1:1 · @Keach1'
@@ -1750,8 +1770,11 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
   function execUndo()        { editorRef.current?.execUndo() }
   function execRedo()        { editorRef.current?.execRedo() }
 
+  /* Overlay height follows the visual viewport (shrinks when keyboard opens) */
+  const overlayStyle = { ...eo.overlay, top: vpTop, height: vpHeight, bottom: 'auto' }
+
   return (
-    <div style={eo.overlay}>
+    <div style={overlayStyle}>
 
       {/* ── Top bar ── */}
       <div style={eo.topBar}>
