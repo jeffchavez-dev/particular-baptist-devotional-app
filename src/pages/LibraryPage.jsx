@@ -1181,7 +1181,10 @@ const TOOLBAR_ACTIONS = [
 /* ══════════════════════════════════════════════════════════════
    Rich Note Editor Component
 ══════════════════════════════════════════════════════════════ */
-function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, onBodyChange, chapterTag }) {
+const RichNoteEditor = React.forwardRef(function RichNoteEditor(
+  { initialTitle = '', initialBody = '', onTitleChange, onBodyChange, chapterTag, showToolbar = true, onActiveFormatsChange },
+  editorImperativeRef
+) {
   const editorRef  = useRef(null)
   const savedRange = useRef(null)
 
@@ -1197,12 +1200,12 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
 
   function checkFormats() {
     const sel = window.getSelection()
-    if (!sel || !sel.rangeCount) { setActiveFormats({}); return }
+    if (!sel || !sel.rangeCount) { setActiveFormats({}); onActiveFormatsChange?.({}); return }
     const node = sel.getRangeAt(0).commonAncestorContainer
     if (!editorRef.current?.contains(node)) return
     try {
       const blockVal = document.queryCommandValue('formatBlock').toLowerCase()
-      setActiveFormats({
+      const newFmts = {
         bold:   document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
         ul:     document.queryCommandState('insertUnorderedList'),
@@ -1210,8 +1213,10 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
         h1:     blockVal === 'h1',
         h2:     blockVal === 'h2',
         p:      blockVal === 'p' || blockVal === '',
-      })
-    } catch { setActiveFormats({}) }
+      }
+      setActiveFormats(newFmts)
+      onActiveFormatsChange?.(newFmts)
+    } catch { setActiveFormats({}); onActiveFormatsChange?.({}) }
   }
 
   /* Listen to selection changes to update active states */
@@ -1615,6 +1620,18 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
     checkAtMention()
   }
 
+  /* Expose execCmd / undo / redo to parent via ref (used by NoteEditOverlay toolbar) */
+  React.useImperativeHandle(editorImperativeRef, () => ({
+    execCmd,
+    execUndo,
+    execRedo,
+  }))
+
+  /* Editor border style: connect to toolbar when shown, full border when hidden (overlay mode) */
+  const editorStyle = showToolbar
+    ? re.editor
+    : { ...re.editor, border: 'none', borderBottom: '1px solid var(--border)', borderRadius: 0, minHeight: '40vh', background: 'transparent' }
+
   return (
     <div style={re.wrap} data-note-editor-wrap="1">
       {/* Title input */}
@@ -1644,40 +1661,42 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
             window.dispatchEvent(new CustomEvent('pb-note-editor-blur'))
           }
         }}
-        style={re.editor}
+        style={editorStyle}
         className="rich-content"
         data-placeholder="Write your note here…"
       />
 
-      {/* Toolbar — sits below the editor so it's always reachable on long notes */}
-      <div style={re.toolbar}>
-        {TOOLBAR_ACTIONS.map(action => (
-          <button
-            key={action.id}
-            title={action.title}
-            onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
-            style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
-            type="button"
-          >
-            {action.label}
+      {/* Inline toolbar — only shown when NOT in fullscreen overlay mode */}
+      {showToolbar && (
+        <div style={re.toolbar}>
+          {TOOLBAR_ACTIONS.map(action => (
+            <button
+              key={action.id}
+              title={action.title}
+              onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
+              style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
+              type="button"
+            >
+              {action.label}
+            </button>
+          ))}
+          <span style={re.toolDivider} />
+          <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
-        ))}
-        <span style={re.toolDivider} />
-        <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <span style={re.toolDivider} />
-        <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand) · @2LBCF 1:1 · @Keach1` : '@ scripture · @2LBCF 1:1 · @Keach1'}</span>
-      </div>
+          <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <span style={re.toolDivider} />
+          <span style={re.atHint}>{chapterTag ? `@ tag (or @${chapterTag.chapter}:1 shorthand) · @2LBCF 1:1 · @Keach1` : '@ scripture · @2LBCF 1:1 · @Keach1'}</span>
+        </div>
+      )}
 
       {/* @ picker popup */}
       {atPopup && (
@@ -1712,6 +1731,111 @@ function RichNoteEditor({ initialTitle = '', initialBody = '', onTitleChange, on
           onEdit={newConf => editConfTag(confTagPopup.el, newConf, confTagPopup.isQuote)}
         />
       )}
+    </div>
+  )
+})
+
+/* ══════════════════════════════════════════════════════════════
+   Note Edit Overlay  — fullscreen fixed overlay (iOS-notes style)
+   Title + editor in scrollable area; toolbar fixed at bottom.
+══════════════════════════════════════════════════════════════ */
+function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, children }) {
+  const [toolbarHidden, setToolbarHidden] = useState(false)
+
+  const atHint = chapterTag
+    ? `@ tag · @${chapterTag.chapter}:1 shorthand · @2LBCF 1:1 · @Keach1`
+    : '@ scripture tag · @2LBCF 1:1 · @Keach1'
+
+  function execCmd(cmd, val) { editorRef.current?.execCmd(cmd, val) }
+  function execUndo()        { editorRef.current?.execUndo() }
+  function execRedo()        { editorRef.current?.execRedo() }
+
+  return (
+    <div style={eo.overlay}>
+
+      {/* ── Top bar ── */}
+      <div style={eo.topBar}>
+        <button onClick={onBack} style={eo.backBtn} aria-label="Back to Library">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Library
+        </button>
+        <span style={eo.topTitle}>{isCreate ? 'New Note' : 'Edit Note'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+          {autoSaved && <span style={eo.autoSavedChip}>✓ Saved</span>}
+          <button onClick={onSave} disabled={saving} style={{ ...eo.saveTopBtn, opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Scrollable content ── */}
+      <div style={eo.scrollArea}>
+        <div style={eo.contentPad}>
+          {children}
+        </div>
+      </div>
+
+      {/* ── Fixed bottom toolbar ── */}
+      <div style={eo.toolbarWrap}>
+        {!toolbarHidden && (
+          <div style={eo.toolbarRow}>
+            {TOOLBAR_ACTIONS.map(action => (
+              <button
+                key={action.id}
+                title={action.title}
+                onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
+                style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
+                type="button"
+              >
+                {action.label}
+              </button>
+            ))}
+            <span style={re.toolDivider} />
+            <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <span style={re.toolDivider} />
+            <span style={{ ...re.atHint, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{atHint}</span>
+          </div>
+        )}
+        {/* Toolbar footer: toggle show/hide */}
+        <div style={eo.toolbarFooter}>
+          <span style={{ flex: 1 }} />
+          <button
+            onMouseDown={e => { e.preventDefault(); setToolbarHidden(h => !h) }}
+            style={eo.toolbarToggleBtn}
+            title={toolbarHidden ? 'Show formatting toolbar' : 'Hide formatting toolbar'}
+          >
+            {toolbarHidden ? (
+              <>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 6.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Format
+              </>
+            ) : (
+              <>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Hide
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
     </div>
   )
 }
@@ -1874,13 +1998,15 @@ function readCreateDraft() {
 function CreateNoteForm({ onSave, onCancel, session }) {
   const draft = useMemo(readCreateDraft, []) // read once on mount
 
-  const [titleVal,   setTitleVal]   = useState(draft?.titleVal   ?? '')
-  const [bodyHtml,   setBodyHtml]   = useState(draft?.bodyHtml   ?? '')
-  const [labels,     setLabels]     = useState(draft?.labels     ?? [])
-  const [tagEnabled, setTagEnabled] = useState(draft?.tagEnabled ?? false)
-  const [tagBook,    setTagBook]    = useState(draft?.tagBook    ?? 'Genesis')
-  const [tagChapter, setTagChapter] = useState(draft?.tagChapter ?? 1)
-  const [saving,     setSaving]     = useState(false)
+  const [titleVal,      setTitleVal]      = useState(draft?.titleVal   ?? '')
+  const [bodyHtml,      setBodyHtml]      = useState(draft?.bodyHtml   ?? '')
+  const [labels,        setLabels]        = useState(draft?.labels     ?? [])
+  const [tagEnabled,    setTagEnabled]    = useState(draft?.tagEnabled ?? false)
+  const [tagBook,       setTagBook]       = useState(draft?.tagBook    ?? 'Genesis')
+  const [tagChapter,    setTagChapter]    = useState(draft?.tagChapter ?? 1)
+  const [saving,        setSaving]        = useState(false)
+  const [activeFormats, setActiveFormats] = useState({})
+  const editorImperativeRef = useRef(null)
   const draftTimer = useRef(null)
 
   const selectedBook = BIBLE_BOOKS.find(b => b.name === tagBook) ?? BIBLE_BOOKS[0]
@@ -1923,30 +2049,30 @@ function CreateNoteForm({ onSave, onCancel, session }) {
     onCancel()
   }
 
-  return (
-    <div style={s.createForm}>
-      {/* Form header */}
-      <div style={s.createFormHeader}>
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
-          <rect x="1.5" y="1.5" width="12" height="12" rx="2" stroke="var(--teal)" strokeWidth="1.4"/>
-          <path d="M4.5 5.5h6M4.5 8h4" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
-        </svg>
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>New Note</span>
-        <button onClick={handleCancel} style={s.formCloseBtn} aria-label="Cancel">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
+  const chapterTagObj = tagEnabled ? { book: tagBook, chapter: tagChapter } : null
 
-      {/* Rich editor */}
+  return (
+    <NoteEditOverlay
+      isCreate
+      onBack={handleCancel}
+      onSave={handleSave}
+      saving={saving}
+      autoSaved={false}
+      editorRef={editorImperativeRef}
+      activeFormats={activeFormats}
+      chapterTag={chapterTagObj}
+    >
+      {/* Rich editor — toolbar hidden (overlay owns the toolbar) */}
       <RichNoteEditor
         key={draft?.bodyHtml ? 'draft' : 'new'}
+        ref={editorImperativeRef}
         initialTitle={titleVal}
         initialBody={bodyHtml}
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
-        chapterTag={tagEnabled ? { book: tagBook, chapter: tagChapter } : null}
+        showToolbar={false}
+        onActiveFormatsChange={setActiveFormats}
+        chapterTag={chapterTagObj}
       />
 
       {/* Labels */}
@@ -2009,18 +2135,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
           Tagged to <strong>{tagBook} {tagChapter}</strong>. In the editor, type <code style={{ fontSize: 10, background: 'var(--parchment-dark)', padding: '1px 4px', borderRadius: 3 }}>@1:1</code> to quickly tag verse 1 of this chapter.
         </p>
       )}
-
-      <div style={s.formActions}>
-        <button onClick={handleCancel} style={s.cancelBtn}>Cancel</button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{ ...s.saveBtn, opacity: saving ? 0.5 : 1 }}
-        >
-          {saving ? 'Saving…' : 'Save Note'}
-        </button>
-      </div>
-    </div>
+    </NoteEditOverlay>
   )
 }
 
@@ -2031,13 +2146,13 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   const isRich = isRichNote(initialRaw)
   const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '', labels: [], verseTag: null }
 
-  const [titleVal, setTitleVal] = useState(parsed.title || '')
-  const [bodyHtml, setBodyHtml] = useState(
-    isRich ? (parsed.body || '') : (initialRaw || '')
-  )
-  const [labels,      setLabels]      = useState(parsed.labels || [])
-  const [saving,      setSaving]      = useState(false)
-  const [autoSaved,   setAutoSaved]   = useState(false)
+  const [titleVal,      setTitleVal]      = useState(parsed.title || '')
+  const [bodyHtml,      setBodyHtml]      = useState(isRich ? (parsed.body || '') : (initialRaw || ''))
+  const [labels,        setLabels]        = useState(parsed.labels || [])
+  const [saving,        setSaving]        = useState(false)
+  const [autoSaved,     setAutoSaved]     = useState(false)
+  const [activeFormats, setActiveFormats] = useState({})
+  const editorImperativeRef = useRef(null)
   const autoSaveTimer = useRef(null)
   const isFirstRender = useRef(true)
 
@@ -2072,27 +2187,25 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
   }
 
   return (
-    <div style={s.createForm}>
-      <div style={s.createFormHeader}>
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
-          <path d="M3 12l1.5-3 6-6 2 2-6 6-3.5.5Z" stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round"/>
-        </svg>
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>Edit Note</span>
-        {autoSaved && (
-          <span style={s.autoSavedTag}>✓ Saved</span>
-        )}
-        <button onClick={onCancel} style={s.formCloseBtn} aria-label="Cancel">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 2l9 9M11 2L2 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
-
+    <NoteEditOverlay
+      isCreate={false}
+      onBack={onCancel}
+      onSave={handleSave}
+      saving={saving}
+      autoSaved={autoSaved}
+      editorRef={editorImperativeRef}
+      activeFormats={activeFormats}
+      chapterTag={chapterTag}
+    >
+      {/* Rich editor — toolbar hidden (overlay owns the toolbar) */}
       <RichNoteEditor
+        ref={editorImperativeRef}
         initialTitle={titleVal}
         initialBody={bodyHtml}
         onTitleChange={setTitleVal}
         onBodyChange={setBodyHtml}
+        showToolbar={false}
+        onActiveFormatsChange={setActiveFormats}
         chapterTag={chapterTag}
       />
 
@@ -2106,18 +2219,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
       )}
 
       <LabelDropdown selected={labels} onChange={setLabels} />
-
-      <div style={s.formActions}>
-        <button onClick={onCancel} style={s.cancelBtn}>Cancel</button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{ ...s.saveBtn, opacity: saving ? 0.5 : 1 }}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
-      </div>
-    </div>
+    </NoteEditOverlay>
   )
 }
 
@@ -2455,7 +2557,6 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     }
   }, [libNotes]) // eslint-disable-line
 
-  const formAreaRef = useRef(null)
   const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
   const [sortBy, setSortByRaw] = useState(() => {
     try { return sessionStorage.getItem(SESSION_SORT_KEY) || 'date-desc' } catch { return 'date-desc' }
@@ -2601,22 +2702,14 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     setEditingNote(null)     // clears SESSION_EDIT_KEY via wrapper
   }
 
-  /* Scroll the form into view whenever it opens */
-  useEffect(() => {
-    if (!showCreateForm && !editingNote) return
-    const t = setTimeout(() => {
-      formAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 60)
-    return () => clearTimeout(t)
-  }, [showCreateForm, editingNote?.key]) // eslint-disable-line
-
   return (
     <div style={s.tabContent}>
 
-      <div ref={formAreaRef}>
-      {showCreateForm ? (
+      {/* Fullscreen overlays — rendered above the main list */}
+      {showCreateForm && (
         <CreateNoteForm session={session} onSave={handleSaved} onCancel={() => setShowCreateForm(false)} />
-      ) : editingNote ? (
+      )}
+      {editingNote && (
         <EditNoteForm
           key={editingNote.key}
           noteKey={editingNote.key}
@@ -2625,9 +2718,10 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           onSave={handleSaved}
           onCancel={() => setEditingNote(null)}
         />
-      ) : (
-        <>
-          {/* Control row: New Note + Sort icon + Filter icon */}
+      )}
+
+      <>
+        {/* Control row: New Note + Sort icon + Filter icon */}
           <div style={s.controlRow}>
             <button onClick={() => setShowCreateForm(true)} style={s.newNoteBtnSmall}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -2733,9 +2827,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               }
             </p>
           )}
-        </>
-      )}
-      </div>{/* /formAreaRef */}
+      </>
 
       <div style={s.divider} />
 
@@ -3701,6 +3793,22 @@ const re = {
     outline: 'none', overflowY: 'auto', wordBreak: 'break-word',
     boxSizing: 'border-box',
   },
+}
+
+/* ── Note Edit Overlay styles ── */
+const eo = {
+  overlay:          { position: 'fixed', inset: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" },
+  topBar:           { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', paddingTop: 'max(10px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 },
+  backBtn:          { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", padding: '4px', flexShrink: 0 },
+  topTitle:         { fontSize: 13, fontWeight: 600, color: 'var(--ink)' },
+  autoSavedChip:    { fontSize: 10, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-light)', borderRadius: 4, padding: '2px 6px', flexShrink: 0 },
+  saveTopBtn:       { background: 'var(--teal)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 16px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
+  scrollArea:       { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  contentPad:       { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
+  toolbarWrap:      { flexShrink: 0, background: 'var(--surface)', borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' },
+  toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap', overflowX: 'auto' },
+  toolbarFooter:    { display: 'flex', alignItems: 'center', padding: '2px 10px 4px' },
+  toolbarToggleBtn: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", padding: '3px 0' },
 }
 
 /* ── @ mention popup styles ── */
