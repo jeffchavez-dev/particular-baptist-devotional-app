@@ -1739,7 +1739,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
    Note Edit Overlay  — fullscreen fixed overlay (iOS-notes style)
    Title + editor in scrollable area; toolbar fixed at bottom.
 ══════════════════════════════════════════════════════════════ */
-function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, children }) {
+function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, navigate, children }) {
   const [toolbarHidden, setToolbarHidden] = useState(false)
 
   /* Track visual viewport height only — top is always 0 for a fixed overlay.
@@ -1776,14 +1776,48 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
 
       {/* ── Top bar ── */}
       <div style={eo.topBar}>
+        {/* Back to Library */}
         <button onClick={onBack} style={eo.backBtn} aria-label="Back to Library">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Library
         </button>
+
         <span style={eo.topTitle}>{isCreate ? 'New Note' : 'Edit Note'}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+
+        {/* Quick-nav shortcuts — navigate without closing the note */}
+        <div style={eo.quickNav}>
+          <button
+            onClick={() => navigate('/scripture')}
+            style={eo.quickNavBtn}
+            title="Go to Scripture (note auto-saved)"
+            aria-label="Open Scripture reader"
+          >
+            {/* Open book */}
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <path d="M2 3.5C2 3.5 4 3 8.5 3s6.5.5 6.5.5V13.5S13 13 8.5 13 2 13.5 2 13.5V3.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+              <path d="M8.5 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            <span style={eo.quickNavLabel}>Scripture</span>
+          </button>
+          <button
+            onClick={() => navigate('/confessions')}
+            style={eo.quickNavBtn}
+            title="Go to Confessions (note auto-saved)"
+            aria-label="Open Confessions"
+          >
+            {/* Scroll / columns */}
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+              <path d="M6 2.5v12M2.5 6.5h3.5M2.5 9.5h3.5M2.5 12.5h3.5M7.5 6.5h7M7.5 9.5h7M7.5 12.5h5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+            <span style={eo.quickNavLabel}>Confession</span>
+          </button>
+        </div>
+
+        {/* Save */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {autoSaved && <span style={eo.autoSavedChip}>✓ Saved</span>}
           <button onClick={onSave} disabled={saving} style={{ ...eo.saveTopBtn, opacity: saving ? 0.6 : 1 }}>
             {saving ? 'Saving…' : 'Save'}
@@ -2016,7 +2050,7 @@ function readCreateDraft() {
   } catch { return null }
 }
 
-function CreateNoteForm({ onSave, onCancel, session }) {
+function CreateNoteForm({ onSave, onCancel, session, navigate }) {
   const draft = useMemo(readCreateDraft, []) // read once on mount
 
   const [titleVal,      setTitleVal]      = useState(draft?.titleVal   ?? '')
@@ -2082,6 +2116,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
       editorRef={editorImperativeRef}
       activeFormats={activeFormats}
       chapterTag={chapterTagObj}
+      navigate={navigate}
     >
       {/* Rich editor — toolbar hidden (overlay owns the toolbar) */}
       <RichNoteEditor
@@ -2163,7 +2198,7 @@ function CreateNoteForm({ onSave, onCancel, session }) {
 /* ══════════════════════════════════════════════════════════════
    Edit Note Form  (rich editor)
 ══════════════════════════════════════════════════════════════ */
-function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
+function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate }) {
   const isRich = isRichNote(initialRaw)
   const parsed = isRich ? parseRichNote(initialRaw) : { title: '', body: '', labels: [], verseTag: null }
 
@@ -2217,6 +2252,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session }) {
       editorRef={editorImperativeRef}
       activeFormats={activeFormats}
       chapterTag={chapterTag}
+      navigate={navigate}
     >
       {/* Rich editor — toolbar hidden (overlay owns the toolbar) */}
       <RichNoteEditor
@@ -2728,7 +2764,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
       {/* Fullscreen overlays — rendered above the main list */}
       {showCreateForm && (
-        <CreateNoteForm session={session} onSave={handleSaved} onCancel={() => setShowCreateForm(false)} />
+        <CreateNoteForm session={session} onSave={handleSaved} onCancel={() => setShowCreateForm(false)} navigate={navigate} />
       )}
       {editingNote && (
         <EditNoteForm
@@ -2738,6 +2774,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           session={session}
           onSave={handleSaved}
           onCancel={() => setEditingNote(null)}
+          navigate={navigate}
         />
       )}
 
@@ -3830,6 +3867,11 @@ const eo = {
   toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap', overflowX: 'auto' },
   toolbarFooter:    { display: 'flex', alignItems: 'center', padding: '2px 10px 4px' },
   toolbarToggleBtn: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", padding: '3px 0' },
+
+  /* Quick-nav row in top bar */
+  quickNav:      { display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 },
+  quickNavBtn:   { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: '3px 7px', borderRadius: 8, fontFamily: "'DM Sans', sans-serif", lineHeight: 1 },
+  quickNavLabel: { fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--ink-faint)' },
 }
 
 /* ── @ mention popup styles ── */
