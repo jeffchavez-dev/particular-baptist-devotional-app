@@ -539,7 +539,7 @@ function ConfessionModal({ conf, onClose, onNavigate, zOverride }) {
    ScTag Action Popup  (shown in EDIT MODE when clicking a tag)
 ══════════════════════════════════════════════════════════════ */
 function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
-  const [verseText,   setVerseText]   = useState(null)
+  const [verseLines,  setVerseLines]  = useState([])   // [{ v, t }]
   const [loading,     setLoading]     = useState(true)
   const [mode,        setMode]        = useState('view')  // 'view' | 'edit'
 
@@ -554,14 +554,20 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
   const editSelectedBook = BIBLE_BOOKS.find(b => b.name === editBook) ?? BIBLE_BOOKS[0]
   const maxEditChapters  = editSelectedBook.chapters
 
-  /* Fetch verse preview */
+  /* Fetch full verse(s) — range-aware */
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetchVerseText(sc.book, sc.chapter, sc.verse, getDefaultReaderVersion())
-      .then(t => { if (!cancelled) { setVerseText(t); setLoading(false) } })
+    const ver = getDefaultReaderVersion()
+    if (sc.verseTo && sc.verseTo !== sc.verse) {
+      fetchVerseRange(sc.book, sc.chapter, sc.verse, sc.verseTo, ver)
+        .then(vs => { if (!cancelled) { setVerseLines(vs); setLoading(false) } })
+    } else {
+      fetchVerseText(sc.book, sc.chapter, sc.verse, ver)
+        .then(t => { if (!cancelled) { setVerseLines(t ? [{ v: sc.verse, t }] : []); setLoading(false) } })
+    }
     return () => { cancelled = true }
-  }, [sc.book, sc.chapter, sc.verse]) // eslint-disable-line
+  }, [sc.book, sc.chapter, sc.verse, sc.verseTo]) // eslint-disable-line
 
   /* Close on outside click/tap */
   useEffect(() => {
@@ -581,11 +587,14 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
     : `${sc.book} ${sc.chapter}:${sc.verse}`
 
   /* Prefer showing ABOVE the tag (same rationale as @ popup) */
-  const POPUP_H  = mode === 'edit' ? 230 : 170
+  const POPUP_H  = mode === 'edit' ? 260 : 300
   const spaceAbove = anchorRect.top - 6
-  const showAbove  = spaceAbove >= POPUP_H
-  const top  = showAbove ? anchorRect.top - POPUP_H - 6 : anchorRect.bottom + 6
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 256))
+  const spaceBelow = window.innerHeight - anchorRect.bottom - 6
+  const showAbove  = spaceAbove >= Math.min(POPUP_H, 200)
+  const availH     = showAbove ? spaceAbove : spaceBelow
+  const clampedH   = Math.min(POPUP_H, Math.max(180, availH))
+  const top  = showAbove ? anchorRect.top - clampedH - 6 : anchorRect.bottom + 6
+  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 272))
 
   function handleUpdate() {
     const vNum  = Math.max(1, parseInt(editVerse)  || 1)
@@ -600,7 +609,8 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
     position: 'fixed', zIndex: 9500, left, top,
     background: 'var(--surface)', border: '1px solid var(--border)',
     borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-    padding: '12px', width: 252,
+    padding: '12px', width: 272, height: clampedH,
+    display: 'flex', flexDirection: 'column',
     fontFamily: "'DM Sans', sans-serif",
   }
 
@@ -614,23 +624,32 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
       {mode === 'view' ? (
         <>
           {/* Reference label */}
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 5px', fontFamily: "'Cormorant Garamond', serif" }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 6px', fontFamily: "'Cormorant Garamond', serif", flexShrink: 0 }}>
             {label}
           </p>
 
-          {/* Verse preview */}
-          {loading ? (
-            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px', fontStyle: 'italic' }}>Loading…</p>
-          ) : verseText ? (
-            <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 68, overflow: 'hidden' }}>
-              "{verseText.length > 110 ? verseText.slice(0, 110) + '…' : verseText}"
-            </p>
-          ) : (
-            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px' }}>Verse not found.</p>
-          )}
+          {/* Full verse text — scrollable so long verses don't get cut off */}
+          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 8 }}>
+            {loading ? (
+              <p style={{ fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic', margin: 0 }}>Loading…</p>
+            ) : verseLines.length > 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.65, margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
+                {verseLines.map((vl, i) => (
+                  <span key={vl.v}>
+                    {verseLines.length > 1 && (
+                      <sup style={{ fontSize: '0.72em', marginRight: 2, color: 'var(--ink-faint)', fontStyle: 'normal' }}>{vl.v}</sup>
+                    )}
+                    {vl.t}{i < verseLines.length - 1 ? ' ' : ''}
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0 }}>Verse not found.</p>
+            )}
+          </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 6 }}>
+          {/* Actions — pinned to bottom */}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
             <button
               onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setMode('edit') }}
               style={{ flex: 1, background: 'var(--parchment-dark)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
