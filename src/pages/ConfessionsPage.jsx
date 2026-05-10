@@ -857,6 +857,7 @@ export default function ConfessionsPage() {
   }, [tab, search]) // eslint-disable-line
   useEffect(() => {
     const saved = loadState('conf', { anchorId: null })
+    let timer2 = null
     const timer = setTimeout(() => {
       if (saved.anchorId) {
         const el = document.getElementById(saved.anchorId)
@@ -865,11 +866,23 @@ export default function ConfessionsPage() {
           setActiveChapter(saved.anchorId)
           return
         }
+        // Retry once more after additional 200ms (content may still be rendering)
+        timer2 = setTimeout(() => {
+          const el2 = document.getElementById(saved.anchorId)
+          if (el2) {
+            window.scrollTo({ top: el2.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
+            setActiveChapter(saved.anchorId)
+          } else {
+            restoreScroll('conf')
+          }
+        }, 200)
+        return
       }
       restoreScroll('conf')
-    }, 80)
+    }, 150)
     return () => {
       clearTimeout(timer)
+      clearTimeout(timer2)
       saveCurrentAnchor()
     }
   }, [])

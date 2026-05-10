@@ -212,14 +212,18 @@ function restoreReaderAnchor(version, root) {
   try {
     const saved = JSON.parse(localStorage.getItem(`bible-reader-${version}`) || 'null')
     if (!saved?.book || !saved?.chapter || !saved?.verse) return false
-    requestAnimationFrame(() => {
+    function attempt(retriesLeft) {
       const selector = `[data-anchor-book="${CSS.escape(saved.book)}"][data-anchor-chapter="${saved.chapter}"][data-anchor-verse="${saved.verse}"]`
       const el = root.querySelector(selector)
-      if (!el) return
-      const rootTop = root.getBoundingClientRect().top
-      const rect = el.getBoundingClientRect()
-      root.scrollTop += rect.top - rootTop - (saved.offset || 0)
-    })
+      if (el) {
+        const rootTop = root.getBoundingClientRect().top
+        const rect = el.getBoundingClientRect()
+        root.scrollTop += rect.top - rootTop - (saved.offset || 0)
+        return
+      }
+      if (retriesLeft > 0) setTimeout(() => attempt(retriesLeft - 1), 60)
+    }
+    requestAnimationFrame(() => attempt(5))
     return true
   } catch {
     return false

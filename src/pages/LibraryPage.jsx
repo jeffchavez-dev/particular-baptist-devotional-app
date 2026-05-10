@@ -1783,8 +1783,12 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
    Note Edit Overlay  — fullscreen fixed overlay (iOS-notes style)
    Title + editor in scrollable area; toolbar fixed at bottom.
 ══════════════════════════════════════════════════════════════ */
-function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, navigate, children }) {
+function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, navigate, children }) {
   const [toolbarHidden, setToolbarHidden] = useState(false)
+  const scrollAreaRef = useRef(null)
+
+  /* Unique sessionStorage key — defaults to isCreate flag if not provided */
+  const _scrollKey = scrollKey || (isCreate ? 'pb-overlay-scroll:create' : 'pb-overlay-scroll:edit')
 
   /* Track visual viewport height only — top is always 0 for a fixed overlay.
      Only listen to 'resize' (keyboard open/close). The 'scroll' event fires whenever
@@ -1821,6 +1825,21 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
       window.scrollTo(0, scrollY)
     }
   }, [])
+
+  /* Restore scroll position on mount; save on unmount */
+  useEffect(() => {
+    const el = scrollAreaRef.current
+    if (!el) return
+    const saved = parseInt(sessionStorage.getItem(_scrollKey) || '0', 10)
+    if (saved > 0) {
+      requestAnimationFrame(() => { el.scrollTop = saved })
+    }
+    return () => {
+      if (scrollAreaRef.current) {
+        sessionStorage.setItem(_scrollKey, String(scrollAreaRef.current.scrollTop))
+      }
+    }
+  }, [_scrollKey])
 
   const atHint = chapterTag
     ? `@ tag · @3 = verse 3 · @1:3 = ch.1 v.3 · @2LBCF 1:1 · @Keach1`
@@ -1889,7 +1908,7 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
       </div>
 
       {/* ── Scrollable content ── */}
-      <div style={eo.scrollArea}>
+      <div ref={scrollAreaRef} style={eo.scrollArea}>
         <div style={eo.contentPad}>
           {children}
         </div>
@@ -2308,6 +2327,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate
   return (
     <NoteEditOverlay
       isCreate={false}
+      scrollKey={`pb-overlay-scroll:${noteKey}`}
       onBack={onCancel}
       onSave={handleSave}
       saving={saving}
