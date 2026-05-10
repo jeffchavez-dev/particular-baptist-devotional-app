@@ -1865,18 +1865,24 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
     return () => overlayEl.removeEventListener('touchmove', blockOutsideScrollMove)
   }, [])
 
-  /* Restore scroll position on mount; save on unmount */
+  /* Restore scroll position on mount; save on unmount.
+     Uses setTimeout(100) not requestAnimationFrame — RichNoteEditor sets
+     innerHTML in a child useEffect, and RAF fires before the browser
+     has computed layout for that content (scrollHeight still 0), so
+     scrollTop would clip to 0. 100ms gives the layout time to settle. */
   useEffect(() => {
-    const el = scrollAreaRef.current
-    if (!el) return
     const saved = parseInt(sessionStorage.getItem(_scrollKey) || '0', 10)
+    let timerId = null
     if (saved > 0) {
-      requestAnimationFrame(() => { el.scrollTop = saved })
+      timerId = setTimeout(() => {
+        const el = scrollAreaRef.current
+        if (el) el.scrollTop = saved
+      }, 100)
     }
     return () => {
-      if (scrollAreaRef.current) {
-        sessionStorage.setItem(_scrollKey, String(scrollAreaRef.current.scrollTop))
-      }
+      clearTimeout(timerId)
+      const el = scrollAreaRef.current
+      if (el) sessionStorage.setItem(_scrollKey, String(el.scrollTop))
     }
   }, [_scrollKey])
 

@@ -857,32 +857,40 @@ export default function ConfessionsPage() {
   }, [tab, search]) // eslint-disable-line
   useEffect(() => {
     const saved = loadState('conf', { anchorId: null })
-    let timer2 = null
-    const timer = setTimeout(() => {
-      if (saved.anchorId) {
-        const el = document.getElementById(saved.anchorId)
-        if (el) {
-          window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
-          setActiveChapter(saved.anchorId)
-          return
-        }
-        // Retry once more after additional 200ms (content may still be rendering)
-        timer2 = setTimeout(() => {
-          const el2 = document.getElementById(saved.anchorId)
-          if (el2) {
-            window.scrollTo({ top: el2.getBoundingClientRect().top + window.scrollY - 80, behavior: 'instant' })
-            setActiveChapter(saved.anchorId)
-          } else {
-            restoreScroll('conf')
-          }
-        }, 200)
+
+    /* Compute scroll-independent absolute offsetTop by walking the offsetParent chain.
+       getBoundingClientRect() is viewport-relative and breaks when window.scrollY
+       is in flux (e.g. NoteEditOverlay body-fix cleanup racing with this timer).
+       offsetTop chain is layout-stable regardless of current scroll position. */
+    function getAbsoluteTop(el) {
+      let top = 0, cur = el
+      while (cur) { top += cur.offsetTop; cur = cur.offsetParent }
+      return top
+    }
+
+    function scrollToSaved(anchorId, retriesLeft) {
+      const el = document.getElementById(anchorId)
+      if (el) {
+        window.scrollTo({ top: Math.max(0, getAbsoluteTop(el) - 80), behavior: 'instant' })
+        setActiveChapter(anchorId)
         return
       }
-      restoreScroll('conf')
-    }, 150)
+      if (retriesLeft > 0) {
+        setTimeout(() => scrollToSaved(anchorId, retriesLeft - 1), 80)
+      } else {
+        restoreScroll('conf')
+      }
+    }
+
+    let timerId = null
+    if (saved.anchorId) {
+      timerId = setTimeout(() => scrollToSaved(saved.anchorId, 8), 100)
+    } else {
+      timerId = setTimeout(() => restoreScroll('conf'), 100)
+    }
+
     return () => {
-      clearTimeout(timer)
-      clearTimeout(timer2)
+      clearTimeout(timerId)
       saveCurrentAnchor()
     }
   }, [])
