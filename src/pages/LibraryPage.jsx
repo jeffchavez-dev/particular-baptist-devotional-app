@@ -1742,17 +1742,14 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
 function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRef, activeFormats, chapterTag, children }) {
   const [toolbarHidden, setToolbarHidden] = useState(false)
 
-  /* Track visual viewport so the overlay shrinks to stay above the soft keyboard */
-  const [vpTop,    setVpTop]    = useState(0)
+  /* Track visual viewport height only — top is always 0 for a fixed overlay.
+     Using offsetTop here creates a downward shift that gaps the toolbar from the keyboard. */
   const [vpHeight, setVpHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
 
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    function update() {
-      setVpTop(Math.round(vv.offsetTop))
-      setVpHeight(Math.round(vv.height))
-    }
+    function update() { setVpHeight(Math.round(vv.height)) }
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
     update()
@@ -1770,8 +1767,9 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
   function execUndo()        { editorRef.current?.execUndo() }
   function execRedo()        { editorRef.current?.execRedo() }
 
-  /* Overlay height follows the visual viewport (shrinks when keyboard opens) */
-  const overlayStyle = { ...eo.overlay, top: vpTop, height: vpHeight, bottom: 'auto' }
+  /* Overlay shrinks to visualViewport.height so the bottom toolbar
+     always lands exactly at the keyboard edge — no gap. */
+  const overlayStyle = { ...eo.overlay, height: vpHeight, bottom: 'auto' }
 
   return (
     <div style={overlayStyle}>
@@ -1801,7 +1799,7 @@ function NoteEditOverlay({ isCreate, onBack, onSave, saving, autoSaved, editorRe
       </div>
 
       {/* ── Fixed bottom toolbar ── */}
-      <div style={eo.toolbarWrap}>
+      <div style={{ ...eo.toolbarWrap, paddingBottom: vpHeight < window.innerHeight ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
         {!toolbarHidden && (
           <div style={eo.toolbarRow}>
             {TOOLBAR_ACTIONS.map(action => (
@@ -3820,7 +3818,7 @@ const re = {
 
 /* ── Note Edit Overlay styles ── */
 const eo = {
-  overlay:          { position: 'fixed', inset: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" },
+  overlay:          { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif" },
   topBar:           { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', paddingTop: 'max(10px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 },
   backBtn:          { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", padding: '4px', flexShrink: 0 },
   topTitle:         { fontSize: 13, fontWeight: 600, color: 'var(--ink)' },
