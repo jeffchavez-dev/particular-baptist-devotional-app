@@ -195,7 +195,8 @@
       "Bash(node -e \"const {execSync}=require\\('child_process'\\); execSync\\('npm create vite@latest client -- --template react', {stdio:'inherit'}\\);\")",
       "Bash(npm create *)",
       "Bash(npx tailwindcss *)",
-      "Bash(mkdir -p \"C:/Users/Jeff Chavez/DevFlow-CRM/app/.claude\")"
+      "Bash(mkdir -p \"C:/Users/Jeff Chavez/DevFlow-CRM/app/.claude\")",
+      "WebFetch(domain:www.exploremdhomes.com)"
     ]
   }
 }
