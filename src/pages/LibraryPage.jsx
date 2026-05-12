@@ -2427,12 +2427,76 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate
   )
 }
 
+const BM_SORT_OPTS = [
+  { id: 'date-desc', label: 'Newest' },
+  { id: 'date-asc',  label: 'Oldest' },
+  { id: 'alpha',     label: 'A → Z'  },
+]
+
 /* ══════════════════════════════════════════════════════════════
    Bookmarks Tab
 ══════════════════════════════════════════════════════════════ */
 function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay, onRemoveScBookmark }) {
+  const [sortBy, setSortBy] = useState('date-desc')
+  const [sortOpen, setSortOpen] = useState(false)
+  const sortRef = useRef(null)
+
+  /* Close sort dropdown on outside click */
+  useEffect(() => {
+    function onDown(e) { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  const sortedDays = useMemo(() => {
+    const list = [...savedDayEntries]
+    if (sortBy === 'date-asc')  return list.reverse()
+    if (sortBy === 'alpha')     return list.sort((a, b) => a.day - b.day)
+    return list // date-desc = default order
+  }, [savedDayEntries, sortBy])
+
+  const sortedScBm = useMemo(() => {
+    const list = [...scBookmarks]
+    if (sortBy === 'date-asc')  return list.sort((a, b) => new Date(a.savedAt) - new Date(b.savedAt))
+    if (sortBy === 'alpha')     return list.sort((a, b) => a.book.localeCompare(b.book) || a.chapter - b.chapter)
+    return list.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)) // date-desc
+  }, [scBookmarks, sortBy])
+
   return (
     <div style={s.tabContent}>
+
+      {/* Sort control */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <div ref={sortRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setSortOpen(o => !o)}
+            style={{ ...s.iconDropBtn, ...(sortOpen ? s.iconDropBtnOpen : {}) }}
+            title="Sort bookmarks"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 4h10M2 7h7M2 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            <span style={s.iconDropLabel}>{BM_SORT_OPTS.find(o => o.id === sortBy)?.label ?? 'Sort'}</span>
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ opacity: 0.5 }}>
+              <path d="M2 3.5l2.5 2.5 2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </button>
+          {sortOpen && (
+            <div style={s.dropPanel}>
+              {BM_SORT_OPTS.map(o => (
+                <button
+                  key={o.id}
+                  style={{ ...s.dropOption, ...(sortBy === o.id ? s.dropOptionActive : {}) }}
+                  onClick={() => { setSortBy(o.id); setSortOpen(false) }}
+                >
+                  <span style={s.dropOptionCheck}>{sortBy === o.id ? '✓' : ''}</span>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <SectionHeader
         icon={
@@ -2446,7 +2510,7 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
       />
       {savedDayEntries.length === 0
         ? <EmptyMsg text="No saved days yet. Tap the bookmark icon on any devotional reading day." />
-        : savedDayEntries.map(entry => (
+        : sortedDays.map(entry => (
           <div key={entry.day} style={s.card} onClick={() => navigate(`/day/${entry.day}`)}>
             <div style={s.cardHead}>
               <span style={s.dayBadge}>Day {entry.day}</span>
@@ -2482,7 +2546,7 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
       <p style={s.sectionHint}>Chapters saved from the Scripture reader toolbar</p>
       {scBookmarks.length === 0
         ? <EmptyMsg text="No scripture bookmarks yet. Tap the bookmark icon in the Scripture reader toolbar to save any chapter." />
-        : scBookmarks.map(bm => (
+        : sortedScBm.map(bm => (
           <div
             key={bm.key}
             style={s.card}
@@ -3303,9 +3367,74 @@ const HL_LEGEND = [
   { id: 'purple',  meaning: 'Question?'      },
 ]
 
+const HL_SORT_OPTS = [
+  { id: 'date-desc', label: 'Newest'  },
+  { id: 'date-asc',  label: 'Oldest'  },
+  { id: 'alpha',     label: 'A → Z'   },
+  { id: 'color',     label: 'By color' },
+]
+
 function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHighlight, onRemoveConfHighlight }) {
+  const [sortBy, setSortBy] = useState('date-desc')
+  const [sortOpen, setSortOpen] = useState(false)
+  const sortRef = useRef(null)
+
+  useEffect(() => {
+    function onDown(e) { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+
+  function sortHighlights(list, isConf = false) {
+    const arr = [...list]
+    if (sortBy === 'date-asc')  return arr.sort((a, b) => (a.savedAt ?? 0) > (b.savedAt ?? 0) ? 1 : -1)
+    if (sortBy === 'color')     return arr.sort((a, b) => (a.colorId ?? '').localeCompare(b.colorId ?? ''))
+    if (sortBy === 'alpha') {
+      return isConf
+        ? arr.sort((a, b) => (a.itemKey ?? '').localeCompare(b.itemKey ?? ''))
+        : arr.sort((a, b) => (a.book ?? '').localeCompare(b.book ?? '') || (a.chapter ?? 0) - (b.chapter ?? 0) || (a.verse ?? 0) - (b.verse ?? 0))
+    }
+    return arr.sort((a, b) => (b.savedAt ?? 0) > (a.savedAt ?? 0) ? 1 : -1) // date-desc
+  }
+
+  const sortedKjv  = useMemo(() => sortHighlights(kjvHighlights, false),  [kjvHighlights,  sortBy]) // eslint-disable-line
+  const sortedConf = useMemo(() => sortHighlights(confHighlights, true),  [confHighlights, sortBy]) // eslint-disable-line
+
   return (
     <div style={s.tabContent}>
+
+      {/* Sort control */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <div ref={sortRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setSortOpen(o => !o)}
+            style={{ ...s.iconDropBtn, ...(sortOpen ? s.iconDropBtnOpen : {}) }}
+            title="Sort highlights"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 4h10M2 7h7M2 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            <span style={s.iconDropLabel}>{HL_SORT_OPTS.find(o => o.id === sortBy)?.label ?? 'Sort'}</span>
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ opacity: 0.5 }}>
+              <path d="M2 3.5l2.5 2.5 2.5-2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </button>
+          {sortOpen && (
+            <div style={s.dropPanel}>
+              {HL_SORT_OPTS.map(o => (
+                <button
+                  key={o.id}
+                  style={{ ...s.dropOption, ...(sortBy === o.id ? s.dropOptionActive : {}) }}
+                  onClick={() => { setSortBy(o.id); setSortOpen(false) }}
+                >
+                  <span style={s.dropOptionCheck}>{sortBy === o.id ? '✓' : ''}</span>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ── Legend ── */}
       <div style={s.hlLegend}>
@@ -3337,7 +3466,7 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
         ? <EmptyMsg text="No scripture highlights yet. Click a verse number in the Scripture reader to highlight it." />
         : (
           <div style={s.hlGrid}>
-            {kjvHighlights.map(h => {
+            {sortedKjv.map(h => {
               const c = getHlStyle(h.colorId)
               return (
                 <div key={h.key} style={{ ...s.hlChip, background: c.rowBg, borderColor: c.border }}>
@@ -3372,7 +3501,7 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
         ? <EmptyMsg text="No confession highlights yet. Open any confession paragraph and tap Highlight." />
         : (
           <div style={s.hlGrid}>
-            {confHighlights.map(h => {
+            {sortedConf.map(h => {
               const c = getHlStyle(h.colorId)
               const srcLabel = h.source === '2lbcf' ? '2LBCF' : h.source === 'catechism' ? 'Catechism' : '1LBCF'
               return (
@@ -3785,9 +3914,11 @@ const s = {
     padding: 0, fontFamily: "'DM Sans', sans-serif",
   },
 
-  /* ── Kanban 2-column grid ── */
+  /* ── Kanban responsive grid — min 250 px per card, wraps automatically ── */
   kanbanGrid: {
-    display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+    gap: 8, marginBottom: 4,
   },
 
   /* ── New Note button (legacy — kept for safety) ── */

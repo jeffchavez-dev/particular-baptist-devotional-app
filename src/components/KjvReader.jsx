@@ -2280,13 +2280,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Book sidebar */}
       <aside style={{
         ...r.sidebar,
+        /* Desktop: push sidebar down by topInset so it starts below the fixed header */
         ...(isMobile ? {
           position:'fixed', left:0, top:0, bottom:0, zIndex:200,
           transform: sideOpen ? 'translateX(0)' : 'translateX(-100%)',
           transition:'transform 0.25s',
           boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
           width: 240,
-        } : {}),
+        } : { top: topInset }),
       }}>
         {isMobile && (
           <div style={r.mobileNavHeader}>
@@ -2394,8 +2395,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         )
       })()}
 
-      {/* Reader panel */}
-      <div style={{ ...r.readerWrap, paddingTop: topInset }} ref={readerRef}>
+      {/* Reader panel — on desktop, paddingLeft clears the 220px sidebar */}
+      <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : 220 }} ref={readerRef}>
 
         <div style={r.content}>
 

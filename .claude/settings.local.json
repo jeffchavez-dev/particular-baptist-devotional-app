@@ -188,7 +188,14 @@
       "Bash(git -C \"C:/Users/Jeff Chavez/Desktop/realcrm\" commit -m \"Fix: escape apostrophe in CRMLS description causing Vite build failure\")",
       "Bash(node --input-type=module --experimental-vm-modules)",
       "Bash(npx --yes eslint src/pages/LibraryPage.jsx --no-eslintrc --rule '{\"no-undef\": \"error\", \"no-unused-vars\": \"warn\"}' --env browser,es2020 --parser-options=ecmaVersion:2020,ecmaFeatures:{jsx:true})",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(mkdir -p \"/c/Users/Jeff Chavez/DevFlow-CRM/server/routes\" \"/c/Users/Jeff Chavez/DevFlow-CRM/server/db\" \"/c/Users/Jeff Chavez/DevFlow-CRM/client/src/components/layout\" \"/c/Users/Jeff Chavez/DevFlow-CRM/client/src/components/ui\" \"/c/Users/Jeff Chavez/DevFlow-CRM/client/src/pages\" \"/c/Users/Jeff Chavez/DevFlow-CRM/client/src/hooks\" && echo \"Dirs created\")",
+      "Bash(node -e \"const db = require\\('better-sqlite3'\\)\\(':memory:'\\); console.log\\('better-sqlite3 ok'\\);\")",
+      "Read(//c/Users/Jeff Chavez/DevFlow-CRM/**)",
+      "Bash(node -e \"const {execSync}=require\\('child_process'\\); execSync\\('npm create vite@latest client -- --template react', {stdio:'inherit'}\\);\")",
+      "Bash(npm create *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(mkdir -p \"C:/Users/Jeff Chavez/DevFlow-CRM/app/.claude\")"
     ]
   }
 }
