@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getBibleProgress, setBibleChapter, toggleBookmark, isBookmarked, getOrthodoxForDay, BIBLE_KEY } from '../lib/supabase'
 import { useAuth, usePrefs } from '../App'
@@ -478,6 +478,7 @@ export default function ReadingPage() {
   const [shareCard, setShareCard] = useState(null)
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
   const [navVisible, setNavVisible] = useState(true)
+  const isDesktopRef = useRef(window.innerWidth >= 768)
   const { prefs, updatePrefs } = usePrefs()
   const orthodoxContent = prefs.includeOrthodox ? getOrthodoxContent(day) : null
   const bibleChapter = entry?.bibleChapter
@@ -509,7 +510,13 @@ export default function ReadingPage() {
     return () => saveScroll(`reading-${day}`)
   }, [day])
 
-  /* ── Scroll-direction detection: hide/show nav chrome ── */
+  /* ── Scroll-direction detection: hide/show nav chrome (mobile only) ── */
+  useEffect(() => {
+    const onResize = () => { isDesktopRef.current = window.innerWidth >= 768 }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   useEffect(() => {
     let lastY = window.scrollY
     function handler() {
@@ -521,7 +528,8 @@ export default function ReadingPage() {
       window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
         detail: { direction, scrollTop: y },
       }))
-      setNavVisible(direction === 'up' || y < 30)
+      // Never hide the nav on desktop
+      if (!isDesktopRef.current) setNavVisible(direction === 'up' || y < 30)
     }
     window.addEventListener('scroll', handler, { passive: true })
     return () => window.removeEventListener('scroll', handler)

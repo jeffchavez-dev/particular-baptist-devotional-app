@@ -702,6 +702,7 @@ export default function ConfessionsPage() {
 
   const [headerH,   setHeaderH]   = useState(53)
   const [chromeVis, setChromeVis] = useState(true)
+  const isDesktopRef = useRef(window.innerWidth >= 768)
 
   /* Deep-link from Settings: scroll to specific paragraph/Q&A/article */
   const deepLinkRef = useRef(
@@ -795,6 +796,12 @@ export default function ConfessionsPage() {
   }
 
   useEffect(() => {
+    const onResize = () => { isDesktopRef.current = window.innerWidth >= 768 }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
     let lastY = window.scrollY
     function handler() {
       const y = window.scrollY
@@ -805,7 +812,8 @@ export default function ConfessionsPage() {
       window.dispatchEvent(new CustomEvent('pb-scroll-dir', {
         detail: { direction, scrollTop: y },
       }))
-      setChromeVis(direction === 'up' || y < 30)
+      // Never hide the header on desktop
+      if (!isDesktopRef.current) setChromeVis(direction === 'up' || y < 30)
       saveCurrentAnchor()
     }
     window.addEventListener('scroll', handler, { passive: true })

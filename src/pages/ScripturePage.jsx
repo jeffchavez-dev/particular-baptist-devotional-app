@@ -114,6 +114,7 @@ export default function ScripturePage() {
   // Timestamp until which we ignore scroll events — prevents the single
   // layout-snap event (caused by paddingTop toggling) from re-triggering the header.
   const suppressUntil = useRef(0)
+  const isDesktopRef  = useRef(window.innerWidth >= 768)
 
   useEffect(() => {
     if (headerRef.current) {
@@ -123,15 +124,23 @@ export default function ScripturePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const handler = () => { isDesktopRef.current = window.innerWidth >= 768 }
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   // Register the scroll-direction handler ONCE (empty deps).
   // Header hides on scroll-down (past 80px); reappears on ANY upward scroll.
   // paddingTop is now constant (= headerH), so there is no layout recalculation
   // when the header hides — the reader scroll container never changes size.
   // suppressUntil prevents an immediate re-hide right after the header becomes visible.
+  // On desktop the header never hides — always stays visible.
   useEffect(() => {
     function handler(e) {
       const { direction, scrollTop, scrollHeight, clientHeight } = e.detail
       if (direction === 'down') {
+        if (isDesktopRef.current) return   // never hide on desktop
         if (Date.now() < suppressUntil.current) return
         // Stay visible near the top and near the chapter end
         if (scrollTop < 80) return

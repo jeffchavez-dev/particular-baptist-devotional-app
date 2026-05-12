@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 const TABS = [
@@ -74,16 +74,23 @@ export default function BottomNav() {
   const { pathname } = useLocation()
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 769)
   const [visible,   setVisible]   = useState(true)
+  const isDesktopRef = useRef(window.innerWidth >= 769)
 
   useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth >= 769)
+    const handler = () => {
+      const d = window.innerWidth >= 769
+      isDesktopRef.current = d
+      setIsDesktop(d)
+      if (d) setVisible(true)   // always show when switching to desktop
+    }
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  /* Auto-hide on scroll down, show on scroll up */
+  /* Auto-hide on scroll down, show on scroll up — mobile only */
   useEffect(() => {
     function onScrollDir(e) {
+      if (isDesktopRef.current) return   // never hide on desktop
       const { direction, scrollTop } = e.detail
       setVisible(direction === 'up' || scrollTop < 30)
     }
