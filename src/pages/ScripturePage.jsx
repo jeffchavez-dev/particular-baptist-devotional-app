@@ -673,6 +673,7 @@ export default function ScripturePage() {
             const result = toggleScriptureBookmark(readBook, readChapter)
             setIsBookmarked(!!result[`${readBook}|${readChapter}`])
           }}
+          chromeVis={chromeVis}
         />
       </div>
 

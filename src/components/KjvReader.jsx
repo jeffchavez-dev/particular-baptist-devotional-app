@@ -597,7 +597,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark, topInset = 0 }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -2348,7 +2348,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         />
       </aside>
 
-      {/* ── Fixed chapter navigation arrows ── */}
+      {/* ── Fixed chapter navigation arrows — hidden when chrome is hidden ── */}
       {(() => {
         const allowed = version === 'greek' ? NT_BOOKS
           : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
@@ -2362,7 +2362,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         return (
           <>
             <button
-              style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev ? 1 : 0, pointerEvents: hasPrev ? 'auto' : 'none' }}
+              style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev && chromeVis ? 1 : 0, pointerEvents: hasPrev && chromeVis ? 'auto' : 'none', transition: 'opacity 0.28s ease' }}
               onClick={() => {
                 // Always compute from bookRef/chapterRef (not render closure) so
                 // rapid taps see the most recent navigation target, not stale state.
@@ -2377,7 +2377,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               </svg>
             </button>
             <button
-              style={{ ...r.chNavArrow, right: 6, opacity: hasNext ? 1 : 0, pointerEvents: hasNext ? 'auto' : 'none' }}
+              style={{ ...r.chNavArrow, right: 6, opacity: hasNext && chromeVis ? 1 : 0, pointerEvents: hasNext && chromeVis ? 'auto' : 'none', transition: 'opacity 0.28s ease' }}
               onClick={() => {
                 // Same ref-based lookup for rapid-tap correctness.
                 const next = getNextChapter(bookRef.current, chapterRef.current)
