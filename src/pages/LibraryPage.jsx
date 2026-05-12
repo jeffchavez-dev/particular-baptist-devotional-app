@@ -2430,6 +2430,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate
 const BM_SORT_OPTS = [
   { id: 'date-desc', label: 'Newest' },
   { id: 'date-asc',  label: 'Oldest' },
+  { id: 'chrono',    label: 'Chrono' },
   { id: 'alpha',     label: 'A → Z'  },
 ]
 
@@ -2458,6 +2459,7 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
   const sortedScBm = useMemo(() => {
     const list = [...scBookmarks]
     if (sortBy === 'date-asc')  return list.sort((a, b) => new Date(a.savedAt) - new Date(b.savedAt))
+    if (sortBy === 'chrono')    return list.sort((a, b) => ((BOOK_ORDER[a.book] ?? 999) * 1000 + (a.chapter ?? 0)) - ((BOOK_ORDER[b.book] ?? 999) * 1000 + (b.chapter ?? 0)))
     if (sortBy === 'alpha')     return list.sort((a, b) => a.book.localeCompare(b.book) || a.chapter - b.chapter)
     return list.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt)) // date-desc
   }, [scBookmarks, sortBy])
@@ -3370,6 +3372,7 @@ const HL_LEGEND = [
 const HL_SORT_OPTS = [
   { id: 'date-desc', label: 'Newest'  },
   { id: 'date-asc',  label: 'Oldest'  },
+  { id: 'chrono',    label: 'Chrono'  },
   { id: 'alpha',     label: 'A → Z'   },
   { id: 'color',     label: 'By color' },
 ]
@@ -3388,6 +3391,11 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
   function sortHighlights(list, isConf = false) {
     const arr = [...list]
     if (sortBy === 'date-asc')  return arr.sort((a, b) => (a.savedAt ?? 0) > (b.savedAt ?? 0) ? 1 : -1)
+    if (sortBy === 'chrono') {
+      return isConf
+        ? arr.sort((a, b) => (a.itemKey ?? '').localeCompare(b.itemKey ?? ''))
+        : arr.sort((a, b) => ((BOOK_ORDER[a.book] ?? 999) * 10000 + (a.chapter ?? 0) * 200 + (a.verse ?? 0)) - ((BOOK_ORDER[b.book] ?? 999) * 10000 + (b.chapter ?? 0) * 200 + (b.verse ?? 0)))
+    }
     if (sortBy === 'color')     return arr.sort((a, b) => (a.colorId ?? '').localeCompare(b.colorId ?? ''))
     if (sortBy === 'alpha') {
       return isConf
