@@ -475,7 +475,6 @@ export default function ReadingPage() {
   const [savedNotes, setSavedNotes] = useState(() => getLocalProgress()[day]?.notes || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [noteOpen, setNoteOpen] = useState(false)
   const [shareCard, setShareCard] = useState(null)
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
   const [navVisible, setNavVisible] = useState(true)
@@ -683,60 +682,58 @@ export default function ReadingPage() {
           </div>
         )}
 
-        {/* Inline confession / catechism text — tapping anywhere opens the note toolkit */}
+        {/* Inline confession / catechism text */}
         <div style={{ position: 'relative' }}>
-          {/* Small completed checkbox — top-left corner of the reading card */}
+          {/* Circular completed checkbox — top-right, matching the scripture reading style */}
           <button
             onClick={e => { e.stopPropagation(); toggleComplete() }}
             title={completed ? 'Mark incomplete' : 'Mark as complete'}
             aria-label={completed ? 'Mark incomplete' : 'Mark as complete'}
             style={{
-              position: 'absolute', top: 10, left: 10, zIndex: 2,
-              width: 22, height: 22, borderRadius: 6,
+              position: 'absolute', top: 12, right: 12, zIndex: 2,
+              width: 32, height: 32, borderRadius: '50%',
               border: `2px solid ${completed ? 'var(--teal)' : 'var(--border-strong)'}`,
               background: completed ? 'var(--teal)' : 'white',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', padding: 0, flexShrink: 0,
-              transition: 'background 0.15s, border-color 0.15s',
+              transition: 'all 0.2s',
               WebkitTapHighlightColor: 'transparent',
             }}
           >
             {completed && (
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <polyline points="2,6 4.5,9 10,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             )}
           </button>
-          <div onClick={() => setNoteOpen(true)} style={{ cursor: 'text' }}>
-            <ContentBlock
-              content={content}
-              session={session}
-              entry={entry}
-              prefs={prefs}
-              onScriptureRef={ref => setKjvModal(ref)}
-              onShare={({ text }) => setShareCard({
-                type: 'reading',
-                day: day,
-                title: entry.reading,
-                subtitle: `Day ${day} · ${entry.date}`,
-                source: entry.src,
-                text: content?.type === 'catechism'
-                  ? `Q. ${content.q}\n\nA. ${content.a}`
-                  : (content?.text || ''),
-                refs: content?.refs || '',
-              })}
-              onShareQuote={(q) => setShareCard({
-                type: 'quote',
-                day: day,
-                source: entry.src,
-                subtitle: `Day ${day} · ${entry.date}`,
-                label: q.heading || '',
-                text: q.quote,
-                title: q.author,
-                subtitle2: q.work,
-              })}
-            />
-          </div>
+          <ContentBlock
+            content={content}
+            session={session}
+            entry={entry}
+            prefs={prefs}
+            onScriptureRef={ref => setKjvModal(ref)}
+            onShare={({ text }) => setShareCard({
+              type: 'reading',
+              day: day,
+              title: entry.reading,
+              subtitle: `Day ${day} · ${entry.date}`,
+              source: entry.src,
+              text: content?.type === 'catechism'
+                ? `Q. ${content.q}\n\nA. ${content.a}`
+                : (content?.text || ''),
+              refs: content?.refs || '',
+            })}
+            onShareQuote={(q) => setShareCard({
+              type: 'quote',
+              day: day,
+              source: entry.src,
+              subtitle: `Day ${day} · ${entry.date}`,
+              label: q.heading || '',
+              text: q.quote,
+              title: q.author,
+              subtitle2: q.work,
+            })}
+          />
         </div>
 
         {/* Orthodox Catechism (optional) */}
@@ -755,80 +752,60 @@ export default function ReadingPage() {
           </div>
         )}
 
-        {/* Note toolkit — shown when noteOpen */}
-        {noteOpen && (
-          <>
-            {/* Backdrop */}
-            <div
-              style={{ position:'fixed', inset:0, zIndex:199, background:'rgba(0,0,0,0.18)' }}
-              onClick={() => { if (!hasUnsaved) setNoteOpen(false) }}
-            />
-            {/* Slide-up panel */}
-            <div style={s.notePanel}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:14, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' }}>
-                    My reflection
-                  </span>
-                  {/* Bookmark toggle */}
-                  <button
-                    onClick={handleBookmark}
-                    title={bookmarked ? 'Remove bookmark' : 'Bookmark this day'}
-                    style={{ background:'none', border:'none', cursor:'pointer', padding:'2px 4px', display:'flex', alignItems:'center', color: bookmarked ? 'var(--teal)' : 'var(--border-strong)', transition:'color 0.15s', WebkitTapHighlightColor:'transparent' }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 2.5A1.5 1.5 0 014.5 1h7A1.5 1.5 0 0113 2.5v12l-5-3-5 3V2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill={bookmarked ? 'currentColor' : 'none'} fillOpacity={bookmarked ? 0.18 : 0}/>
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  onClick={() => setNoteOpen(false)}
-                  style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, color:'var(--ink-faint)', lineHeight:1, padding:'2px 4px' }}
-                  aria-label="Close"
-                >×</button>
-              </div>
-              <textarea
-                autoFocus
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="What stood out to you? What questions arose? How does this apply to your life?"
-                style={{ ...s.textarea, minHeight: 120 }}
-                rows={5}
-              />
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:10, gap:8, flexWrap:'wrap' }}>
-                <div style={{ display:'flex', gap:6 }}>
-                  {savedNotes && <CopyBtn getText={() => savedNotes} label="Copy" />}
-                  {savedNotes && (
-                    <button
-                      onClick={() => setShareCard({ type:'note', day, title: entry.reading, subtitle:`Day ${day} · ${entry.date}`, source: entry.src, text: savedNotes, label:'My Reflection' })}
-                      style={{ ...cb.btn, color:'var(--purple-ink)', borderColor:'var(--purple-soft)' }}
-                      title="Share note as image"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-                        <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                        <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                        <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                        <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                      </svg>
-                      <span style={{ fontSize:11 }}>Share</span>
-                    </button>
-                  )}
-                </div>
-                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                  {saved && <span style={{ fontSize:12, color:'var(--teal)' }}>Saved ✓</span>}
-                  <button
-                    className="btn btn-primary"
-                    onClick={async () => { await saveNotes(); setNoteOpen(false) }}
-                    disabled={saving || !hasUnsaved}
-                    style={{ opacity: (!hasUnsaved && !saving) ? 0.5 : 1, fontSize:13 }}
-                  >
-                    {saving ? <span className="spinner" style={{ width:13, height:13 }} /> : 'Save to Library'}
-                  </button>
-                </div>
-              </div>
+        {/* My Reflection — compact inline section */}
+        <div className="card" style={s.reflectionCard}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:14, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' }}>
+                My reflection
+              </span>
+              <button
+                onClick={handleBookmark}
+                title={bookmarked ? 'Remove bookmark' : 'Bookmark this day'}
+                style={{ background:'none', border:'none', cursor:'pointer', padding:'2px 4px', display:'flex', alignItems:'center', color: bookmarked ? 'var(--teal)' : 'var(--border-strong)', transition:'color 0.15s', WebkitTapHighlightColor:'transparent' }}
+              >
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 2.5A1.5 1.5 0 014.5 1h7A1.5 1.5 0 0113 2.5v12l-5-3-5 3V2.5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" fill={bookmarked ? 'currentColor' : 'none'} fillOpacity={bookmarked ? 0.18 : 0}/>
+                </svg>
+              </button>
             </div>
-          </>
-        )}
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              {saved && <span style={{ fontSize:11, color:'var(--teal)' }}>Saved ✓</span>}
+              {savedNotes && (
+                <button
+                  onClick={() => setShareCard({ type:'note', day, title: entry.reading, subtitle:`Day ${day} · ${entry.date}`, source: entry.src, text: savedNotes, label:'My Reflection' })}
+                  style={{ ...cb.btn, color:'var(--purple-ink)', borderColor:'var(--purple-soft)' }}
+                  title="Share note as image"
+                >
+                  <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                    <circle cx="10.5" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="10.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <circle cx="2.5" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M4 5.8l5-2.8M4 7.2l5 2.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{ fontSize:11 }}>Share</span>
+                </button>
+              )}
+            </div>
+          </div>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="What stood out to you? What questions arose? How does this apply to your life?"
+            style={{ ...s.textarea, minHeight:80 }}
+            rows={3}
+          />
+          <div style={{ display:'flex', justifyContent:'flex-end', marginTop:8 }}>
+            <button
+              className="btn btn-primary"
+              onClick={saveNotes}
+              disabled={saving || !hasUnsaved}
+              style={{ opacity: (!hasUnsaved && !saving) ? 0.5 : 1, fontSize:13 }}
+            >
+              {saving ? <span className="spinner" style={{ width:13, height:13 }} /> : 'Save to Library'}
+            </button>
+          </div>
+        </div>
       </main>
 
       {/* Share Card modal */}
@@ -962,14 +939,6 @@ const s = {
     marginTop:8, fontSize:11, color:'var(--teal)', fontWeight:600,
     fontFamily:"'DM Sans',sans-serif",
   },
-  notesCard: { padding:'20px' },
-  textarea: { resize:'vertical', minHeight:120, lineHeight:1.7 },
-  nav: { display:'flex', justifyContent:'space-between', gap:12, marginTop:8 },
-  notePanel: {
-    position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 200,
-    background: 'var(--surface)', borderTop: '1px solid var(--border)',
-    borderRadius: '16px 16px 0 0',
-    padding: '20px 20px 28px',
-    boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
-  },
+  textarea: { resize:'vertical', minHeight:80, lineHeight:1.7 },
+  reflectionCard: { padding:'16px 20px' },
 }
