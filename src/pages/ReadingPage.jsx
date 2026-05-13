@@ -580,6 +580,20 @@ export default function ReadingPage() {
     const newVal = !bibleChapterDone
     setBibleChapterDone(newVal)
     if (bibleChapter) setBibleChapter(bibleChapter, newVal, session?.user?.id)
+    // Checking the scripture chapter also marks the day as complete
+    if (newVal && !completed) {
+      setCompleted(true)
+      setLocalProgress(day, { completed: true, notes })
+      if (session) {
+        supabase.from('progress').upsert({
+          user_id: session.user.id,
+          day_number: day,
+          completed: true,
+          notes,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,day_number' }).catch(() => {})
+      }
+    }
   }
 
   function handleBookmark(e) {
@@ -682,9 +696,9 @@ export default function ReadingPage() {
           </div>
         )}
 
-        {/* Inline confession / catechism text */}
+        {/* Inline confession / catechism text (or review-day placeholder) */}
         <div style={{ position: 'relative' }}>
-          {/* Circular completed checkbox — top-right, matching the scripture reading style */}
+          {/* Circular completed checkbox — top-right, always anchored to a visible card */}
           <button
             onClick={e => { e.stopPropagation(); toggleComplete() }}
             title={completed ? 'Mark incomplete' : 'Mark as complete'}
@@ -706,34 +720,45 @@ export default function ReadingPage() {
               </svg>
             )}
           </button>
-          <ContentBlock
-            content={content}
-            session={session}
-            entry={entry}
-            prefs={prefs}
-            onScriptureRef={ref => setKjvModal(ref)}
-            onShare={({ text }) => setShareCard({
-              type: 'reading',
-              day: day,
-              title: entry.reading,
-              subtitle: `Day ${day} · ${entry.date}`,
-              source: entry.src,
-              text: content?.type === 'catechism'
-                ? `Q. ${content.q}\n\nA. ${content.a}`
-                : (content?.text || ''),
-              refs: content?.refs || '',
-            })}
-            onShareQuote={(q) => setShareCard({
-              type: 'quote',
-              day: day,
-              source: entry.src,
-              subtitle: `Day ${day} · ${entry.date}`,
-              label: q.heading || '',
-              text: q.quote,
-              title: q.author,
-              subtitle2: q.work,
-            })}
-          />
+
+          {content ? (
+            <ContentBlock
+              content={content}
+              session={session}
+              entry={entry}
+              prefs={prefs}
+              onScriptureRef={ref => setKjvModal(ref)}
+              onShare={({ text }) => setShareCard({
+                type: 'reading',
+                day: day,
+                title: entry.reading,
+                subtitle: `Day ${day} · ${entry.date}`,
+                source: entry.src,
+                text: content.type === 'catechism'
+                  ? `Q. ${content.q}\n\nA. ${content.a}`
+                  : (content.text || ''),
+                refs: content.refs || '',
+              })}
+              onShareQuote={(q) => setShareCard({
+                type: 'quote',
+                day: day,
+                source: entry.src,
+                subtitle: `Day ${day} · ${entry.date}`,
+                label: q.heading || '',
+                text: q.quote,
+                title: q.author,
+                subtitle2: q.work,
+              })}
+            />
+          ) : (
+            /* Placeholder card for review / reflection days — gives the checkbox something to sit on */
+            <div className="card" style={{ ...s.contentCard, paddingRight: 56 }}>
+              <span style={s.contentLabel}>Weekly Review &amp; Reflection</span>
+              <p style={{ fontSize: 14, color: 'var(--ink-muted)', marginTop: 10, lineHeight: 1.7, fontFamily: "'Cormorant Garamond', serif" }}>
+                No assigned reading today. Take time to pray through this week's passages, review what you've learned, and reflect on how God is shaping you through His Word.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Orthodox Catechism (optional) */}
