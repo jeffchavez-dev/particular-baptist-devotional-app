@@ -2785,6 +2785,7 @@ const SESSION_EDIT_KEY   = 'pb-lib-editing-note'
 const SESSION_CREATE_KEY = 'pb-lib-creating-note'
 const SESSION_SORT_KEY   = 'pb-lib-sort'
 const SESSION_FILTER_KEY = 'pb-lib-filter-label'
+const VIEW_KEY           = 'pb-lib-note-view'
 
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   /* Persist create-form open state across navigation */
@@ -2853,6 +2854,19 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [filterOpen,     setFilterOpen]     = useState(false)
   const sortRef   = useRef(null)
   const filterRef = useRef(null)
+
+  /* ── View mode: 'grid' (2-col) | 'list' (single-col) ── */
+  const [noteView, setNoteViewRaw] = useState(() => {
+    try { return localStorage.getItem(VIEW_KEY) || 'grid' } catch { return 'grid' }
+  })
+  function setNoteView(v) {
+    setNoteViewRaw(v)
+    try { localStorage.setItem(VIEW_KEY, v) } catch {}
+  }
+  const gridStyle = noteView === 'grid'
+    ? { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 4 }
+    : { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }
+
   const [scriptureModal,  setScriptureModal]  = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
   const [pendingDelete,   setPendingDelete]   = useState(null) // { key, type }
@@ -3035,6 +3049,31 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               )}
             </div>
 
+            {/* ── Grid / List view toggle ── */}
+            <div style={{ display: 'flex', gap: 2 }}>
+              <button
+                onClick={() => setNoteView('grid')}
+                style={{ ...s.viewToggleBtn, ...(noteView === 'grid' ? s.viewToggleBtnActive : {}) }}
+                title="Grid view" aria-label="Grid view"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="1" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                  <rect x="7.5" y="1" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                  <rect x="1" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                  <rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+                </svg>
+              </button>
+              <button
+                onClick={() => setNoteView('list')}
+                style={{ ...s.viewToggleBtn, ...(noteView === 'list' ? s.viewToggleBtnActive : {}) }}
+                title="List view" aria-label="List view"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M1 3h11M1 6.5h11M1 10h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+
             {/* ── Filter by label dropdown ── */}
             {allUsedLabels.length > 0 && (
               <div ref={filterRef} style={{ position: 'relative' }}>
@@ -3122,7 +3161,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
               ? <EmptyMsg text='Scripture-tagged notes are shown in "Scripture Notes" below.' />
               : <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
             : (
-              <div style={s.kanbanGrid}>
+              <div style={gridStyle}>
                 {filteredLib.map(n => {
                   const { title, labels } = isRichNote(n.note) ? parseRichNote(n.note) : { title: '', labels: [] }
                   const chTagBadge = n.chapterTag
@@ -3171,7 +3210,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           {filteredKjv.length === 0 && !isSearching
             ? <EmptyMsg text="No scripture notes yet. Use the pencil icon on any verse, or tag a scripture when creating a new note above." />
             : (
-              <div style={s.kanbanGrid}>
+              <div style={gridStyle}>
                 {filteredKjv.map(n => {
                   const badge = `${n.book} ${n.chapter}:${n.verse}`
                   const badgeStyle = { background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
@@ -3223,7 +3262,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           ) : filteredDev.length === 0 && !isSearching ? (
             <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
           ) : (
-            <div style={s.kanbanGrid}>
+            <div style={gridStyle}>
               {filteredDev.map(n => {
                 const badge = `Day ${n.day_number}`
                 const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
@@ -3264,7 +3303,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           {filteredConf.length === 0 && !isSearching
             ? <EmptyMsg text="No confession notes yet. Open any confession paragraph and tap Note." />
             : (
-              <div style={s.kanbanGrid}>
+              <div style={gridStyle}>
                 {filteredConf.map(n => {
                   const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
                   const badge = `${srcLabel} ${n.itemKey}`
@@ -3886,6 +3925,17 @@ const s = {
   },
   iconDropLabel: {
     maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+  },
+  /* ── Grid / List view toggle buttons ── */
+  viewToggleBtn: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 28, height: 28,
+    background: 'var(--parchment-dark)', border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--ink-faint)',
+    transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+  },
+  viewToggleBtnActive: {
+    background: 'var(--teal-light)', borderColor: 'var(--teal)', color: 'var(--teal)',
   },
   iconDropActiveDot: {
     position: 'absolute', top: 4, right: 4,
