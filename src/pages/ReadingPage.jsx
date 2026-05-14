@@ -256,7 +256,7 @@ const cb = {
   },
 }
 
-function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, onScriptureRef }) {
+function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, onScriptureRef, completedControl }) {
   if (!content) return null
 
   const textStyle = prefs
@@ -296,6 +296,7 @@ function ContentBlock({ content, session, entry, prefs, onShare, onShareQuote, o
               <span style={{fontSize:11}}>Share</span>
             </button>
           )}
+          {completedControl}
         </div>
       </div>
 
@@ -697,69 +698,88 @@ export default function ReadingPage() {
         )}
 
         {/* Inline confession / catechism text (or review-day placeholder) */}
-        <div style={{ position: 'relative' }}>
-          {/* Circular completed checkbox — top-right, always anchored to a visible card */}
-          <button
-            onClick={e => { e.stopPropagation(); toggleComplete() }}
-            title={completed ? 'Mark incomplete' : 'Mark as complete'}
-            aria-label={completed ? 'Mark incomplete' : 'Mark as complete'}
-            style={{
-              position: 'absolute', top: 12, right: 12, zIndex: 2,
-              width: 32, height: 32, borderRadius: '50%',
-              border: `2px solid ${completed ? 'var(--teal)' : 'var(--border-strong)'}`,
-              background: completed ? 'var(--teal)' : 'white',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', padding: 0, flexShrink: 0,
-              transition: 'all 0.2s',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {completed && (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-          </button>
-
-          {content ? (
-            <ContentBlock
-              content={content}
-              session={session}
-              entry={entry}
-              prefs={prefs}
-              onScriptureRef={ref => setKjvModal(ref)}
-              onShare={({ text }) => setShareCard({
-                type: 'reading',
-                day: day,
-                title: entry.reading,
-                subtitle: `Day ${day} · ${entry.date}`,
-                source: entry.src,
-                text: content.type === 'catechism'
-                  ? `Q. ${content.q}\n\nA. ${content.a}`
-                  : (content.text || ''),
-                refs: content.refs || '',
-              })}
-              onShareQuote={(q) => setShareCard({
-                type: 'quote',
-                day: day,
-                source: entry.src,
-                subtitle: `Day ${day} · ${entry.date}`,
-                label: q.heading || '',
-                text: q.quote,
-                title: q.author,
-                subtitle2: q.work,
-              })}
-            />
-          ) : (
-            /* Placeholder card for review / reflection days — gives the checkbox something to sit on */
-            <div className="card" style={{ ...s.contentCard, paddingRight: 56 }}>
+        {content ? (
+          <ContentBlock
+            content={content}
+            session={session}
+            entry={entry}
+            prefs={prefs}
+            onScriptureRef={ref => setKjvModal(ref)}
+            onShare={({ text }) => setShareCard({
+              type: 'reading',
+              day: day,
+              title: entry.reading,
+              subtitle: `Day ${day} · ${entry.date}`,
+              source: entry.src,
+              text: content.type === 'catechism'
+                ? `Q. ${content.q}\n\nA. ${content.a}`
+                : (content.text || ''),
+              refs: content.refs || '',
+            })}
+            onShareQuote={(q) => setShareCard({
+              type: 'quote',
+              day: day,
+              source: entry.src,
+              subtitle: `Day ${day} · ${entry.date}`,
+              label: q.heading || '',
+              text: q.quote,
+              title: q.author,
+              subtitle2: q.work,
+            })}
+            completedControl={
+              <button
+                onClick={e => { e.stopPropagation(); toggleComplete() }}
+                title={completed ? 'Mark incomplete' : 'Mark as complete'}
+                aria-label={completed ? 'Mark incomplete' : 'Mark as complete'}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${completed ? 'var(--teal)' : 'var(--border-strong)'}`,
+                  background: completed ? 'var(--teal)' : 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', padding: 0,
+                  transition: 'all 0.2s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {completed && (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            }
+          />
+        ) : (
+          /* Placeholder card for review / reflection days */
+          <div className="card" style={s.contentCard}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
               <span style={s.contentLabel}>Weekly Review &amp; Reflection</span>
-              <p style={{ fontSize: 14, color: 'var(--ink-muted)', marginTop: 10, lineHeight: 1.7, fontFamily: "'Cormorant Garamond', serif" }}>
-                No assigned reading today. Take time to pray through this week's passages, review what you've learned, and reflect on how God is shaping you through His Word.
-              </p>
+              <button
+                onClick={toggleComplete}
+                title={completed ? 'Mark incomplete' : 'Mark as complete'}
+                aria-label={completed ? 'Mark incomplete' : 'Mark as complete'}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                  border: `2px solid ${completed ? 'var(--teal)' : 'var(--border-strong)'}`,
+                  background: completed ? 'var(--teal)' : 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', padding: 0,
+                  transition: 'all 0.2s',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {completed && (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
             </div>
-          )}
-        </div>
+            <p style={{ fontSize: 14, color: 'var(--ink-muted)', margin: 0, lineHeight: 1.7, fontFamily: "'Cormorant Garamond', serif" }}>
+              No assigned reading today. Take time to pray through this week's passages, review what you've learned, and reflect on how God is shaping you through His Word.
+            </p>
+          </div>
+        )}
 
         {/* Orthodox Catechism (optional) */}
         {orthodoxContent && (
@@ -869,7 +889,7 @@ const s = {
     padding:'5px 12px', textDecoration:'none',
   },
   contentCard: { padding:'24px' },
-  contentHeader: { marginBottom:16 },
+  contentHeader: { marginBottom:16, display:'flex', alignItems:'center', justifyContent:'space-between' },
   contentLabel: {
     fontSize:10, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.08em',
     color:'var(--ink-faint)',
