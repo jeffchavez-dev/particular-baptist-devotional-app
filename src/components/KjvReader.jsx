@@ -480,22 +480,48 @@ function BibleResultsPanel({ bibleResults, searchQuery, onNavigate, onClose, rea
 }
 
 /* ── Sidebar ── */
+
+/** Find which category id contains a given book name */
+function findCatForBook(bookName) {
+  for (const cat of [...OT_CATS, ...NT_CATS]) {
+    if (cat.books.includes(bookName)) return cat.id
+  }
+  return null
+}
+
 function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMobile, ntOnly, otOnly }) {
-  const [openCats, setOpenCats] = useState(() => new Set())
+  // Auto-open the category that contains the currently-reading book
+  const [openCats, setOpenCats] = useState(() => {
+    const catId = findCatForBook(selectedBook)
+    return catId ? new Set([catId]) : new Set()
+  })
   const [expandedBook, setExpandedBook] = useState(selectedBook)
+  const activeChRef = useRef(null)  // ref on the currently-active chapter button
+
+  // When the reader navigates to a different book, follow it in the sidebar
+  useEffect(() => {
+    const catId = findCatForBook(selectedBook)
+    if (catId) setOpenCats(new Set([catId]))
+    setExpandedBook(selectedBook)
+  }, [selectedBook])
+
+  // After the chapter grid renders, scroll the active chapter button into view
+  useEffect(() => {
+    if (activeChRef.current) {
+      activeChRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }
+  }, [expandedBook, selectedChapter])
 
   function toggleCat(id) {
     setOpenCats(prev => {
       if (prev.has(id)) {
-        // Close this category
         const next = new Set(prev)
         next.delete(id)
         return next
       }
-      // Open exclusively — close all others and collapse any expanded book
+      // Open exclusively — close all others
       return new Set([id])
     })
-    // Collapse any open book chapter grid when switching categories
     setExpandedBook(null)
   }
 
@@ -561,20 +587,24 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                     </button>
                     {isExpanded && chCount > 1 && (
                       <div style={sb.chapterGrid}>
-                        {Array.from({ length: chCount }, (_, i) => i + 1).map(ch => (
-                          <button
-                            key={ch}
-                            style={{
-                              ...sb.chapterBtn,
-                              ...(isReading && selectedChapter === ch
-                                ? { background: cat.color, color:'white', fontWeight:700, borderColor: cat.color }
-                                : {}),
-                            }}
-                            onClick={() => handleChapterClick(b, ch)}
-                          >
-                            {ch}
-                          </button>
-                        ))}
+                        {Array.from({ length: chCount }, (_, i) => i + 1).map(ch => {
+                          const isActive = isReading && selectedChapter === ch
+                          return (
+                            <button
+                              key={ch}
+                              ref={isActive ? activeChRef : null}
+                              style={{
+                                ...sb.chapterBtn,
+                                ...(isActive
+                                  ? { background: cat.color, color:'white', fontWeight:700, borderColor: cat.color }
+                                  : {}),
+                              }}
+                              onClick={() => handleChapterClick(b, ch)}
+                            >
+                              {ch}
+                            </button>
+                          )
+                        })}
                       </div>
                     )}
                   </div>

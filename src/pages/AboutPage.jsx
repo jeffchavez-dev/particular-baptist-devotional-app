@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
@@ -106,13 +107,24 @@ const DATA_SOURCES = [
   },
 ]
 
-/* ── Collapsible section wrapper ── */
+/* ── Collapsible section wrapper — state persisted so back-nav restores it ── */
 function CollapseSection({ id, icon, title, badge, defaultOpen = false, children }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const sk = `pb-settings-${id}`
+  const [open, setOpen] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(sk)
+      return raw !== null ? raw === '1' : defaultOpen
+    } catch { return defaultOpen }
+  })
+  function toggle() {
+    const next = !open
+    setOpen(next)
+    try { sessionStorage.setItem(sk, next ? '1' : '0') } catch {}
+  }
   return (
     <section style={cs.section}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         style={cs.header}
         aria-expanded={open}
         id={id}
@@ -226,6 +238,12 @@ export default function AboutPage() {
   const [progressData, setProgressData] = useState(null)
   const [syncMessage, setSyncMessage] = useState(null)
   const [syncing, setSyncing] = useState(false)
+
+  /* Restore scroll on mount, save on unmount — so back-navigation returns to same spot */
+  useEffect(() => {
+    restoreScroll('settings')
+    return () => saveScroll('settings')
+  }, [])
 
   useEffect(() => {
     if (!session) return

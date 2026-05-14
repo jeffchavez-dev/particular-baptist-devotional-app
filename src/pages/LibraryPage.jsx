@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
 import {
   getAllKjvHighlights, getAllKjvNotes,
@@ -63,15 +64,32 @@ function HlDot({ colorId, size = 9 }) {
   )
 }
 
-function SectionHeader({ icon, title, count, filtered }) {
+function SectionHeader({ icon, title, count, filtered, open, onToggle }) {
+  const clickable = !!onToggle
   return (
-    <div style={s.sectionHeader}>
+    <div
+      style={{
+        ...s.sectionHeader,
+        ...(clickable ? { cursor: 'pointer', WebkitTapHighlightColor: 'transparent' } : {}),
+      }}
+      onClick={onToggle}
+      role={clickable ? 'button' : undefined}
+      aria-expanded={clickable ? open : undefined}
+    >
       {icon}
       <span style={s.sectionTitle}>{title}</span>
       {count > 0 && (
         <span style={s.sectionBadge}>
           {filtered != null && filtered !== count ? `${filtered} / ${count}` : count}
         </span>
+      )}
+      {clickable && (
+        <svg
+          width="13" height="13" viewBox="0 0 13 13" fill="none"
+          style={{ marginLeft: 'auto', flexShrink: 0, transition: 'transform 0.22s', transform: open ? 'rotate(180deg)' : 'none', color: 'var(--ink-faint)' }}
+        >
+          <path d="M2.5 4.5l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       )}
     </div>
   )
@@ -2784,8 +2802,9 @@ const SORT_OPTS = [
 const SESSION_EDIT_KEY   = 'pb-lib-editing-note'
 const SESSION_CREATE_KEY = 'pb-lib-creating-note'
 const SESSION_SORT_KEY   = 'pb-lib-sort'
-const SESSION_FILTER_KEY = 'pb-lib-filter-label'
-const VIEW_KEY           = 'pb-lib-note-view'
+const SESSION_FILTER_KEY   = 'pb-lib-filter-label'
+const VIEW_KEY             = 'pb-lib-note-view'
+const SESSION_SECTIONS_KEY = 'pb-lib-notes-sections'
 
 function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
   /* Persist create-form open state across navigation */
@@ -2854,6 +2873,23 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const [filterOpen,     setFilterOpen]     = useState(false)
   const sortRef   = useRef(null)
   const filterRef = useRef(null)
+
+  /* ── Accordion section open/close (persisted so back-nav restores state) ── */
+  const [openSections, setOpenSectionsRaw] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_SECTIONS_KEY)
+      return raw ? JSON.parse(raw) : { lib: false, kjv: false, dev: false, conf: false }
+    } catch {
+      return { lib: false, kjv: false, dev: false, conf: false }
+    }
+  })
+  function toggleSection(key) {
+    setOpenSectionsRaw(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      try { sessionStorage.setItem(SESSION_SECTIONS_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
 
   /* ── View mode: 'grid' (2-col) | 'list' (single-col) ── */
   const [noteView, setNoteViewRaw] = useState(() => {
@@ -3141,7 +3177,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
       <div style={s.divider} />
 
-      {/* ── Personal Library Notes — kanban grid ── */}
+      {/* ── Personal Library Notes ── */}
       {(!isSearching || filteredLib.length > 0) && (
         <>
           <SectionHeader
@@ -3154,45 +3190,51 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             title="Personal Notes"
             count={libFreeNotes.length}
             filtered={isSearching ? filteredLib.length : null}
+            open={isSearching || openSections.lib}
+            onToggle={!isSearching ? () => toggleSection('lib') : undefined}
           />
-          <p style={s.sectionHint}>Notes created directly in My Library</p>
-          {filteredLib.length === 0 && !isSearching
-            ? libTaggedNotes.length > 0
-              ? <EmptyMsg text='Scripture-tagged notes are shown in "Scripture Notes" below.' />
-              : <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
-            : (
-              <div style={gridStyle}>
-                {filteredLib.map(n => {
-                  const { title, labels } = isRichNote(n.note) ? parseRichNote(n.note) : { title: '', labels: [] }
-                  const chTagBadge = n.chapterTag
-                    ? `${n.chapterTag.book} ${n.chapterTag.chapter}`
-                    : null
-                  const chTagBadgeStyle = { background: 'var(--amber-soft)', color: 'var(--amber-ink)', border: '1px solid var(--amber-ink)', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, display: 'inline-block', marginLeft: 4 }
-                  return (
-                    <NoteCard
-                      key={n.key}
-                      title={title}
-                      labels={labels}
-                      chapterBadge={chTagBadge}
-                      chapterBadgeStyle={chTagBadgeStyle}
-                      preview={notePreviewText(n.note)}
-                      date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, title, type: 'lib' })}
-                      onEdit={() => setEditingNote(n)}
-                      onDelete={() => requestDelete(n.key, 'lib')}
-                      query={isSearching ? searchQuery.trim() : ''}
-                    />
-                  )
-                })}
-              </div>
-            )
-          }
+          {(isSearching || openSections.lib) && (
+            <>
+              <p style={s.sectionHint}>Notes created directly in My Library</p>
+              {filteredLib.length === 0 && !isSearching
+                ? libTaggedNotes.length > 0
+                  ? <EmptyMsg text='Scripture-tagged notes are shown in "Scripture Notes" below.' />
+                  : <EmptyMsg text='No personal notes yet. Tap "New Note" above to write one.' />
+                : (
+                  <div style={gridStyle}>
+                    {filteredLib.map(n => {
+                      const { title, labels } = isRichNote(n.note) ? parseRichNote(n.note) : { title: '', labels: [] }
+                      const chTagBadge = n.chapterTag
+                        ? `${n.chapterTag.book} ${n.chapterTag.chapter}`
+                        : null
+                      const chTagBadgeStyle = { background: 'var(--amber-soft)', color: 'var(--amber-ink)', border: '1px solid var(--amber-ink)', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 99, display: 'inline-block', marginLeft: 4 }
+                      return (
+                        <NoteCard
+                          key={n.key}
+                          title={title}
+                          labels={labels}
+                          chapterBadge={chTagBadge}
+                          chapterBadgeStyle={chTagBadgeStyle}
+                          preview={notePreviewText(n.note)}
+                          date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                          onCardClick={() => setViewingNote({ note: n.note, key: n.key, title, type: 'lib' })}
+                          onEdit={() => setEditingNote(n)}
+                          onDelete={() => requestDelete(n.key, 'lib')}
+                          query={isSearching ? searchQuery.trim() : ''}
+                        />
+                      )
+                    })}
+                  </div>
+                )
+              }
+            </>
+          )}
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Scripture Notes — kanban grid ── */}
+      {/* ── Scripture Notes ── */}
       {(!isSearching || filteredKjv.length > 0) && (
         <>
           <SectionHeader
@@ -3205,41 +3247,47 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             title="Scripture Notes"
             count={allScriptureNotes.length}
             filtered={isSearching ? filteredKjv.length : null}
+            open={isSearching || openSections.kjv}
+            onToggle={!isSearching ? () => toggleSection('kjv') : undefined}
           />
-          <p style={s.sectionHint}>Notes attached to specific Bible verses</p>
-          {filteredKjv.length === 0 && !isSearching
-            ? <EmptyMsg text="No scripture notes yet. Use the pencil icon on any verse, or tag a scripture when creating a new note above." />
-            : (
-              <div style={gridStyle}>
-                {filteredKjv.map(n => {
-                  const badge = `${n.book} ${n.chapter}:${n.verse}`
-                  const badgeStyle = { background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
-                  const noteType = n.isLibTagged ? 'lib' : 'kjv'
-                  return (
-                    <NoteCard
-                      key={n.key}
-                      badge={badge}
-                      badgeStyle={badgeStyle}
-                      labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
-                      preview={notePreviewText(n.note)}
-                      date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: noteType, extra: { book: n.book, chapter: n.chapter, verse: n.verse } })}
-                      onEdit={() => setEditingNote({ key: n.key, note: n.note })}
-                      onDelete={() => requestDelete(n.key, noteType)}
-                      onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
-                      query={isSearching ? searchQuery.trim() : ''}
-                    />
-                  )
-                })}
-              </div>
-            )
-          }
+          {(isSearching || openSections.kjv) && (
+            <>
+              <p style={s.sectionHint}>Notes attached to specific Bible verses</p>
+              {filteredKjv.length === 0 && !isSearching
+                ? <EmptyMsg text="No scripture notes yet. Use the pencil icon on any verse, or tag a scripture when creating a new note above." />
+                : (
+                  <div style={gridStyle}>
+                    {filteredKjv.map(n => {
+                      const badge = `${n.book} ${n.chapter}:${n.verse}`
+                      const badgeStyle = { background: 'var(--teal-light)', color: 'var(--teal)', border: '1px solid var(--teal)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                      const noteType = n.isLibTagged ? 'lib' : 'kjv'
+                      return (
+                        <NoteCard
+                          key={n.key}
+                          badge={badge}
+                          badgeStyle={badgeStyle}
+                          labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
+                          preview={notePreviewText(n.note)}
+                          date={n.createdAt ? new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                          onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: noteType, extra: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                          onEdit={() => setEditingNote({ key: n.key, note: n.note })}
+                          onDelete={() => requestDelete(n.key, noteType)}
+                          onOpen={() => navigate('/scripture', { state: { book: n.book, chapter: n.chapter, verse: n.verse } })}
+                          query={isSearching ? searchQuery.trim() : ''}
+                        />
+                      )
+                    })}
+                  </div>
+                )
+              }
+            </>
+          )}
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Devotional Notes — kanban grid ── */}
+      {/* ── Devotional Notes ── */}
       {(!isSearching || filteredDev.length > 0) && (
         <>
           <SectionHeader
@@ -3251,42 +3299,48 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             title="Devotional Notes"
             count={enrichedDevNotes.length}
             filtered={isSearching ? filteredDev.length : null}
+            open={isSearching || openSections.dev}
+            onToggle={!isSearching ? () => toggleSection('dev') : undefined}
           />
-          {!session ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
-              <p style={s.emptyText}>Sign in to sync and view your devotional notes.</p>
-              <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }}>
-                Sign in →
-              </button>
-            </div>
-          ) : filteredDev.length === 0 && !isSearching ? (
-            <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
-          ) : (
-            <div style={gridStyle}>
-              {filteredDev.map(n => {
-                const badge = `Day ${n.day_number}`
-                const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
-                return (
-                  <NoteCard
-                    key={n.day_number}
-                    badge={badge}
-                    badgeStyle={badgeStyle}
-                    preview={notePreviewText(n.notes)}
-                    date={n.entry.date}
-                    onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
-                    onOpen={() => navigate(`/day/${n.day_number}`)}
-                    query={isSearching ? searchQuery.trim() : ''}
-                  />
-                )
-              })}
-            </div>
+          {(isSearching || openSections.dev) && (
+            <>
+              {!session ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
+                  <p style={s.emptyText}>Sign in to sync and view your devotional notes.</p>
+                  <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }}>
+                    Sign in →
+                  </button>
+                </div>
+              ) : filteredDev.length === 0 && !isSearching ? (
+                <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
+              ) : (
+                <div style={gridStyle}>
+                  {filteredDev.map(n => {
+                    const badge = `Day ${n.day_number}`
+                    const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                    return (
+                      <NoteCard
+                        key={n.day_number}
+                        badge={badge}
+                        badgeStyle={badgeStyle}
+                        preview={notePreviewText(n.notes)}
+                        date={n.entry.date}
+                        onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
+                        onOpen={() => navigate(`/day/${n.day_number}`)}
+                        query={isSearching ? searchQuery.trim() : ''}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
 
       <div style={s.divider} />
 
-      {/* ── Confession Notes — kanban grid ── */}
+      {/* ── Confession Notes ── */}
       {(!isSearching || filteredConf.length > 0) && (
         <>
           <SectionHeader
@@ -3299,33 +3353,39 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             title="Confession Notes"
             count={confNotes.length}
             filtered={isSearching ? filteredConf.length : null}
+            open={isSearching || openSections.conf}
+            onToggle={!isSearching ? () => toggleSection('conf') : undefined}
           />
-          {filteredConf.length === 0 && !isSearching
-            ? <EmptyMsg text="No confession notes yet. Open any confession paragraph and tap Note." />
-            : (
-              <div style={gridStyle}>
-                {filteredConf.map(n => {
-                  const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
-                  const badge = `${srcLabel} ${n.itemKey}`
-                  const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', border: '1px solid var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
-                  return (
-                    <NoteCard
-                      key={n.key}
-                      badge={badge}
-                      badgeStyle={badgeStyle}
-                      labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
-                      preview={notePreviewText(n.note)}
-                      onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: 'conf', extra: { source: n.source, itemKey: n.itemKey } })}
-                      onEdit={() => setEditingNote({ key: n.key, note: n.note })}
-                      onDelete={() => requestDelete(n.key, 'conf')}
-                      onOpen={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
-                      query={isSearching ? searchQuery.trim() : ''}
-                    />
-                  )
-                })}
-              </div>
-            )
-          }
+          {(isSearching || openSections.conf) && (
+            <>
+              {filteredConf.length === 0 && !isSearching
+                ? <EmptyMsg text="No confession notes yet. Open any confession paragraph and tap Note." />
+                : (
+                  <div style={gridStyle}>
+                    {filteredConf.map(n => {
+                      const srcLabel = n.source === '2lbcf' ? '2LBCF' : n.source === 'catechism' ? 'Catechism' : '1LBCF'
+                      const badge = `${srcLabel} ${n.itemKey}`
+                      const badgeStyle = { background: 'var(--purple-soft)', color: 'var(--purple-ink)', border: '1px solid var(--purple-ink)', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, display: 'inline-block' }
+                      return (
+                        <NoteCard
+                          key={n.key}
+                          badge={badge}
+                          badgeStyle={badgeStyle}
+                          labels={isRichNote(n.note) ? parseRichNote(n.note).labels || [] : []}
+                          preview={notePreviewText(n.note)}
+                          onCardClick={() => setViewingNote({ note: n.note, key: n.key, badge, badgeStyle, type: 'conf', extra: { source: n.source, itemKey: n.itemKey } })}
+                          onEdit={() => setEditingNote({ key: n.key, note: n.note })}
+                          onDelete={() => requestDelete(n.key, 'conf')}
+                          onOpen={() => navigate(`/confessions?t=${n.source}`, { state: { itemKey: n.itemKey, source: n.source } })}
+                          query={isSearching ? searchQuery.trim() : ''}
+                        />
+                      )
+                    })}
+                  </div>
+                )
+              }
+            </>
+          )}
         </>
       )}
 
@@ -3608,6 +3668,12 @@ export default function LibraryPage() {
       )
     }
   }, [session])
+
+  /* Restore scroll on mount, save on unmount — so back-navigation returns to same spot */
+  useEffect(() => {
+    restoreScroll('library')
+    return () => saveScroll('library')
+  }, [])
 
   useEffect(() => {
     const refresh = () => {
