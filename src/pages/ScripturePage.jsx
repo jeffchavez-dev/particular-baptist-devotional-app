@@ -7,7 +7,7 @@ import { DAY_BIBLE } from '../data/readingPlan'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion } from '../lib/readerPrefs'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
-import { BIBLE_BOOKS } from '../lib/bibleBooks'
+import { BIBLE_BOOKS, BOOK_ABBR } from '../lib/bibleBooks'
 import { addSearchHistory, getSearchHistory, clearSearchHistory, isScriptureBookmarked, toggleScriptureBookmark } from '../lib/annotations'
 import { isAuthor } from '../lib/authorContent'
 
@@ -245,7 +245,7 @@ export default function ScripturePage() {
               <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
               <path d="M3 3.5h5M3 5.5h5M3 7.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
-            <span style={s.readBookName}>{readBook}</span>
+            <span style={s.readBookName}>{BOOK_ABBR[readBook] ?? readBook}</span>
             <span style={s.readBookCh}>Ch. {readChapter}</span>
           </button>
 
