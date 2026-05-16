@@ -70,6 +70,7 @@ const SCRIPTURE_FEATURES = [
   { title: 'In-App Strong\'s Lexicon', body: 'Tap a Strong\'s number to open a full lexicon entry — lemma, transliteration, pronunciation, and definition — without leaving the app. Browse all 8,600+ entries.' },
   { title: 'Find in GNT / HOT', body: 'From any lexicon entry, search every occurrence of a word across the Greek NT or Hebrew OT. Results navigate to the exact verse with the matching word auto-highlighted.' },
   { title: 'Scroll-Synced Navigation', body: 'The chapter indicator in the header always reflects which chapter you\'re currently reading as you scroll through continuous chapters.' },
+  { title: 'Smart Book Sidebar', body: 'The book navigation sidebar always opens to the category and chapter grid for the book you\'re currently reading, with the active chapter highlighted and scrolled into view — making it quick to switch chapters within the same book.' },
   { title: 'Verse Highlighting & Notes', body: 'Highlight individual verses in five colors and attach personal notes. Annotations are stored locally and sync to your account.' },
   { title: 'Offline Ready (PWA)', body: 'Install as a Progressive Web App. All Bible data — KJV, GNT, HOT, and lexicons — caches on first load and reads fully offline thereafter.' },
 ]

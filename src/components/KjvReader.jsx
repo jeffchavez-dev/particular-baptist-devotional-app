@@ -720,6 +720,25 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     return idx
   }, [itemNotes])
 
+  /* Index lib| notes that have a chapterTag — maps "Book|ch" → [{ key, title, body }] */
+  const chapterNoteIndex = useMemo(() => {
+    const idx = {}
+    for (const [k, raw] of Object.entries(itemNotes)) {
+      if (!k.startsWith('lib|')) continue
+      if (!raw || !raw.startsWith('<!RICH>')) continue
+      try {
+        const parsed = JSON.parse(raw.slice(7))
+        const ct = parsed.chapterTag
+        if (ct?.book && ct.chapter) {
+          const ck = `${ct.book}|${ct.chapter}`
+          if (!idx[ck]) idx[ck] = []
+          idx[ck].push({ key: k, title: parsed.title || '', body: parsed.body || '' })
+        }
+      } catch {}
+    }
+    return idx
+  }, [itemNotes])
+
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
@@ -2213,6 +2232,47 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     )
   }
 
+  /** Renders chapter-tagged library notes in study mode — shown below the chapter heading */
+  function renderChapterLibNotes(segBook, segChapter) {
+    if (!studyMode) return null
+    const notes = chapterNoteIndex[`${segBook}|${segChapter}`]
+    if (!notes?.length) return null
+    return (
+      <div style={r.chapterLibNotesWrap}>
+        {notes.map(n => {
+          const preview = (n.body || '')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/&amp;/g, '&').replace(/&nbsp;/g, ' ')
+            .replace(/\s+/g, ' ').trim()
+          const trimmed = preview.length > 120 ? preview.slice(0, 120) + '…' : preview
+          return (
+            <button
+              key={n.key}
+              style={r.chapterLibNoteCard}
+              onClick={e => { e.stopPropagation(); routerNavigate('/library') }}
+              title="View in My Library"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0 }}>
+                  <rect x="1" y="1" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M3 3.5h4M3 5.5h2.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+                </svg>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.03em' }}>
+                  {n.title ? n.title : 'My Note'}
+                </span>
+              </div>
+              {trimmed && (
+                <div style={{ fontSize: 11, opacity: 0.85, textAlign: 'left', lineHeight: 1.4, marginTop: 2 }}>
+                  {trimmed}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   /** Renders the author-editable verse description below a verse row */
   /**
    * Renders an author-editable section heading ABOVE a verse.
@@ -2517,6 +2577,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             </div>
                         }
                         {renderScriptureChapterDesc(seg.book, seg.chapter)}
+                        {renderChapterLibNotes(seg.book, seg.chapter)}
 
                         <div style={r.verseList}>
                           {seg.verses.map(({ verse, words }) => {
@@ -4417,6 +4478,20 @@ const r = {
     fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap',
     transition:'opacity 0.12s',
   },
+  /* Cards shown when there are lib| notes tagged to a chapter (study mode) */
+  chapterLibNotesWrap: {
+    margin: '2px 0 12px',
+    display: 'flex', flexDirection: 'column', gap: 5,
+  },
+  chapterLibNoteCard: {
+    display: 'block', textAlign: 'left', width: '100%',
+    background: 'var(--teal-light)', color: 'var(--teal)',
+    border: '1px solid rgba(29,107,90,0.25)',
+    borderRadius: 'var(--radius)', padding: '7px 10px',
+    cursor: 'pointer', fontFamily: "'DM Sans', sans-serif",
+    transition: 'opacity 0.12s',
+  },
+
   /* Chip shown when there are lib| notes tagged to a verse */
   libNoteChip: {
     display:'inline-flex', alignItems:'center', gap:4,

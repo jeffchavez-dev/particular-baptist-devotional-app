@@ -313,6 +313,36 @@ export default function ScripturePage() {
             </button>
           )}
 
+          {/* Back / Forward history navigation */}
+          <button
+            style={{
+              ...s.menuBtn,
+              opacity: navHistoryIdx <= 0 ? 0.35 : 1,
+            }}
+            onClick={() => kjvRef.current?.goBack()}
+            disabled={navHistoryIdx <= 0}
+            aria-label="Go back in history"
+            title="Go back"
+          >
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <path d="M10.5 4L6 8.5L10.5 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            style={{
+              ...s.menuBtn,
+              opacity: navHistoryIdx >= navHistory.length - 1 ? 0.35 : 1,
+            }}
+            onClick={() => kjvRef.current?.goForward()}
+            disabled={navHistoryIdx >= navHistory.length - 1}
+            aria-label="Go forward in history"
+            title="Go forward"
+          >
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+              <path d="M6.5 4L11 8.5L6.5 13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
           {/* Study mode toggle — show/hide all notes and reference chips */}
           <button
             style={{
