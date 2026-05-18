@@ -182,19 +182,20 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.fillText(typeLabel, typeBadgeX + badgePadX, badgeY + badgePadY + badgeFontSize * 0.78)
   ctx.globalAlpha = 1
 
-  // Large decorative open-quote
-  const quoteFontSize = Math.round(refDim * 0.32)
+  // Large decorative open-quote — sized proportionally, placed relative to text start
+  const badgeBottom = badgeY + badgeH
+  const textY = badgeBottom + Math.round(refDim * 0.08)
+  const quoteFontSize = Math.round(refDim * 0.18)  // was 0.32
   ctx.save()
-  ctx.globalAlpha = 0.2
+  ctx.globalAlpha = 0.15  // was 0.2
   ctx.fillStyle = accentColor
   ctx.font = `bold ${quoteFontSize}px Georgia, serif`
-  ctx.fillText('“', PAD - Math.round(refDim * 0.02), PAD * 1.8 + quoteFontSize * 0.6)
+  ctx.fillText('”', PAD - Math.round(refDim * 0.01), textY + quoteFontSize * 0.75)
   ctx.restore()
 
   // Main text
   const mainFontSize = Math.round(refDim * 0.048)
   const mainLineHeight = mainFontSize * 1.55
-  const textY = PAD * 1.8
   const maxTextWidth = w - PAD * 2.2
   const maxLines = Math.floor((h * 0.52) / mainLineHeight)
 
@@ -208,12 +209,14 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   const endY = wrapText(ctx, note.text || '', PAD, textY, maxTextWidth, mainLineHeight, maxLines)
 
   // Author attribution
+  let finalBottom = endY
   if (book.author) {
     const attrFontSize = Math.round(refDim * 0.032)
     const attrY = endY + Math.round(refDim * 0.035)
     ctx.fillStyle = accentColor
     ctx.font = `500 ${attrFontSize}px 'DM Sans', sans-serif`
     ctx.fillText(`— ${book.author}`, PAD, attrY)
+    finalBottom = attrY + attrFontSize * 0.3
 
     // Page/percent line
     const subFontSize = Math.round(refDim * 0.026)
@@ -225,18 +228,20 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
     if (note.percent != null) locParts.push(`${note.percent}%`)
     if (locParts.length) {
       ctx.fillText(locParts.join(' · '), PAD, attrY + attrFontSize * 1.6)
+      finalBottom = attrY + attrFontSize * 1.6 + subFontSize * 0.3
     }
     ctx.globalAlpha = 1
   }
 
-  // Bottom rule
+  // Bottom rule — dynamic, sits just below the content
+  const bottomRuleY = Math.min(Math.max(finalBottom + refDim * 0.065, h * 0.68), h * 0.93)
   ctx.save()
   ctx.globalAlpha = 0.35
   ctx.strokeStyle = accentColor
   ctx.lineWidth = Math.round(refDim * 0.003)
   ctx.beginPath()
-  ctx.moveTo(PAD, h - PAD * 0.55)
-  ctx.lineTo(w - PAD, h - PAD * 0.55)
+  ctx.moveTo(PAD, bottomRuleY)
+  ctx.lineTo(w - PAD, bottomRuleY)
   ctx.stroke()
   ctx.restore()
 
@@ -245,7 +250,7 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.fillStyle = textColor
   ctx.globalAlpha = 0.4
   ctx.font = `500 ${brandFontSize}px 'DM Sans', sans-serif`
-  ctx.fillText('Particular Baptist Devotional', PAD, h - PAD * 0.28)
+  ctx.fillText('Particular Baptist Devotional', PAD, bottomRuleY + brandFontSize * 1.6)
   ctx.globalAlpha = 1
 }
 

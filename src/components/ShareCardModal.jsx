@@ -119,19 +119,28 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
   return sourceY
 }
 
-function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor) {
+/**
+ * Draw the bottom rule + branding.
+ * @param {number|null} contentBottom - Y of the last content pixel; if provided,
+ *   the chrome is placed just below the content instead of always at h*0.9.
+ */
+function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, contentBottom = null) {
   const refDim = Math.min(w, h)
+  const fSz    = Math.round(refDim * 0.019)
+
+  // Dynamic positioning: sit just below the content with at least 6% padding,
+  // but never higher than 68% of height and never lower than 93%.
+  const ruleY = contentBottom !== null
+    ? Math.min(Math.max(contentBottom + refDim * 0.065, h * 0.68), h * 0.93)
+    : h * 0.9
+
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.35; ctx.lineWidth = 1
-  ctx.beginPath(); ctx.moveTo(PAD, h * 0.9); ctx.lineTo(w - PAD, h * 0.9); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, ruleY); ctx.lineTo(w - PAD, ruleY); ctx.stroke()
   ctx.globalAlpha = 1
 
-  const fSz = Math.round(refDim * 0.019)
   ctx.font = `${fSz}px 'DM Sans','Helvetica Neue',sans-serif`
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.45; ctx.textAlign = 'left'
-  ctx.fillText('Particular Baptist Devotional', PAD, h * 0.92)
-  /* Removed URL */
-  // ctx.fillStyle = accentColor; ctx.globalAlpha = 0.65; ctx.textAlign = 'right'
-  // ctx.fillText('pb-devotional.vercel.app', w - PAD, h * 0.94)
+  ctx.fillText('Particular Baptist Devotional', PAD, ruleY + fSz * 1.6)
   ctx.globalAlpha = 1; ctx.textAlign = 'left'
 }
 
@@ -147,19 +156,19 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
 
   /* Title */
   const titleSz = Math.round(refDim * 0.048)
-  const titleY  = sourceY + refDim * 0.07
+  const titleY  = sourceY + refDim * 0.095   // was 0.07 — more space below badge
   ctx.fillStyle = textColor
   ctx.font = `600 ${titleSz}px 'Georgia','Times New Roman',serif`
-  const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.25, 3)
+  const titleBottom = wrapText(ctx, card.title || '', PAD, titleY, contentW, titleSz * 1.3, 3)
 
   /* Divider */
   ctx.strokeStyle = accentColor; ctx.globalAlpha = 0.25; ctx.lineWidth = 1
-  const divY = titleBottom + refDim * 0.015
+  const divY = titleBottom + refDim * 0.030   // was 0.015 — doubled gap
   ctx.beginPath(); ctx.moveTo(PAD, divY); ctx.lineTo(w - PAD, divY); ctx.stroke()
   ctx.globalAlpha = 1
 
   /* Optional label */
-  let contentY = divY + refDim * 0.038
+  let contentY = divY + refDim * 0.055   // was 0.038 — more space below divider
   if (card.label) {
     ctx.fillStyle = accentColor
     ctx.font = `bold ${Math.round(refDim * 0.018)}px 'DM Sans','Helvetica Neue',sans-serif`
@@ -168,8 +177,8 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
   }
 
   /* Decorative quote mark — mirrored for Hebrew RTL */
-  ctx.fillStyle = accentColor; ctx.globalAlpha = 0.22
-  ctx.font = `${Math.round(refDim * 0.13)}px 'Georgia',serif`
+  ctx.fillStyle = accentColor; ctx.globalAlpha = 0.18
+  ctx.font = `${Math.round(refDim * 0.10)}px 'Georgia',serif`
   if (isHeb) {
     ctx.textAlign = 'right'; ctx.direction = 'rtl'
     ctx.fillText('\u201D', w - PAD + refDim * 0.008, contentY + refDim * 0.045)
@@ -183,7 +192,7 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
   const cSz = Math.round(refDim * 0.031 * scale)
   const cLineH = cSz * (isHeb ? 2.1 : 1.75)
   const refsPresent = !!(card.refs && card.refs.trim())
-  const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.44 : 0.58)) / cLineH))
+  const maxLines = Math.max(3, Math.floor((h * (refsPresent ? 0.48 : 0.62)) / cLineH))
   ctx.fillStyle = textColor
   let contentBottom
   if (isHeb) {
@@ -199,6 +208,7 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
   }
 
   /* Scripture references — smaller, muted, below content */
+  let finalBottom = contentBottom
   if (refsPresent) {
     const refAreaTop = contentBottom + refDim * 0.03
     if (refAreaTop < h * 0.88) {
@@ -214,12 +224,12 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
 
       ctx.fillStyle = textColor; ctx.globalAlpha = 0.38
       ctx.font = `${refSz}px 'DM Sans','Helvetica Neue',sans-serif`
-      wrapText(ctx, refsClean, PAD + w * 0.04, refAreaTop + refSz * 1.7, contentW - w * 0.04, refLineH, refMaxLines)
+      finalBottom = wrapText(ctx, refsClean, PAD + w * 0.04, refAreaTop + refSz * 1.7, contentW - w * 0.04, refLineH, refMaxLines)
       ctx.globalAlpha = 1
     }
   }
 
-  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor)
+  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom)
 }
 
 /* ── Quote card — quote text is the hero ── */
@@ -269,15 +279,20 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0
   const attribY = Math.min(quoteBottom + refDim * 0.07, h * 0.87)
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.75
   ctx.font = `500 ${Math.round(refDim * 0.024)}px 'DM Sans','Helvetica Neue',sans-serif`
-  if (card.title) ctx.fillText(`\u2014 ${card.title}`, PAD, attribY)
+  let finalBottom = attribY
+  if (card.title) {
+    ctx.fillText(`\u2014 ${card.title}`, PAD, attribY)
+    finalBottom = attribY + refDim * 0.032
+  }
   if (card.subtitle2) {
     ctx.globalAlpha = 0.5
     ctx.font = `italic ${Math.round(refDim * 0.021)}px 'Georgia',serif`
     ctx.fillText(card.subtitle2, PAD, attribY + refDim * 0.042)
+    finalBottom = attribY + refDim * 0.042 + refDim * 0.028
   }
   ctx.globalAlpha = 1
 
-  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor)
+  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom)
 }
 
 /* ── Master draw dispatcher ── */
