@@ -3678,6 +3678,10 @@ export default function LibraryPage() {
   const { session } = useAuth()
 
   const [activeTab, setActiveTab] = useState('notes')
+  // If the user signs out while on the Books tab, fall back to Notes
+  useEffect(() => {
+    if (!session && activeTab === 'books') setActiveTab('notes')
+  }, [session, activeTab])
   const [libSearch,     setLibSearch]     = useState('')
   const [bookLibraryCount, setBookLibraryCount] = useState(() =>
     Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
@@ -3825,7 +3829,8 @@ export default function LibraryPage() {
     { id: 'notes',      label: 'Notes',      count: notesCount      },
     { id: 'bookmarks',  label: 'Bookmarks',  count: bookmarksCount  },
     { id: 'highlights', label: 'Highlights', count: highlightsCount },
-    { id: 'books',      label: 'Books',      count: bookLibraryCount },
+    // Books tab is only available to signed-in users
+    ...(session ? [{ id: 'books', label: 'Books', count: bookLibraryCount }] : []),
   ]
 
   const handleRemoveSavedDay      = useCallback(day  => { toggleBookmark(day); setSavedDays(prev => { const n = {...prev}; delete n[day]; return n }) }, [])
@@ -3959,7 +3964,22 @@ export default function LibraryPage() {
           />
         )}
         {activeTab === 'books' && (
-          <BookLibraryTab searchQuery={libSearch} />
+          session ? (
+            <BookLibraryTab searchQuery={libSearch} />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '48px 24px', textAlign: 'center' }}>
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style={{ color: 'var(--teal)', opacity: 0.7 }}>
+                <rect x="6" y="5" width="20" height="28" rx="2" stroke="currentColor" strokeWidth="1.6"/>
+                <path d="M26 9h6v26l-6-3-6 3V9" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+              </svg>
+              <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-muted)', maxWidth: 260, lineHeight: 1.6 }}>
+                Sign in to access Book Reading Notes and track your reading journey.
+              </p>
+              <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{ fontSize: 13 }}>
+                Sign in →
+              </button>
+            </div>
+          )
         )}
       </div>
 

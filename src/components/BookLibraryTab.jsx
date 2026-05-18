@@ -1,10 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { generateId, getAllBooks, saveBook, deleteBook, searchBookCovers } from '../lib/bookLibrary'
+import BookCelebration from './BookCelebration'
 
 /*
-  Book: { id, title, author, isEbook, totalPages, coverUrl, coverData, addedAt, notes[] }
+  Book: { id, title, author, isEbook, totalPages, coverUrl, coverData, addedAt, notes[], completed, labels[] }
   Note: { id, type ('note'|'quote'), text, page, percent, createdAt, updatedAt }
 */
+
+/* Inject spinner keyframes once */
+;(function injectSpinKf() {
+  const id = 'bl-spin-kf'
+  if (document.getElementById(id)) return
+  const s = document.createElement('style')
+  s.id = id
+  s.textContent = '@keyframes spin { to { transform: rotate(360deg) } }'
+  document.head.appendChild(s)
+})()
 
 /* ── Canvas helpers ─────────────────────────────────────────────────────────── */
 
@@ -392,6 +403,32 @@ function BookNoteShareModal({ note, book, onClose }) {
   )
 }
 
+/* ── Date helpers ───────────────────────────────────────────────────────────── */
+
+/** ISO string → "YYYY-MM-DD" for <input type="date"> */
+function isoToDateInput(iso) {
+  if (!iso) return ''
+  return (iso.length > 10 ? iso : iso + 'T12:00:00').split('T')[0]
+}
+
+/** "YYYY-MM-DD" from <input type="date"> → full ISO string (local noon to avoid UTC date shift) */
+function dateInputToISO(val) {
+  if (!val) return new Date().toISOString()
+  return new Date(val + 'T12:00:00').toISOString()
+}
+
+/** Today as "YYYY-MM-DD" */
+function todayDateInput() {
+  return new Date().toISOString().split('T')[0]
+}
+
+/** Display a date from ISO or YYYY-MM-DD */
+function formatDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso.length > 10 ? iso : iso + 'T12:00:00')
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 /* ── AddBookModal ───────────────────────────────────────────────────────────── */
 
 function AddBookModal({ book, onSave, onClose }) {
@@ -402,11 +439,31 @@ function AddBookModal({ book, onSave, onClose }) {
   const [coverUrl, setCoverUrl] = useState(book?.coverUrl || '')
   const [coverData, setCoverData] = useState(book?.coverData || null)
   const [coverSuggestions, setCoverSuggestions] = useState([])
-  const [coverLoading, setCoverLoading] = useState(false)
+  const [coverLoading,   setCoverLoading]   = useState(false)
+  const [fetchingCover,  setFetchingCover]  = useState(false) // converting selected suggestion to base64
   const [searchTouched, setSearchTouched] = useState(false)
   const [selectedCoverId, setSelectedCoverId] = useState(null)
+  const [labels, setLabels] = useState(book?.labels || [])
+  const [labelInput, setLabelInput] = useState('')
+  const [startedAt, setStartedAt] = useState(
+    book?.startedAt ? isoToDateInput(book.startedAt) : todayDateInput()
+  )
   const fileInputRef = useRef(null)
   const debounceRef = useRef(null)
+
+  function addLabel(raw) {
+    const tag = raw.trim().toLowerCase().replace(/[,;]+$/, '')
+    if (!tag || labels.includes(tag)) { setLabelInput(''); return }
+    setLabels(prev => [...prev, tag])
+    setLabelInput('')
+  }
+  function removeLabel(tag) { setLabels(prev => prev.filter(l => l !== tag)) }
+  function handleLabelKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addLabel(labelInput) }
+    if (e.key === 'Backspace' && !labelInput && labels.length) {
+      setLabels(prev => prev.slice(0, -1))
+    }
+  }
 
   useEffect(() => {
     if (!title.trim()) { setCoverSuggestions([]); return }
@@ -433,10 +490,31 @@ function AddBookModal({ book, onSave, onClose }) {
     reader.readAsDataURL(file)
   }
 
-  function handleSelectSuggestion(suggestion) {
+  /* Fetch the chosen Google Books cover and convert to base64 so it is
+     stored locally and works offline (just like a manually uploaded image).
+     Falls back to storing the URL only if CORS/network prevents the fetch. */
+  async function handleSelectSuggestion(suggestion) {
     setSelectedCoverId(suggestion.id)
-    setCoverUrl(suggestion.coverUrl)
-    setCoverData(null)
+    setFetchingCover(true)
+    try {
+      const res = await fetch(suggestion.coverUrl, { mode: 'cors' })
+      if (!res.ok) throw new Error('fetch failed')
+      const blob = await res.blob()
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload  = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+      setCoverData(dataUrl)
+      setCoverUrl('')
+    } catch {
+      /* CORS or offline — store URL as best-effort; image won't show offline */
+      setCoverUrl(suggestion.coverUrl)
+      setCoverData(null)
+    } finally {
+      setFetchingCover(false)
+    }
   }
 
   function handleSave() {
@@ -451,6 +529,10 @@ function AddBookModal({ book, onSave, onClose }) {
       coverData,
       addedAt: book?.addedAt || new Date().toISOString(),
       notes: book?.notes || [],
+      completed: book?.completed || false,
+      completedAt: book?.completedAt || null,
+      labels,
+      startedAt: startedAt ? dateInputToISO(startedAt) : new Date().toISOString(),
     }
     onSave(bookData)
   }
@@ -543,6 +625,38 @@ function AddBookModal({ book, onSave, onClose }) {
             </div>
           )}
 
+          {/* Labels */}
+          <div style={addbook.field}>
+            <label style={addbook.label}>Labels / Tags</label>
+            <div style={addbook.labelWrap}>
+              {labels.map(tag => (
+                <span key={tag} style={addbook.labelChip}>
+                  {tag}
+                  <button style={addbook.labelChipX} onClick={() => removeLabel(tag)}>×</button>
+                </span>
+              ))}
+              <input
+                style={addbook.labelInput}
+                value={labelInput}
+                onChange={e => setLabelInput(e.target.value)}
+                onKeyDown={handleLabelKeyDown}
+                onBlur={() => labelInput.trim() && addLabel(labelInput)}
+                placeholder={labels.length ? 'Add another…' : 'Type label + Enter'}
+              />
+            </div>
+          </div>
+
+          {/* Start date */}
+          <div style={addbook.field}>
+            <label style={addbook.label}>Started Reading</label>
+            <input
+              style={addbook.input}
+              type="date"
+              value={startedAt}
+              onChange={e => setStartedAt(e.target.value)}
+            />
+          </div>
+
           {/* Cover suggestions */}
           {searchTouched && (
             <div style={addbook.field}>
@@ -556,12 +670,20 @@ function AddBookModal({ book, onSave, onClose }) {
                       key={s.id}
                       title={`${s.title}${s.authors ? ' — ' + s.authors : ''}`}
                       onClick={() => handleSelectSuggestion(s)}
+                      disabled={fetchingCover}
                       style={{
                         ...addbook.suggestionItem,
                         outline: selectedCoverId === s.id ? '2px solid var(--teal)' : '2px solid transparent',
+                        opacity: fetchingCover && selectedCoverId !== s.id ? 0.5 : 1,
                       }}
                     >
                       <img src={s.coverUrl} alt={s.title} style={addbook.suggestionImg} />
+                      {/* Spinner overlay while this cover is being fetched to base64 */}
+                      {fetchingCover && selectedCoverId === s.id && (
+                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:4 }}>
+                          <div style={{ width:16, height:16, border:'2px solid #fff', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -774,17 +896,34 @@ function BookCard({ book, onClick, onEdit, onDelete }) {
         {noteCount > 0 && (
           <span style={bcard.noteBadge}>{noteCount}</span>
         )}
+        {book.completed && (
+          <span style={bcard.completedBadge}>✓</span>
+        )}
       </div>
       <div style={bcard.info}>
         <div style={bcard.title}>{book.title}</div>
         {book.author && <div style={bcard.author}>{book.author}</div>}
-        {progress != null && (
+        {book.labels?.length > 0 && (
+          <div style={bcard.labelsRow}>
+            {book.labels.slice(0, 2).map(l => (
+              <span key={l} style={bcard.labelPill}>{l}</span>
+            ))}
+            {book.labels.length > 2 && <span style={bcard.labelPill}>+{book.labels.length - 2}</span>}
+          </div>
+        )}
+        {!book.completed && progress != null && (
           <div style={bcard.progressWrap}>
             <div style={bcard.progressTrack}>
               <div style={{ ...bcard.progressFill, width: `${Math.min(100, progress)}%` }} />
             </div>
             <span style={bcard.progressLabel}>{progress}%</span>
           </div>
+        )}
+        {book.completed && book.completedAt && (
+          <div style={bcard.dateLabel}>✅ {formatDate(book.completedAt)}</div>
+        )}
+        {!book.completed && book.startedAt && (
+          <div style={bcard.dateLabel}>📅 {formatDate(book.startedAt)}</div>
         )}
         <div style={bcard.actions} onClick={e => e.stopPropagation()}>
           <button style={bcard.actionBtn} onClick={onEdit}>Edit</button>
@@ -803,6 +942,7 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
   const [editNote, setEditNote] = useState(null)
   const [shareNote, setShareNote] = useState(null)
   const [deleteNote, setDeleteNote] = useState(null)
+  const [celebrating, setCelebrating] = useState(false)
 
   // Sync when initialBook prop changes
   useEffect(() => { setBook(initialBook) }, [initialBook])
@@ -829,6 +969,44 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
     onChange(updatedBook)
   }
 
+  /** Returns 0–100 progress for a book object based on its notes */
+  function computeBookProgress(b) {
+    const ns = b.notes || []
+    if (b.isEbook) {
+      const maxPct = ns.filter(n => n.percent != null).reduce((mx, n) => Math.max(mx, n.percent), 0)
+      return maxPct
+    }
+    if (b.totalPages && ns.some(n => n.page)) {
+      const maxPage = Math.max(...ns.filter(n => n.page).map(n => n.page))
+      return Math.round((maxPage / b.totalPages) * 100)
+    }
+    return 0
+  }
+
+  /** After a note mutation, check if progress hit 100% and auto-complete */
+  function checkAutoComplete(updated) {
+    if (updated.completed) return updated // already done
+    const pct = computeBookProgress(updated)
+    if (pct >= 100) {
+      const autoCompleted = { ...updated, completed: true, completedAt: new Date().toISOString() }
+      mutateBook(autoCompleted)
+      setCelebrating(true)
+      return autoCompleted
+    }
+    return updated
+  }
+
+  function toggleCompleted() {
+    const nowCompleted = !book.completed
+    const updated = {
+      ...book,
+      completed: nowCompleted,
+      completedAt: nowCompleted ? new Date().toISOString() : null,
+    }
+    mutateBook(updated)
+    if (nowCompleted) setCelebrating(true)
+  }
+
   function handleAddNote(noteData) {
     const newNote = {
       id: generateId(),
@@ -837,8 +1015,10 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
       updatedAt: new Date().toISOString(),
     }
     const updated = { ...book, notes: [newNote, ...(book.notes || [])] }
+    // mutateBook first so UI reflects the new note regardless of auto-complete
     mutateBook(updated)
     setAddNoteOpen(false)
+    checkAutoComplete(updated)
   }
 
   function handleEditNote(noteData) {
@@ -848,6 +1028,7 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
     const updated = { ...book, notes: updatedNotes }
     mutateBook(updated)
     setEditNote(null)
+    checkAutoComplete(updated)
   }
 
   function handleDeleteNote(note) {
@@ -887,7 +1068,14 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
           <h2 style={bdetail.bookTitle}>{book.title}</h2>
           {book.author && <div style={bdetail.bookAuthor}>{book.author}</div>}
           {book.totalPages && !book.isEbook && <div style={bdetail.bookMeta}>{book.totalPages} pages</div>}
-          {progress != null && (
+          {book.labels?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+              {book.labels.map(l => (
+                <span key={l} style={bdetail.labelPill}>{l}</span>
+              ))}
+            </div>
+          )}
+          {!book.completed && progress != null && (
             <div style={bdetail.progressWrap}>
               <div style={bdetail.progressTrack}>
                 <div style={{ ...bdetail.progressFill, width: `${Math.min(100, progress)}%` }} />
@@ -896,6 +1084,25 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
             </div>
           )}
           <div style={bdetail.noteMeta}>{notes.length} note{notes.length !== 1 ? 's' : ''}</div>
+          {/* Date row */}
+          <div style={bdetail.dateRow}>
+            {book.startedAt && (
+              <span style={bdetail.datePill}>
+                📅 Started {formatDate(book.startedAt)}
+              </span>
+            )}
+            {book.completedAt && (
+              <span style={{ ...bdetail.datePill, color: '#38a169' }}>
+                ✅ Finished {formatDate(book.completedAt)}
+              </span>
+            )}
+          </div>
+          <button
+            style={book.completed ? bdetail.completedBtn : bdetail.markFinishedBtn}
+            onClick={toggleCompleted}
+          >
+            {book.completed ? '↩ Mark as Reading' : '✓ Mark as Finished'}
+          </button>
         </div>
       </div>
 
@@ -948,11 +1155,21 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
           </div>
         </div>
       )}
+      {celebrating && (
+        <BookCelebration bookName={book.title} onClose={() => setCelebrating(false)} />
+      )}
     </div>
   )
 }
 
 /* ── BookLibraryTab (default export) ────────────────────────────────────────── */
+
+const SORT_OPTIONS = [
+  { id: 'newest', label: 'Newest' },
+  { id: 'oldest', label: 'Oldest' },
+  { id: 'title',  label: 'Title A–Z' },
+  { id: 'author', label: 'Author A–Z' },
+]
 
 export default function BookLibraryTab({ searchQuery }) {
   const [books, setBooks] = useState(() => getAllBooks())
@@ -961,6 +1178,10 @@ export default function BookLibraryTab({ searchQuery }) {
   const [addBookOpen, setAddBookOpen] = useState(false)
   const [editBook, setEditBook] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [sortBy, setSortBy] = useState('newest')
+  const [filterLabel, setFilterLabel] = useState(null)
+  const [sortOpen, setSortOpen] = useState(false)
+  const sortRef = useRef(null)
 
   useEffect(() => {
     const handler = () => setBooks(getAllBooks())
@@ -968,19 +1189,41 @@ export default function BookLibraryTab({ searchQuery }) {
     return () => window.removeEventListener('pb-book-library-updated', handler)
   }, [])
 
+  // Close sort dropdown on outside click
+  useEffect(() => {
+    if (!sortOpen) return
+    function handler(e) {
+      if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [sortOpen])
+
   const bookList = Object.values(books).sort((a, b) => {
-    const da = new Date(a.addedAt || 0)
-    const db = new Date(b.addedAt || 0)
-    return db - da
+    if (sortBy === 'newest') return new Date(b.addedAt || 0) - new Date(a.addedAt || 0)
+    if (sortBy === 'oldest') return new Date(a.addedAt || 0) - new Date(b.addedAt || 0)
+    if (sortBy === 'title')  return (a.title || '').localeCompare(b.title || '')
+    if (sortBy === 'author') return (a.author || '').localeCompare(b.author || '')
+    return 0
   })
 
-  const filteredBooks = searchQuery
+  // Collect all unique labels across all books
+  const allLabels = [...new Set(bookList.flatMap(b => b.labels || []))]
+
+  const searchFiltered = searchQuery
     ? bookList.filter(b =>
         b.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         b.author?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (b.notes || []).some(n => n.text?.toLowerCase().includes(searchQuery.toLowerCase()))
       )
     : bookList
+
+  const filteredBooks = filterLabel
+    ? searchFiltered.filter(b => (b.labels || []).includes(filterLabel))
+    : searchFiltered
+
+  const inProgressBooks = filteredBooks.filter(b => !b.completed)
+  const completedBooks  = filteredBooks.filter(b => b.completed)
 
   const selectedBook = selectedBookId ? books[selectedBookId] : null
 
@@ -1008,14 +1251,69 @@ export default function BookLibraryTab({ searchQuery }) {
     setDeleteConfirm(null)
   }
 
+  const sortLabel = SORT_OPTIONS.find(o => o.id === sortBy)?.label || 'Sort'
+
+  function renderGrid(bookArr) {
+    return (
+      <div style={blt.grid}>
+        {bookArr.map(book => (
+          <BookCard
+            key={book.id}
+            book={book}
+            onClick={() => { setSelectedBookId(book.id); setView('detail') }}
+            onEdit={(e) => { e.stopPropagation(); setEditBook(book) }}
+            onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(book) }}
+          />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div style={blt.wrap}>
+      {/* Toolbar */}
       <div style={blt.toolbar}>
         <span style={blt.bookCount}>
           {filteredBooks.length} {filteredBooks.length === 1 ? 'book' : 'books'}
         </span>
-        <button style={blt.addBtn} onClick={() => setAddBookOpen(true)}>+ Add Book</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Sort dropdown */}
+          <div style={{ position: 'relative' }} ref={sortRef}>
+            <button style={blt.sortBtn} onClick={() => setSortOpen(v => !v)}>
+              ↕ {sortLabel}
+            </button>
+            {sortOpen && (
+              <div style={blt.sortMenu}>
+                {SORT_OPTIONS.map(opt => (
+                  <button
+                    key={opt.id}
+                    style={{ ...blt.sortMenuItem, ...(sortBy === opt.id ? blt.sortMenuItemActive : {}) }}
+                    onClick={() => { setSortBy(opt.id); setSortOpen(false) }}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button style={blt.addBtn} onClick={() => setAddBookOpen(true)}>+ Add Book</button>
+        </div>
       </div>
+
+      {/* Label filter chips */}
+      {allLabels.length > 0 && (
+        <div style={blt.labelBar}>
+          <button
+            style={{ ...blt.labelChip, ...(filterLabel === null ? blt.labelChipActive : {}) }}
+            onClick={() => setFilterLabel(null)}
+          >All</button>
+          {allLabels.map(l => (
+            <button
+              key={l}
+              style={{ ...blt.labelChip, ...(filterLabel === l ? blt.labelChipActive : {}) }}
+              onClick={() => setFilterLabel(filterLabel === l ? null : l)}
+            >{l}</button>
+          ))}
+        </div>
+      )}
 
       {filteredBooks.length === 0
         ? (
@@ -1023,27 +1321,43 @@ export default function BookLibraryTab({ searchQuery }) {
             <span style={{ fontSize: 48 }}>📚</span>
             <div style={blt.emptyTitle}>Your Book Library</div>
             <div style={blt.emptySub}>
-              {searchQuery
-                ? 'No books match your search.'
+              {searchQuery || filterLabel
+                ? 'No books match your filter.'
                 : 'Track books you\'re reading, save quotes, and write notes.'}
             </div>
-            {!searchQuery && (
+            {!searchQuery && !filterLabel && (
               <button style={blt.emptyBtn} onClick={() => setAddBookOpen(true)}>Add Your First Book</button>
             )}
           </div>
         )
         : (
-          <div style={blt.grid}>
-            {filteredBooks.map(book => (
-              <BookCard
-                key={book.id}
-                book={book}
-                onClick={() => { setSelectedBookId(book.id); setView('detail') }}
-                onEdit={(e) => { e.stopPropagation(); setEditBook(book) }}
-                onDelete={(e) => { e.stopPropagation(); setDeleteConfirm(book) }}
-              />
-            ))}
-          </div>
+          <>
+            {/* In Progress section */}
+            {inProgressBooks.length > 0 && (
+              <>
+                {completedBooks.length > 0 && (
+                  <div style={blt.sectionHeader}>
+                    <span style={blt.sectionIcon}>📖</span>
+                    <span style={blt.sectionTitle}>In Progress</span>
+                    <span style={blt.sectionCount}>{inProgressBooks.length}</span>
+                  </div>
+                )}
+                {renderGrid(inProgressBooks)}
+              </>
+            )}
+
+            {/* Completed section */}
+            {completedBooks.length > 0 && (
+              <>
+                <div style={{ ...blt.sectionHeader, marginTop: inProgressBooks.length ? 20 : 0 }}>
+                  <span style={blt.sectionIcon}>✅</span>
+                  <span style={blt.sectionTitle}>Completed</span>
+                  <span style={blt.sectionCount}>{completedBooks.length}</span>
+                </div>
+                {renderGrid(completedBooks)}
+              </>
+            )}
+          </>
         )
       }
 
@@ -1099,6 +1413,99 @@ const blt = {
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  sortBtn: {
+    background: 'none',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    padding: '7px 12px',
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--ink-muted)',
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+    whiteSpace: 'nowrap',
+  },
+  sortMenu: {
+    position: 'absolute',
+    right: 0,
+    top: '100%',
+    marginTop: 4,
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: 10,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+    zIndex: 100,
+    overflow: 'hidden',
+    minWidth: 130,
+  },
+  sortMenuItem: {
+    display: 'block',
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    textAlign: 'left',
+    padding: '9px 14px',
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--ink)',
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  sortMenuItemActive: {
+    color: 'var(--teal)',
+    fontWeight: 700,
+    background: 'rgba(0,139,139,0.07)',
+  },
+  labelBar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 14,
+    paddingBottom: 2,
+  },
+  labelChip: {
+    background: 'var(--parchment)',
+    border: '1px solid var(--border)',
+    borderRadius: 99,
+    padding: '4px 12px',
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--ink-muted)',
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+    textTransform: 'lowercase',
+  },
+  labelChipActive: {
+    background: 'var(--teal)',
+    borderColor: 'var(--teal)',
+    color: '#fff',
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  sectionIcon: {
+    fontSize: 15,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: 'var(--ink)',
+    fontFamily: "'DM Sans', sans-serif",
+    flex: 1,
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--ink-faint)',
+    background: 'var(--parchment)',
+    border: '1px solid var(--border)',
+    borderRadius: 99,
+    padding: '1px 8px',
     fontFamily: "'DM Sans', sans-serif",
   },
   grid: {
@@ -1188,6 +1595,34 @@ const bcard = {
     padding: '2px 6px',
     fontFamily: "'DM Sans', sans-serif",
   },
+  completedBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    background: '#38a169',
+    color: '#fff',
+    borderRadius: 99,
+    fontSize: 10,
+    fontWeight: 700,
+    padding: '2px 6px',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  labelsRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginTop: 2,
+  },
+  labelPill: {
+    fontSize: 9,
+    fontWeight: 600,
+    padding: '1px 6px',
+    borderRadius: 99,
+    background: 'rgba(0,139,139,0.1)',
+    color: 'var(--teal)',
+    fontFamily: "'DM Sans', sans-serif",
+    textTransform: 'lowercase',
+  },
   info: {
     padding: '8px 10px 10px',
     flex: 1,
@@ -1235,6 +1670,12 @@ const bcard = {
     fontSize: 10,
     color: 'var(--ink-faint)',
     whiteSpace: 'nowrap',
+  },
+  dateLabel: {
+    fontSize: 10,
+    color: 'var(--ink-faint)',
+    marginTop: 2,
+    fontFamily: "'DM Sans', sans-serif",
   },
   actions: {
     display: 'flex',
@@ -1358,6 +1799,53 @@ const bdetail = {
     fontSize: 12,
     color: 'var(--ink-faint)',
     marginTop: 2,
+  },
+  dateRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+    marginTop: 4,
+  },
+  datePill: {
+    fontSize: 11,
+    color: 'var(--ink-muted)',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  labelPill: {
+    fontSize: 11,
+    fontWeight: 600,
+    padding: '2px 9px',
+    borderRadius: 99,
+    background: 'rgba(0,139,139,0.1)',
+    color: 'var(--teal)',
+    fontFamily: "'DM Sans', sans-serif",
+    textTransform: 'lowercase',
+  },
+  markFinishedBtn: {
+    marginTop: 8,
+    background: '#38a169',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 7,
+    padding: '6px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+    alignSelf: 'flex-start',
+  },
+  completedBtn: {
+    marginTop: 8,
+    background: 'none',
+    color: '#38a169',
+    border: '1px solid #38a169',
+    borderRadius: 7,
+    padding: '6px 12px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+    alignSelf: 'flex-start',
   },
   notesHeader: {
     display: 'flex',
@@ -1629,6 +2117,49 @@ const addbook = {
     color: '#fff',
     fontWeight: 700,
   },
+  labelWrap: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 6,
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    padding: '7px 10px',
+    background: 'var(--parchment)',
+    minHeight: 38,
+    alignItems: 'center',
+  },
+  labelChip: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    background: 'rgba(0,139,139,0.12)',
+    color: 'var(--teal)',
+    borderRadius: 99,
+    fontSize: 12,
+    fontWeight: 600,
+    padding: '2px 8px 2px 10px',
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  labelChipX: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--teal)',
+    cursor: 'pointer',
+    fontSize: 14,
+    lineHeight: 1,
+    padding: 0,
+    fontFamily: "'DM Sans', sans-serif",
+  },
+  labelInput: {
+    border: 'none',
+    outline: 'none',
+    background: 'none',
+    fontSize: 13,
+    color: 'var(--ink)',
+    fontFamily: "'DM Sans', sans-serif",
+    minWidth: 100,
+    flex: 1,
+  },
   suggestionsRow: {
     display: 'flex',
     gap: 8,
@@ -1636,6 +2167,7 @@ const addbook = {
     paddingBottom: 4,
   },
   suggestionItem: {
+    position: 'relative', // needed for spinner overlay
     background: 'none',
     border: 'none',
     padding: 0,
