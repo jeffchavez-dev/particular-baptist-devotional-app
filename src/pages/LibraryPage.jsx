@@ -18,6 +18,8 @@ import { LBCF2 } from '../data/lbcf2'
 import { LBCF1 } from '../data/lbcf1'
 import { CATECHISM } from '../data/catechism'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
+import BookLibraryTab from '../components/BookLibraryTab'
+import { getAllBooks as getBookLibraryBooks } from '../lib/bookLibrary'
 
 const SCHEDULE = buildSchedule()
 
@@ -3677,6 +3679,9 @@ export default function LibraryPage() {
 
   const [activeTab, setActiveTab] = useState('notes')
   const [libSearch,     setLibSearch]     = useState('')
+  const [bookLibraryCount, setBookLibraryCount] = useState(() =>
+    Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
+  )
   const [libSearchOpen, setLibSearchOpen] = useState(false)
   const libSearchRef = useRef(null)
   /* Track whether the note editor is focused (for nav-hide / Done bar) */
@@ -3755,6 +3760,15 @@ export default function LibraryPage() {
     return () => window.removeEventListener('pb-sc-bookmark-changed', handler)
   }, [])
 
+  useEffect(() => {
+    const handler = () => {
+      const count = Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
+      setBookLibraryCount(count)
+    }
+    window.addEventListener('pb-book-library-updated', handler)
+    return () => window.removeEventListener('pb-book-library-updated', handler)
+  }, [])
+
   /* Show/hide nav & header when note editor is focused */
   useEffect(() => {
     const onFocus = () => {
@@ -3811,6 +3825,7 @@ export default function LibraryPage() {
     { id: 'notes',      label: 'Notes',      count: notesCount      },
     { id: 'bookmarks',  label: 'Bookmarks',  count: bookmarksCount  },
     { id: 'highlights', label: 'Highlights', count: highlightsCount },
+    { id: 'books',      label: 'Books',      count: bookLibraryCount },
   ]
 
   const handleRemoveSavedDay      = useCallback(day  => { toggleBookmark(day); setSavedDays(prev => { const n = {...prev}; delete n[day]; return n }) }, [])
@@ -3942,6 +3957,9 @@ export default function LibraryPage() {
             onRemoveKjvHighlight={handleRemoveKjvHighlight}
             onRemoveConfHighlight={handleRemoveConfHighlight}
           />
+        )}
+        {activeTab === 'books' && (
+          <BookLibraryTab searchQuery={libSearch} />
         )}
       </div>
 
