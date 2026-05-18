@@ -448,6 +448,7 @@ function AddBookModal({ book, onSave, onClose }) {
   const [startedAt, setStartedAt] = useState(
     book?.startedAt ? isoToDateInput(book.startedAt) : todayDateInput()
   )
+  const [saveError, setSaveError] = useState('')
   const fileInputRef = useRef(null)
   const debounceRef = useRef(null)
 
@@ -518,23 +519,29 @@ function AddBookModal({ book, onSave, onClose }) {
   }
 
   function handleSave() {
-    if (!title.trim()) return
-    const bookData = {
-      id: book?.id || generateId(),
-      title: title.trim(),
-      author: author.trim(),
-      isEbook,
-      totalPages: isEbook ? null : (parseInt(totalPages) || null),
-      coverUrl,
-      coverData,
-      addedAt: book?.addedAt || new Date().toISOString(),
-      notes: book?.notes || [],
-      completed: book?.completed || false,
-      completedAt: book?.completedAt || null,
-      labels,
-      startedAt: startedAt ? dateInputToISO(startedAt) : new Date().toISOString(),
+    setSaveError('')
+    const t = title.trim()
+    if (!t) { setSaveError('Please enter a book title.'); return }
+    try {
+      const bookData = {
+        id: book?.id || generateId(),
+        title: t,
+        author: author.trim(),
+        isEbook,
+        totalPages: isEbook ? null : (parseInt(totalPages) || null),
+        coverUrl,
+        coverData,
+        addedAt: book?.addedAt || new Date().toISOString(),
+        notes: book?.notes || [],
+        completed: book?.completed || false,
+        completedAt: book?.completedAt || null,
+        labels,
+        startedAt: startedAt ? dateInputToISO(startedAt) : new Date().toISOString(),
+      }
+      onSave(bookData)
+    } catch (err) {
+      setSaveError(err?.message || 'Could not save. Storage may be full.')
     }
-    onSave(bookData)
   }
 
   const previewSrc = coverData || coverUrl
@@ -574,18 +581,20 @@ function AddBookModal({ book, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Fields */}
+          {/* Title */}
           <div style={addbook.field}>
             <label style={addbook.label}>Title <span style={{ color: 'var(--teal)' }}>*</span></label>
             <input
-              style={addbook.input}
+              style={{ ...addbook.input, ...(saveError && !title.trim() ? { borderColor: '#e53e3e' } : {}) }}
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => { setTitle(e.target.value); setSaveError('') }}
+              onInput={e => { setTitle(e.currentTarget.value); setSaveError('') }}
               placeholder="Book title"
               autoFocus
             />
           </div>
 
+          {/* Author */}
           <div style={addbook.field}>
             <label style={addbook.label}>Author</label>
             <input
@@ -595,6 +604,51 @@ function AddBookModal({ book, onSave, onClose }) {
               placeholder="Author name"
             />
           </div>
+
+          {/* Cover suggestions — shown as soon as title is non-empty */}
+          {title.trim() && (
+            <div style={addbook.field}>
+              <div style={addbook.suggestionsHeader}>
+                <span style={addbook.label}>
+                  {coverLoading
+                    ? '🔍 Searching covers…'
+                    : coverSuggestions.length > 0
+                      ? `Book Covers (${coverSuggestions.length} found)`
+                      : searchTouched ? 'No covers found online' : 'Cover Suggestions'}
+                </span>
+                {coverLoading && (
+                  <div style={{ width: 14, height: 14, border: '2px solid var(--teal)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+                )}
+              </div>
+              {coverSuggestions.length > 0 && (
+                <div style={addbook.suggestionsRow}>
+                  {coverSuggestions.map(s => (
+                    <button
+                      key={s.id}
+                      title={`${s.title}${s.authors ? ' — ' + s.authors : ''}`}
+                      onClick={() => handleSelectSuggestion(s)}
+                      disabled={fetchingCover}
+                      style={{
+                        ...addbook.suggestionItem,
+                        outline: selectedCoverId === s.id ? '2px solid var(--teal)' : '2px solid transparent',
+                        opacity: fetchingCover && selectedCoverId !== s.id ? 0.5 : 1,
+                      }}
+                    >
+                      <img src={s.coverUrl} alt={s.title} style={addbook.suggestionImg} />
+                      {fetchingCover && selectedCoverId === s.id && (
+                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:4 }}>
+                          <div style={{ width:16, height:16, border:'2px solid #fff', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!coverLoading && searchTouched && coverSuggestions.length === 0 && (
+                <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>No covers found online — upload one below.</span>
+              )}
+            </div>
+          )}
 
           {/* Format toggle */}
           <div style={addbook.field}>
@@ -656,48 +710,21 @@ function AddBookModal({ book, onSave, onClose }) {
               onChange={e => setStartedAt(e.target.value)}
             />
           </div>
-
-          {/* Cover suggestions */}
-          {searchTouched && (
-            <div style={addbook.field}>
-              <label style={addbook.label}>
-                {coverLoading ? 'Searching covers…' : `Cover Suggestions (${coverSuggestions.length})`}
-              </label>
-              {coverSuggestions.length > 0 && (
-                <div style={addbook.suggestionsRow}>
-                  {coverSuggestions.map(s => (
-                    <button
-                      key={s.id}
-                      title={`${s.title}${s.authors ? ' — ' + s.authors : ''}`}
-                      onClick={() => handleSelectSuggestion(s)}
-                      disabled={fetchingCover}
-                      style={{
-                        ...addbook.suggestionItem,
-                        outline: selectedCoverId === s.id ? '2px solid var(--teal)' : '2px solid transparent',
-                        opacity: fetchingCover && selectedCoverId !== s.id ? 0.5 : 1,
-                      }}
-                    >
-                      <img src={s.coverUrl} alt={s.title} style={addbook.suggestionImg} />
-                      {/* Spinner overlay while this cover is being fetched to base64 */}
-                      {fetchingCover && selectedCoverId === s.id && (
-                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.45)', display:'flex', alignItems:'center', justifyContent:'center', borderRadius:4 }}>
-                          <div style={{ width:16, height:16, border:'2px solid #fff', borderTopColor:'transparent', borderRadius:'50%', animation:'spin 0.7s linear infinite' }} />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {!coverLoading && coverSuggestions.length === 0 && (
-                <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>No covers found. Try uploading one above.</span>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Save error */}
+        {saveError && (
+          <div style={{ padding: '8px 18px', color: '#e53e3e', fontSize: 13, fontWeight: 600, background: 'rgba(229,62,62,0.07)', borderTop: '1px solid rgba(229,62,62,0.15)' }}>
+            ⚠ {saveError}
+          </div>
+        )}
 
         <div style={addbook.footer}>
           <button style={addbook.cancelBtn} onClick={onClose}>Cancel</button>
-          <button style={addbook.saveBtn} onClick={handleSave} disabled={!title.trim()}>
+          <button
+            style={{ ...addbook.saveBtn, ...(!title.trim() ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}
+            onClick={handleSave}
+          >
             {book ? 'Save Changes' : 'Add Book'}
           </button>
         </div>
@@ -2159,6 +2186,12 @@ const addbook = {
     fontFamily: "'DM Sans', sans-serif",
     minWidth: 100,
     flex: 1,
+  },
+  suggestionsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   suggestionsRow: {
     display: 'flex',
