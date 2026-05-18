@@ -53,8 +53,16 @@ export default defineConfig({
         // Inject push notification handler into the generated service worker
         importScripts: ['push-handler.js'],
 
-        // Pre-cache all app assets (JS, CSS, HTML, fonts, icons)
+        // Pre-cache the app shell (JS, CSS, HTML, fonts, icons).
+        // Bible JSON files are NOT in globPatterns — they are large (up to 28 MB)
+        // and are pre-warmed at app startup via preloadBible.js instead, so the
+        // service-worker CacheFirst handler caches them on first fetch online.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+
+        // Raise the per-file size ceiling so Workbox never silently drops a file
+        // from the precache manifest. Default is 2 MB which would exclude most
+        // of our Bible data if they were ever added to globPatterns in the future.
+        maximumFileSizeToCacheInBytes: 30 * 1024 * 1024, // 30 MB ceiling
 
         // Don't cache Supabase auth tokens or user-specific API calls
         navigateFallback: '/index.html',

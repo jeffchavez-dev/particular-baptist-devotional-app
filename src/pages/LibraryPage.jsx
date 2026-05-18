@@ -3480,6 +3480,7 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
   const [sortBy, setSortBy] = useState('date-desc')
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef(null)
+  const [viewingHighlight, setViewingHighlight] = useState(null) // { book, chapter, verse } | null
 
   useEffect(() => {
     function onDown(e) { if (sortRef.current && !sortRef.current.contains(e.target)) setSortOpen(false) }
@@ -3579,7 +3580,7 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
                 <div key={h.key} style={{ ...s.hlChip, background: c.rowBg, borderColor: c.border }}>
                   <button
                     style={{ ...s.hlChipInner, color: c.numClr }}
-                    onClick={() => navigate('/scripture', { state: { book: h.book, chapter: h.chapter, verse: h.verse } })}
+                    onClick={() => setViewingHighlight({ book: h.book, chapter: h.chapter, verse: h.verse })}
                   >
                     <HlDot colorId={h.colorId} />
                     {h.book} {h.chapter}:{h.verse}
@@ -3627,6 +3628,16 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
           </div>
         )
       }
+
+      {/* Scripture verse preview modal — shown when a scripture highlight chip is tapped */}
+      <ScriptureVerseModal
+        sc={viewingHighlight}
+        onClose={() => setViewingHighlight(null)}
+        onNavigate={(book, ch, vs) => {
+          setViewingHighlight(null)
+          navigate('/scripture', { state: { book, chapter: ch, verse: vs } })
+        }}
+      />
     </div>
   )
 }
@@ -3654,20 +3665,36 @@ export default function LibraryPage() {
   const [confNotes,      setConfNotes]      = useState(() => getAllConfNotes())
   const [libNotes,       setLibNotes]       = useState(() => getAllLibNotes())
 
+  // Load devNotes from local storage (always) and sync with Supabase when signed in
+  function loadDevNotesFromLocal() {
+    const local = getLocalProgress()
+    setDevNotes(
+      Object.entries(local)
+        .filter(([, d]) => d.notes && d.notes.trim())
+        .map(([day, d]) => ({ day_number: parseInt(day), notes: d.notes }))
+    )
+  }
+
   useEffect(() => {
+    // Show local notes immediately (fast, offline-safe)
+    loadDevNotesFromLocal()
+    // If signed in, merge with Supabase data (which may include notes from other devices)
     if (session) {
       supabase.from('progress').select('day_number, completed, notes')
         .eq('user_id', session.user.id)
-        .then(({ data }) => setDevNotes((data || []).filter(r => r.notes && r.notes.trim())))
-    } else {
-      const local = getLocalProgress()
-      setDevNotes(
-        Object.entries(local)
-          .filter(([, d]) => d.notes && d.notes.trim())
-          .map(([day, d]) => ({ day_number: parseInt(day), notes: d.notes }))
-      )
+        .then(({ data }) => {
+          if (data) setDevNotes(data.filter(r => r.notes && r.notes.trim()))
+        })
     }
-  }, [session])
+  }, [session]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When ReadingPage saves a note, it dispatches this event so we can refresh
+  // immediately from localStorage without waiting for a Supabase round-trip.
+  useEffect(() => {
+    const handler = () => loadDevNotesFromLocal()
+    window.addEventListener('pb-progress-updated', handler)
+    return () => window.removeEventListener('pb-progress-updated', handler)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Restore scroll on mount, save on unmount — so back-navigation returns to same spot */
   useEffect(() => {

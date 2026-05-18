@@ -607,6 +607,8 @@ export default function ReadingPage() {
     setSaving(true)
     // Always write locally first — instant and works offline
     setLocalProgress(day, { completed, notes })
+    // Notify LibraryPage immediately so devNotes refreshes without a Supabase round-trip
+    window.dispatchEvent(new CustomEvent('pb-progress-updated'))
     if (session) {
       supabase.from('progress').upsert({
         user_id: session.user.id,

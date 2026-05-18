@@ -26,6 +26,7 @@ import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarke
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
 import ShareCardModal from './ShareCardModal'
+import BookCelebration from './BookCelebration'
 import ConfessionModal from './ConfessionModal'
 import StrongsModal from './StrongsModal'
 import { usePrefs, useAuth } from '../App'
@@ -632,7 +633,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const routerNavigate = useNavigate()
 
   /* ── Bible chapter read progress (synced with tracker & devotional) ── */
-  const [bibleProgress, setBibleProgressState] = useState(() => getBibleProgress())
+  const [bibleProgress,  setBibleProgressState] = useState(() => getBibleProgress())
+  const [bookCelebration, setBookCelebration]   = useState(null) // bookName string when showing
   useEffect(() => {
     function onStorage(e) {
       if (e.key === BIBLE_KEY) setBibleProgressState(getBibleProgress())
@@ -3757,6 +3759,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             onClick={() => {
                               const newDone = !isDone
                               setBibleChapter(chKey, newDone, session?.user?.id)
+                              // setBibleChapter writes to localStorage synchronously —
+                              // check book completion immediately after.
+                              if (newDone) {
+                                const bookName = BIBLE_BOOKS.find(b => chKey.startsWith(b.name + ' '))?.name
+                                if (bookName) {
+                                  const bk = BIBLE_BOOKS.find(b => b.name === bookName)
+                                  const fresh = getBibleProgress()
+                                  const allDone = Array.from({ length: bk.chapters }, (_, i) => `${bookName} ${i + 1}`)
+                                    .every(id => fresh[id])
+                                  if (allDone) setBookCelebration(bookName)
+                                }
+                              }
                               setBibleProgressState(prev => {
                                 const next = { ...prev }
                                 if (newDone) next[chKey] = true; else delete next[chKey]
@@ -3940,6 +3954,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       )}
 
       {/* Strong's lexicon modal */}
+      {/* Book completion celebration */}
+      {bookCelebration && (
+        <BookCelebration bookName={bookCelebration} onClose={() => setBookCelebration(null)} />
+      )}
+
       {strongsModal && (
         <StrongsModal
           strongsId={strongsModal.strongsId}
