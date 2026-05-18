@@ -81,8 +81,8 @@ function applyBg(ctx, preset, w, h) {
 }
 
 async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale) {
-  const w = format.w * scale
-  const h = format.h * scale
+  const w = format.w
+  const h = format.h
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
@@ -193,8 +193,8 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.fillText('”', PAD - Math.round(refDim * 0.01), textY + quoteFontSize * 0.75)
   ctx.restore()
 
-  // Main text
-  const mainFontSize = Math.round(refDim * 0.048)
+  // Main text — scale only affects font size, not canvas dimensions
+  const mainFontSize = Math.round(refDim * 0.048 * scale)
   const mainLineHeight = mainFontSize * 1.55
   const maxTextWidth = w - PAD * 2.2
   const maxLines = Math.floor((h * 0.52) / mainLineHeight)
