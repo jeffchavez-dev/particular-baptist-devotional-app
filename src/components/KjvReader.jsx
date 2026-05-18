@@ -3952,27 +3952,38 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             // Save return context so user can go back to results
             const { strongsId: sid, lang: slang } = strongsModal
             setLexReturn({ strongsId: sid, lang: slang })
-            // After morph chapter loads, auto-select the matched word
-            if (v) pendingLexHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
             setStrongsModal(null)
-            // Switch to the correct morphological version matching the corpus:
-            // GNT results require Greek mode; HOT results require Hebrew mode.
-            // Set lexNavVersionRef so the version load effect knows NOT to clear
-            // lexReturn / pendingLexHighlightRef (they must survive the version switch).
-            if (slang === 'greek' && version !== 'greek') {
-              lexNavVersionRef.current = 'greek'
-              onVersionChange?.('greek')
-            } else if (slang === 'hebrew' && version !== 'hebrew') {
-              lexNavVersionRef.current = 'hebrew'
-              onVersionChange?.('hebrew')
+
+            // If the user already has the matching parallel panel open (GNT for Greek words,
+            // HOT for Hebrew words), stay in the current text version so the parallel view
+            // remains visible. Just navigate to the chapter and scroll to the verse.
+            // Only switch to full morph mode when no parallel panel is covering it.
+            const hasMatchingParallel =
+              (slang === 'greek'  && parallelVersions.has('gnt')) ||
+              (slang === 'hebrew' && parallelVersions.has('hot'))
+
+            if (!hasMatchingParallel) {
+              // Switch to the correct morphological version matching the corpus:
+              // GNT results require Greek mode; HOT results require Hebrew mode.
+              // Set lexNavVersionRef so the version load effect knows NOT to clear
+              // lexReturn / pendingLexHighlightRef (they must survive the version switch).
+              if (v) pendingLexHighlightRef.current = { book: b, chapter: ch, verse: v, strongsId: sid }
+              if (slang === 'greek' && version !== 'greek') {
+                lexNavVersionRef.current = 'greek'
+                onVersionChange?.('greek')
+              } else if (slang === 'hebrew' && version !== 'hebrew') {
+                lexNavVersionRef.current = 'hebrew'
+                onVersionChange?.('hebrew')
+              }
             }
+
             navigate(b, ch)
-            // Scroll to the target verse after morph data loads (longer delay for version switch)
+            // Scroll to the target verse (longer delay when a version switch is also happening)
             if (v) {
               setTimeout(() => {
                 const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              }, 500)
+              }, hasMatchingParallel ? 150 : 500)
             }
           }}
           onNavigateLxx={(b, ch, v) => {
