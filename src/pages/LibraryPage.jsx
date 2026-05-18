@@ -1851,9 +1851,12 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   /* Unique sessionStorage key — defaults to isCreate flag if not provided */
   const _scrollKey = scrollKey || (isCreate ? 'pb-overlay-scroll:create' : 'pb-overlay-scroll:edit')
 
-  /* Track visual viewport height only — top is always 0 for a fixed overlay.
-     Only listen to 'resize' (keyboard open/close). The 'scroll' event fires whenever
-     the page scrolls (browser chrome shows/hides) and causes the toolbar to jump. */
+  /* Track visual viewport height to compute keyboard height.
+     layoutH is the full screen height (captured once, never changes).
+     kbHeight = how many px the keyboard is taking up at the bottom.
+     This is used only to add bottom padding to the scroll content — the
+     overlay itself is always full-screen (no height restriction). */
+  const layoutH = useRef(document.documentElement.clientHeight || window.screen.availHeight || 812)
   const [vpHeight, setVpHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
 
   useEffect(() => {
@@ -1864,6 +1867,9 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
     update()
     return () => vv.removeEventListener('resize', update)
   }, [])
+
+  /* How much vertical space the keyboard is occupying. Used for scroll padding. */
+  const kbHeight = Math.max(0, layoutH.current - vpHeight)
 
   /* Signal LibraryPage that the overlay is open so it hides the sticky header.
      This prevents the header from peeking through on iOS Safari due to
@@ -1939,8 +1945,9 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   function execUndo()        { editorRef.current?.execUndo() }
   function execRedo()        { editorRef.current?.execRedo() }
 
-  /* Overlay shrinks to visualViewport.height so content never hides behind the keyboard. */
-  const overlayStyle = { ...eo.overlay, height: vpHeight, bottom: 'auto' }
+  /* Overlay is always full-screen (top:0 bottom:0). The keyboard sits on top naturally.
+     No height restriction = no gap between overlay edge and keyboard top. */
+  const overlayStyle = eo.overlay
 
   return (
     <div ref={overlayRef} style={overlayStyle}>
@@ -2056,7 +2063,8 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
 
       {/* ── Scrollable content ── */}
       <div ref={scrollAreaRef} style={eo.scrollArea}>
-        <div style={eo.contentPad}>
+        {/* paddingBottom keeps note content above the keyboard so it's always reachable */}
+        <div style={{ ...eo.contentPad, paddingBottom: kbHeight + 24 }}>
           {children}
         </div>
       </div>
