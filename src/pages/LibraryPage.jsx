@@ -1939,8 +1939,7 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   function execUndo()        { editorRef.current?.execUndo() }
   function execRedo()        { editorRef.current?.execRedo() }
 
-  /* Overlay shrinks to visualViewport.height so the bottom toolbar
-     always lands exactly at the keyboard edge — no gap. */
+  /* Overlay shrinks to visualViewport.height so content never hides behind the keyboard. */
   const overlayStyle = { ...eo.overlay, height: vpHeight, bottom: 'auto' }
 
   return (
@@ -1997,15 +1996,8 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
         </div>
       </div>
 
-      {/* ── Scrollable content ── */}
-      <div ref={scrollAreaRef} style={eo.scrollArea}>
-        <div style={eo.contentPad}>
-          {children}
-        </div>
-      </div>
-
-      {/* ── Fixed bottom toolbar ── */}
-      <div style={{ ...eo.toolbarWrap, paddingBottom: vpHeight < window.innerHeight ? 0 : 'env(safe-area-inset-bottom, 0px)' }}>
+      {/* ── Formatting toolbar — sits just below top bar, above content ── */}
+      <div style={eo.toolbarWrap}>
         {!toolbarHidden && (
           <div style={eo.toolbarRow}>
             {TOOLBAR_ACTIONS.map(action => (
@@ -2034,32 +2026,38 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
             </button>
             <span style={re.toolDivider} />
             <span style={{ ...re.atHint, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{atHint}</span>
+            {/* Hide button inline at end of toolbar row */}
+            <button
+              onMouseDown={e => { e.preventDefault(); setToolbarHidden(true) }}
+              style={{ ...eo.toolbarToggleBtn, marginLeft: 4 }}
+              title="Hide formatting toolbar"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 3.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
           </div>
         )}
-        {/* Toolbar footer: toggle show/hide */}
-        <div style={eo.toolbarFooter}>
-          <span style={{ flex: 1 }} />
-          <button
-            onMouseDown={e => { e.preventDefault(); setToolbarHidden(h => !h) }}
-            style={eo.toolbarToggleBtn}
-            title={toolbarHidden ? 'Show formatting toolbar' : 'Hide formatting toolbar'}
-          >
-            {toolbarHidden ? (
-              <>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M1.5 6.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Format
-              </>
-            ) : (
-              <>
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                  <path d="M1.5 3.5l3.5 3.5 3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                Hide
-              </>
-            )}
-          </button>
+        {toolbarHidden && (
+          <div style={eo.toolbarFooter}>
+            <button
+              onMouseDown={e => { e.preventDefault(); setToolbarHidden(false) }}
+              style={eo.toolbarToggleBtn}
+              title="Show formatting toolbar"
+            >
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 6.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Format
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Scrollable content ── */}
+      <div ref={scrollAreaRef} style={eo.scrollArea}>
+        <div style={eo.contentPad}>
+          {children}
         </div>
       </div>
 
@@ -4316,9 +4314,9 @@ const eo = {
   saveTopBtn:       { background: 'var(--teal)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 16px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
   scrollArea:       { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
   contentPad:       { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
-  toolbarWrap:      { flexShrink: 0, background: 'var(--surface)', borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' },
-  toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px 4px', flexWrap: 'wrap', overflowX: 'auto' },
-  toolbarFooter:    { display: 'flex', alignItems: 'center', padding: '2px 10px 4px' },
+  toolbarWrap:      { flexShrink: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)' },
+  toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '5px 8px', flexWrap: 'wrap', overflowX: 'auto' },
+  toolbarFooter:    { display: 'flex', alignItems: 'center', padding: '3px 10px' },
   toolbarToggleBtn: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", padding: '3px 0' },
 
   /* Quick-nav row in top bar */

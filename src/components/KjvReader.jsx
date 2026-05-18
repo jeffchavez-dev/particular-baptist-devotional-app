@@ -790,6 +790,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [morphReady,    setMorphReady]    = useState(false)
   const [morphSegments, setMorphSegments] = useState([])   // [{book, chapter, verses:[{verse,words}]}]
   const [selectedWord,  setSelectedWord]  = useState(null) // {verseKey, wordIdx}
+  const [lexNavVerse,   setLexNavVerse]   = useState(null) // {book,chapter,verse} — highlights lex result in parallel mode
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
   const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang, initialView? } | null
   const [wordSearchModal, setWordSearchModal] = useState(null) // { word } | null  (KJV word tap)
@@ -3093,6 +3094,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         const isActiveSegment = seg.book === book && seg.chapter === chapter
                         const isSearchMatch = isActiveSegment && !bibleResults && searchQuery.trim() && text.toLowerCase().includes(searchQuery.trim().toLowerCase())
                         const isFocusMatch  = isActiveSegment && !bibleResults && chapterMatches[searchFocus]?.verse === verse
+                        const isLexNavMatch = lexNavVerse && seg.book === lexNavVerse.book && seg.chapter === lexNavVerse.chapter && verse === lexNavVerse.verse
 
                         // LXX word chips
                         const lxxPKey       = `${seg.book}:${seg.chapter}`
@@ -3113,8 +3115,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               ...r.verseOuter,
                               ...(isSelected ? { background:'var(--teal-light)', borderLeftColor:'var(--teal)' } :
                                   hlColorId ? { background: hlStyle.rowBg, borderLeftColor: hlStyle.border } : {}),
-                              ...(isFocusMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
+                              ...(isFocusMatch || isLexNavMatch ? { outline:'2px solid var(--teal)', outlineOffset:2, borderRadius:6 } : {}),
                               ...(isSearchMatch && !isFocusMatch && !isSelected ? { background:'rgba(254,240,138,0.25)' } : {}),
+                              ...(isLexNavMatch && !isFocusMatch && !isSelected ? { background:'var(--teal-light)' } : {}),
                             }}
                           >
                             {/* ── main verse row — tap to select ── */}
@@ -3994,6 +3997,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 lexNavVersionRef.current = 'hebrew'
                 onVersionChange?.('hebrew')
               }
+            } else if (v) {
+              // Parallel panel is open — no morph mode switch, but highlight the verse
+              // so the user can see which verse the lexicon result landed on.
+              setLexNavVerse({ book: b, chapter: ch, verse: v })
             }
 
             navigate(b, ch)
@@ -4029,7 +4036,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             style={r.lexBackBtn}
             onClick={() => {
               setStrongsModal({ strongsId: lexReturn.strongsId, lang: lexReturn.lang, initialView: 'scripture' })
-              setLexReturn(null) // pill is consumed — don't show again after modal closes
+              setLexReturn(null); setLexNavVerse(null) // pill consumed
             }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
@@ -4037,7 +4044,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             </svg>
             Back to lexicon results
           </button>
-          <button style={r.lexBackDismiss} onClick={() => setLexReturn(null)} title="Dismiss">×</button>
+          <button style={r.lexBackDismiss} onClick={() => { setLexReturn(null); setLexNavVerse(null) }} title="Dismiss">×</button>
         </div>
       )}
 
