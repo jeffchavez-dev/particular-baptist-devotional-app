@@ -1851,25 +1851,35 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   /* Unique sessionStorage key — defaults to isCreate flag if not provided */
   const _scrollKey = scrollKey || (isCreate ? 'pb-overlay-scroll:create' : 'pb-overlay-scroll:edit')
 
-  /* Track visual viewport height to compute keyboard height.
-     layoutH is the full screen height (captured once, never changes).
-     kbHeight = how many px the keyboard is taking up at the bottom.
-     This is used only to add bottom padding to the scroll content — the
-     overlay itself is always full-screen (no height restriction). */
-  const layoutH = useRef(document.documentElement.clientHeight || window.screen.availHeight || 812)
-  const [vpHeight, setVpHeight] = useState(() => window.visualViewport?.height ?? window.innerHeight)
+  /* Track the visual viewport's position AND size.
+     On iOS, when the keyboard opens the browser shifts the visual viewport
+     downward (offsetTop > 0) to reveal the focused input. Without tracking
+     offsetTop the overlay's top bar flies off-screen above the keyboard.
+     We listen to both 'resize' (keyboard open/close) and 'scroll' (viewport pan). */
+  const [vpHeight,    setVpHeight]    = useState(() => window.visualViewport?.height    ?? window.innerHeight)
+  const [vpOffsetTop, setVpOffsetTop] = useState(() => window.visualViewport?.offsetTop ?? 0)
 
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
-    function update() { setVpHeight(Math.round(vv.height)) }
+    let raf = null
+    function update() {
+      if (raf) return               // coalesce rapid scroll + resize events
+      raf = requestAnimationFrame(() => {
+        raf = null
+        setVpHeight(Math.round(vv.height))
+        setVpOffsetTop(Math.round(vv.offsetTop))
+      })
+    }
     vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
     update()
-    return () => vv.removeEventListener('resize', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [])
-
-  /* How much vertical space the keyboard is occupying. Used for scroll padding. */
-  const kbHeight = Math.max(0, layoutH.current - vpHeight)
 
   /* Signal LibraryPage that the overlay is open so it hides the sticky header.
      This prevents the header from peeking through on iOS Safari due to
@@ -1945,9 +1955,12 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   function execUndo()        { editorRef.current?.execUndo() }
   function execRedo()        { editorRef.current?.execRedo() }
 
-  /* Overlay is always full-screen (top:0 bottom:0). The keyboard sits on top naturally.
-     No height restriction = no gap between overlay edge and keyboard top. */
-  const overlayStyle = eo.overlay
+  /* Pin overlay to the visual viewport:
+     - top: vpOffsetTop  → stays at the top of the visible area (top bar never flies off)
+     - height: vpHeight  → ends exactly where the keyboard starts (no gap at bottom)
+     Both values update in real-time as the keyboard opens/closes or the
+     visual viewport pans. */
+  const overlayStyle = { ...eo.overlay, top: vpOffsetTop, height: vpHeight, bottom: 'auto' }
 
   return (
     <div ref={overlayRef} style={overlayStyle}>
@@ -2063,8 +2076,7 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
 
       {/* ── Scrollable content ── */}
       <div ref={scrollAreaRef} style={eo.scrollArea}>
-        {/* paddingBottom keeps note content above the keyboard so it's always reachable */}
-        <div style={{ ...eo.contentPad, paddingBottom: kbHeight + 24 }}>
+        <div style={eo.contentPad}>
           {children}
         </div>
       </div>
