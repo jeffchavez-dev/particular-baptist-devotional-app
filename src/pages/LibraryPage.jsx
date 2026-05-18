@@ -1865,6 +1865,14 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
     return () => vv.removeEventListener('resize', update)
   }, [])
 
+  /* Signal LibraryPage that the overlay is open so it hides the sticky header.
+     This prevents the header from peeking through on iOS Safari due to
+     position:sticky creating its own stacking context above position:fixed. */
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('pb-note-overlay-open'))
+    return () => window.dispatchEvent(new CustomEvent('pb-note-overlay-close'))
+  }, [])
+
   /* Lock background scroll while overlay is open.
      iOS ignores overflow:hidden on body alone — the position:fixed trick is required. */
   useEffect(() => {
@@ -3655,6 +3663,9 @@ export default function LibraryPage() {
   const libSearchRef = useRef(null)
   /* Track whether the note editor is focused (for nav-hide / Done bar) */
   const [isEditingNote, setIsEditingNote] = useState(false)
+  /* Track whether the full-screen NoteEditOverlay is open — used to hide
+     the sticky header completely so it can't peek through on iOS Safari */
+  const [isNoteOverlayOpen, setIsNoteOverlayOpen] = useState(false)
 
   const [devNotes,       setDevNotes]       = useState([])
   const [savedDays,      setSavedDays]      = useState(() => getBookmarks())
@@ -3745,6 +3756,19 @@ export default function LibraryPage() {
     }
   }, [])
 
+  /* Hide the sticky header completely when NoteEditOverlay is open so it
+     cannot peek through on iOS Safari (position:sticky stacking context) */
+  useEffect(() => {
+    const onOpen  = () => setIsNoteOverlayOpen(true)
+    const onClose = () => setIsNoteOverlayOpen(false)
+    window.addEventListener('pb-note-overlay-open',  onOpen)
+    window.addEventListener('pb-note-overlay-close', onClose)
+    return () => {
+      window.removeEventListener('pb-note-overlay-open',  onOpen)
+      window.removeEventListener('pb-note-overlay-close', onClose)
+    }
+  }, [])
+
   const enrichedDevNotes = useMemo(() =>
     devNotes
       .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
@@ -3783,7 +3807,7 @@ export default function LibraryPage() {
     <div style={s.page}>
 
       {/* ── Header (no back button — BottomNav handles navigation) ── */}
-      <header style={{ ...s.header, ...(isEditingNote ? s.headerEditing : {}) }}>
+      <header style={{ ...s.header, ...(isEditingNote ? s.headerEditing : {}), ...(isNoteOverlayOpen ? { visibility: 'hidden', pointerEvents: 'none' } : {}) }}>
         {/* Editing mode: minimal "Note editing · Done" bar */}
         {isEditingNote && (
           <div style={s.editingBar}>
