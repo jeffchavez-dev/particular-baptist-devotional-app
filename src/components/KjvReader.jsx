@@ -861,6 +861,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const lxxReaderLoadedRef = useRef(new Set())
 
   function toggleParallel(versionId) {
+    // Save current position BEFORE the layout shifts from inserting/removing parallel panels
+    if (readerRef.current) saveReaderAnchor(versionRef.current, readerRef.current)
     setParallelVersions(prev => {
       const next = new Set(prev)
       if (next.has(versionId)) next.delete(versionId)
@@ -869,6 +871,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       return next
     })
   }
+
+  // Restore reading position after parallel panel insert/remove causes layout shift
+  useEffect(() => {
+    if (!readerRef.current) return
+    restoreReaderAnchor(versionRef.current, readerRef.current)
+  }, [parallelVersions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
@@ -1439,6 +1447,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Load Bible version / Greek NT / Hebrew OT whenever the version prop changes */
   useEffect(() => {
     let cancelled = false
+
+    // ── Preserve reading position across translation switch ──────────────────
+    // The reader DOM still shows the old version's content at this point, so we can
+    // find the first visible verse and save it under the NEW version's key.
+    // The chapter-navigation effect will then call restoreReaderAnchor(version, …)
+    // and find the data, keeping the same passage in view after the new data loads.
+    if (readerRef.current) {
+      saveReaderAnchor(version, readerRef.current)
+      restoreReaderScrollRef.current = true
+    }
+
     // If this version change was triggered by a lexicon result navigation (e.g. LXX→GNT),
     // preserve the back-pill and pending highlights so the user can return to results.
     // For all other version switches (manual translation toggle), clear them.
