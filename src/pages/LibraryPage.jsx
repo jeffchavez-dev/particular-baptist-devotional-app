@@ -3683,9 +3683,7 @@ export default function LibraryPage() {
     if (!session && activeTab === 'books') setActiveTab('notes')
   }, [session, activeTab])
   const [libSearch,     setLibSearch]     = useState('')
-  const [bookLibraryCount, setBookLibraryCount] = useState(() =>
-    Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
-  )
+  const [bookLibraryCount, setBookLibraryCount] = useState(0)
   const [libSearchOpen, setLibSearchOpen] = useState(false)
   const libSearchRef = useRef(null)
   /* Track whether the note editor is focused (for nav-hide / Done bar) */
@@ -3764,14 +3762,19 @@ export default function LibraryPage() {
     return () => window.removeEventListener('pb-sc-bookmark-changed', handler)
   }, [])
 
+  // Book library count — only active (and non-zero) when signed in
   useEffect(() => {
-    const handler = () => {
-      const count = Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
-      setBookLibraryCount(count)
+    if (!session) {
+      setBookLibraryCount(0)
+      return
     }
+    const calc = () =>
+      Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
+    setBookLibraryCount(calc())
+    const handler = () => setBookLibraryCount(calc())
     window.addEventListener('pb-book-library-updated', handler)
     return () => window.removeEventListener('pb-book-library-updated', handler)
-  }, [])
+  }, [session])
 
   /* Show/hide nav & header when note editor is focused */
   useEffect(() => {
