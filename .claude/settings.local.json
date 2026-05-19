@@ -202,7 +202,9 @@
       "Bash(node build-devflow-specs.js)",
       "Bash(python \"C:\\\\Users\\\\Jeff Chavez\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\de2fb2cb-fec6-4b7e-b57c-68ca039d0b0f\\\\8df0bcb7-d8ba-4ee2-8101-b26fd24939c7\\\\skills\\\\docx\\\\scripts\\\\office\\\\validate.py\" \"C:\\\\Users\\\\Jeff Chavez\\\\Downloads\\\\DevFlow-CRM-Technical-Specs.docx\")",
       "mcp__Claude_in_Chrome__browser_batch",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
+      "Bash(cat vite.config.js)",
+      "Bash(cat vite.config.ts)"
     ]
   }
 }

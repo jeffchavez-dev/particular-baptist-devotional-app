@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { buildSchedule } from '../lib/supabase'
+import { getAllBooks } from '../lib/bookLibrary'
 
 const SCHEDULE = buildSchedule()
 
@@ -24,6 +25,7 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
 
   const completedCount = Object.values(progress).filter(Boolean).length
   const noteCount      = userNotes.length
+  const books          = Object.values(getAllBooks())
 
   function flash(key) {
     setDownloaded(key)
@@ -53,7 +55,7 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
       app: 'Particular Baptist Devotional',
       exported: new Date().toISOString(),
       user: session?.user?.email || 'guest',
-      summary: { total: 365, completed: completedCount, withNotes: noteCount },
+      summary: { total: 365, completed: completedCount, withNotes: noteCount, books: books.length },
       days: SCHEDULE
         .filter(r => progress[r.day] || noteMap[r.day])
         .map(r => ({
@@ -64,6 +66,19 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
           completed: !!progress[r.day],
           notes:     noteMap[r.day] || null,
         })),
+      bookLibrary: books.map(b => ({
+        id:          b.id,
+        title:       b.title,
+        author:      b.author || null,
+        isEbook:     b.isEbook || false,
+        totalPages:  b.totalPages || null,
+        labels:      b.labels || [],
+        completed:   b.completed || false,
+        startedAt:   b.startedAt || null,
+        completedAt: b.completedAt || null,
+        addedAt:     b.addedAt || null,
+        notes:       b.notes || [],
+      })),
     }
     triggerDownload(
       'pb-devotional-backup.json',
@@ -81,7 +96,7 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
         <div style={m.header}>
           <div>
             <div style={m.title}>Export &amp; Backup</div>
-            <div style={m.subtitle}>{completedCount} days completed · {noteCount} notes</div>
+            <div style={m.subtitle}>{completedCount} days completed · {noteCount} notes · {books.length} books</div>
           </div>
           <button onClick={onClose} style={m.closeBtn} aria-label="Close">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

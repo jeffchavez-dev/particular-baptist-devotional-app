@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgressDown } from './lib/supabase'
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
+import { syncBooksUp, syncBooksDown } from './lib/bookLibrary'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -47,6 +48,7 @@ export default function App() {
       if (!document.hidden && prevUser.current) {
         syncAnnotationsDown(prevUser.current.id)
         syncBibleProgressDown(prevUser.current.id)
+        syncBooksDown(prevUser.current.id)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -90,6 +92,10 @@ export default function App() {
         syncBibleProgressUp(s.user.id)
           .then(() => syncBibleProgressDown(s.user.id))
           .catch(e => console.warn('[auth-sync-bible] error:', e?.message))
+        /* Sync book library: push local → pull server */
+        syncBooksUp(s.user.id)
+          .then(() => syncBooksDown(s.user.id))
+          .catch(e => console.warn('[auth-sync-books] error:', e?.message))
       }
       prevUser.current = s?.user ?? null
       setSession(s)

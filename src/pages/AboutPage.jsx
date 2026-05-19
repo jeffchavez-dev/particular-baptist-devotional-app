@@ -6,12 +6,14 @@ import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
+import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
 import BibleTrackerSection from '../components/BibleTrackerSection'
 import {
   clearAllHighlights, clearAllNotes,
+  syncAnnotationsUp, syncAnnotationsDown,
 } from '../lib/annotations'
 import {
   getDefaultReaderVersion, setDefaultReaderVersion, DEFAULT_VERSION_OPTIONS,
@@ -285,7 +287,11 @@ export default function AboutPage() {
     setSyncing(true)
     setSyncMessage(null)
     try {
-      const result = await syncAll(session.user.id)
+      const [result] = await Promise.all([
+        syncAll(session.user.id),
+        syncBooksUp(session.user.id).then(() => syncBooksDown(session.user.id)),
+        syncAnnotationsUp(session.user.id).then(() => syncAnnotationsDown(session.user.id)),
+      ])
       setSyncMessage({
         type: result.success ? 'success' : 'error',
         text: result.message,

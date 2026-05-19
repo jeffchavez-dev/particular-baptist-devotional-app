@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { generateId, getAllBooks, saveBook, deleteBook, searchBookCovers } from '../lib/bookLibrary'
+import { useAuth } from '../App'
 import BookCelebration from './BookCelebration'
 
 /*
@@ -968,7 +969,7 @@ function BookCard({ book, onClick, onEdit, onDelete }) {
 
 /* ── BookDetail ─────────────────────────────────────────────────────────────── */
 
-function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
+function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }) {
   const [book, setBook] = useState(initialBook)
   const [addNoteOpen, setAddNoteOpen] = useState(false)
   const [editNote, setEditNote] = useState(null)
@@ -996,7 +997,7 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery }) {
         : null)
 
   function mutateBook(updatedBook) {
-    saveBook(updatedBook)
+    saveBook(updatedBook, userId)
     setBook(updatedBook)
     onChange(updatedBook)
   }
@@ -1204,6 +1205,8 @@ const SORT_OPTIONS = [
 ]
 
 export default function BookLibraryTab({ searchQuery }) {
+  const { session } = useAuth()
+  const userId = session?.user?.id || null
   const [books, setBooks] = useState(() => getAllBooks())
   const [view, setView] = useState('list')
   const [selectedBookId, setSelectedBookId] = useState(null)
@@ -1266,19 +1269,20 @@ export default function BookLibraryTab({ searchQuery }) {
         onBack={() => { setView('list'); setSelectedBookId(null) }}
         onChange={(updatedBook) => setBooks(getAllBooks())}
         searchQuery={searchQuery}
+        userId={userId}
       />
     )
   }
 
   function handleSaveBook(bookData) {
-    saveBook(bookData)
+    saveBook(bookData, userId)
     setBooks(getAllBooks())
     setAddBookOpen(false)
     setEditBook(null)
   }
 
   function handleDeleteBook(book) {
-    deleteBook(book.id)
+    deleteBook(book.id, userId)
     setBooks(getAllBooks())
     setDeleteConfirm(null)
   }
