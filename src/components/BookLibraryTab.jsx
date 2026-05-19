@@ -3,6 +3,18 @@ import { generateId, getAllBooks, saveBook, deleteBook, searchBookCovers } from 
 import { useAuth } from '../App'
 import BookCelebration from './BookCelebration'
 
+/* ── Logo preloader (shared cache) ── */
+let _logoImg = null
+function getLogoImg() {
+  return new Promise(resolve => {
+    if (_logoImg) { resolve(_logoImg); return }
+    const img = new Image()
+    img.onload  = () => { _logoImg = img; resolve(img) }
+    img.onerror = () => resolve(null)
+    img.src = '/pwa-192.png'
+  })
+}
+
 /*
   Book: { id, title, author, isEbook, totalPages, coverUrl, coverData, addedAt, notes[], completed, labels[] }
   Note: { id, type ('note'|'quote'), text, page, percent, createdAt, updatedAt }
@@ -246,23 +258,31 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.stroke()
   ctx.restore()
 
-  // Branding
-  const brandFontSize = Math.round(refDim * 0.024)
-  ctx.fillStyle = textColor
-  ctx.globalAlpha = 0.4
-  ctx.font = `500 ${brandFontSize}px 'DM Sans', sans-serif`
-  ctx.fillText('Particular Baptist Devotional', PAD, bottomRuleY + brandFontSize * 1.6)
-  ctx.globalAlpha = 1
+  // App logo — small circle, bottom-right corner
+  const logoImg = await getLogoImg()
+  if (logoImg) {
+    const logoSize = Math.round(refDim * 0.055)
+    const logoX    = w - PAD - logoSize
+    const logoY    = bottomRuleY + Math.round((h - bottomRuleY - logoSize) / 2)
+    ctx.save()
+    ctx.globalAlpha = 0.62
+    ctx.beginPath()
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize)
+    ctx.restore()
+  }
 }
 
 /* ── Presets & Formats ──────────────────────────────────────────────────────── */
 
 const SHARE_PRESETS = [
-  { id: 'ink',       label: 'Deep Ink',  type: 'solid',    bg: '#1a1410',              textColor: '#f5f0e8', accentColor: '#c9a84c' },
-  { id: 'parchment', label: 'Parchment', type: 'gradient', bg: ['#f5f0e8', '#ddd5c5'], textColor: '#1a1410', accentColor: '#8a6d2e' },
-  { id: 'forest',    label: 'Forest',    type: 'gradient', bg: ['#1a3a2a', '#0d2418'], textColor: '#e8f5f0', accentColor: '#7ec8b0' },
-  { id: 'royal',     label: 'Royal',     type: 'gradient', bg: ['#2d1b4e', '#1a0f2e'], textColor: '#e8e0f8', accentColor: '#a87ee8' },
-  { id: 'amber',     label: 'Amber',     type: 'gradient', bg: ['#4a3210', '#2a1e08'], textColor: '#f5ece0', accentColor: '#d4a84c' },
+  { id: 'ink',       label: 'Deep Ink',     type: 'solid',    bg: '#1a1410',              textColor: '#f5f0e8', accentColor: '#c9a84c' },
+  { id: 'parchment', label: 'Parchment',    type: 'gradient', bg: ['#f5f0e8', '#ddd5c5'], textColor: '#1a1410', accentColor: '#8a6d2e' },
+  { id: 'ancient',   label: '17th Century', type: 'gradient', bg: ['#d8b86a', '#9a7020'], textColor: '#0e0400', accentColor: '#7a1408' },
+  { id: 'forest',    label: 'Forest',       type: 'gradient', bg: ['#1a3a2a', '#0d2418'], textColor: '#e8f5f0', accentColor: '#7ec8b0' },
+  { id: 'royal',     label: 'Royal',        type: 'gradient', bg: ['#2d1b4e', '#1a0f2e'], textColor: '#e8e0f8', accentColor: '#a87ee8' },
+  { id: 'amber',     label: 'Amber',        type: 'gradient', bg: ['#4a3210', '#2a1e08'], textColor: '#f5ece0', accentColor: '#d4a84c' },
 ]
 
 const SHARE_FORMATS = [

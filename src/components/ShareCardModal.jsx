@@ -1,14 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react'
 
+/* ── Logo preloader (cached after first load) ── */
+let _logoImg = null
+function getLogoImg() {
+  return new Promise(resolve => {
+    if (_logoImg) { resolve(_logoImg); return }
+    const img = new Image()
+    img.onload  = () => { _logoImg = img; resolve(img) }
+    img.onerror = () => resolve(null)
+    img.src = '/pwa-192.png'
+  })
+}
+
 /* ── Background presets ── */
 const PRESETS = [
-  { id:'ink',       label:'Deep Ink',    type:'solid',    bg:'#1a1410',               textColor:'#f5f0e8', accentColor:'#c9a84c' },
-  { id:'parchment', label:'Parchment',   type:'gradient', bg:['#f5f0e8','#ddd5c5'],  textColor:'#1a1410', accentColor:'#8a6d2e' },
-  { id:'forest',    label:'Forest',      type:'gradient', bg:['#1a3a2a','#0d2418'],  textColor:'#e8f5f0', accentColor:'#7ec8b0' },
-  { id:'royal',     label:'Royal',       type:'gradient', bg:['#2d1b4e','#1a0f2e'],  textColor:'#e8e0f8', accentColor:'#a87ee8' },
-  { id:'teal',      label:'Deep Teal',   type:'gradient', bg:['#1a3a38','#0d2220'],  textColor:'#e0f5f4', accentColor:'#7ecfc8' },
-  { id:'amber',     label:'Amber',       type:'gradient', bg:['#4a3210','#2a1e08'],  textColor:'#f5ece0', accentColor:'#d4a84c' },
-  { id:'custom',    label:'Custom',      type:'solid',    bg:'#ffffff',              textColor:'#1a1410', accentColor:'#8a6d2e' },
+  { id:'ink',       label:'Deep Ink',      type:'solid',    bg:'#1a1410',               textColor:'#f5f0e8', accentColor:'#c9a84c' },
+  { id:'parchment', label:'Parchment',     type:'gradient', bg:['#f5f0e8','#ddd5c5'],  textColor:'#1a1410', accentColor:'#8a6d2e' },
+  { id:'ancient',   label:'17th Century',  type:'gradient', bg:['#d8b86a','#9a7020'],  textColor:'#0e0400', accentColor:'#7a1408' },
+  { id:'forest',    label:'Forest',        type:'gradient', bg:['#1a3a2a','#0d2418'],  textColor:'#e8f5f0', accentColor:'#7ec8b0' },
+  { id:'royal',     label:'Royal',         type:'gradient', bg:['#2d1b4e','#1a0f2e'],  textColor:'#e8e0f8', accentColor:'#a87ee8' },
+  { id:'teal',      label:'Deep Teal',     type:'gradient', bg:['#1a3a38','#0d2220'],  textColor:'#e0f5f4', accentColor:'#7ecfc8' },
+  { id:'amber',     label:'Amber',         type:'gradient', bg:['#4a3210','#2a1e08'],  textColor:'#f5ece0', accentColor:'#d4a84c' },
+  { id:'custom',    label:'Custom',        type:'solid',    bg:'#ffffff',              textColor:'#1a1410', accentColor:'#8a6d2e' },
 ]
 
 /* Card text-size — A−/A+ continuous control */
@@ -120,16 +133,14 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
 }
 
 /**
- * Draw the bottom rule + branding.
- * @param {number|null} contentBottom - Y of the last content pixel; if provided,
- *   the chrome is placed just below the content instead of always at h*0.9.
+ * Draw the bottom rule + logo mark (bottom-right).
+ * @param {number|null} contentBottom - Y of the last content pixel; dynamic positioning.
+ * @param {HTMLImageElement|null} logoImg - pre-loaded app icon, drawn as a small circle.
  */
-function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, contentBottom = null) {
+function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, contentBottom = null, logoImg = null) {
   const refDim = Math.min(w, h)
-  const fSz    = Math.round(refDim * 0.019)
 
-  // Dynamic positioning: sit just below the content with at least 6% padding,
-  // but never higher than 68% of height and never lower than 93%.
+  // Dynamic positioning: sit just below the content, clamped to a sensible range.
   const ruleY = contentBottom !== null
     ? Math.min(Math.max(contentBottom + refDim * 0.065, h * 0.68), h * 0.93)
     : h * 0.9
@@ -138,14 +149,23 @@ function drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, contentBottom 
   ctx.beginPath(); ctx.moveTo(PAD, ruleY); ctx.lineTo(w - PAD, ruleY); ctx.stroke()
   ctx.globalAlpha = 1
 
-  ctx.font = `${fSz}px 'DM Sans','Helvetica Neue',sans-serif`
-  ctx.fillStyle = textColor; ctx.globalAlpha = 0.45; ctx.textAlign = 'left'
-  ctx.fillText('Particular Baptist Devotional', PAD, ruleY + fSz * 1.6)
-  ctx.globalAlpha = 1; ctx.textAlign = 'left'
+  // App logo — small circle, bottom-right corner
+  if (logoImg) {
+    const logoSize = Math.round(refDim * 0.055)
+    const logoX    = w - PAD - logoSize
+    const logoY    = ruleY + Math.round((h - ruleY - logoSize) / 2)
+    ctx.save()
+    ctx.globalAlpha = 0.62
+    ctx.beginPath()
+    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize)
+    ctx.restore()
+  }
 }
 
 /* ── Reading / Note card ── */
-function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
+function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0, logoImg = null) {
   const refDim   = Math.min(w, h)
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
@@ -229,11 +249,11 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1
     }
   }
 
-  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom)
+  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom, logoImg)
 }
 
 /* ── Quote card — quote text is the hero ── */
-function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0) {
+function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0, logoImg = null) {
   const refDim   = Math.min(w, h)
   const contentW = w - PAD * 2
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
@@ -292,11 +312,11 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale = 1.0
   }
   ctx.globalAlpha = 1
 
-  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom)
+  drawBottomChrome(ctx, w, h, PAD, accentColor, textColor, finalBottom, logoImg)
 }
 
 /* ── Master draw dispatcher ── */
-function drawCard(canvas, card, preset, format, customBg, customText, scale = 1.0) {
+function drawCard(canvas, card, preset, format, customBg, customText, scale = 1.0, logoImg = null) {
   const { w, h } = format
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
@@ -308,9 +328,9 @@ function drawCard(canvas, card, preset, format, customBg, customText, scale = 1.
   ctx.textBaseline = 'alphabetic'
 
   if (card.type === 'quote') {
-    drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale)
+    drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg)
   } else {
-    drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale)
+    drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg)
   }
 }
 
@@ -327,11 +347,12 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   useEffect(() => {
     if (!isOpen || !card) return
 
-    function render() {
+    async function render() {
       const canvas = canvasRef.current
       if (!canvas) return
       try {
-        drawCard(canvas, card, preset, format, customBg, customText, cardScale)
+        const logo = await getLogoImg()
+        drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo)
       } catch (err) {
         console.error('[ShareCard] draw error:', err)
       }
