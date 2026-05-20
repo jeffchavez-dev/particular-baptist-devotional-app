@@ -74,8 +74,8 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
     return JSON.stringify(data, null, 2)
   }
 
-  /* ── CSV download ── */
-  function exportCSV() {
+  /* ── Shared CSV builder (used by local export + Drive upload) ── */
+  function buildBackupCSV() {
     const header = ['Day','Date','Source','Reading','Detail','Completed','Notes']
     const rows   = SCHEDULE.map(r => [
       r.day, r.date, r.src,
@@ -84,8 +84,12 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
       progress[r.day] ? 'Yes' : 'No',
       `"${(noteMap[r.day] || '').replace(/"/g, '""')}"`,
     ])
-    const csv = [header, ...rows].map(r => r.join(',')).join('\n')
-    triggerDownload(`pb-devotional-export-${todayISO()}.csv`, csv, 'text/csv;charset=utf-8;')
+    return [header, ...rows].map(r => r.join(',')).join('\n')
+  }
+
+  /* ── CSV download ── */
+  function exportCSV() {
+    triggerDownload(`pb-devotional-export-${todayISO()}.csv`, buildBackupCSV(), 'text/csv;charset=utf-8;')
     flash('csv')
   }
 
@@ -136,18 +140,18 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
     setDriveStatus('uploading')
     try {
       const date     = todayISO()
-      const filename = `pb-devotional-backup-${date}.json`
-      const content  = buildBackupJSON()
+      const filename = `pb-devotional-backup-${date}.csv`
+      const content  = buildBackupCSV()
 
       const metadata = {
         name:        filename,
-        mimeType:    'application/json',
+        mimeType:    'text/csv',
         description: `Particular Baptist Devotional backup — ${date}. ${completedCount}/365 days completed, ${noteCount} notes, ${books.length} books.`,
       }
 
       const form = new FormData()
       form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-      form.append('file',     new Blob([content],                  { type: 'application/json' }))
+      form.append('file',     new Blob([content],                  { type: 'text/csv' }))
 
       const res = await fetch(
         'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
@@ -244,7 +248,7 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
               <div>
                 <p style={m.driveDesc}>
                   Direct Drive upload needs a one-time Google Cloud setup. Once configured, every backup uploads as
-                  {' '}<code style={m.code}>pb-devotional-backup-YYYY-MM-DD.json</code> — dated so you can track each version.
+                  {' '}<code style={m.code}>pb-devotional-backup-YYYY-MM-DD.csv</code> — dated so you can track each version.
                 </p>
                 <div style={m.setupSteps}>
                   <div style={m.setupStep}><span style={m.stepNum}>1</span> Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" style={m.link}>console.cloud.google.com</a> and create a project</div>
@@ -302,7 +306,7 @@ export default function ExportModal({ isOpen, onClose, userNotes = [], progress 
               <div>
                 <p style={m.driveDesc}>
                   Uploads directly to your Google Drive as{' '}
-                  <code style={m.code}>pb-devotional-backup-{todayISO()}.json</code>.
+                  <code style={m.code}>pb-devotional-backup-{todayISO()}.csv</code>.
                   Each backup is date-stamped so you can track your history.
                 </p>
                 <button
