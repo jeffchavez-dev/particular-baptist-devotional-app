@@ -186,7 +186,7 @@ export default function BookCelebration({ bookName, onClose }) {
             width:'100%',
           }}
         >
-          Praise the Lord! 🎉
+          Soli Deo Gloria! 🎉
         </button>
       </div>
     </div>
