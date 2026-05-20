@@ -343,14 +343,38 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logo
 }
 
 /* ── Master draw dispatcher ── */
-function drawCard(canvas, card, preset, format, customBg, customText, scale, logoImg, textPosition, textAlign, metaShown) {
+async function drawCard(canvas, card, preset, format, customBg, customText, scale, logoImg, textPosition, textAlign, metaShown, coverPhoto) {
   const { w, h } = format
   canvas.width = w; canvas.height = h
-  const ctx         = canvas.getContext('2d')
-  const PAD         = Math.round(Math.min(w, h) * 0.08)
-  const textColor   = preset.id === 'custom' ? (customText || '#1a1410') : preset.textColor
-  const accentColor = preset.accentColor
-  applyBackground(ctx, preset, w, h, customBg)
+  const ctx = canvas.getContext('2d')
+  const PAD = Math.round(Math.min(w, h) * 0.08)
+  let textColor   = preset.id === 'custom' ? (customText || '#1a1410') : preset.textColor
+  let accentColor = preset.accentColor
+
+  if (coverPhoto) {
+    await new Promise(resolve => {
+      const img = new Image()
+      img.onload = () => {
+        const imgRatio = img.width / img.height
+        const canvasRatio = w / h
+        let sx, sy, sw, sh
+        if (imgRatio > canvasRatio) {
+          sh = img.height; sw = sh * canvasRatio; sx = (img.width - sw) / 2; sy = 0
+        } else {
+          sw = img.width; sh = sw / canvasRatio; sx = 0; sy = (img.height - sh) / 2
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
+        ctx.fillStyle = 'rgba(10,8,5,0.72)'; ctx.fillRect(0, 0, w, h)
+        resolve()
+      }
+      img.onerror = () => { applyBackground(ctx, preset, w, h, customBg); resolve() }
+      img.src = coverPhoto
+    })
+    textColor = '#f5f0e8'; accentColor = '#c9a84c'
+  } else {
+    applyBackground(ctx, preset, w, h, customBg)
+  }
+
   ctx.textBaseline = 'alphabetic'
   if (card.type === 'quote') {
     drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, format.id)
@@ -362,6 +386,7 @@ function drawCard(canvas, card, preset, format, customBg, customText, scale, log
 /* ── Modal ── */
 export default function ShareCardModal({ isOpen, onClose, card }) {
   const canvasRef                    = useRef(null)
+  const fileInputRef                 = useRef(null)
   const [preset,       setPreset]    = useState(PRESETS[0])
   const [format,       setFormat]    = useState(FORMATS[0])
   const [customBg,     setCustomBg]  = useState('#f5f0e8')
@@ -370,6 +395,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   const [textPosition, setTextPosition] = useState('top')
   const [textAlign,    setTextAlign]    = useState('left')
   const [metaShown,    setMetaShown]    = useState({ title:true, version:true, label:true, refs:true })
+  const [coverPhoto,   setCoverPhoto]   = useState(null)   // dataURL | null
 
   const availableMeta = useMemo(() => {
     if (!card) return {}
@@ -395,13 +421,13 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
       const canvas = canvasRef.current; if (!canvas) return
       try {
         const logo = await getLogoImg()
-        drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo, textPosition, textAlign, metaShown)
+        await drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo, textPosition, textAlign, metaShown, coverPhoto)
       } catch (err) { console.error('[ShareCard]', err) }
     }
     render()
     const t = setTimeout(render, 120)
     return () => clearTimeout(t)
-  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown])
+  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown, coverPhoto])
 
   useEffect(() => {
     if (!isOpen) return
@@ -550,6 +576,30 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
               </div>
             </div>
           )}
+
+          {/* Background Photo */}
+          <div style={m.section}>
+            <div style={m.label}>Background Photo <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— overrides color preset</span></div>
+            {coverPhoto ? (
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                <img src={coverPhoto} alt="" style={{width:44, height:44, objectFit:'cover', borderRadius:6, border:'1.5px solid var(--border)', flexShrink:0}} />
+                <span style={{fontSize:12, color:'var(--ink-muted)', flex:1}}>Custom photo applied</span>
+                <button onClick={() => setCoverPhoto(null)} style={{fontSize:12, color:'#c0392b', background:'none', border:'1px solid #c0392b', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", flexShrink:0}}>Remove</button>
+              </div>
+            ) : (
+              <button onClick={() => fileInputRef.current?.click()} style={{...m.chip, display:'inline-flex', alignItems:'center', gap:6, width:'fit-content'}}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 5l3.5-4L10 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 10.5h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                Upload Photo
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={e => {
+              const file = e.target.files?.[0]; if (!file) return
+              const reader = new FileReader()
+              reader.onload = ev => setCoverPhoto(ev.target.result)
+              reader.readAsDataURL(file)
+              e.target.value = ''
+            }} />
+          </div>
 
           {/* Background */}
           <div style={m.section}>

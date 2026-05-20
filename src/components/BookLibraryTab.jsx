@@ -47,64 +47,47 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
-  const words = text.split(' ')
-  let line = ''
-  let lineCount = 0
-  let currentY = y
-  const align  = ctx.textAlign || 'left'
-  const drawX  = align === 'right'  ? x + maxWidth
-               : align === 'center' ? x + maxWidth / 2
-               : x
-
-  for (let i = 0; i < words.length; i++) {
-    const testLine = line + (line ? ' ' : '') + words[i]
-    const metrics = ctx.measureText(testLine)
-    if (metrics.width > maxWidth && line) {
-      if (lineCount >= maxLines - 1) {
-        let truncated = line
-        while (ctx.measureText(truncated + '…').width > maxWidth && truncated.length > 0) {
-          truncated = truncated.slice(0, -1)
-        }
-        ctx.fillText(truncated + '…', drawX, currentY)
-        return currentY + lineHeight
-      }
+function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 'left') {
+  if (!text) return y
+  ctx.direction = 'ltr'   // prevent bidi bleed from Hebrew segments
+  ctx.textAlign = align
+  const drawX = align === 'right'  ? x + maxWidth
+              : align === 'center' ? x + maxWidth / 2
+              : x
+  const words = text.split(' ').filter(Boolean)
+  let line = '', lineCount = 0, currentY = y
+  for (const word of words) {
+    const testLine = line ? line + ' ' + word : word
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      if (lineCount >= maxLines - 1) { ctx.fillText(line + '…', drawX, currentY); return currentY }
       ctx.fillText(line, drawX, currentY)
-      currentY += lineHeight
-      lineCount++
-      line = words[i]
-    } else {
-      line = testLine
-    }
+      line = word; currentY += lineHeight; lineCount++
+    } else { line = testLine }
   }
-  if (line) {
-    ctx.fillText(line, drawX, currentY)
-    currentY += lineHeight
-  }
+  if (line) { ctx.fillText(line, drawX, currentY); currentY += lineHeight }
   return currentY
 }
 
-function applyBg(ctx, preset, w, h) {
-  if (preset.type === 'solid') {
+function applyBg(ctx, preset, w, h, customBg) {
+  if (preset.id === 'custom') {
+    ctx.fillStyle = customBg || '#ffffff'
+  } else if (preset.type === 'solid') {
     ctx.fillStyle = preset.bg
-    ctx.fillRect(0, 0, w, h)
   } else {
     const grad = ctx.createLinearGradient(0, 0, 0, h)
     grad.addColorStop(0, preset.bg[0])
     grad.addColorStop(1, preset.bg[1])
     ctx.fillStyle = grad
-    ctx.fillRect(0, 0, w, h)
   }
+  ctx.fillRect(0, 0, w, h)
 }
 
-async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition = 'top', textAlign = 'left', metaShown = {}) {
-  const w = format.w
-  const h = format.h
-  canvas.width = w
-  canvas.height = h
+async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition = 'top', textAlign = 'left', metaShown = {}, customBg, customText) {
+  const w = format.w, h = format.h
+  canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
 
-  let textColor = preset.textColor
+  let textColor   = preset.id === 'custom' ? (customText || '#1a1410') : preset.textColor
   let accentColor = preset.accentColor
 
   if (useCoverBg && (book.coverData || book.coverUrl)) {
@@ -121,16 +104,15 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
           sw = img.width; sh = sw / canvasRatio; sx = 0; sy = (img.height - sh) / 2
         }
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
-        ctx.fillStyle = 'rgba(10,8,5,0.72)'
-        ctx.fillRect(0, 0, w, h)
+        ctx.fillStyle = 'rgba(10,8,5,0.72)'; ctx.fillRect(0, 0, w, h)
         textColor = '#f5f0e8'; accentColor = '#d4a84c'
         resolve()
       }
-      img.onerror = () => { applyBg(ctx, preset, w, h); resolve() }
+      img.onerror = () => { applyBg(ctx, preset, w, h, customBg); resolve() }
       img.src = book.coverData || book.coverUrl
     })
   } else {
-    applyBg(ctx, preset, w, h)
+    applyBg(ctx, preset, w, h, customBg)
   }
 
   const refDim = Math.min(w, h)
@@ -144,10 +126,10 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.beginPath(); ctx.moveTo(PAD, PAD * 0.6); ctx.lineTo(w - PAD, PAD * 0.6); ctx.stroke()
   ctx.restore()
 
-  // ── Book title badge (top chrome — always shown) ──
+  // ── Book title badge ──
   const badgeFontSize = Math.round(refDim * 0.028)
   ctx.font = `600 ${badgeFontSize}px 'DM Sans', sans-serif`
-  ctx.textAlign = 'left'
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
   const titleText  = book.title || 'Unknown Book'
   const badgePadX  = Math.round(refDim * 0.022)
   const badgePadY  = Math.round(refDim * 0.012)
@@ -168,56 +150,60 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   const typeBadgeX = showBookTitle ? PAD + badgeW + Math.round(refDim * 0.015) : PAD
   const typeLabel  = note.type === 'quote' ? '❝ Quote' : '✍ Note'
   ctx.font = `500 ${badgeFontSize}px 'DM Sans', sans-serif`
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
   ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = textColor
   roundRect(ctx, typeBadgeX, badgeY, ctx.measureText(typeLabel).width + badgePadX * 2, badgeH, badgeR); ctx.fill(); ctx.restore()
   ctx.fillStyle = textColor; ctx.globalAlpha = 0.7
   ctx.fillText(typeLabel, typeBadgeX + badgePadX, badgeY + badgePadY + badgeFontSize * 0.78)
   ctx.globalAlpha = 1
 
-  // ── Content block geometry ──
+  // ── Content block geometry (format-aware) ──
   const badgeBottom  = badgeY + badgeH
-  const isLeft       = textPosition === 'left'
-  const isRight      = textPosition === 'right'
-  const isBottom     = textPosition === 'bottom'
-  const contentX     = isRight ? Math.round(w * 0.45) : PAD
-  const contentW     = (isLeft || isRight) ? Math.round((w - PAD * 2) * 0.56) : w - PAD * 2.2
-  const blockStartY  = isBottom ? Math.round(h * 0.52) : badgeBottom + Math.round(refDim * 0.08)
+  const isLeft   = textPosition === 'left'
+  const isRight  = textPosition === 'right'
+  const isBottom = textPosition === 'bottom'
+  const isCenter = textPosition === 'center'
+  const colFrac    = format.id === 'wide' ? 0.48 : 0.52
+  const bottomFrac = format.id === 'wide' ? 0.38 : format.id === 'story' ? 0.56 : 0.50
+  const centerFrac = format.id === 'wide' ? 0.28 : format.id === 'story' ? 0.36 : 0.32
+  const contentX    = isRight ? Math.round(w - PAD - (w - PAD * 2) * colFrac) : PAD
+  const contentW    = (isLeft || isRight) ? Math.round((w - PAD * 2) * colFrac) : w - PAD * 2
+  const blockStartY = isBottom ? Math.round(h * bottomFrac)
+                    : isCenter ? Math.round(h * centerFrac)
+                    : badgeBottom + Math.round(refDim * 0.08)
 
-  // ── Category tags (optional — shown above quote) ──
+  // ── Category tags ──
   let catBottom = blockStartY
   const showCategory = metaShown.category !== false && book.labels?.length
   if (showCategory) {
-    const catSz   = Math.round(refDim * 0.020)
-    ctx.font      = `500 ${catSz}px 'DM Sans', sans-serif`
+    const catSz = Math.round(refDim * 0.020)
+    ctx.font = `500 ${catSz}px 'DM Sans', sans-serif`
     ctx.fillStyle = accentColor; ctx.globalAlpha = 0.7
-    ctx.textAlign = textAlign
-    const catDrawX = textAlign === 'right' ? contentX + contentW : textAlign === 'center' ? contentX + contentW / 2 : contentX
-    ctx.fillText(book.labels.join(' · '), catDrawX, blockStartY)
+    wrapText(ctx, book.labels.join(' · '), contentX, blockStartY, contentW, catSz * 1.5, 1, textAlign)
     ctx.globalAlpha = 1
     catBottom = blockStartY + catSz * 1.5
   }
 
-  // ── Decorative open-quote — always anchored to content left ──
-  const textY        = catBottom
+  // ── Decorative open-quote — always left-anchored, always LTR ──
+  const textY = catBottom
   const quoteFontSize = Math.round(refDim * 0.18)
   ctx.save(); ctx.globalAlpha = 0.15; ctx.fillStyle = accentColor
   ctx.font = `bold ${quoteFontSize}px Georgia, serif`
-  ctx.textAlign = 'left'
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
   ctx.fillText('”', contentX - Math.round(refDim * 0.01), textY + quoteFontSize * 0.75)
   ctx.restore()
 
   // ── Main text ──
   const mainFontSize   = Math.round(refDim * 0.048 * scale)
   const mainLineHeight = mainFontSize * 1.55
-  const maxLines       = Math.floor((h * 0.52) / mainLineHeight)
+  const maxLines       = Math.max(3, Math.floor((h * 0.52) / mainLineHeight))
   ctx.fillStyle = textColor
-  ctx.textAlign = textAlign
   if (note.type === 'quote') {
     ctx.font = `italic ${mainFontSize}px Georgia, serif`
   } else {
     ctx.font = `${mainFontSize}px 'DM Sans', sans-serif`
   }
-  const endY = wrapText(ctx, note.text || '', contentX, textY, contentW, mainLineHeight, maxLines)
+  const endY = wrapText(ctx, note.text || '', contentX, textY, contentW, mainLineHeight, maxLines, textAlign)
 
   // ── Author attribution ──
   let finalBottom = endY
@@ -226,24 +212,20 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
     const attrFontSize = Math.round(refDim * 0.032)
     const attrY        = endY + Math.round(refDim * 0.035)
     ctx.fillStyle = accentColor
-    ctx.font      = `500 ${attrFontSize}px 'DM Sans', sans-serif`
-    ctx.textAlign = textAlign
-    const attrDrawX = textAlign === 'right' ? contentX + contentW : textAlign === 'center' ? contentX + contentW / 2 : contentX
-    ctx.fillText(`— ${book.author}`, attrDrawX, attrY)
+    ctx.font = `500 ${attrFontSize}px 'DM Sans', sans-serif`
+    wrapText(ctx, `— ${book.author}`, contentX, attrY, contentW, attrFontSize * 1.4, 1, textAlign)
     finalBottom = attrY + attrFontSize * 0.3
-
-    // Page/percent
-    const subFontSize = Math.round(refDim * 0.026)
-    ctx.font = `${subFontSize}px 'DM Sans', sans-serif`
-    ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
     const locParts = []
     if (note.page) locParts.push(`p. ${note.page}`)
     if (note.percent != null) locParts.push(`${note.percent}%`)
     if (locParts.length) {
-      ctx.fillText(locParts.join(' · '), attrDrawX, attrY + attrFontSize * 1.6)
+      const subFontSize = Math.round(refDim * 0.026)
+      ctx.font = `${subFontSize}px 'DM Sans', sans-serif`
+      ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
+      wrapText(ctx, locParts.join(' · '), contentX, attrY + attrFontSize * 1.6, contentW, subFontSize * 1.4, 1, textAlign)
+      ctx.globalAlpha = 1
       finalBottom = attrY + attrFontSize * 1.6 + subFontSize * 0.3
     }
-    ctx.globalAlpha = 1
   }
 
   // ── Bottom rule (dynamic) ──
@@ -253,7 +235,7 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   ctx.beginPath(); ctx.moveTo(PAD, bottomRuleY); ctx.lineTo(w - PAD, bottomRuleY); ctx.stroke()
   ctx.restore()
 
-  // ── Logo — FIXED at bottom-right corner, never moves with content ──
+  // ── Logo — FIXED at bottom-right corner ──
   const logoImg = await getLogoImg()
   if (logoImg) {
     const logoSize = Math.round(refDim * 0.055)
@@ -276,7 +258,9 @@ const SHARE_PRESETS = [
   { id: 'ancient',   label: '17th Century', type: 'gradient', bg: ['#d8b86a', '#9a7020'], textColor: '#0e0400', accentColor: '#7a1408' },
   { id: 'forest',    label: 'Forest',       type: 'gradient', bg: ['#1a3a2a', '#0d2418'], textColor: '#e8f5f0', accentColor: '#7ec8b0' },
   { id: 'royal',     label: 'Royal',        type: 'gradient', bg: ['#2d1b4e', '#1a0f2e'], textColor: '#e8e0f8', accentColor: '#a87ee8' },
+  { id: 'teal',      label: 'Deep Teal',    type: 'gradient', bg: ['#1a3a38', '#0d2220'], textColor: '#e0f5f4', accentColor: '#7ecfc8' },
   { id: 'amber',     label: 'Amber',        type: 'gradient', bg: ['#4a3210', '#2a1e08'], textColor: '#f5ece0', accentColor: '#d4a84c' },
+  { id: 'custom',    label: 'Custom',       type: 'solid',    bg: '#ffffff',              textColor: '#1a1410', accentColor: '#8a6d2e' },
 ]
 
 const SHARE_FORMATS = [
@@ -289,31 +273,37 @@ const SHARE_FORMATS = [
 
 export function BookNoteShareModal({ note, book, onClose }) {
   const canvasRef  = useRef(null)
-  const [preset,      setPreset]     = useState(SHARE_PRESETS[0])
-  const [format,      setFormat]     = useState(SHARE_FORMATS[0])
+  const [preset,       setPreset]       = useState(SHARE_PRESETS[0])
+  const [format,       setFormat]       = useState(SHARE_FORMATS[0])
   const hasCover = !!(book.coverData || book.coverUrl)
-  const [useCoverBg,  setUseCoverBg] = useState(hasCover)
-  const [scale,       setScale]      = useState(1.0)
-  const [sharing,     setSharing]    = useState(false)
-  const [textPosition,setTextPosition] = useState('top')   // top | bottom | left | right
-  const [textAlign,   setTextAlign]    = useState('left')  // left | center | right
-  const [metaShown,   setMetaShown]    = useState({
+  const [useCoverBg,   setUseCoverBg]   = useState(hasCover)
+  const [customBg,     setCustomBg]     = useState('#f5f0e8')
+  const [customText,   setCustomText]   = useState('#1a1410')
+  const [scale,        setScale]        = useState(1.0)
+  const [sharing,      setSharing]      = useState(false)
+  const [textPosition, setTextPosition] = useState('top')
+  const [textAlign,    setTextAlign]    = useState('left')
+  const [metaShown,    setMetaShown]    = useState({
     bookTitle: true,
     author:    true,
     category:  !!(book.labels?.length),
   })
 
-  const redraw = () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown)
-  }
+  const SCALE_MIN = 0.5, SCALE_MAX = 1.8, SCALE_STEP = 0.1
 
-  useEffect(() => { redraw() }, [note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown])
+  const metaLabels = { bookTitle: 'Book Title', author: 'Author', category: 'Category' }
+  const metaKeys   = Object.entries({ bookTitle: true, author: !!book.author, category: !!(book.labels?.length) })
+    .filter(([, v]) => v).map(([k]) => k)
+  const toggleMeta = key => setMetaShown(prev => ({ ...prev, [key]: prev[key] === false }))
+
   useEffect(() => {
-    const t = setTimeout(redraw, 150)
+    const canvas = canvasRef.current; if (!canvas) return
+    drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown, customBg, customText)
+    const t = setTimeout(() => {
+      if (canvasRef.current) drawBookNoteCard(canvasRef.current, note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown, customBg, customText)
+    }, 120)
     return () => clearTimeout(t)
-  }, [note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown])
+  }, [note, book, preset, format, useCoverBg, customBg, customText, scale, textPosition, textAlign, metaShown])
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
@@ -321,138 +311,206 @@ export function BookNoteShareModal({ note, book, onClose }) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  async function share() {
-    setSharing(true)
-    const canvas = canvasRef.current
-    canvas.toBlob(async (blob) => {
-      const file = new File([blob], 'note-card.png', { type: 'image/png' })
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: book.title || 'Note Card' })
-        } catch (_) { download(blob) }
-      } else { download(blob) }
-      setSharing(false)
-    }, 'image/png')
-  }
+  const canShare = typeof navigator !== 'undefined' && !!navigator.share
 
-  function download(blob) {
+  function fallbackDownload(blob) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `note-card-${Date.now()}.png`; a.click()
+    a.href = url; a.download = `book-note-${Date.now()}.png`; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  const toggleMeta = key => setMetaShown(prev => ({ ...prev, [key]: !prev[key] }))
+  async function shareNative() {
+    setSharing(true)
+    try {
+      const blob = await new Promise(r => canvasRef.current.toBlob(r, 'image/png'))
+      const file = new File([blob], `book-note-${Date.now()}.png`, { type: 'image/png' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: book.title || 'Book Note' })
+      } else { fallbackDownload(blob) }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        const blob = await new Promise(r => canvasRef.current.toBlob(r, 'image/png'))
+        fallbackDownload(blob)
+      }
+    } finally { setSharing(false) }
+  }
 
-  const POSITIONS = [
-    { id:'top',    label:'Top'    },
-    { id:'bottom', label:'Bottom' },
-    { id:'left',   label:'Left'   },
-    { id:'right',  label:'Right'  },
-  ]
-  const ALIGNS = [
-    { id:'left',   label:'Left'   },
-    { id:'center', label:'Center' },
-    { id:'right',  label:'Right'  },
-  ]
-  const META_LABELS = {
-    bookTitle: 'Book Title',
-    author:    'Author',
-    category:  'Category',
+  const selectStyle = {
+    appearance:'none', WebkitAppearance:'none',
+    padding:'7px 30px 7px 10px', borderRadius:8, fontSize:12, fontWeight:600,
+    fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+    border:'1.5px solid var(--border)',
+    background:`var(--parchment) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23888' d='M5 7L1 3h8z'/%3E%3C/svg%3E") no-repeat right 8px center`,
+    color:'var(--ink)', outline:'none', width:'100%',
   }
 
   return (
-    <div style={bshare.overlay} onClick={onClose}>
-      <div style={bshare.modal} onClick={e => e.stopPropagation()}>
-        <div style={bshare.header}>
-          <span style={bshare.headerTitle}>Share Note Card</span>
-          <button style={bshare.closeBtn} onClick={onClose}>×</button>
+    <div style={bm.overlay} onClick={onClose}>
+      <div style={bm.modal} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={bm.header}>
+          <div>
+            <span style={bm.title}>Share Note Card</span>
+            <span style={bm.titleSub}> — {note.type === 'quote' ? 'Quote' : 'Reflection'}</span>
+          </div>
+          <button onClick={onClose} style={bm.closeBtn} aria-label="Close">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
 
-        <div style={bshare.canvasWrap}>
-          <canvas ref={canvasRef} style={bshare.canvas} />
-        </div>
+        {/* Body */}
+        <div style={bm.body}>
 
-        <div style={bshare.controls}>
-          {hasCover && (
-            <label style={bshare.toggleRow}>
-              <input type="checkbox" checked={useCoverBg} onChange={e => setUseCoverBg(e.target.checked)} style={{ accentColor: 'var(--teal)' }} />
-              <span style={{ fontSize:13, color:'var(--ink-muted)' }}>Use book cover as background</span>
-            </label>
-          )}
-
-          <div style={bshare.sectionLabel}>Format</div>
-          <div style={bshare.chipRow}>
-            {SHARE_FORMATS.map(f => (
-              <button key={f.id} style={{ ...bshare.chip, ...(format.id === f.id ? bshare.chipActive : {}) }} onClick={() => setFormat(f)}>{f.label}</button>
-            ))}
+          {/* Canvas preview */}
+          <div style={bm.preview}>
+            <canvas ref={canvasRef} style={{ maxWidth:'100%', maxHeight: format.id === 'wide' ? 220 : 340, borderRadius:8, boxShadow:'0 4px 24px rgba(0,0,0,0.25)', display:'block' }} />
           </div>
 
-          {/* Position + Align */}
-          <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
-            <div style={{ flex:1, minWidth:130 }}>
-              <div style={bshare.sectionLabel}>Text Position</div>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {POSITIONS.map(p => (
-                  <button key={p.id} style={{ ...bshare.chip, ...(textPosition === p.id ? bshare.chipActive : {}) }} onClick={() => setTextPosition(p.id)}>{p.label}</button>
-                ))}
-              </div>
+          {/* Format */}
+          <div style={bm.section}>
+            <div style={bm.label}>Format</div>
+            <div style={bm.row}>
+              {SHARE_FORMATS.map(f => (
+                <button key={f.id} style={{ ...bm.chip, ...(format.id === f.id ? bm.chipActive : {}) }} onClick={() => setFormat(f)}>{f.label}</button>
+              ))}
             </div>
-            <div style={{ flex:1, minWidth:130 }}>
-              <div style={bshare.sectionLabel}>Text Align</div>
-              <div style={{ display:'flex', gap:6 }}>
-                {ALIGNS.map(a => (
-                  <button key={a.id} style={{ ...bshare.chip, ...(textAlign === a.id ? bshare.chipActive : {}) }} onClick={() => setTextAlign(a.id)}>{a.label}</button>
-                ))}
-              </div>
+          </div>
+
+          {/* Position + Align dropdowns */}
+          <div style={{ display:'flex', gap:10 }}>
+            <div style={{ ...bm.section, flex:1 }}>
+              <label style={bm.label} htmlFor="bn-position">Text Position</label>
+              <select id="bn-position" value={textPosition} onChange={e => setTextPosition(e.target.value)} style={selectStyle}>
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+            <div style={{ ...bm.section, flex:1 }}>
+              <label style={bm.label} htmlFor="bn-align">Text Align</label>
+              <select id="bn-align" value={textAlign} onChange={e => setTextAlign(e.target.value)} style={selectStyle}>
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Text Size */}
+          <div style={bm.section}>
+            <div style={bm.label}>Text Size <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— smaller fits more text</span></div>
+            <div style={{...bm.row, alignItems:'center'}}>
+              <button onClick={() => setScale(s => Math.max(SCALE_MIN, +(s-SCALE_STEP).toFixed(2)))} disabled={scale <= SCALE_MIN} style={{...bm.scaleBtn, opacity: scale <= SCALE_MIN ? 0.35 : 1}}>A<sup style={{fontSize:'0.55em'}}>−</sup></button>
+              <span style={bm.scaleCurrent}>{Math.round(scale * 100)}%</span>
+              <button onClick={() => setScale(s => Math.min(SCALE_MAX, +(s+SCALE_STEP).toFixed(2)))} disabled={scale >= SCALE_MAX} style={{...bm.scaleBtn, opacity: scale >= SCALE_MAX ? 0.35 : 1}}>A<sup style={{fontSize:'0.55em'}}>+</sup></button>
             </div>
           </div>
 
           {/* Show Fields */}
-          <div style={bshare.sectionLabel}>Show Fields</div>
-          <div style={bshare.chipRow}>
-            {Object.entries(META_LABELS).map(([key, label]) => {
-              const on = metaShown[key]
-              // Only show category toggle if labels exist
-              if (key === 'category' && !book.labels?.length) return null
-              return (
-                <button key={key}
-                  style={{ ...bshare.chip, ...(on ? bshare.chipActive : { opacity:0.5 }) }}
-                  onClick={() => toggleMeta(key)}
-                >
-                  {on ? '✓ ' : ''}{label}
-                </button>
-              )
-            })}
-          </div>
-
-          {!useCoverBg && (
-            <>
-              <div style={bshare.sectionLabel}>Style</div>
-              <div style={bshare.presetRow}>
-                {SHARE_PRESETS.map(p => (
-                  <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
-                    ...bshare.presetSwatch,
-                    background: Array.isArray(p.bg) ? `linear-gradient(135deg, ${p.bg[0]}, ${p.bg[1]})` : p.bg,
-                    outline: preset.id === p.id ? '2px solid var(--teal)' : '2px solid transparent',
-                    outlineOffset: 2,
-                  }} />
-                ))}
+          {metaKeys.length > 0 && (
+            <div style={bm.section}>
+              <div style={bm.label}>Show Fields</div>
+              <div style={bm.fieldsList}>
+                {metaKeys.map(key => {
+                  const on = metaShown[key] !== false
+                  return (
+                    <label key={key} style={bm.fieldRow}>
+                      <span style={{fontSize:12, color:'var(--ink-muted)', flex:1}}>{metaLabels[key]}</span>
+                      <div
+                        style={{...bm.toggle, background: on ? 'var(--teal)' : 'var(--border-strong)'}}
+                        onClick={() => toggleMeta(key)}
+                        role="switch" aria-checked={on} tabIndex={0}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleMeta(key)}
+                      >
+                        <div style={{...bm.toggleThumb, transform: on ? 'translateX(14px)' : 'translateX(2px)'}} />
+                      </div>
+                    </label>
+                  )
+                })}
               </div>
-            </>
+            </div>
           )}
 
-          <div style={bshare.sectionLabel}>Text Size</div>
-          <div style={bshare.chipRow}>
-            <button style={bshare.chip} onClick={() => setScale(s => Math.max(0.5, +(s - 0.1).toFixed(1)))}>A−</button>
-            <span style={{ fontSize:13, color:'var(--ink-muted)', padding:'0 4px' }}>{Math.round(scale * 100)}%</span>
-            <button style={bshare.chip} onClick={() => setScale(s => Math.min(2.0, +(s + 0.1).toFixed(1)))}>A+</button>
+          {/* Background */}
+          <div style={bm.section}>
+            <div style={bm.label}>Background</div>
+            {/* Book cover toggle */}
+            {hasCover && (
+              <div style={bm.fieldsList}>
+                <label style={bm.fieldRow}>
+                  <span style={{fontSize:12, color:'var(--ink-muted)', flex:1}}>Use book cover as background</span>
+                  <div
+                    style={{...bm.toggle, background: useCoverBg ? 'var(--teal)' : 'var(--border-strong)'}}
+                    onClick={() => setUseCoverBg(v => !v)}
+                    role="switch" aria-checked={useCoverBg} tabIndex={0}
+                    onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setUseCoverBg(v => !v)}
+                  >
+                    <div style={{...bm.toggleThumb, transform: useCoverBg ? 'translateX(14px)' : 'translateX(2px)'}} />
+                  </div>
+                </label>
+              </div>
+            )}
+            {/* Preset swatches — only when not using cover */}
+            {!useCoverBg && (
+              <>
+                <div style={bm.row}>
+                  {SHARE_PRESETS.map(p => (
+                    <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
+                      ...bm.swatch,
+                      background: p.id === 'custom' ? 'conic-gradient(#ff6b6b 0deg,#ffd93d 90deg,#6bcb77 180deg,#4d96ff 270deg,#ff6b6b 360deg)' : Array.isArray(p.bg) ? `linear-gradient(135deg,${p.bg[0]},${p.bg[1]})` : p.bg,
+                      outline: preset.id === p.id ? '2.5px solid var(--teal)' : '2px solid transparent', outlineOffset:2,
+                    }} />
+                  ))}
+                </div>
+                <div style={bm.presetName}>{preset.label}</div>
+              </>
+            )}
+          </div>
+
+          {/* Custom colors */}
+          {!useCoverBg && preset.id === 'custom' && (
+            <div style={bm.section}>
+              <div style={bm.colorRow}>
+                <label style={bm.colorLabel}><span style={bm.label}>Background</span><input type="color" value={customBg} onChange={e => setCustomBg(e.target.value)} style={bm.colorInput} /></label>
+                <label style={bm.colorLabel}><span style={bm.label}>Text color</span><input type="color" value={customText} onChange={e => setCustomText(e.target.value)} style={bm.colorInput} /></label>
+              </div>
+            </div>
+          )}
+
+          {/* Tip */}
+          <div style={bm.tip}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{flexShrink:0,marginTop:1}}>
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="var(--teal)" strokeWidth="1.2"/>
+              <path d="M6.5 5.5v4M6.5 4h.01" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            {canShare
+              ? <span><strong>On mobile:</strong> tap <em>Share / Save Image</em> to save to Photos or post to Instagram.</span>
+              : <span><strong>On desktop:</strong> the PNG downloads to your computer.</span>
+            }
           </div>
         </div>
 
-        <div style={bshare.footer}>
-          <button style={bshare.cancelBtn} onClick={onClose}>Cancel</button>
-          <button style={bshare.shareBtn} onClick={share} disabled={sharing}>
-            {sharing ? 'Preparing…' : navigator.share ? 'Share' : 'Download'}
+        {/* Footer */}
+        <div style={bm.footer}>
+          <button onClick={onClose} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
+          {!canShare && (
+            <button onClick={() => canvasRef.current.toBlob(blob => fallbackDownload(blob), 'image/png')} className="btn btn-outline" style={{fontSize:13, gap:6}}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7M4 7l3 3 3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Download PNG
+            </button>
+          )}
+          <button onClick={shareNative} className="btn btn-primary" disabled={sharing} style={{fontSize:13, gap:6}}>
+            {sharing
+              ? <span className="spinner" style={{width:14,height:14}} />
+              : <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v5M4.5 4.5L7 2l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 7v4.5h8V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            }
+            {canShare ? 'Share / Save Image' : 'Save PNG'}
           </button>
         </div>
       </div>
@@ -2510,153 +2568,34 @@ const addnote = {
 }
 
 /* Share modal */
-const bshare = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.5)',
-    zIndex: 300,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  modal: {
-    background: 'var(--surface)',
-    borderRadius: 14,
-    width: '100%',
-    maxWidth: 480,
-    maxHeight: '92vh',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: "'DM Sans', sans-serif",
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '14px 18px 10px',
-    borderBottom: '1px solid var(--border)',
-    flexShrink: 0,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: 'var(--ink)',
-  },
-  closeBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: 22,
-    color: 'var(--ink-muted)',
-    cursor: 'pointer',
-    lineHeight: 1,
-    padding: 2,
-  },
-  canvasWrap: {
-    padding: '12px 18px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--parchment)',
-    flexShrink: 0,
-  },
-  canvas: {
-    maxWidth: '100%',
-    maxHeight: 220,
-    borderRadius: 6,
-    boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
-    objectFit: 'contain',
-  },
-  controls: {
-    padding: '12px 18px',
-    overflowY: 'auto',
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  toggleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    cursor: 'pointer',
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: 700,
-    color: 'var(--ink-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginTop: 4,
-  },
-  chipRow: {
-    display: 'flex',
-    gap: 6,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  chip: {
-    background: 'var(--parchment)',
-    border: '1px solid var(--border)',
-    borderRadius: 99,
-    padding: '5px 12px',
-    fontSize: 12,
-    fontWeight: 600,
-    color: 'var(--ink)',
-    cursor: 'pointer',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  chipActive: {
-    background: 'var(--teal)',
-    borderColor: 'var(--teal)',
-    color: '#fff',
-  },
-  presetRow: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  presetSwatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 99,
-    border: 'none',
-    cursor: 'pointer',
-  },
-  footer: {
-    display: 'flex',
-    gap: 10,
-    padding: '12px 18px',
-    borderTop: '1px solid var(--border)',
-    flexShrink: 0,
-    paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-  },
-  cancelBtn: {
-    flex: 1,
-    background: 'none',
-    border: '1px solid var(--border)',
-    borderRadius: 9,
-    padding: '10px',
-    fontSize: 14,
-    fontWeight: 600,
-    color: 'var(--ink-muted)',
-    cursor: 'pointer',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  shareBtn: {
-    flex: 2,
-    background: 'var(--teal)',
-    border: 'none',
-    borderRadius: 9,
-    padding: '10px',
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#fff',
-    cursor: 'pointer',
-    fontFamily: "'DM Sans', sans-serif",
-  },
+/* Unified share modal styles — mirrors ShareCardModal's `m` object */
+const bm = {
+  overlay:     { position:'fixed', inset:0, background:'rgba(20,16,10,0.65)', zIndex:300, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:16 },
+  modal:       { background:'white', borderRadius:14, maxWidth:460, width:'100%', boxShadow:'0 24px 64px rgba(0,0,0,0.4)', display:'flex', flexDirection:'column', maxHeight:'92vh', overflow:'hidden' },
+  header:      { display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom:'1px solid var(--border)', flexShrink:0 },
+  title:       { fontSize:15, fontWeight:600, color:'var(--ink)' },
+  titleSub:    { fontSize:13, color:'var(--ink-faint)', fontWeight:400 },
+  closeBtn:    { background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', padding:5, borderRadius:6 },
+  body:        { padding:'20px', overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:14 },
+  preview:     { display:'flex', justifyContent:'center', alignItems:'center', background:'#e8e8e8', borderRadius:10, padding:6 },
+  section:     { display:'flex', flexDirection:'column', gap:6 },
+  label:       { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' },
+  row:         { display:'flex', flexWrap:'wrap', gap:8 },
+  chip:        { padding:'6px 14px', borderRadius:99, border:'1.5px solid var(--border)', background:'var(--parchment)', fontSize:12, cursor:'pointer', fontFamily:"'DM Sans',sans-serif", color:'var(--ink)', transition:'all 0.15s' },
+  chipActive:  { borderColor:'var(--teal)', background:'var(--teal-light)', color:'var(--teal)' },
+  scaleBtn:    { width:40, height:40, borderRadius:'var(--radius)', border:'1.5px solid var(--border)', cursor:'pointer', fontFamily:"'Georgia',serif", display:'flex', alignItems:'center', justifyContent:'center', background:'var(--parchment)', color:'var(--ink)' },
+  scaleCurrent:{ flex:1, textAlign:'center', fontSize:12, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif", fontWeight:600 },
+  fieldsList:  { display:'flex', flexDirection:'column', gap:0, border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' },
+  fieldRow:    { display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:'var(--parchment)', cursor:'pointer', borderBottom:'1px solid var(--border)' },
+  toggle:      { width:30, height:18, borderRadius:9, position:'relative', flexShrink:0, cursor:'pointer', transition:'background 0.2s' },
+  toggleThumb: { position:'absolute', top:2, width:14, height:14, borderRadius:'50%', background:'white', transition:'transform 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.25)' },
+  swatch:      { width:34, height:34, borderRadius:8, cursor:'pointer', flexShrink:0, border:'none', transition:'outline 0.12s' },
+  presetName:  { fontSize:12, color:'var(--ink-muted)', marginTop:-2 },
+  colorRow:    { display:'flex', gap:20 },
+  colorLabel:  { display:'flex', flexDirection:'column', gap:6, cursor:'pointer' },
+  colorInput:  { width:52, height:38, padding:2, border:'1.5px solid var(--border)', borderRadius:8, cursor:'pointer', background:'none' },
+  tip:         { display:'flex', alignItems:'flex-start', gap:8, padding:'10px 12px', background:'var(--teal-light)', borderRadius:'var(--radius)', fontSize:12, color:'var(--ink-muted)', lineHeight:1.55 },
+  footer:      { display:'flex', alignItems:'center', justifyContent:'flex-end', gap:8, padding:'14px 20px', borderTop:'1px solid var(--border)', flexShrink:0 },
 }
 
 /* Generic confirm modal */
