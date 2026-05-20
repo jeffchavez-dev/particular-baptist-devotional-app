@@ -818,6 +818,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
      switch or parallel-panel toggle — restored after new content renders */
   const pendingVersionScrollRef  = useRef(null)
   const pendingParallelScrollRef = useRef(null)
+  /* Tracks which version the current versionData belongs to.
+     Set to null when a version switch starts; set to the new version string
+     after its data finishes loading.  The chapter-nav effect uses this to
+     avoid consuming the captured snap against stale (wrong-version) data. */
+  const loadedForVersionRef = useRef(null)
   /* Timestamp of the last explicit navigation — used to suppress scroll-spy
      for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
   const lastNavMsRef            = useRef(0)
@@ -1510,6 +1515,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     // the stale-key / per-version localStorage mismatch that caused jumps.
     pendingVersionScrollRef.current = captureVisibleVerse(readerRef.current)
     restoreReaderScrollRef.current = true
+    // Mark versionData as not-yet-loaded for the new version.  This prevents
+    // the chapter-nav effect from consuming the snap prematurely in the same
+    // render cycle against stale (old-version) data.
+    loadedForVersionRef.current = null
 
     // If this version change was triggered by a lexicon result navigation (e.g. LXX→GNT),
     // preserve the back-pill and pending highlights so the user can return to results.
@@ -1571,6 +1580,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       loadBibleData(version)
         .then(data => {
           if (cancelled) return
+          // Mark BEFORE setting state so chapter-nav effect sees correct key
+          loadedForVersionRef.current = version
           setVersionData(data)
           setDataReady(true)
           setLoading(false)
@@ -1592,6 +1603,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Chapter navigation — load single segment, restore or reset scroll */
   useEffect(() => {
     if (!dataReady) return
+    // Guard: skip if versionData belongs to a different version (stale state in the
+    // same render cycle as the version effect — prevents premature snap consumption).
+    if (loadedForVersionRef.current !== version) return
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) {
       lastNavMsRef.current = Date.now()
