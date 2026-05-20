@@ -3808,6 +3808,20 @@ export default function LibraryPage() {
     }
   }, [])
 
+  // Track offline banner so the sticky header knows where to stick.
+  const OFFLINE_BANNER_H = 34
+  const [offlineBannerH, setOfflineBannerH] = useState(() => navigator.onLine ? 0 : OFFLINE_BANNER_H)
+  useEffect(() => {
+    const goOnline  = () => setOfflineBannerH(0)
+    const goOffline = () => setOfflineBannerH(OFFLINE_BANNER_H)
+    window.addEventListener('online',  goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online',  goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, []) // eslint-disable-line
+
   const enrichedDevNotes = useMemo(() =>
     devNotes
       .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
@@ -3848,7 +3862,7 @@ export default function LibraryPage() {
     <div style={s.page}>
 
       {/* ── Header (no back button — BottomNav handles navigation) ── */}
-      <header style={{ ...s.header, ...(isEditingNote ? s.headerEditing : {}), ...(isNoteOverlayOpen ? { visibility: 'hidden', pointerEvents: 'none' } : {}) }}>
+      <header style={{ ...s.header, top: offlineBannerH, ...(isEditingNote ? s.headerEditing : {}), ...(isNoteOverlayOpen ? { visibility: 'hidden', pointerEvents: 'none' } : {}) }}>
         {/* Editing mode: minimal "Note editing · Done" bar */}
         {isEditingNote && (
           <div style={s.editingBar}>

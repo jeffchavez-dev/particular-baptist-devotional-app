@@ -704,6 +704,20 @@ export default function ConfessionsPage() {
   const [chromeVis, setChromeVis] = useState(true)
   const isDesktopRef = useRef(window.innerWidth >= 768)
 
+  // Track offline banner height so the fixed header drops below it.
+  const OFFLINE_BANNER_H = 34
+  const [offlineBannerH, setOfflineBannerH] = useState(() => navigator.onLine ? 0 : OFFLINE_BANNER_H)
+  useEffect(() => {
+    const goOnline  = () => setOfflineBannerH(0)
+    const goOffline = () => setOfflineBannerH(OFFLINE_BANNER_H)
+    window.addEventListener('online',  goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online',  goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, []) // eslint-disable-line
+
   /* Deep-link from Settings: scroll to specific paragraph/Q&A/article */
   const deepLinkRef = useRef(
     locationState?.itemKey && locationState?.source ? locationState : null
@@ -1243,6 +1257,7 @@ export default function ConfessionsPage() {
         ref={headerRef}
         style={{
           ...s.header,
+          top:        offlineBannerH,   // slide below offline banner when present
           transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
           transition: 'transform 0.28s ease',
         }}
@@ -1310,7 +1325,7 @@ export default function ConfessionsPage() {
 
       {/* ── Search panel ── */}
       {searchOpen && (
-        <div style={{ ...sl.searchPanel, top: headerH }}>
+        <div style={{ ...sl.searchPanel, top: headerH + offlineBannerH }}>
           <div style={sl.searchInputRow} ref={searchWrapRef}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
               <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
@@ -1376,8 +1391,8 @@ export default function ConfessionsPage() {
         {!isMobile && (
           <aside style={{
             ...s.desktopSidebar,
-            top: headerH,
-            height: `calc(100vh - ${headerH}px)`,
+            top: headerH + offlineBannerH,
+            height: `calc(100vh - ${headerH + offlineBannerH}px)`,
           }}>
             {SidebarContent}
           </aside>
