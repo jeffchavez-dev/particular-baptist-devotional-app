@@ -102,6 +102,21 @@ export default function ScripturePage() {
     return () => document.removeEventListener('mousedown', onOutside)
   }, [showVersionDropdown])
 
+  // Track the offline banner height so the fixed header can drop below it.
+  // Mirrors App.jsx's isOnline detection without prop-drilling.
+  const OFFLINE_BANNER_H = 34  // must match App.jsx banner height
+  const [offlineBannerH, setOfflineBannerH] = useState(() => navigator.onLine ? 0 : OFFLINE_BANNER_H)
+  useEffect(() => {
+    const goOnline  = () => setOfflineBannerH(0)
+    const goOffline = () => setOfflineBannerH(OFFLINE_BANNER_H)
+    window.addEventListener('online',  goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online',  goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, []) // eslint-disable-line
+
   // Auto-hide header on scroll-down, show on scroll-up.
   // The header uses transform-only (no marginBottom) so the flex layout never
   // changes when the header hides → no scroll-position side-effects, no
@@ -223,13 +238,14 @@ export default function ScripturePage() {
   }, [])
 
   return (
-    <div style={s.page}>
+    <div style={{ ...s.page, height: `calc(100vh - ${offlineBannerH}px)` }}>
 
       {/* ── Header ── */}
       <header
         ref={headerRef}
         style={{
           ...s.header,
+          top:        offlineBannerH,   // slide below offline banner when present
           transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
           transition: 'transform 0.28s ease',
         }}
