@@ -231,6 +231,49 @@ function restoreReaderAnchor(version, root) {
   }
 }
 
+/** Capture the first visible verse in the reader into a plain object.
+ *  Returns {book, chapter, verse, offset} or null if nothing found.
+ *  Used to restore position across version switches and parallel-panel toggles. */
+function captureVisibleVerse(root) {
+  if (!root) return null
+  try {
+    const rootTop = root.getBoundingClientRect().top
+    const nodes = root.querySelectorAll('[data-anchor-book][data-anchor-chapter][data-anchor-verse]')
+    for (const el of nodes) {
+      if (el.getBoundingClientRect().bottom >= rootTop + 8) {
+        return {
+          book:    el.dataset.anchorBook,
+          chapter: parseInt(el.dataset.anchorChapter, 10) || 1,
+          verse:   parseInt(el.dataset.anchorVerse,   10) || 1,
+          offset:  Math.round(el.getBoundingClientRect().top - rootTop),
+        }
+      }
+    }
+  } catch {}
+  return null
+}
+
+/** Scroll root so that {book, chapter, verse} appears at the same relative
+ *  offset it had when captureVisibleVerse() ran.  Retries up to 5× / 60 ms
+ *  to let React finish painting the new content. */
+function restoreCapturedVerse(snap, root) {
+  if (!snap || !root) return
+  const tryScroll = (retriesLeft) => {
+    if (!root) return
+    const sel = `[data-anchor-book="${CSS.escape(snap.book)}"]` +
+                `[data-anchor-chapter="${snap.chapter}"]` +
+                `[data-anchor-verse="${snap.verse}"]`
+    const el = root.querySelector(sel)
+    if (el) {
+      const rootTop = root.getBoundingClientRect().top
+      root.scrollTop += el.getBoundingClientRect().top - rootTop - snap.offset
+    } else if (retriesLeft > 0) {
+      setTimeout(() => tryScroll(retriesLeft - 1), 60)
+    }
+  }
+  requestAnimationFrame(() => tryScroll(5))
+}
+
 /* ── Source chip colours for cross-references ── */
 const SRC_CHIP = {
   '2LBCF':    { bg:'rgba(61,43,107,0.10)',  color:'#3d2b6b', border:'rgba(61,43,107,0.2)'  },
@@ -767,6 +810,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const readerRef    = useRef(null)
   const restoreReaderScrollRef  = useRef(true)
   const pendingVisibleTargetRef = useRef(null)
+  /* Stores {book,chapter,verse,offset} of the first visible verse before a version
+     switch or parallel-panel toggle — restored after new content renders */
+  const pendingVersionScrollRef  = useRef(null)
+  const pendingParallelScrollRef = useRef(null)
   /* Timestamp of the last explicit navigation — used to suppress scroll-spy
      for ~400 ms after a sidebar/history navigation so we don't flash wrong chapter */
   const lastNavMsRef            = useRef(0)
@@ -864,8 +911,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const lxxReaderLoadedRef = useRef(new Set())
 
   function toggleParallel(versionId) {
-    // Save current position BEFORE the layout shifts from inserting/removing parallel panels
-    if (readerRef.current) saveReaderAnchor(versionRef.current, readerRef.current)
+    // Capture current visible verse BEFORE the layout shifts from inserting/removing parallel panels
+    pendingParallelScrollRef.current = captureVisibleVerse(readerRef.current)
     setParallelVersions(prev => {
       const next = new Set(prev)
       if (next.has(versionId)) next.delete(versionId)
@@ -877,14 +924,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   // Restore reading position after parallel panel insert/remove causes layout shift
   useEffect(() => {
-    if (!readerRef.current) return
-    restoreReaderAnchor(versionRef.current, readerRef.current)
+    const snap = pendingParallelScrollRef.current
+    if (!snap || !readerRef.current) return
+    pendingParallelScrollRef.current = null
+    restoreCapturedVerse(snap, readerRef.current)
   }, [parallelVersions]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
-  // Which text-version parallel is selected (if any) — supports KJV, ABAB, NASB
-  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb'])
+  // Which text-version parallel is selected (if any) — supports all English text translations
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb', 'bsb', 'gnv', 'rv', 'tnt'])
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
@@ -1452,14 +1501,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     let cancelled = false
 
     // ── Preserve reading position across translation switch ──────────────────
-    // The reader DOM still shows the old version's content at this point, so we can
-    // find the first visible verse and save it under the NEW version's key.
-    // The chapter-navigation effect will then call restoreReaderAnchor(version, …)
-    // and find the data, keeping the same passage in view after the new data loads.
-    if (readerRef.current) {
-      saveReaderAnchor(version, readerRef.current)
-      restoreReaderScrollRef.current = true
-    }
+    // Capture the first visible verse into a ref (not localStorage) so we can
+    // restore it after the new translation's content has rendered.  This avoids
+    // the stale-key / per-version localStorage mismatch that caused jumps.
+    pendingVersionScrollRef.current = captureVisibleVerse(readerRef.current)
+    restoreReaderScrollRef.current = true
 
     // If this version change was triggered by a lexicon result navigation (e.g. LXX→GNT),
     // preserve the back-pill and pending highlights so the user can return to results.
@@ -1528,6 +1574,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (version === 'lxx' && NT_BOOKS.has(book)) {
             setBook('Genesis'); setChapter(1)
           }
+          // TNT is NT-only — if currently on an OT book, jump to Matthew
+          if (version === 'tnt' && !NT_BOOKS.has(book)) {
+            setBook('Matthew'); setChapter(1)
+          }
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
     }
@@ -1548,7 +1598,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     if (readerRef.current) {
       if (restoreReaderScrollRef.current) {
         restoreReaderScrollRef.current = false
-        if (!restoreReaderAnchor(version, readerRef.current)) {
+        const snap = pendingVersionScrollRef.current
+        if (snap) {
+          // Restore the exact verse that was visible before the translation switch
+          pendingVersionScrollRef.current = null
+          restoreCapturedVerse(snap, readerRef.current)
+        } else if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
       } else {
@@ -1576,7 +1631,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     if (readerRef.current) {
       if (restoreReaderScrollRef.current) {
         restoreReaderScrollRef.current = false
-        if (!restoreReaderAnchor(version, readerRef.current)) {
+        const snap = pendingVersionScrollRef.current
+        if (snap) {
+          pendingVersionScrollRef.current = null
+          restoreCapturedVerse(snap, readerRef.current)
+        } else if (!restoreReaderAnchor(version, readerRef.current)) {
           restoreElementScroll(`scripture-${version}`, readerRef.current)
         }
       } else {
@@ -2413,7 +2472,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         )}
 
         {/* ── Parallel section ── */}
-        {(version === 'kjv' || version === 'abab' || version === 'nasb') && (
+        {_TEXT_VERSIONS.has(version) && (
           <div style={sb.parallelSection}>
             <div style={sb.versionSectionTitle}>Parallel</div>
             <div style={sb.parallelPills}>
@@ -2422,6 +2481,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   { id: 'kjv',  label: 'KJV',  title: 'King James Version' },
                   { id: 'abab', label: 'ABAB', title: 'Ang Bagong Ang Biblia' },
                   { id: 'nasb', label: 'NASB', title: 'New American Standard Bible 1995' },
+                  { id: 'bsb',  label: 'BSB',  title: 'Berean Standard Bible' },
+                  { id: 'gnv',  label: 'GNV',  title: 'Geneva Bible (1599)' },
+                  { id: 'rv',   label: 'RV',   title: 'Revised Version (1895)' },
+                  { id: 'tnt',  label: 'TNT',  title: 'Tyndale New Testament (NT only)' },
                 ].filter(v => v.id !== version),
                 { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
                 { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
@@ -2450,13 +2513,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           selectedBook={book}
           selectedChapter={chapter}
           onNavigate={(b, ch) => {
-            if (version === 'greek'  && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
+            if ((version === 'greek' || version === 'tnt') && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
             if ((version === 'hebrew' || version === 'lxx') && !OT_BOOKS.has(b)) { navigate('Genesis', 1); return }
             navigate(b, ch)
           }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
-          ntOnly={version === 'greek'}
+          ntOnly={version === 'greek' || version === 'tnt'}
           otOnly={version === 'hebrew' || version === 'lxx'}
         />
       </aside>
@@ -3752,8 +3815,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       })}
                     </div>
 
-                    {/* ── Chapter-end read button (KJV / ABAB / NASB only) ── */}
-                    {(version === 'kjv' || version === 'abab' || version === 'nasb') && (() => {
+                    {/* ── Chapter-end read button (all text translations) ── */}
+                    {_TEXT_VERSIONS.has(version) && (() => {
                       const chKey = `${seg.book} ${seg.chapter}`
                       const isDone = !!bibleProgress[chKey]
                       return (

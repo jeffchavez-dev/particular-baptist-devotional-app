@@ -20,6 +20,10 @@ export const DEFAULT_VERSION_OPTIONS = [
   { id: 'kjv',      label: 'KJV',      full: 'King James Version' },
   { id: 'abab',     label: 'ABAB',     full: 'Ang Bagong Ang Biblia' },
   { id: 'nasb',     label: 'NASB',     full: 'New American Standard Bible 1995' },
+  { id: 'bsb',      label: 'BSB',      full: 'Berean Standard Bible' },
+  { id: 'gnv',      label: 'GNV',      full: 'Geneva Bible (1599)' },
+  { id: 'rv',       label: 'RV',       full: 'Revised Version (1895)' },
+  { id: 'tnt',      label: 'TNT',      full: 'Tyndale New Testament (1534)' },
   { id: 'original', label: 'Original', full: 'HOT (OT) · GNT (NT)' },
 ]
 

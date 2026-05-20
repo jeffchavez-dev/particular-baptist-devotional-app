@@ -731,7 +731,7 @@ export default function ScripturePage() {
                   key={v.id}
                   style={vp.card}
                   onClick={() => {
-                    setDefaultReaderVersion(['kjv','abab','nasb'].includes(v.id) ? v.id : 'kjv')
+                    setDefaultReaderVersion(['kjv','abab','nasb','bsb','gnv','rv','tnt'].includes(v.id) ? v.id : 'kjv')
                     setReadVersion(v.id)
                     try { localStorage.setItem('reader-version', v.id) } catch {}
                     setShowVersionPicker(false)
