@@ -549,41 +549,38 @@ export default function AboutPage() {
                 <span style={s.settingName}>Default Bible Translation</span>
                 <span style={s.settingHint}>Used when opening Scripture from devotionals and confession proof texts</span>
               </div>
-              <div style={{ display:'flex', gap:6, flexShrink:0 }}>
-                {DEFAULT_VERSION_OPTIONS.map(opt => {
-                  const active = defaultVersion === opt.id
-                  return (
-                    <button
-                      key={opt.id}
-                      title={opt.full}
-                      onClick={() => {
-                        setDefaultVersion(opt.id)
-                        setDefaultReaderVersion(opt.id)
-                        // For concrete versions, update sessionStorage immediately so the
-                        // Scripture page picks it up. For 'original', clear the session key
-                        // so ScripturePage resolves HOT/GNT from the book context.
-                        try {
-                          if (opt.id === 'original') {
-                            sessionStorage.removeItem('reader-version')
-                          } else {
-                            sessionStorage.setItem('reader-version', opt.id)
-                          }
-                        } catch {}
-                      }}
-                      style={{
-                        padding:'6px 14px', borderRadius:99, fontSize:12, fontWeight:700,
-                        fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
-                        border: active ? '1.5px solid var(--teal)' : '1.5px solid var(--border-strong)',
-                        background: active ? 'var(--teal-light)' : 'var(--surface)',
-                        color: active ? 'var(--teal)' : 'var(--ink-muted)',
-                        transition:'all 0.15s',
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
+              <select
+                value={defaultVersion}
+                onChange={e => {
+                  const id = e.target.value
+                  setDefaultVersion(id)
+                  setDefaultReaderVersion(id)
+                  try {
+                    if (id === 'original') {
+                      sessionStorage.removeItem('reader-version')
+                    } else {
+                      sessionStorage.setItem('reader-version', id)
+                    }
+                  } catch {}
+                }}
+                style={{
+                  appearance:'none', WebkitAppearance:'none',
+                  padding:'8px 36px 8px 14px', borderRadius:99,
+                  fontSize:13, fontWeight:700,
+                  fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                  border:'1.5px solid var(--teal)',
+                  background:`var(--teal-light) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231d6b5a' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 14px center`,
+                  color:'var(--teal)',
+                  minWidth:160, flexShrink:0,
+                  outline:'none',
+                }}
+              >
+                {DEFAULT_VERSION_OPTIONS.map(opt => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label} — {opt.full}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Backup */}
