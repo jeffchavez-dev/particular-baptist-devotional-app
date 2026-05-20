@@ -318,30 +318,97 @@ export async function syncBibleDown(userId) {
   }
 }
 
+// ── Generic user-data sync (bookmarks, scripture bookmarks, completions) ──────
+// Requires this table in Supabase (run once):
+//
+//   create table pb_user_data (
+//     id uuid default gen_random_uuid() primary key,
+//     user_id uuid references auth.users(id) on delete cascade not null,
+//     data_key text not null,
+//     data_value jsonb not null,
+//     updated_at timestamptz default now(),
+//     unique(user_id, data_key)
+//   );
+//   alter table pb_user_data enable row level security;
+//   create policy "own user data" on pb_user_data
+//     for all using (auth.uid() = user_id);
+
+const USER_DATA_MAP = [
+  { local: 'pb-bookmarks',             remote: 'bookmarks' },
+  { local: 'pb-scripture-bookmarks',   remote: 'scripture_bookmarks' },
+  { local: 'pb-scripture-completions', remote: 'scripture_completions' },
+]
+
+export async function syncUserDataUp(userId) {
+  if (!userId) return { success: false, count: 0 }
+  try {
+    const rows = USER_DATA_MAP.map(({ local, remote }) => {
+      const raw = localStorage.getItem(local)
+      const val = raw ? JSON.parse(raw) : null
+      // Skip empty objects/arrays
+      if (!val || (Array.isArray(val) ? val.length === 0 : Object.keys(val).length === 0)) return null
+      return { user_id: userId, data_key: remote, data_value: val, updated_at: new Date().toISOString() }
+    }).filter(Boolean)
+
+    if (rows.length) {
+      await supabase.from('pb_user_data').upsert(rows, { onConflict: 'user_id,data_key' })
+    }
+    return { success: true, count: rows.length }
+  } catch (e) {
+    // Table may not exist yet — degrade gracefully
+    console.warn('[syncUserDataUp]', e?.message)
+    return { success: true, count: 0 }
+  }
+}
+
+export async function syncUserDataDown(userId) {
+  if (!userId) return { success: false, count: 0 }
+  try {
+    const { data, error } = await supabase
+      .from('pb_user_data')
+      .select('data_key,data_value')
+      .eq('user_id', userId)
+
+    if (error || !data?.length) return { success: true, count: 0 }
+
+    data.forEach(({ data_key, data_value }) => {
+      const mapping = USER_DATA_MAP.find(k => k.remote === data_key)
+      if (mapping && data_value != null) {
+        try { localStorage.setItem(mapping.local, JSON.stringify(data_value)) } catch {}
+      }
+    })
+    return { success: true, count: data.length }
+  } catch (e) {
+    console.warn('[syncUserDataDown]', e?.message)
+    return { success: true, count: 0 }
+  }
+}
+
 /**
- * Full sync: both up and down for devotional + Bible progress.
+ * Full sync: devotional progress, Bible progress, and local-only user data.
+ * Books and annotations are synced separately via their own lib functions.
  */
 export async function syncAll(userId) {
   if (!userId) return { success: false, message: 'Not logged in' }
   try {
-    const results = {
-      devUp: await syncProgressUp(userId),
-      devDown: await syncProgressDown(userId),
-      bibleUp: await syncBibleUp(userId),
-      bibleDown: await syncBibleDown(userId),
-    }
-    
-    const allSuccess = Object.values(results).every(r => r.success)
-    const totalItems = (results.devUp.count || 0) + (results.devDown.count || 0) +
-                       (results.bibleUp.count || 0) + (results.bibleDown.count || 0)
-    
+    const [devUp, devDown, bibleUp, bibleDown, udUp, udDown] = await Promise.all([
+      syncProgressUp(userId),
+      syncProgressDown(userId),
+      syncBibleUp(userId),
+      syncBibleDown(userId),
+      syncUserDataUp(userId),
+      syncUserDataDown(userId),
+    ])
+
+    const allSuccess = [devUp, devDown, bibleUp, bibleDown, udUp, udDown].every(r => r.success)
     return {
       success: allSuccess,
-      message: allSuccess 
-        ? `Sync complete! (${totalItems} items)`
-        : 'Sync completed with some errors',
-      results,
-      totalItems,
+      message: allSuccess ? 'Sync complete' : 'Sync completed with some errors',
+      counts: {
+        devotional: (devUp.count || 0) + (devDown.count || 0),
+        bible:      (bibleUp.count || 0) + (bibleDown.count || 0),
+        userData:   (udUp.count || 0) + (udDown.count || 0),
+      },
     }
   } catch (e) {
     console.error('[sync-all]', e?.message)

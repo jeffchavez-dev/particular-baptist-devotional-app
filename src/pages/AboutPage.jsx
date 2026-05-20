@@ -287,16 +287,28 @@ export default function AboutPage() {
     setSyncing(true)
     setSyncMessage(null)
     try {
-      const [result] = await Promise.all([
-        syncAll(session.user.id),
-        syncBooksUp(session.user.id).then(() => syncBooksDown(session.user.id)),
-        syncAnnotationsUp(session.user.id).then(() => syncAnnotationsDown(session.user.id)),
+      const uid = session.user.id
+      // Run all syncs in parallel — devotional + bible + user data + books + annotations
+      const [baseResult, , annotResult] = await Promise.all([
+        syncAll(uid),                                                          // devotional + bible + bookmarks/completions
+        syncBooksUp(uid).then(() => syncBooksDown(uid)),                       // book library
+        syncAnnotationsUp(uid).then(() => syncAnnotationsDown(uid)).then(() => ({ success: true })), // highlights + notes
       ])
+
+      const success = baseResult.success
+      const c = baseResult.counts || {}
+      const parts = []
+      if ((c.devotional || 0) > 0)  parts.push(`${c.devotional} devotional`)
+      if ((c.bible || 0) > 0)       parts.push(`${c.bible} Bible chapters`)
+      if ((c.userData || 0) > 0)    parts.push(`${c.userData} bookmarks/records`)
+
       setSyncMessage({
-        type: result.success ? 'success' : 'error',
-        text: result.message,
+        type: success ? 'success' : 'error',
+        text: success
+          ? `All data synced${parts.length ? ` · ${parts.join(', ')} updated` : ' · everything up to date'}`
+          : baseResult.message || 'Sync completed with some errors',
       })
-      setTimeout(() => setSyncMessage(null), 4000)
+      setTimeout(() => setSyncMessage(null), 5000)
     } catch (e) {
       setSyncMessage({ type: 'error', text: e?.message || 'Sync failed' })
     } finally {
