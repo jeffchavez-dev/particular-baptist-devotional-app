@@ -5,6 +5,8 @@ import { useAuth, usePrefs } from '../App'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
+import ShareCardModal from '../components/ShareCardModal'
+import { BookNoteShareModal } from '../components/BookLibraryTab'
 
 /* ── Progress sessionStorage cache ─────────────────────────────────── */
 const DASH_CACHE_KEY = 'pb-dash-progress'
@@ -126,6 +128,8 @@ export default function Dashboard() {
   /* ── Memory slots ── */
   const [memorizeVerse, setMemorizeVerseState] = useState(() => getMemorizeVerse())
   const [memorizeNote,  setMemorizeNoteState]  = useState(() => getMemorizeNote())
+  const [shareMemVerse, setShareMemVerse] = useState(false)   // open ShareCardModal for verse
+  const [shareMemNote,  setShareMemNote]  = useState(false)   // open BookNoteShareModal for note
 
   // Keep in sync when other pages write to the slots
   useEffect(() => {
@@ -312,6 +316,7 @@ export default function Dashboard() {
   }, [todayEntry])
 
   return (
+    <>
     <div style={s.page}>
 
       <main style={s.main}>
@@ -399,6 +404,18 @@ export default function Dashboard() {
                   <span style={s.memorizeRef}>{memorizeVerse.ref}</span>
                   <span style={s.memorizeVersion}>{memorizeVerse.version}</span>
                   <button
+                    style={s.memorizeShareBtn}
+                    onClick={() => setShareMemVerse(true)}
+                    title="Share this verse"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                  <button
                     style={s.memorizeClearBtn}
                     onClick={() => { clearMemorizeVerse(); setMemorizeVerseState(null) }}
                     title="Remove from memory"
@@ -419,6 +436,18 @@ export default function Dashboard() {
                   </span>
                   <span style={s.memorizeRef}>{memorizeNote.bookTitle}</span>
                   {memorizeNote.bookAuthor && <span style={s.memorizeVersion}>{memorizeNote.bookAuthor}</span>}
+                  <button
+                    style={s.memorizeShareBtn}
+                    onClick={() => setShareMemNote(true)}
+                    title="Share this note"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+                    </svg>
+                  </button>
                   <button
                     style={s.memorizeClearBtn}
                     onClick={() => { clearMemorizeNote(); setMemorizeNoteState(null) }}
@@ -628,6 +657,42 @@ export default function Dashboard() {
       </footer>
 
     </div>
+
+    {/* ── Share memorized verse ── */}
+    {shareMemVerse && memorizeVerse && (
+      <ShareCardModal
+        isOpen
+        onClose={() => setShareMemVerse(false)}
+        card={{
+          type: 'reading',
+          title: memorizeVerse.ref,
+          subtitle: memorizeVerse.version,
+          source: memorizeVerse.version,
+          text: memorizeVerse.text,
+          label: '',
+        }}
+      />
+    )}
+
+    {/* ── Share memorized note ── */}
+    {shareMemNote && memorizeNote && (
+      <BookNoteShareModal
+        note={{
+          id: memorizeNote.noteId,
+          type: memorizeNote.type,
+          text: memorizeNote.text,
+          page: memorizeNote.page,
+          percent: memorizeNote.percent,
+        }}
+        book={{
+          id: memorizeNote.bookId,
+          title: memorizeNote.bookTitle,
+          author: memorizeNote.bookAuthor,
+        }}
+        onClose={() => setShareMemNote(false)}
+      />
+    )}
+    </>
   )
 }
 
@@ -715,8 +780,13 @@ const s = {
   memorizeVersion: {
     fontSize:11, color:'var(--ink-faint)', flexShrink:0,
   },
+  memorizeShareBtn: {
+    marginLeft:'auto', background:'none', border:'1px solid var(--border)', cursor:'pointer',
+    color:'var(--ink-muted)', padding:'3px 6px', borderRadius:6, lineHeight:1,
+    display:'flex', alignItems:'center', flexShrink:0,
+  },
   memorizeClearBtn: {
-    marginLeft:'auto', background:'none', border:'none', cursor:'pointer',
+    background:'none', border:'none', cursor:'pointer',
     fontSize:16, color:'var(--ink-faint)', padding:'0 2px', lineHeight:1, flexShrink:0,
   },
   memorizeText: {

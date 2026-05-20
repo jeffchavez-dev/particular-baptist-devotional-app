@@ -294,7 +294,7 @@ const SHARE_FORMATS = [
 
 /* ── BookNoteShareModal ─────────────────────────────────────────────────────── */
 
-function BookNoteShareModal({ note, book, onClose }) {
+export function BookNoteShareModal({ note, book, onClose }) {
   const canvasRef = useRef(null)
   const [preset, setPreset] = useState(SHARE_PRESETS[0])
   const [format, setFormat] = useState(SHARE_FORMATS[0])
