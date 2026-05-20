@@ -52,21 +52,24 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
   let line = ''
   let lineCount = 0
   let currentY = y
+  const align  = ctx.textAlign || 'left'
+  const drawX  = align === 'right'  ? x + maxWidth
+               : align === 'center' ? x + maxWidth / 2
+               : x
 
   for (let i = 0; i < words.length; i++) {
     const testLine = line + (line ? ' ' : '') + words[i]
     const metrics = ctx.measureText(testLine)
     if (metrics.width > maxWidth && line) {
       if (lineCount >= maxLines - 1) {
-        // truncate with ellipsis
         let truncated = line
         while (ctx.measureText(truncated + '…').width > maxWidth && truncated.length > 0) {
           truncated = truncated.slice(0, -1)
         }
-        ctx.fillText(truncated + '…', x, currentY)
+        ctx.fillText(truncated + '…', drawX, currentY)
         return currentY + lineHeight
       }
-      ctx.fillText(line, x, currentY)
+      ctx.fillText(line, drawX, currentY)
       currentY += lineHeight
       lineCount++
       line = words[i]
@@ -75,7 +78,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines) {
     }
   }
   if (line) {
-    ctx.fillText(line, x, currentY)
+    ctx.fillText(line, drawX, currentY)
     currentY += lineHeight
   }
   return currentY
@@ -94,7 +97,7 @@ function applyBg(ctx, preset, w, h) {
   }
 }
 
-async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale) {
+async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition = 'top', textAlign = 'left', metaShown = {}) {
   const w = format.w
   const h = format.h
   canvas.width = w
@@ -105,38 +108,25 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   let accentColor = preset.accentColor
 
   if (useCoverBg && (book.coverData || book.coverUrl)) {
-    // Draw cover image as background
     await new Promise((resolve) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
-        // Scale cover to fill canvas
         const imgRatio = img.width / img.height
         const canvasRatio = w / h
         let sx, sy, sw, sh
         if (imgRatio > canvasRatio) {
-          sh = img.height
-          sw = sh * canvasRatio
-          sx = (img.width - sw) / 2
-          sy = 0
+          sh = img.height; sw = sh * canvasRatio; sx = (img.width - sw) / 2; sy = 0
         } else {
-          sw = img.width
-          sh = sw / canvasRatio
-          sx = 0
-          sy = (img.height - sh) / 2
+          sw = img.width; sh = sw / canvasRatio; sx = 0; sy = (img.height - sh) / 2
         }
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
-        // Dark overlay
         ctx.fillStyle = 'rgba(10,8,5,0.72)'
         ctx.fillRect(0, 0, w, h)
-        textColor = '#f5f0e8'
-        accentColor = '#d4a84c'
+        textColor = '#f5f0e8'; accentColor = '#d4a84c'
         resolve()
       }
-      img.onerror = () => {
-        applyBg(ctx, preset, w, h)
-        resolve()
-      }
+      img.onerror = () => { applyBg(ctx, preset, w, h); resolve() }
       img.src = book.coverData || book.coverUrl
     })
   } else {
@@ -144,129 +134,132 @@ async function drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, 
   }
 
   const refDim = Math.min(w, h)
-  const PAD = Math.round(refDim * 0.08)
+  const PAD    = Math.round(refDim * 0.08)
+  ctx.textBaseline = 'alphabetic'
 
-  // Top rule
+  // ── Top rule ──
   ctx.save()
-  ctx.globalAlpha = 0.35
-  ctx.strokeStyle = accentColor
+  ctx.globalAlpha = 0.35; ctx.strokeStyle = accentColor
   ctx.lineWidth = Math.round(refDim * 0.003)
-  ctx.beginPath()
-  ctx.moveTo(PAD, PAD * 0.6)
-  ctx.lineTo(w - PAD, PAD * 0.6)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, PAD * 0.6); ctx.lineTo(w - PAD, PAD * 0.6); ctx.stroke()
   ctx.restore()
 
-  // Book title badge
+  // ── Book title badge (top chrome — always shown) ──
   const badgeFontSize = Math.round(refDim * 0.028)
   ctx.font = `600 ${badgeFontSize}px 'DM Sans', sans-serif`
-  const titleText = book.title || 'Unknown Book'
-  const titleMetrics = ctx.measureText(titleText)
-  const badgePadX = Math.round(refDim * 0.022)
-  const badgePadY = Math.round(refDim * 0.012)
-  const badgeH = badgeFontSize + badgePadY * 2
-  const badgeW = titleMetrics.width + badgePadX * 2
-  const badgeX = PAD
-  const badgeY = Math.round(PAD * 0.75)
-  const badgeR = badgeH / 2
+  ctx.textAlign = 'left'
+  const titleText  = book.title || 'Unknown Book'
+  const badgePadX  = Math.round(refDim * 0.022)
+  const badgePadY  = Math.round(refDim * 0.012)
+  const badgeH     = badgeFontSize + badgePadY * 2
+  const badgeW     = ctx.measureText(titleText).width + badgePadX * 2
+  const badgeY     = Math.round(PAD * 0.75)
+  const badgeR     = badgeH / 2
+  const showBookTitle = metaShown.bookTitle !== false
 
-  ctx.save()
-  ctx.globalAlpha = 0.3
-  ctx.fillStyle = accentColor
-  roundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeR)
-  ctx.fill()
-  ctx.restore()
-
-  ctx.fillStyle = accentColor
-  ctx.font = `600 ${badgeFontSize}px 'DM Sans', sans-serif`
-  ctx.fillText(titleText, badgeX + badgePadX, badgeY + badgePadY + badgeFontSize * 0.78)
+  if (showBookTitle) {
+    ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = accentColor
+    roundRect(ctx, PAD, badgeY, badgeW, badgeH, badgeR); ctx.fill(); ctx.restore()
+    ctx.fillStyle = accentColor
+    ctx.fillText(titleText, PAD + badgePadX, badgeY + badgePadY + badgeFontSize * 0.78)
+  }
 
   // Note type badge
-  const typeBadgeX = badgeX + badgeW + Math.round(refDim * 0.015)
-  const typeLabel = note.type === 'quote' ? '❝ Quote' : '✍ Note'
-  ctx.save()
-  ctx.globalAlpha = 0.2
-  ctx.fillStyle = textColor
-  roundRect(ctx, typeBadgeX, badgeY, ctx.measureText(typeLabel).width + badgePadX * 2, badgeH, badgeR)
-  ctx.fill()
-  ctx.restore()
-  ctx.fillStyle = textColor
-  ctx.globalAlpha = 0.7
+  const typeBadgeX = showBookTitle ? PAD + badgeW + Math.round(refDim * 0.015) : PAD
+  const typeLabel  = note.type === 'quote' ? '❝ Quote' : '✍ Note'
   ctx.font = `500 ${badgeFontSize}px 'DM Sans', sans-serif`
+  ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = textColor
+  roundRect(ctx, typeBadgeX, badgeY, ctx.measureText(typeLabel).width + badgePadX * 2, badgeH, badgeR); ctx.fill(); ctx.restore()
+  ctx.fillStyle = textColor; ctx.globalAlpha = 0.7
   ctx.fillText(typeLabel, typeBadgeX + badgePadX, badgeY + badgePadY + badgeFontSize * 0.78)
   ctx.globalAlpha = 1
 
-  // Large decorative open-quote — sized proportionally, placed relative to text start
-  const badgeBottom = badgeY + badgeH
-  const textY = badgeBottom + Math.round(refDim * 0.08)
-  const quoteFontSize = Math.round(refDim * 0.18)  // was 0.32
-  ctx.save()
-  ctx.globalAlpha = 0.15  // was 0.2
-  ctx.fillStyle = accentColor
+  // ── Content block geometry ──
+  const badgeBottom  = badgeY + badgeH
+  const isLeft       = textPosition === 'left'
+  const isRight      = textPosition === 'right'
+  const isBottom     = textPosition === 'bottom'
+  const contentX     = isRight ? Math.round(w * 0.45) : PAD
+  const contentW     = (isLeft || isRight) ? Math.round((w - PAD * 2) * 0.56) : w - PAD * 2.2
+  const blockStartY  = isBottom ? Math.round(h * 0.52) : badgeBottom + Math.round(refDim * 0.08)
+
+  // ── Category tags (optional — shown above quote) ──
+  let catBottom = blockStartY
+  const showCategory = metaShown.category !== false && book.labels?.length
+  if (showCategory) {
+    const catSz   = Math.round(refDim * 0.020)
+    ctx.font      = `500 ${catSz}px 'DM Sans', sans-serif`
+    ctx.fillStyle = accentColor; ctx.globalAlpha = 0.7
+    ctx.textAlign = textAlign
+    const catDrawX = textAlign === 'right' ? contentX + contentW : textAlign === 'center' ? contentX + contentW / 2 : contentX
+    ctx.fillText(book.labels.join(' · '), catDrawX, blockStartY)
+    ctx.globalAlpha = 1
+    catBottom = blockStartY + catSz * 1.5
+  }
+
+  // ── Decorative open-quote — always anchored to content left ──
+  const textY        = catBottom
+  const quoteFontSize = Math.round(refDim * 0.18)
+  ctx.save(); ctx.globalAlpha = 0.15; ctx.fillStyle = accentColor
   ctx.font = `bold ${quoteFontSize}px Georgia, serif`
-  ctx.fillText('”', PAD - Math.round(refDim * 0.01), textY + quoteFontSize * 0.75)
+  ctx.textAlign = 'left'
+  ctx.fillText('”', contentX - Math.round(refDim * 0.01), textY + quoteFontSize * 0.75)
   ctx.restore()
 
-  // Main text — scale only affects font size, not canvas dimensions
-  const mainFontSize = Math.round(refDim * 0.048 * scale)
+  // ── Main text ──
+  const mainFontSize   = Math.round(refDim * 0.048 * scale)
   const mainLineHeight = mainFontSize * 1.55
-  const maxTextWidth = w - PAD * 2.2
-  const maxLines = Math.floor((h * 0.52) / mainLineHeight)
-
+  const maxLines       = Math.floor((h * 0.52) / mainLineHeight)
   ctx.fillStyle = textColor
+  ctx.textAlign = textAlign
   if (note.type === 'quote') {
     ctx.font = `italic ${mainFontSize}px Georgia, serif`
   } else {
     ctx.font = `${mainFontSize}px 'DM Sans', sans-serif`
   }
+  const endY = wrapText(ctx, note.text || '', contentX, textY, contentW, mainLineHeight, maxLines)
 
-  const endY = wrapText(ctx, note.text || '', PAD, textY, maxTextWidth, mainLineHeight, maxLines)
-
-  // Author attribution
+  // ── Author attribution ──
   let finalBottom = endY
-  if (book.author) {
+  const showAuthor = metaShown.author !== false && book.author
+  if (showAuthor) {
     const attrFontSize = Math.round(refDim * 0.032)
-    const attrY = endY + Math.round(refDim * 0.035)
+    const attrY        = endY + Math.round(refDim * 0.035)
     ctx.fillStyle = accentColor
-    ctx.font = `500 ${attrFontSize}px 'DM Sans', sans-serif`
-    ctx.fillText(`— ${book.author}`, PAD, attrY)
+    ctx.font      = `500 ${attrFontSize}px 'DM Sans', sans-serif`
+    ctx.textAlign = textAlign
+    const attrDrawX = textAlign === 'right' ? contentX + contentW : textAlign === 'center' ? contentX + contentW / 2 : contentX
+    ctx.fillText(`— ${book.author}`, attrDrawX, attrY)
     finalBottom = attrY + attrFontSize * 0.3
 
-    // Page/percent line
+    // Page/percent
     const subFontSize = Math.round(refDim * 0.026)
     ctx.font = `${subFontSize}px 'DM Sans', sans-serif`
-    ctx.fillStyle = textColor
-    ctx.globalAlpha = 0.5
+    ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
     const locParts = []
     if (note.page) locParts.push(`p. ${note.page}`)
     if (note.percent != null) locParts.push(`${note.percent}%`)
     if (locParts.length) {
-      ctx.fillText(locParts.join(' · '), PAD, attrY + attrFontSize * 1.6)
+      ctx.fillText(locParts.join(' · '), attrDrawX, attrY + attrFontSize * 1.6)
       finalBottom = attrY + attrFontSize * 1.6 + subFontSize * 0.3
     }
     ctx.globalAlpha = 1
   }
 
-  // Bottom rule — dynamic, sits just below the content
+  // ── Bottom rule (dynamic) ──
   const bottomRuleY = Math.min(Math.max(finalBottom + refDim * 0.065, h * 0.68), h * 0.93)
-  ctx.save()
-  ctx.globalAlpha = 0.35
-  ctx.strokeStyle = accentColor
+  ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = accentColor
   ctx.lineWidth = Math.round(refDim * 0.003)
-  ctx.beginPath()
-  ctx.moveTo(PAD, bottomRuleY)
-  ctx.lineTo(w - PAD, bottomRuleY)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(PAD, bottomRuleY); ctx.lineTo(w - PAD, bottomRuleY); ctx.stroke()
   ctx.restore()
 
-  // App logo — small circle, bottom-right corner
+  // ── Logo — FIXED at bottom-right corner, never moves with content ──
   const logoImg = await getLogoImg()
   if (logoImg) {
     const logoSize = Math.round(refDim * 0.055)
     const logoX    = w - PAD - logoSize
-    const logoY    = bottomRuleY + Math.round((h - bottomRuleY - logoSize) / 2)
-    ctx.save()
-    ctx.globalAlpha = 0.62
+    const logoY    = h - Math.round(PAD * 0.65) - logoSize
+    ctx.save(); ctx.globalAlpha = 0.62
     ctx.beginPath()
     ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2)
     ctx.clip()
@@ -295,32 +288,35 @@ const SHARE_FORMATS = [
 /* ── BookNoteShareModal ─────────────────────────────────────────────────────── */
 
 export function BookNoteShareModal({ note, book, onClose }) {
-  const canvasRef = useRef(null)
-  const [preset, setPreset] = useState(SHARE_PRESETS[0])
-  const [format, setFormat] = useState(SHARE_FORMATS[0])
+  const canvasRef  = useRef(null)
+  const [preset,      setPreset]     = useState(SHARE_PRESETS[0])
+  const [format,      setFormat]     = useState(SHARE_FORMATS[0])
   const hasCover = !!(book.coverData || book.coverUrl)
-  const [useCoverBg, setUseCoverBg] = useState(hasCover)
-  const [scale, setScale] = useState(1.0)
-  const [sharing, setSharing] = useState(false)
+  const [useCoverBg,  setUseCoverBg] = useState(hasCover)
+  const [scale,       setScale]      = useState(1.0)
+  const [sharing,     setSharing]    = useState(false)
+  const [textPosition,setTextPosition] = useState('top')   // top | bottom | left | right
+  const [textAlign,   setTextAlign]    = useState('left')  // left | center | right
+  const [metaShown,   setMetaShown]    = useState({
+    bookTitle: true,
+    author:    true,
+    category:  !!(book.labels?.length),
+  })
 
-  useEffect(() => {
+  const redraw = () => {
     const canvas = canvasRef.current
     if (!canvas) return
-    drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale)
-  }, [note, book, preset, format, useCoverBg, scale])
+    drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown)
+  }
 
-  // Re-draw after 150ms for font settling
+  useEffect(() => { redraw() }, [note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown])
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const timer = setTimeout(() => {
-      drawBookNoteCard(canvas, note, book, preset, format, useCoverBg, scale)
-    }, 150)
-    return () => clearTimeout(timer)
-  }, [note, book, preset, format, useCoverBg, scale])
+    const t = setTimeout(redraw, 150)
+    return () => clearTimeout(t)
+  }, [note, book, preset, format, useCoverBg, scale, textPosition, textAlign, metaShown])
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    const handler = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -331,14 +327,9 @@ export function BookNoteShareModal({ note, book, onClose }) {
     canvas.toBlob(async (blob) => {
       const file = new File([blob], 'note-card.png', { type: 'image/png' })
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ files: [file], title: book.title || 'Note Card' })
-        } catch (_) {
-          download(blob)
-        }
-      } else {
-        download(blob)
-      }
+        try { await navigator.share({ files: [file], title: book.title || 'Note Card' })
+        } catch (_) { download(blob) }
+      } else { download(blob) }
       setSharing(false)
     }, 'image/png')
   }
@@ -346,10 +337,27 @@ export function BookNoteShareModal({ note, book, onClose }) {
   function download(blob) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `note-card-${Date.now()}.png`
-    a.click()
+    a.href = url; a.download = `note-card-${Date.now()}.png`; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  const toggleMeta = key => setMetaShown(prev => ({ ...prev, [key]: !prev[key] }))
+
+  const POSITIONS = [
+    { id:'top',    label:'Top'    },
+    { id:'bottom', label:'Bottom' },
+    { id:'left',   label:'Left'   },
+    { id:'right',  label:'Right'  },
+  ]
+  const ALIGNS = [
+    { id:'left',   label:'Left'   },
+    { id:'center', label:'Center' },
+    { id:'right',  label:'Right'  },
+  ]
+  const META_LABELS = {
+    bookTitle: 'Book Title',
+    author:    'Author',
+    category:  'Category',
   }
 
   return (
@@ -367,25 +375,54 @@ export function BookNoteShareModal({ note, book, onClose }) {
         <div style={bshare.controls}>
           {hasCover && (
             <label style={bshare.toggleRow}>
-              <input
-                type="checkbox"
-                checked={useCoverBg}
-                onChange={e => setUseCoverBg(e.target.checked)}
-                style={{ accentColor: 'var(--teal)' }}
-              />
-              <span style={{ fontSize: 13, color: 'var(--ink-muted)' }}>Use book cover as background</span>
+              <input type="checkbox" checked={useCoverBg} onChange={e => setUseCoverBg(e.target.checked)} style={{ accentColor: 'var(--teal)' }} />
+              <span style={{ fontSize:13, color:'var(--ink-muted)' }}>Use book cover as background</span>
             </label>
           )}
 
           <div style={bshare.sectionLabel}>Format</div>
           <div style={bshare.chipRow}>
             {SHARE_FORMATS.map(f => (
-              <button
-                key={f.id}
-                style={{ ...bshare.chip, ...(format.id === f.id ? bshare.chipActive : {}) }}
-                onClick={() => setFormat(f)}
-              >{f.label}</button>
+              <button key={f.id} style={{ ...bshare.chip, ...(format.id === f.id ? bshare.chipActive : {}) }} onClick={() => setFormat(f)}>{f.label}</button>
             ))}
+          </div>
+
+          {/* Position + Align */}
+          <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+            <div style={{ flex:1, minWidth:130 }}>
+              <div style={bshare.sectionLabel}>Text Position</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {POSITIONS.map(p => (
+                  <button key={p.id} style={{ ...bshare.chip, ...(textPosition === p.id ? bshare.chipActive : {}) }} onClick={() => setTextPosition(p.id)}>{p.label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ flex:1, minWidth:130 }}>
+              <div style={bshare.sectionLabel}>Text Align</div>
+              <div style={{ display:'flex', gap:6 }}>
+                {ALIGNS.map(a => (
+                  <button key={a.id} style={{ ...bshare.chip, ...(textAlign === a.id ? bshare.chipActive : {}) }} onClick={() => setTextAlign(a.id)}>{a.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Show Fields */}
+          <div style={bshare.sectionLabel}>Show Fields</div>
+          <div style={bshare.chipRow}>
+            {Object.entries(META_LABELS).map(([key, label]) => {
+              const on = metaShown[key]
+              // Only show category toggle if labels exist
+              if (key === 'category' && !book.labels?.length) return null
+              return (
+                <button key={key}
+                  style={{ ...bshare.chip, ...(on ? bshare.chipActive : { opacity:0.5 }) }}
+                  onClick={() => toggleMeta(key)}
+                >
+                  {on ? '✓ ' : ''}{label}
+                </button>
+              )
+            })}
           </div>
 
           {!useCoverBg && (
@@ -393,19 +430,12 @@ export function BookNoteShareModal({ note, book, onClose }) {
               <div style={bshare.sectionLabel}>Style</div>
               <div style={bshare.presetRow}>
                 {SHARE_PRESETS.map(p => (
-                  <button
-                    key={p.id}
-                    title={p.label}
-                    onClick={() => setPreset(p)}
-                    style={{
-                      ...bshare.presetSwatch,
-                      background: Array.isArray(p.bg)
-                        ? `linear-gradient(135deg, ${p.bg[0]}, ${p.bg[1]})`
-                        : p.bg,
-                      outline: preset.id === p.id ? `2px solid var(--teal)` : '2px solid transparent',
-                      outlineOffset: 2,
-                    }}
-                  />
+                  <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
+                    ...bshare.presetSwatch,
+                    background: Array.isArray(p.bg) ? `linear-gradient(135deg, ${p.bg[0]}, ${p.bg[1]})` : p.bg,
+                    outline: preset.id === p.id ? '2px solid var(--teal)' : '2px solid transparent',
+                    outlineOffset: 2,
+                  }} />
                 ))}
               </div>
             </>
@@ -414,7 +444,7 @@ export function BookNoteShareModal({ note, book, onClose }) {
           <div style={bshare.sectionLabel}>Text Size</div>
           <div style={bshare.chipRow}>
             <button style={bshare.chip} onClick={() => setScale(s => Math.max(0.5, +(s - 0.1).toFixed(1)))}>A−</button>
-            <span style={{ fontSize: 13, color: 'var(--ink-muted)', padding: '0 4px' }}>{Math.round(scale * 100)}%</span>
+            <span style={{ fontSize:13, color:'var(--ink-muted)', padding:'0 4px' }}>{Math.round(scale * 100)}%</span>
             <button style={bshare.chip} onClick={() => setScale(s => Math.min(2.0, +(s + 0.1).toFixed(1)))}>A+</button>
           </div>
         </div>
