@@ -680,8 +680,9 @@ export default function ConfessionsPage() {
 
   const [activeChapter, setActiveChapter] = useState(null)
   const [search,        setSearch]        = useState(_saved.search)
-  const [searchOpen,    setSearchOpen]    = useState(false)
-  const [navOpen,       setNavOpen]       = useState(false)
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false)
+  const [openSources,     setOpenSources]     = useState(() => new Set())
+  const [navOpen,         setNavOpen]         = useState(false)
   const [kjvModal,      setKjvModal]      = useState(null)
   const [shareCard,     setShareCard]     = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
@@ -725,7 +726,6 @@ export default function ConfessionsPage() {
 
   /* Search history */
   const [searchHistory, setSearchHistory] = useState(() => getSearchHistory('conf'))
-  const [showHistDrop,  setShowHistDrop]  = useState(false)
 
   /* Annotations — plain state, always written by reading fresh from localStorage */
   const [hlData,   setHlData]   = useState(() => loadHighlights())
@@ -1084,13 +1084,14 @@ export default function ConfessionsPage() {
     if (trimmed) {
       addSearchHistory('conf', trimmed)
       setSearchHistory(getSearchHistory('conf'))
+      // Auto-expand all sources when a search is submitted
+      setOpenSources(new Set(Object.keys(SOURCES)))
     }
-    setShowHistDrop(false)
   }
 
   /* Navigate to a search result: switch tab if needed, then scroll to item */
   function navigateToResult(result) {
-    setSearchOpen(false)
+    setSearchPanelOpen(false)
     const targetTab = result.source
     if (tab !== targetTab) {
       pendingScrollRef.current = result.id
@@ -1263,18 +1264,7 @@ export default function ConfessionsPage() {
         }}
       >
         <div style={s.headerInner}>
-          {tab && (
-            <button
-              style={sl.libraryBtn}
-              onClick={() => { setSearchParams({}); saveState('conf', { tab: null, search: '' }) }}
-              title="Back to library"
-              aria-label="Back to confession library"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9 2L5 7l4 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          )}
+          {/* Hamburger — always top-left on mobile */}
           {isMobile && (
             <button
               onClick={() => setNavOpen(o => !o)}
@@ -1291,20 +1281,44 @@ export default function ConfessionsPage() {
             </button>
           )}
 
-          {!isMobile && (
-            <div style={{display:'flex', alignItems:'center', gap:8, minWidth:0}}>
+          {/* Source badge + name (desktop always; mobile when tab selected) */}
+          {!isMobile && tab && (
+            <div style={{display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1}}>
               <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
               <span style={s.srcName}>{src.name}</span>
             </div>
           )}
+          {!isMobile && !tab && (
+            <div style={{flex:1, minWidth:0}}>
+              <span style={{fontSize:14, fontWeight:700, color:'var(--ink)', fontFamily:"'Cormorant Garamond',serif"}}>
+                Historic Baptist Confessions
+              </span>
+            </div>
+          )}
+          {isMobile && tab && (
+            <div style={{display:'flex', alignItems:'center', gap:6, flex:1, minWidth:0, overflow:'hidden'}}>
+              <span style={{...s.srcBadge, background: src.bg, color: src.color}}>{src.label}</span>
+              <span style={{...s.srcName, fontSize:12}}>{src.name}</span>
+            </div>
+          )}
+          {isMobile && !tab && (
+            <div style={{flex:1, minWidth:0}}>
+              <span style={{fontSize:13, fontWeight:700, color:'var(--ink)', fontFamily:"'Cormorant Garamond',serif"}}>
+                Confessions
+              </span>
+            </div>
+          )}
 
-          {/* Search icon toggle */}
+          {/* Search icon — always far right */}
           <button
-            onClick={() => { setSearchOpen(o => !o); if (searchOpen) { setSearch(''); setShowHistDrop(false) } }}
+            onClick={() => {
+              setSearchPanelOpen(o => !o)
+              if (searchPanelOpen) setSearch('')
+            }}
             style={{
               ...sl.searchIconBtn,
-              color: searchOpen || search ? 'var(--teal)' : 'var(--ink-faint)',
-              background: searchOpen || search ? 'var(--teal-light)' : 'none',
+              color: searchPanelOpen || search ? 'var(--teal)' : 'var(--ink-faint)',
+              background: searchPanelOpen || search ? 'var(--teal-light)' : 'none',
             }}
             title="Search confessions"
             aria-label="Search"
@@ -1323,68 +1337,151 @@ export default function ConfessionsPage() {
         <div style={s.backdrop} onClick={() => setNavOpen(false)} />
       )}
 
-      {/* ── Search panel ── */}
-      {searchOpen && (
-        <div style={{ ...sl.searchPanel, top: headerH + offlineBannerH }}>
-          <div style={sl.searchInputRow} ref={searchWrapRef}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
-              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
-              <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      {/* ── Right-panel search drawer ── */}
+      {searchPanelOpen && (
+        <div
+          style={srp.backdrop}
+          onClick={() => { setSearchPanelOpen(false); setSearch('') }}
+        />
+      )}
+      <div style={{
+        ...srp.panel,
+        transform: searchPanelOpen ? 'translateX(0)' : 'translateX(100%)',
+      }}>
+        {/* Panel header */}
+        <div style={srp.panelHeader}>
+          <span style={srp.panelTitle}>Search Confessions</span>
+          <button
+            style={srp.closeBtn}
+            onClick={() => { setSearchPanelOpen(false); setSearch('') }}
+            aria-label="Close search"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
             </svg>
-            <input
-              autoFocus
-              style={sl.searchPanelInput}
-              value={search}
-              onChange={e => {
-                setSearch(e.target.value)
-                setShowHistDrop(!e.target.value && searchHistory.length > 0)
-              }}
-              onFocus={() => { if (!search && searchHistory.length) setShowHistDrop(true) }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') submitSearch(search)
-                if (e.key === 'Escape') { setSearch(''); setSearchOpen(false) }
-              }}
-              placeholder="Search all confessions & catechisms…"
-            />
-            {search
-              ? <button onClick={() => setSearch('')} style={s.clearBtn}>×</button>
-              : <button onClick={() => setSearchOpen(false)} style={s.clearBtn} aria-label="Close search">×</button>
-            }
-            {showHistDrop && searchHistory.length > 0 && (
-              <SearchHistDrop
-                history={searchHistory}
-                onSelect={q => { setSearch(q); setShowHistDrop(false) }}
-                onRemove={q => { removeSearchEntry('conf', q); setSearchHistory(getSearchHistory('conf')) }}
-                onClear={() => { clearSearchHistory('conf'); setSearchHistory([]); setShowHistDrop(false) }}
-                onClose={() => setShowHistDrop(false)}
-              />
-            )}
-          </div>
+          </button>
+        </div>
 
-          {/* Results list */}
-          {search && searchResults.length === 0 && (
-            <div style={sl.searchEmpty}>No results for "{search}"</div>
-          )}
-          {search && searchResults.length > 0 && (
-            <div style={sl.resultsList}>
-              <div style={sl.resultsCount}>{searchResults.length} result{searchResults.length !== 1 ? 's' : ''}</div>
-              {searchResults.map((r, i) => {
-                const srcInfo = SOURCES[r.source] || SOURCES['2lbcf']
-                const snippet = r.text ? r.text.slice(0, 120) + (r.text.length > 120 ? '…' : '') : ''
-                return (
-                  <button key={i} style={sl.resultItem} onClick={() => navigateToResult(r)}>
-                    <div style={sl.resultTop}>
-                      <span style={{...sl.resultBadge, background: srcInfo.bg, color: srcInfo.color}}>{srcInfo.label}</span>
-                      <span style={sl.resultLabel}>{r.label}</span>
-                    </div>
-                    <p style={sl.resultSnippet}>{highlight(snippet, search)}</p>
+        {/* Search input */}
+        <div style={srp.inputRow}>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{color:'var(--ink-faint)',flexShrink:0}}>
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <input
+            autoFocus
+            style={srp.input}
+            value={search}
+            onChange={e => {
+              const v = e.target.value
+              setSearch(v)
+              if (v.trim()) setOpenSources(new Set(Object.keys(SOURCES)))
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') submitSearch(search)
+              if (e.key === 'Escape') { setSearch(''); setSearchPanelOpen(false) }
+            }}
+            placeholder="Search all confessions & catechisms…"
+          />
+          {search
+            ? <button onClick={() => setSearch('')} style={srp.clearBtn}>×</button>
+            : null
+          }
+        </div>
+
+        {/* Scrollable body */}
+        <div style={srp.body}>
+
+          {/* No query → show history */}
+          {!q && searchHistory.length > 0 && (
+            <div style={srp.histSection}>
+              <div style={srp.histHeader}>
+                <span style={srp.histLabel}>Recent searches</span>
+                <button style={srp.histClearAll} onClick={() => { clearSearchHistory('conf'); setSearchHistory([]) }}>
+                  Clear all
+                </button>
+              </div>
+              {searchHistory.map(entry => (
+                <div key={entry} style={srp.histRow}>
+                  <button style={srp.histItem} onClick={() => {
+                    setSearch(entry)
+                    setOpenSources(new Set(Object.keys(SOURCES)))
+                  }}>
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{flexShrink:0,opacity:0.4}}>
+                      <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M5.5 3v3l2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    <span style={srp.histItemText}>{entry}</span>
                   </button>
+                  <button style={srp.histRm} onClick={() => {
+                    removeSearchEntry('conf', entry)
+                    setSearchHistory(getSearchHistory('conf'))
+                  }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!q && searchHistory.length === 0 && (
+            <div style={srp.emptyHint}>Type to search across all confessions and catechisms</div>
+          )}
+
+          {/* Results grouped by source */}
+          {q && searchResults.length === 0 && (
+            <div style={srp.noResults}>No results for "{search}"</div>
+          )}
+
+          {q && searchResults.length > 0 && (
+            <div style={srp.resultsSections}>
+              <div style={srp.totalCount}>
+                {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+              </div>
+              {Object.entries(SOURCES).map(([srcKey, srcInfo]) => {
+                const hits = searchResults.filter(r => r.source === srcKey)
+                if (!hits.length) return null
+                const isOpen = openSources.has(srcKey)
+                return (
+                  <div key={srcKey} style={srp.srcGroup}>
+                    <button
+                      style={srp.srcGroupHeader}
+                      onClick={() => setOpenSources(prev => {
+                        const next = new Set(prev)
+                        if (next.has(srcKey)) next.delete(srcKey)
+                        else next.add(srcKey)
+                        return next
+                      })}
+                    >
+                      <span style={{...srp.srcBadge, background: srcInfo.bg, color: srcInfo.color}}>
+                        {srcInfo.label}
+                      </span>
+                      <span style={srp.srcGroupName}>{srcInfo.name}</span>
+                      <span style={srp.srcGroupCount}>{hits.length}</span>
+                      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"
+                        style={{flexShrink:0, transition:'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0)', color:'var(--ink-faint)'}}>
+                        <path d="M3.5 2l4 3.5-4 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      </svg>
+                    </button>
+
+                    {isOpen && (
+                      <div style={srp.hitList}>
+                        {hits.map((r, i) => {
+                          const snippet = r.text ? r.text.slice(0, 140) + (r.text.length > 140 ? '…' : '') : ''
+                          return (
+                            <button key={i} style={srp.hitItem} onClick={() => navigateToResult(r)}>
+                              <span style={srp.hitLabel}>{r.label}</span>
+                              <p style={srp.hitSnippet}>{highlight(snippet, search)}</p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>
           )}
         </div>
-      )}
+      </div>
 
       <div style={s.layout}>
 
@@ -1916,46 +2013,132 @@ const sl = {
     background:'var(--teal)', color:'white', borderRadius:99, padding:'0 4px',
   },
 
-  /* Search panel */
-  searchPanel: {
-    position:'fixed', top:0, left:0, right:0, zIndex:200,
-    background:'var(--surface)',
-    borderBottom:'1px solid var(--border)',
-    boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
-    maxHeight:'80vh', overflowY:'auto',
+}
+
+/* ── Right-panel search drawer styles ── */
+const srp = {
+  backdrop: {
+    position:'fixed', inset:0, zIndex:150,
+    background:'rgba(0,0,0,0.3)', backdropFilter:'blur(1px)',
   },
-  searchInputRow: {
+  panel: {
+    position:'fixed', top:0, right:0, bottom:0, zIndex:160,
+    width:340, maxWidth:'92vw',
+    background:'var(--surface)', borderLeft:'1px solid var(--border)',
+    boxShadow:'-4px 0 24px rgba(0,0,0,0.12)',
+    display:'flex', flexDirection:'column',
+    transition:'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  panelHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'14px 16px', borderBottom:'1px solid var(--border)',
+    flexShrink:0,
+  },
+  panelTitle: {
+    fontSize:14, fontWeight:700, color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  closeBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', display:'flex', alignItems:'center',
+    justifyContent:'center', padding:6, borderRadius:'var(--radius)',
+    transition:'color 0.12s',
+  },
+  inputRow: {
     display:'flex', alignItems:'center', gap:8,
-    padding:'12px 16px', position:'relative',
-    borderBottom:'1px solid var(--border)',
+    padding:'10px 14px', borderBottom:'1px solid var(--border)',
+    flexShrink:0,
   },
-  searchPanelInput: {
+  input: {
     flex:1, border:'none', background:'transparent', outline:'none',
-    fontSize:15, color:'var(--ink)', fontFamily:"'DM Sans',sans-serif",
+    fontSize:14, color:'var(--ink)', fontFamily:"'DM Sans',sans-serif",
+    padding:'2px 0',
   },
-  searchEmpty: {
-    padding:'24px 16px', textAlign:'center',
-    fontSize:14, color:'var(--ink-faint)',
+  clearBtn: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', fontSize:16, lineHeight:1, padding:'0 2px',
   },
-  resultsList: { display:'flex', flexDirection:'column' },
-  resultsCount: {
-    fontSize:11, fontWeight:600, color:'var(--ink-faint)',
-    padding:'8px 16px 4px', textTransform:'uppercase', letterSpacing:'0.06em',
+  body: { flex:1, overflowY:'auto', padding:'8px 0' },
+
+  /* History */
+  histSection: { padding:'4px 0 8px' },
+  histHeader: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'6px 16px 8px',
   },
-  resultItem: {
-    display:'flex', flexDirection:'column', gap:4, textAlign:'left',
-    padding:'10px 16px', border:'none', borderBottom:'1px solid var(--border)',
-    background:'var(--surface)', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", transition:'background 0.12s',
+  histLabel: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase',
+    letterSpacing:'0.07em', color:'var(--ink-faint)',
   },
-  resultTop: { display:'flex', alignItems:'center', gap:8 },
-  resultBadge: {
+  histClearAll: {
+    fontSize:11, fontWeight:600, color:'var(--teal)',
+    background:'none', border:'none', cursor:'pointer', padding:0,
+  },
+  histRow: { display:'flex', alignItems:'center' },
+  histItem: {
+    display:'flex', alignItems:'center', gap:8, flex:1,
+    padding:'8px 16px', background:'none', border:'none',
+    cursor:'pointer', textAlign:'left', fontFamily:"'DM Sans',sans-serif",
+  },
+  histItemText: { fontSize:13, color:'var(--ink)', flex:1 },
+  histRm: {
+    background:'none', border:'none', cursor:'pointer',
+    color:'var(--ink-faint)', fontSize:16, padding:'0 14px', flexShrink:0,
+  },
+
+  emptyHint: {
+    fontSize:13, color:'var(--ink-faint)', textAlign:'center',
+    padding:'32px 24px', lineHeight:1.6,
+  },
+  noResults: {
+    fontSize:14, color:'var(--ink-faint)', textAlign:'center',
+    padding:'32px 16px',
+  },
+
+  /* Results */
+  resultsSections: { display:'flex', flexDirection:'column' },
+  totalCount: {
+    fontSize:10, fontWeight:700, color:'var(--ink-faint)',
+    textTransform:'uppercase', letterSpacing:'0.07em',
+    padding:'8px 16px 4px',
+  },
+  srcGroup: {
+    borderBottom:'1px solid var(--border)', overflow:'hidden',
+  },
+  srcGroupHeader: {
+    display:'flex', alignItems:'center', gap:8, width:'100%',
+    padding:'9px 14px', background:'var(--parchment)',
+    border:'none', cursor:'pointer', textAlign:'left',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.1s',
+  },
+  srcBadge: {
     fontSize:9, fontWeight:700, letterSpacing:'0.07em',
     padding:'2px 7px', borderRadius:99, flexShrink:0,
   },
-  resultLabel: { fontSize:12, fontWeight:600, color:'var(--ink)' },
-  resultSnippet: {
-    fontSize:13, color:'var(--ink-muted)', margin:0, lineHeight:1.5,
+  srcGroupName: {
+    fontSize:11, fontWeight:600, color:'var(--ink)', flex:1, minWidth:0,
+    overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis',
+    fontFamily:"'Cormorant Garamond',serif",
+  },
+  srcGroupCount: {
+    fontSize:10, fontWeight:600, color:'var(--ink-faint)', flexShrink:0,
+  },
+  hitList: { display:'flex', flexDirection:'column' },
+  hitItem: {
+    display:'flex', flexDirection:'column', gap:3, textAlign:'left',
+    padding:'9px 16px 9px 20px', border:'none',
+    borderBottom:'1px solid var(--border)',
+    background:'var(--surface)', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.1s',
+    width:'100%',
+  },
+  hitLabel: {
+    fontSize:11, fontWeight:700, color:'var(--teal)',
+    letterSpacing:'0.03em',
+  },
+  hitSnippet: {
+    fontSize:12, color:'var(--ink-muted)', margin:0, lineHeight:1.55,
     display:'-webkit-box', WebkitLineClamp:2,
     WebkitBoxOrient:'vertical', overflow:'hidden',
     fontFamily:"'Cormorant Garamond',serif",
