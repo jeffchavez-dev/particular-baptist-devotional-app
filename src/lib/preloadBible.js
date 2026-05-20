@@ -9,10 +9,9 @@
  * versions and lexicons are already in the SW CacheFirst runtime cache
  * and load instantly.
  *
- * Larger / optional files (tagnt, tahot, lxx, lxx-words, nasb, bsb,
- * gnv, rv, tnt) are intentionally excluded here. They're loaded on
- * demand the first time the user opens those modes, and cached by the
- * SW thereafter.
+ * Larger / optional files (lxx, lxx-words, bsb, gnv, rv, tnt) are
+ * intentionally excluded here. They're loaded on demand the first time
+ * the user opens those modes, and cached by the SW thereafter.
  */
 
 import { loadBibleVersion } from './bibleVersions'
@@ -28,15 +27,18 @@ export function preloadBibleData() {
   // Skip if no network — nothing to warm, and we'd just get errors
   if (!navigator.onLine) return
 
-  // --- KJV (default version, 9.3 MB) ---
+  // --- Core Bible versions ---
   // Uses the same loader as KjvReader so the in-memory _versionCache is
   // populated too. That way, if the user opens the Bible reader while the
   // fetch is still in flight, the single Promise is shared (no double-download).
   // The SW CacheFirst handler stores the response so all future loads are instant.
-  loadBibleVersion('kjv').catch(() => {})
+  loadBibleVersion('kjv').catch(() => {})   // 9.3 MB
+  loadBibleVersion('abab').catch(() => {})  // Filipino — Ang Bagong Ang Biblia
+  loadBibleVersion('nasb').catch(() => {})  // New American Standard Bible 1995
 
-  // --- ABAB (Ang Bagong Ang Biblia — Filipino default for many users) ---
-  loadBibleVersion('abab').catch(() => {})
+  // --- Original-language texts ---
+  loadBibleVersion('hebrew').catch(() => {}) // tahot.json — HOT Hebrew OT
+  loadBibleVersion('greek').catch(() => {})  // tagnt.json — GNT Greek NT
 
   // --- Strong's lexicons (small, needed for word-study mode) ---
   // Fire and forget — the SW CacheFirst handler caches each on first fetch.
