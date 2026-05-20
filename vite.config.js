@@ -110,14 +110,16 @@ export default defineConfig({
             },
           },
           // All large JSON data files — cache on first fetch, serve offline thereafter
-          // Covers: kjv.json, tagnt.json, tahot.json, strongs-greek.json, strongs-hebrew.json
-          // (and any future abab.json or other Bible version files)
+          // Current files (13): kjv, abab, nasb, bsb, gnv, rv, tnt,
+          //   tagnt, tahot, lxx, lxx-words, strongs-greek, strongs-hebrew
+          // maxEntries must exceed the total file count or Workbox will evict the
+          // least-recently-used entries, breaking offline access for those translations.
           {
             urlPattern: ({ url }) => url.pathname.endsWith('.json') && url.origin === self.location.origin,
             handler: 'CacheFirst',
             options: {
               cacheName: 'app-json-data',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              expiration: { maxEntries: 25, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
