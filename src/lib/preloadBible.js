@@ -5,13 +5,14 @@
  * that the user is most likely to need immediately.
  *
  * Called at app startup (main.jsx) so that by the time the user opens
- * the Bible reader — even if they go offline in between — kjv.json and
- * the Strong's lexicons are already in the SW CacheFirst runtime cache
+ * the Bible reader — even if they go offline in between — the listed
+ * versions and lexicons are already in the SW CacheFirst runtime cache
  * and load instantly.
  *
- * Larger / optional files (tagnt, tahot, lxx, lxx-words, abab, nasb)
- * are intentionally excluded here. They're loaded on demand the first
- * time the user opens those modes, and cached by the SW thereafter.
+ * Larger / optional files (tagnt, tahot, lxx, lxx-words, nasb, bsb,
+ * gnv, rv, tnt) are intentionally excluded here. They're loaded on
+ * demand the first time the user opens those modes, and cached by the
+ * SW thereafter.
  */
 
 import { loadBibleVersion } from './bibleVersions'
@@ -33,6 +34,9 @@ export function preloadBibleData() {
   // fetch is still in flight, the single Promise is shared (no double-download).
   // The SW CacheFirst handler stores the response so all future loads are instant.
   loadBibleVersion('kjv').catch(() => {})
+
+  // --- ABAB (Ang Bagong Ang Biblia — Filipino default for many users) ---
+  loadBibleVersion('abab').catch(() => {})
 
   // --- Strong's lexicons (small, needed for word-study mode) ---
   // Fire and forget — the SW CacheFirst handler caches each on first fetch.
