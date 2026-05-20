@@ -156,15 +156,20 @@ function contentGeometry(textPosition, w, h, PAD, refDim, afterY, formatId) {
   const isLeft   = textPosition === 'left'
   const isRight  = textPosition === 'right'
   const isBottom = textPosition === 'bottom'
+  const isCenter = textPosition === 'center'
   // Landscape uses wider columns (card is short, side-by-side looks better)
   // Square/Story use narrower column so the other side has visual breathing room
   const colFrac  = formatId === 'wide' ? 0.48 : 0.52
   // Bottom start point — relative to card height so it's proportional per format
-  const bottomFrac = formatId === 'wide' ? 0.38 : formatId === 'story' ? 0.56 : 0.50
+  const bottomFrac  = formatId === 'wide' ? 0.38 : formatId === 'story' ? 0.56 : 0.50
+  // Center start point — vertically centered on the card
+  const centerFrac  = formatId === 'wide' ? 0.28 : formatId === 'story' ? 0.36 : 0.32
   return {
     contentX:    isRight ? Math.round(w - PAD - (w - PAD * 2) * colFrac) : PAD,
     contentW:    (isLeft || isRight) ? Math.round((w - PAD * 2) * colFrac) : w - PAD * 2,
-    blockStartY: isBottom ? Math.round(h * bottomFrac) : afterY,
+    blockStartY: isBottom ? Math.round(h * bottomFrac)
+               : isCenter ? Math.round(h * centerFrac)
+               : afterY,
   }
 }
 
@@ -490,6 +495,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
               <label style={m.label} htmlFor="sc-position">Text Position</label>
               <select id="sc-position" value={textPosition} onChange={e => setTextPosition(e.target.value)} style={selectStyle}>
                 <option value="top">Top</option>
+                <option value="center">Center</option>
                 <option value="bottom">Bottom</option>
                 <option value="left">Left</option>
                 <option value="right">Right</option>
