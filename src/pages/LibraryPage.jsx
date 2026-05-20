@@ -3701,7 +3701,7 @@ export default function LibraryPage() {
   const [confNotes,      setConfNotes]      = useState(() => getAllConfNotes())
   const [libNotes,       setLibNotes]       = useState(() => getAllLibNotes())
 
-  // Load devNotes from local storage (always) and sync with Supabase when signed in
+  // Load devNotes from localStorage (always fast, works offline)
   function loadDevNotesFromLocal() {
     const local = getLocalProgress()
     setDevNotes(
@@ -3712,14 +3712,27 @@ export default function LibraryPage() {
   }
 
   useEffect(() => {
-    // Show local notes immediately (fast, offline-safe)
+    // Show local notes immediately — fast, offline-safe, always up-to-date
     loadDevNotesFromLocal()
-    // If signed in, merge with Supabase data (which may include notes from other devices)
+    // When signed in, merge Supabase data so notes from other devices appear too.
+    // IMPORTANT: local notes take precedence — a note just saved from ReadingPage
+    // is in localStorage instantly but may not yet be in Supabase, so we must
+    // not overwrite local data with the cloud response.
     if (session) {
       supabase.from('progress').select('day_number, completed, notes')
         .eq('user_id', session.user.id)
         .then(({ data }) => {
-          if (data) setDevNotes(data.filter(r => r.notes && r.notes.trim()))
+          if (!data) return
+          const local = getLocalProgress()
+          // Build a merged map: start from cloud notes, then overlay local (higher priority)
+          const map = {}
+          data.forEach(r => { if (r.notes?.trim()) map[r.day_number] = r.notes })
+          Object.entries(local).forEach(([day, d]) => {
+            if (d.notes?.trim()) map[parseInt(day)] = d.notes  // local wins on conflict
+          })
+          setDevNotes(
+            Object.entries(map).map(([day, notes]) => ({ day_number: parseInt(day), notes }))
+          )
         })
     }
   }, [session]) // eslint-disable-line react-hooks/exhaustive-deps

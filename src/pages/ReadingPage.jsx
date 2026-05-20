@@ -476,6 +476,7 @@ export default function ReadingPage() {
   const [savedNotes, setSavedNotes] = useState(() => getLocalProgress()[day]?.notes || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [autoSaved, setAutoSaved] = useState(false)   // shows "Saved locally ✓" after auto-save
   const [shareCard, setShareCard] = useState(null)
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, refDisplay }
   const [navVisible, setNavVisible] = useState(true)
@@ -504,6 +505,28 @@ export default function ReadingPage() {
   useEffect(() => {
     try { localStorage.setItem('pb-last-devotional-path', `/day/${day}`) } catch {}
   }, [day])
+
+  /* ── Auto-save notes to localStorage as the user types (debounced 1.5 s) ──
+     This ensures the reflection appears in My Library even if the user
+     navigates away before clicking "Save to Library". The explicit button
+     still triggers the Supabase sync for cross-device persistence.          */
+  const autoSaveRef     = useRef(null)
+  const autoSavedTimer  = useRef(null)
+  useEffect(() => {
+    clearTimeout(autoSaveRef.current)
+    // Nothing to auto-save if it already matches what's in localStorage
+    const currentLocal = getLocalProgress()[day]?.notes || ''
+    if (notes === currentLocal) return
+    autoSaveRef.current = setTimeout(() => {
+      setLocalProgress(day, { completed, notes })
+      window.dispatchEvent(new CustomEvent('pb-progress-updated'))
+      // Show a brief "Saved locally" indicator
+      setAutoSaved(true)
+      clearTimeout(autoSavedTimer.current)
+      autoSavedTimer.current = setTimeout(() => setAutoSaved(false), 2500)
+    }, 1500)
+    return () => clearTimeout(autoSaveRef.current)
+  }, [notes]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Save scroll on unmount, restore on mount ── */
   useEffect(() => {
@@ -817,7 +840,8 @@ export default function ReadingPage() {
               </button>
             </div>
             <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-              {saved && <span style={{ fontSize:11, color:'var(--teal)' }}>Saved ✓</span>}
+              {saved      && <span style={{ fontSize:11, color:'var(--teal)' }}>Synced ✓</span>}
+              {autoSaved && !saved && <span style={{ fontSize:11, color:'var(--ink-faint)' }}>Saved locally ✓</span>}
               {savedNotes && (
                 <button
                   onClick={() => setShareCard({ type:'note', day, title: entry.reading, subtitle:`Day ${day} · ${entry.date}`, source: entry.src, text: savedNotes, label:'My Reflection' })}
@@ -849,7 +873,7 @@ export default function ReadingPage() {
               disabled={saving || !hasUnsaved}
               style={{ opacity: (!hasUnsaved && !saving) ? 0.5 : 1, fontSize:13 }}
             >
-              {saving ? <span className="spinner" style={{ width:13, height:13 }} /> : 'Save to Library'}
+              {saving ? <span className="spinner" style={{ width:13, height:13 }} /> : 'Sync to Cloud'}
             </button>
           </div>
         </div>
