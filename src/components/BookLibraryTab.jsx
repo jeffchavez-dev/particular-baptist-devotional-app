@@ -54,17 +54,19 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 
   const drawX = align === 'right'  ? x + maxWidth
               : align === 'center' ? x + maxWidth / 2
               : x
+  // Zero-width LTR mark — prevents bidi engine from reordering trailing punctuation
+  const LTR = '‎'
   const words = text.split(' ').filter(Boolean)
   let line = '', lineCount = 0, currentY = y
   for (const word of words) {
     const testLine = line ? line + ' ' + word : word
     if (ctx.measureText(testLine).width > maxWidth && line) {
-      if (lineCount >= maxLines - 1) { ctx.fillText(line + '…', drawX, currentY); return currentY }
-      ctx.fillText(line, drawX, currentY)
+      if (lineCount >= maxLines - 1) { ctx.fillText(LTR + line + '…', drawX, currentY); return currentY }
+      ctx.fillText(LTR + line, drawX, currentY)
       line = word; currentY += lineHeight; lineCount++
     } else { line = testLine }
   }
-  if (line) { ctx.fillText(line, drawX, currentY); currentY += lineHeight }
+  if (line) { ctx.fillText(LTR + line, drawX, currentY); currentY += lineHeight }
   return currentY
 }
 

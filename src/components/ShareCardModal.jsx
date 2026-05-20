@@ -76,6 +76,9 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 
   const drawX = align === 'right'  ? x + maxWidth
               : align === 'center' ? x + maxWidth / 2
               : x
+  // ‎ = LEFT-TO-RIGHT MARK — zero-width, forces LTR on the platform's
+  // bidi engine so a trailing period is never reordered to the front of the line.
+  const LTR = '‎'
   const paragraphs = text.split(/\n+/)
   let currentY = y, linesDrawn = 0
   for (const para of paragraphs) {
@@ -84,14 +87,14 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 
     for (const word of words) {
       const testLine = line ? line + ' ' + word : word
       if (ctx.measureText(testLine).width > maxWidth && line) {
-        if (linesDrawn >= maxLines - 1) { ctx.fillText(line + '…', drawX, currentY); return currentY }
-        ctx.fillText(line, drawX, currentY)
+        if (linesDrawn >= maxLines - 1) { ctx.fillText(LTR + line + '…', drawX, currentY); return currentY }
+        ctx.fillText(LTR + line, drawX, currentY)
         line = word; currentY += lineHeight; linesDrawn++
       } else { line = testLine }
     }
     if (line) {
-      if (linesDrawn >= maxLines) { ctx.fillText(line + '…', drawX, currentY); return currentY }
-      ctx.fillText(line, drawX, currentY)
+      if (linesDrawn >= maxLines) { ctx.fillText(LTR + line + '…', drawX, currentY); return currentY }
+      ctx.fillText(LTR + line, drawX, currentY)
       currentY += lineHeight; linesDrawn++
     }
   }
@@ -222,11 +225,17 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, lo
     contentY += refDim * 0.05
   }
 
-  /* Decorative quote mark — always left-anchored, always LTR */
+  /* Decorative quote mark — follows text alignment so the change is visible */
+  const qMarkSzR = Math.round(refDim * 0.10)
+  const qGlyph   = isHeb ? '״' : '“'  // ״ for Hebrew, " for LTR
+  const qX = effAlign === 'right'  ? contentX + contentW + refDim * 0.008
+           : effAlign === 'center' ? contentX + contentW / 2
+           : contentX - refDim * 0.008  // left (default)
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.18
-  ctx.font      = `${Math.round(refDim * 0.10)}px 'Georgia',serif`
-  ctx.direction = 'ltr'; ctx.textAlign = 'left'
-  ctx.fillText(isHeb ? '"' : '"', contentX - refDim * 0.008, contentY + refDim * 0.045)
+  ctx.font      = `${qMarkSzR}px 'Georgia',serif`
+  ctx.direction = 'ltr'
+  ctx.textAlign = effAlign === 'right' ? 'right' : effAlign === 'center' ? 'center' : 'left'
+  ctx.fillText(qGlyph, qX, contentY + refDim * 0.045)
   ctx.globalAlpha = 1
 
   /* Content body */
