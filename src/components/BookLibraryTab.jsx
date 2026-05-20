@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { generateId, getAllBooks, saveBook, deleteBook, searchBookCovers } from '../lib/bookLibrary'
 import { useAuth } from '../App'
 import BookCelebration from './BookCelebration'
+import { getMemorizeNote, setMemorizeNote } from '../lib/memorize'
 
 /* ── Logo preloader (shared cache) ── */
 let _logoImg = null
@@ -869,7 +870,7 @@ function AddNoteModal({ book, note, onSave, onClose }) {
 
 /* ── NoteCard ───────────────────────────────────────────────────────────────── */
 
-function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy }) {
+function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy, onMemorize }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -905,6 +906,7 @@ function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy }) {
             <div style={bnote.menu}>
               <button style={bnote.menuItem} onClick={() => { onCopy(note); setMenuOpen(false) }}>Copy</button>
               <button style={bnote.menuItem} onClick={() => { onShare(note); setMenuOpen(false) }}>Share</button>
+              <button style={bnote.menuItem} onClick={() => { onMemorize?.(note); setMenuOpen(false) }}>Memorize</button>
               <button style={bnote.menuItem} onClick={() => { onEdit(note); setMenuOpen(false) }}>Edit</button>
               <button style={{ ...bnote.menuItem, color: '#e53e3e' }} onClick={() => { onDelete(note); setMenuOpen(false) }}>Delete</button>
             </div>
@@ -996,6 +998,7 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
   const [shareNote, setShareNote] = useState(null)
   const [deleteNote, setDeleteNote] = useState(null)
   const [celebrating, setCelebrating] = useState(false)
+  const [memorizeConfirm, setMemorizeConfirm] = useState(null) // { incoming, existing } | null
 
   // Sync when initialBook prop changes
   useEffect(() => { setBook(initialBook) }, [initialBook])
@@ -1020,6 +1023,25 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
     saveBook(updatedBook, userId)
     setBook(updatedBook)
     onChange(updatedBook)
+  }
+
+  function handleMemorize(note) {
+    const incoming = {
+      noteId: note.id,
+      bookId: book.id,
+      bookTitle: book.title,
+      bookAuthor: book.author || '',
+      type: note.type,
+      text: note.text,
+      page: note.page || null,
+      percent: note.percent != null ? note.percent : null,
+    }
+    const existing = getMemorizeNote()
+    if (existing) {
+      setMemorizeConfirm({ incoming, existing })
+    } else {
+      setMemorizeNote(incoming)
+    }
   }
 
   /** Returns 0–100 progress for a book object based on its notes */
@@ -1183,6 +1205,7 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
             onDelete={setDeleteNote}
             onShare={setShareNote}
             onCopy={handleCopy}
+            onMemorize={handleMemorize}
           />
         ))
       }
@@ -1204,6 +1227,36 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
             <div style={bmodal.confirmActions}>
               <button style={bmodal.cancelBtn} onClick={() => setDeleteNote(null)}>Cancel</button>
               <button style={bmodal.deleteBtn} onClick={() => handleDeleteNote(deleteNote)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {memorizeConfirm && (
+        <div style={bmodal.overlay} onClick={() => setMemorizeConfirm(null)}>
+          <div style={{ ...bmodal.sheet, maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div style={bmodal.confirmTitle}>Replace memory note?</div>
+            <div style={{ padding:'0 16px 12px', borderBottom:'1px solid var(--border)' }}>
+              <p style={{ fontSize:12, color:'var(--ink-muted)', margin:'0 0 4px' }}>Current ({memorizeConfirm.existing.type}):</p>
+              <p style={{ fontSize:13, color:'var(--ink)', margin:'0 0 2px', fontStyle: memorizeConfirm.existing.type === 'quote' ? 'italic' : 'normal',
+                display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                {memorizeConfirm.existing.type === 'quote' ? `"${memorizeConfirm.existing.text}"` : memorizeConfirm.existing.text}
+              </p>
+              <p style={{ fontSize:11, color:'var(--teal)', margin:0 }}>— {memorizeConfirm.existing.bookTitle}</p>
+            </div>
+            <div style={{ padding:'12px 16px 4px' }}>
+              <p style={{ fontSize:12, color:'var(--ink-muted)', margin:'0 0 4px' }}>Replace with ({memorizeConfirm.incoming.type}):</p>
+              <p style={{ fontSize:13, color:'var(--ink)', margin:'0 0 2px', fontStyle: memorizeConfirm.incoming.type === 'quote' ? 'italic' : 'normal',
+                display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                {memorizeConfirm.incoming.type === 'quote' ? `"${memorizeConfirm.incoming.text}"` : memorizeConfirm.incoming.text}
+              </p>
+              <p style={{ fontSize:11, color:'var(--teal)', margin:'0 0 12px' }}>— {memorizeConfirm.incoming.bookTitle}</p>
+            </div>
+            <div style={bmodal.confirmActions}>
+              <button style={bmodal.cancelBtn} onClick={() => setMemorizeConfirm(null)}>Cancel</button>
+              <button
+                style={{ ...bmodal.deleteBtn, background:'var(--teal)', borderColor:'var(--teal)' }}
+                onClick={() => { setMemorizeNote(memorizeConfirm.incoming); setMemorizeConfirm(null) }}
+              >Replace</button>
             </div>
           </div>
         </div>

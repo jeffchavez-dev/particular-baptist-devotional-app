@@ -47,6 +47,7 @@ import {
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
+import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -743,6 +744,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Share + confession modals */
   const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
+
+  /* Memorize confirm — { incoming: {verseKey,ref,text,version}, existing: {...} } */
+  const [memorizeConfirm, setMemorizeConfirm] = useState(null)
 
   /* Annotations — plain state, always written by reading fresh from localStorage */
   const [highlights, setHighlights] = useState(() => loadHighlights())
@@ -2061,6 +2065,30 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     navigator.clipboard.writeText(lines.join('\n\n')).catch(() => {})
     setCopiedKey('selection')
     setTimeout(() => { setCopiedKey(null); setSelectedVerses(new Set()) }, 1500)
+  }
+
+  /* ── Memorize verse ── */
+  function handleMemorizeVerse() {
+    if (selectedVerses.size !== 1) return
+    const [verseKey] = [...selectedVerses]
+    const [, bk, ch, vn] = verseKey.split('|')
+    const pool = (version === 'greek' || version === 'hebrew') ? morphSegments : segments
+    let text = ''
+    for (const seg of pool) {
+      if (seg.book === bk && String(seg.chapter) === ch) {
+        const vObj = seg.verses?.find(ve => String(ve.verse) === vn)
+        if (vObj) { text = vObj.text || ''; break }
+      }
+    }
+    const abbr = BIBLE_VERSIONS.find(v2 => v2.id === version)?.abbreviation || version.toUpperCase()
+    const incoming = { verseKey, ref: `${bk} ${ch}:${vn}`, text, version: abbr }
+    const existing = getMemorizeVerse()
+    if (existing) {
+      setMemorizeConfirm({ incoming, existing })
+    } else {
+      setMemorizeVerse(incoming)
+      clearSelection()
+    }
   }
 
   /* ── Share helpers ── */
@@ -3954,6 +3982,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 </svg>
               </button>
             )}
+
+            {/* Memorize — single verse only */}
+            <button
+              style={{ ...r.floatingBtn, ...(selectedVerses.size !== 1 ? { opacity:0.35, cursor:'default' } : {}) }}
+              onClick={selectedVerses.size === 1 ? handleMemorizeVerse : undefined}
+              title={selectedVerses.size !== 1 ? 'Select a single verse to memorize' : 'Add to memory'}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2C5.24 2 3 4.24 3 7c0 1.85 1.01 3.47 2.5 4.34V13h5v-1.66A5 5 0 0013 7c0-2.76-2.24-5-5-5z"
+                  stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                <path d="M5.5 13h5M6.5 15h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
           </div>
 
           {/* Color picker row — shown when highlight is tapped */}
@@ -3991,6 +4032,38 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         onClose={() => setShareCard(null)}
         card={shareCard}
       />
+
+      {/* Memorize verse — replace confirm */}
+      {memorizeConfirm && (
+        <div style={r.modalBackdrop} onClick={() => setMemorizeConfirm(null)}>
+          <div style={{ ...r.authorRefModalBox, maxWidth:340 }} onClick={e => e.stopPropagation()}>
+            <div style={r.authorRefModalHeader}>
+              <span style={{ fontSize:14, fontWeight:700, color:'var(--ink)' }}>Replace memory verse?</span>
+              <button style={r.confCloseBtn} onClick={() => setMemorizeConfirm(null)}>✕</button>
+            </div>
+            <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)' }}>
+              <p style={{ fontSize:12, color:'var(--ink-muted)', margin:'0 0 6px' }}>Current:</p>
+              <p style={{ fontSize:13, fontStyle:'italic', color:'var(--ink)', margin:'0 0 2px' }}>"{memorizeConfirm.existing.text}"</p>
+              <p style={{ fontSize:11, color:'var(--teal)', margin:0 }}>{memorizeConfirm.existing.ref} · {memorizeConfirm.existing.version}</p>
+            </div>
+            <div style={{ padding:'12px 16px 4px' }}>
+              <p style={{ fontSize:12, color:'var(--ink-muted)', margin:'0 0 6px' }}>Replace with:</p>
+              <p style={{ fontSize:13, fontStyle:'italic', color:'var(--ink)', margin:'0 0 2px' }}>"{memorizeConfirm.incoming.text}"</p>
+              <p style={{ fontSize:11, color:'var(--teal)', margin:0 }}>{memorizeConfirm.incoming.ref} · {memorizeConfirm.incoming.version}</p>
+            </div>
+            <div style={{ display:'flex', gap:8, padding:'12px 16px 16px', justifyContent:'flex-end' }}>
+              <button
+                style={{ fontSize:13, padding:'6px 16px', borderRadius:6, border:'1px solid var(--border)', background:'var(--surface)', color:'var(--ink-muted)', cursor:'pointer' }}
+                onClick={() => setMemorizeConfirm(null)}
+              >Cancel</button>
+              <button
+                style={{ fontSize:13, padding:'6px 16px', borderRadius:6, border:'none', background:'var(--teal)', color:'#fff', cursor:'pointer', fontWeight:600 }}
+                onClick={() => { setMemorizeVerse(memorizeConfirm.incoming); setMemorizeConfirm(null); clearSelection() }}
+              >Replace</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Confession modal */}
       {confessionModal && (

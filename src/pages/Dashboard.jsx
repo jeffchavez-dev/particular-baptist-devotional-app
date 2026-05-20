@@ -4,6 +4,7 @@ import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDa
 import { useAuth, usePrefs } from '../App'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
+import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
 
 /* ── Progress sessionStorage cache ─────────────────────────────────── */
 const DASH_CACHE_KEY = 'pb-dash-progress'
@@ -121,6 +122,20 @@ export default function Dashboard() {
   const [bookmarks,    setBookmarks]    = useState(() => getBookmarks())
   const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
   const [todaySeeMore, setTodaySeeMore] = useState(false)
+
+  /* ── Memory slots ── */
+  const [memorizeVerse, setMemorizeVerseState] = useState(() => getMemorizeVerse())
+  const [memorizeNote,  setMemorizeNoteState]  = useState(() => getMemorizeNote())
+
+  // Keep in sync when other pages write to the slots
+  useEffect(() => {
+    function sync() {
+      setMemorizeVerseState(getMemorizeVerse())
+      setMemorizeNoteState(getMemorizeNote())
+    }
+    window.addEventListener('pb-memorize-changed', sync)
+    return () => window.removeEventListener('pb-memorize-changed', sync)
+  }, [])
 
   /* search: user's notes + quote data */
   const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
@@ -360,6 +375,67 @@ export default function Dashboard() {
                 >
                   Open full reading →
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Memory section ── */}
+        {(memorizeVerse || memorizeNote) && (
+          <div style={s.memorizeSection}>
+            <div style={s.memorizeHeader}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink:0 }}>
+                <path d="M8 2C5.24 2 3 4.24 3 7c0 1.85 1.01 3.47 2.5 4.34V13h5v-1.66A5 5 0 0013 7c0-2.76-2.24-5-5-5z"
+                  stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round" fill="rgba(0,139,139,0.1)"/>
+                <path d="M5.5 13h5M6.5 15h3" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              <span style={s.memorizeHeaderText}>Memory</span>
+            </div>
+
+            {memorizeVerse && (
+              <div style={s.memorizeCard}>
+                <div style={s.memorizeCardTop}>
+                  <span style={s.memorizeTypeBadge}>✦ Scripture</span>
+                  <span style={s.memorizeRef}>{memorizeVerse.ref}</span>
+                  <span style={s.memorizeVersion}>{memorizeVerse.version}</span>
+                  <button
+                    style={s.memorizeClearBtn}
+                    onClick={() => { clearMemorizeVerse(); setMemorizeVerseState(null) }}
+                    title="Remove from memory"
+                  >×</button>
+                </div>
+                <p style={{ ...s.memorizeText, fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx }}>
+                  {memorizeVerse.text}
+                </p>
+              </div>
+            )}
+
+            {memorizeNote && (
+              <div style={{ ...s.memorizeCard, borderLeftColor: memorizeNote.type === 'quote' ? '#d4a84c' : 'var(--teal)' }}>
+                <div style={s.memorizeCardTop}>
+                  <span style={{ ...s.memorizeTypeBadge, color: memorizeNote.type === 'quote' ? '#b8860b' : 'var(--teal)',
+                    background: memorizeNote.type === 'quote' ? 'rgba(212,168,76,0.1)' : 'rgba(0,139,139,0.08)' }}>
+                    {memorizeNote.type === 'quote' ? '❝ Quote' : '✍ Note'}
+                  </span>
+                  <span style={s.memorizeRef}>{memorizeNote.bookTitle}</span>
+                  {memorizeNote.bookAuthor && <span style={s.memorizeVersion}>{memorizeNote.bookAuthor}</span>}
+                  <button
+                    style={s.memorizeClearBtn}
+                    onClick={() => { clearMemorizeNote(); setMemorizeNoteState(null) }}
+                    title="Remove from memory"
+                  >×</button>
+                </div>
+                <p style={{ ...s.memorizeText, fontStyle: memorizeNote.type === 'quote' ? 'italic' : 'normal',
+                  fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx }}>
+                  {memorizeNote.type === 'quote' && <span style={{ color:'var(--ink-faint)', marginRight:2 }}>"</span>}
+                  {memorizeNote.text}
+                  {memorizeNote.type === 'quote' && <span style={{ color:'var(--ink-faint)', marginLeft:2 }}>"</span>}
+                </p>
+                {(memorizeNote.page || memorizeNote.percent != null) && (
+                  <p style={s.memorizeLocation}>
+                    {memorizeNote.page ? `p. ${memorizeNote.page}` : `${memorizeNote.percent}%`}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -605,6 +681,49 @@ const s = {
   readFullBtn: {
     background:'none', border:'none', cursor:'pointer', fontSize:12,
     color:'var(--ink-faint)', padding:0, fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* memory */
+  memorizeSection: {
+    marginBottom:'1.25rem',
+  },
+  memorizeHeader: {
+    display:'flex', alignItems:'center', gap:6,
+    marginBottom:8,
+  },
+  memorizeHeaderText: {
+    fontSize:10, fontWeight:700, textTransform:'uppercase',
+    letterSpacing:'0.09em', color:'var(--teal)',
+  },
+  memorizeCard: {
+    background:'var(--surface)', border:'1px solid var(--border)',
+    borderLeft:'3px solid var(--teal)',
+    borderRadius:'var(--radius)', padding:'12px 14px',
+    marginBottom:8,
+  },
+  memorizeCardTop: {
+    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6,
+  },
+  memorizeTypeBadge: {
+    fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99,
+    background:'rgba(0,139,139,0.08)', color:'var(--teal)',
+    textTransform:'uppercase', letterSpacing:'0.06em', flexShrink:0,
+  },
+  memorizeRef: {
+    fontSize:12, fontWeight:600, color:'var(--ink)', flexShrink:0,
+  },
+  memorizeVersion: {
+    fontSize:11, color:'var(--ink-faint)', flexShrink:0,
+  },
+  memorizeClearBtn: {
+    marginLeft:'auto', background:'none', border:'none', cursor:'pointer',
+    fontSize:16, color:'var(--ink-faint)', padding:'0 2px', lineHeight:1, flexShrink:0,
+  },
+  memorizeText: {
+    margin:0, color:'var(--ink)', lineHeight:1.6,
+  },
+  memorizeLocation: {
+    margin:'6px 0 0', fontSize:11, color:'var(--ink-faint)',
   },
 
   /* stats */

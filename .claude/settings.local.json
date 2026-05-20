@@ -204,7 +204,25 @@
       "mcp__Claude_in_Chrome__browser_batch",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
       "Bash(cat vite.config.js)",
-      "Bash(cat vite.config.ts)"
+      "Bash(cat vite.config.ts)",
+      "WebFetch(domain:fetch.bible)",
+      "WebFetch(domain:api.fetch.bible)",
+      "WebFetch(domain:collection.fetch.bible)",
+      "WebFetch(domain:v1.fetch.bible)",
+      "Bash(curl -s \"https://v1.fetch.bible/manifest.json\")",
+      "Bash(curl -s \"https://v1.fetch.bible/bibles/eng_bsb/txt/matthew.json\")",
+      "Bash(curl -s \"https://v1.fetch.bible/bibles/eng_bsb/html/matthew.json\")",
+      "Bash(curl -s \"https://v1.fetch.bible/bibles/eng_bsb/extra.json\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://v1.fetch.bible/bibles/eng_bsb/usx/matthew.usx\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://v1.fetch.bible/bibles/eng_bsb/usfm/matthew.usfm\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://v1.fetch.bible/bibles/eng_bsb/html/mat.json\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://v1.fetch.bible/bibles/eng_bsb/txt/mat.json\")",
+      "Bash(curl -s \"https://v1.fetch.bible/bibles/eng_bsb/txt/mat.json\")",
+      "Bash(curl -s \"https://v1.fetch.bible/bibles/eng_bsb/html/mat.json\")",
+      "Bash(node scripts/download-translations.mjs)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
