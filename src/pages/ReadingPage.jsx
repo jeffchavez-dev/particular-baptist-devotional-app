@@ -674,7 +674,7 @@ export default function ReadingPage() {
                     <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   </svg>
                 </button>
-                <span style={s.bibleHint}>Tap to read in KJV · check when done</span>
+                <span style={s.bibleHint}>Tap to read · check when done</span>
               </div>
               <button
                 onClick={toggleBibleChapter}
