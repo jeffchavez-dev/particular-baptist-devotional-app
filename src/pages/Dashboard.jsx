@@ -6,7 +6,6 @@ import { getFontCss } from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
 import ShareCardModal from '../components/ShareCardModal'
-import { BookNoteShareModal } from '../components/BookLibraryTab'
 
 /* ── Progress sessionStorage cache ─────────────────────────────────── */
 const DASH_CACHE_KEY = 'pb-dash-progress'
@@ -129,7 +128,7 @@ export default function Dashboard() {
   const [memorizeVerse, setMemorizeVerseState] = useState(() => getMemorizeVerse())
   const [memorizeNote,  setMemorizeNoteState]  = useState(() => getMemorizeNote())
   const [shareMemVerse, setShareMemVerse] = useState(false)   // open ShareCardModal for verse
-  const [shareMemNote,  setShareMemNote]  = useState(false)   // open BookNoteShareModal for note
+  const [shareMemNote,  setShareMemNote]  = useState(false)   // open ShareCardModal for note
 
   // Keep in sync when other pages write to the slots
   useEffect(() => {
@@ -676,20 +675,19 @@ export default function Dashboard() {
 
     {/* ── Share memorized note ── */}
     {shareMemNote && memorizeNote && (
-      <BookNoteShareModal
-        note={{
-          id: memorizeNote.noteId,
-          type: memorizeNote.type,
-          text: memorizeNote.text,
-          page: memorizeNote.page,
-          percent: memorizeNote.percent,
-        }}
-        book={{
-          id: memorizeNote.bookId,
-          title: memorizeNote.bookTitle,
-          author: memorizeNote.bookAuthor,
-        }}
+      <ShareCardModal
+        isOpen={shareMemNote && !!memorizeNote}
         onClose={() => setShareMemNote(false)}
+        card={{
+          type:       memorizeNote.type === 'quote' ? 'book_quote' : 'book_note',
+          noteType:   memorizeNote.type,
+          text:       memorizeNote.text,
+          bookTitle:  memorizeNote.bookTitle,
+          bookAuthor: memorizeNote.bookAuthor,
+          bookLabels: null,
+          page:       memorizeNote.page,
+          percent:    memorizeNote.percent,
+        }}
       />
     )}
     </>

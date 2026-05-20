@@ -14,14 +14,14 @@ function getLogoImg() {
 
 /* ── Background presets ── */
 const PRESETS = [
-  { id:'ink',       label:'Deep Ink',      type:'solid',    bg:'#1a1410',               textColor:'#f5f0e8', accentColor:'#c9a84c' },
-  { id:'parchment', label:'Parchment',     type:'gradient', bg:['#f5f0e8','#ddd5c5'],  textColor:'#1a1410', accentColor:'#8a6d2e' },
-  { id:'ancient',   label:'17th Century',  type:'gradient', bg:['#d8b86a','#9a7020'],  textColor:'#0e0400', accentColor:'#7a1408' },
-  { id:'forest',    label:'Forest',        type:'gradient', bg:['#1a3a2a','#0d2418'],  textColor:'#e8f5f0', accentColor:'#7ec8b0' },
-  { id:'royal',     label:'Royal',         type:'gradient', bg:['#2d1b4e','#1a0f2e'],  textColor:'#e8e0f8', accentColor:'#a87ee8' },
-  { id:'teal',      label:'Deep Teal',     type:'gradient', bg:['#1a3a38','#0d2220'],  textColor:'#e0f5f4', accentColor:'#7ecfc8' },
-  { id:'amber',     label:'Amber',         type:'gradient', bg:['#4a3210','#2a1e08'],  textColor:'#f5ece0', accentColor:'#d4a84c' },
-  { id:'custom',    label:'Custom',        type:'solid',    bg:'#ffffff',              textColor:'#1a1410', accentColor:'#8a6d2e' },
+  { id:'ink',       label:'Deep Ink',      type:'solid',    bg:'#1a1410',              textColor:'#f5f0e8', accentColor:'#c9a84c' },
+  { id:'parchment', label:'Parchment',     type:'gradient', bg:['#f5f0e8','#ddd5c5'], textColor:'#1a1410', accentColor:'#8a6d2e' },
+  { id:'ancient',   label:'17th Century',  type:'gradient', bg:['#d8b86a','#9a7020'], textColor:'#0e0400', accentColor:'#7a1408' },
+  { id:'forest',    label:'Forest',        type:'gradient', bg:['#1a3a2a','#0d2418'], textColor:'#e8f5f0', accentColor:'#7ec8b0' },
+  { id:'royal',     label:'Royal',         type:'gradient', bg:['#2d1b4e','#1a0f2e'], textColor:'#e8e0f8', accentColor:'#a87ee8' },
+  { id:'teal',      label:'Deep Teal',     type:'gradient', bg:['#1a3a38','#0d2220'], textColor:'#e0f5f4', accentColor:'#7ecfc8' },
+  { id:'amber',     label:'Amber',         type:'gradient', bg:['#4a3210','#2a1e08'], textColor:'#f5ece0', accentColor:'#d4a84c' },
+  { id:'custom',    label:'Custom',        type:'solid',    bg:'#ffffff',             textColor:'#1a1410', accentColor:'#8a6d2e' },
 ]
 
 const CARD_SCALE_MIN     = 0.5
@@ -50,6 +50,9 @@ const HEBREW_RE = /[֐-׿יִ-ﭏ]/
 function hasHebrew(str) { return HEBREW_RE.test(str || '') }
 const HEBREW_FONT = "'Noto Serif Hebrew','Frank Ruhl Libre','Arial Hebrew','David','SBL Hebrew',serif"
 
+// Explicit Unicode escape so no editor can strip the invisible character
+const LTR = '‎'   // LEFT-TO-RIGHT MARK — zero-width, prevents bidi reordering of trailing punctuation
+
 /* ── Canvas helpers ── */
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath()
@@ -66,19 +69,17 @@ function roundRect(ctx, x, y, w, h, r) {
 
 /**
  * Word-wrap text onto the canvas.
- * align: 'left' | 'center' | 'right' — sets ctx.textAlign and calculates drawX.
- * Always forces ctx.direction = 'ltr' to prevent bidi punctuation reordering.
+ * align: 'left' | 'center' | 'right'
+ * Always forces ctx.direction = 'ltr' and prepends LTR mark to every drawn line
+ * to prevent the Unicode BiDi algorithm from reordering trailing punctuation.
  */
 function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 'left') {
   if (!text) return y
-  ctx.direction = 'ltr'   // ← prevent bidi bleed from Hebrew segments
+  ctx.direction = 'ltr'
   ctx.textAlign = align
   const drawX = align === 'right'  ? x + maxWidth
               : align === 'center' ? x + maxWidth / 2
               : x
-  // ‎ = LEFT-TO-RIGHT MARK — zero-width, forces LTR on the platform's
-  // bidi engine so a trailing period is never reordered to the front of the line.
-  const LTR = '‎'
   const paragraphs = text.split(/\n+/)
   let currentY = y, linesDrawn = 0
   for (const para of paragraphs) {
@@ -101,7 +102,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 99, align = 
   return currentY
 }
 
-/* ── Background ── */
+/* ── Solid/gradient background ── */
 function applyBackground(ctx, preset, w, h, customBg) {
   if (preset.type === 'gradient' && Array.isArray(preset.bg)) {
     const grd = ctx.createLinearGradient(0, 0, 0, h)
@@ -130,7 +131,7 @@ function drawTopChrome(ctx, w, h, PAD, accentColor, source) {
   ctx.fillStyle = srcColors.bg
   roundRect(ctx, PAD, sourceY - bFontSz - bPadY, bW, bH, bH / 2); ctx.fill()
   ctx.fillStyle = srcColors.text
-  ctx.fillText(bLabel, PAD + bPadX, sourceY)
+  ctx.fillText(LTR + bLabel, PAD + bPadX, sourceY)
   return sourceY
 }
 
@@ -160,13 +161,9 @@ function contentGeometry(textPosition, w, h, PAD, refDim, afterY, formatId) {
   const isRight  = textPosition === 'right'
   const isBottom = textPosition === 'bottom'
   const isCenter = textPosition === 'center'
-  // Landscape uses wider columns (card is short, side-by-side looks better)
-  // Square/Story use narrower column so the other side has visual breathing room
-  const colFrac  = formatId === 'wide' ? 0.48 : 0.52
-  // Bottom start point — relative to card height so it's proportional per format
-  const bottomFrac  = formatId === 'wide' ? 0.38 : formatId === 'story' ? 0.56 : 0.50
-  // Center start point — vertically centered on the card
-  const centerFrac  = formatId === 'wide' ? 0.28 : formatId === 'story' ? 0.36 : 0.32
+  const colFrac    = formatId === 'wide' ? 0.48 : 0.52
+  const bottomFrac = formatId === 'wide' ? 0.38 : formatId === 'story' ? 0.56 : 0.50
+  const centerFrac = formatId === 'wide' ? 0.28 : formatId === 'story' ? 0.36 : 0.32
   return {
     contentX:    isRight ? Math.round(w - PAD - (w - PAD * 2) * colFrac) : PAD,
     contentW:    (isLeft || isRight) ? Math.round((w - PAD * 2) * colFrac) : w - PAD * 2,
@@ -176,7 +173,7 @@ function contentGeometry(textPosition, w, h, PAD, refDim, afterY, formatId) {
   }
 }
 
-/* ── Reading / Note card ── */
+/* ── Reading / Note card (devotional, confession, scripture) ── */
 function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, formatId) {
   const refDim   = Math.min(w, h)
   const sourceY  = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
@@ -225,17 +222,22 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, lo
     contentY += refDim * 0.05
   }
 
-  /* Decorative quote mark — follows text alignment so the change is visible */
+  /* Decorative quote mark — follows text alignment */
   const qMarkSzR = Math.round(refDim * 0.10)
-  const qGlyph   = isHeb ? '״' : '“'  // ״ for Hebrew, " for LTR
-  const qX = effAlign === 'right'  ? contentX + contentW + refDim * 0.008
-           : effAlign === 'center' ? contentX + contentW / 2
-           : contentX - refDim * 0.008  // left (default)
+  const qGlyph   = isHeb ? '״' : '“'
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.18
   ctx.font      = `${qMarkSzR}px 'Georgia',serif`
   ctx.direction = 'ltr'
-  ctx.textAlign = effAlign === 'right' ? 'right' : effAlign === 'center' ? 'center' : 'left'
-  ctx.fillText(qGlyph, qX, contentY + refDim * 0.045)
+  if (effAlign === 'right') {
+    ctx.textAlign = 'right'
+    ctx.fillText(qGlyph, contentX + contentW, contentY + refDim * 0.045)
+  } else if (effAlign === 'center') {
+    ctx.textAlign = 'center'
+    ctx.fillText(qGlyph, contentX + contentW / 2, contentY + refDim * 0.045)
+  } else {
+    ctx.textAlign = 'left'
+    ctx.fillText(qGlyph, contentX, contentY + refDim * 0.045)
+  }
   ctx.globalAlpha = 1
 
   /* Content body */
@@ -252,7 +254,6 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, lo
     ctx.direction = 'rtl'; ctx.textAlign = 'right'
     const drawX = contentX + contentW - refDim * 0.04
     const txtW  = contentW - refDim * 0.04
-    // Hebrew: wrap manually keeping RTL intact
     const words = (card.text || '').split(' ').filter(Boolean)
     let line = '', lineCount = 0, cy = contentY + refDim * 0.02
     for (const word of words) {
@@ -292,13 +293,12 @@ function drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, lo
   drawBottomChrome(ctx, w, h, PAD, accentColor, finalBottom, logoImg)
 }
 
-/* ── Quote card ── */
+/* ── Quote card (book quotes from reading page) ── */
 function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, formatId) {
   const refDim  = Math.min(w, h)
   const sourceY = drawTopChrome(ctx, w, h, PAD, accentColor, card.source)
   const { contentX, contentW, blockStartY } = contentGeometry(textPosition, w, h, PAD, refDim, sourceY + refDim * 0.025, formatId)
 
-  /* Section heading */
   let headY = blockStartY
   const showLabel = metaShown.label !== false && card.label
   if (showLabel) {
@@ -313,10 +313,9 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logo
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.2
   ctx.font      = `${qMarkSz}px 'Georgia',serif`
   ctx.direction = 'ltr'; ctx.textAlign = 'left'
-  ctx.fillText('"', contentX - refDim * 0.01, headY + qMarkSz * 0.52)
+  ctx.fillText('“', contentX - refDim * 0.01, headY + qMarkSz * 0.52)
   ctx.globalAlpha = 1
 
-  /* Quote text */
   const qSz      = Math.round(refDim * 0.038 * scale), qLineH = qSz * 1.85
   const maxLines = Math.max(4, Math.floor((h * 0.65) / qLineH))
   ctx.fillStyle  = textColor
@@ -324,14 +323,12 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logo
   const indentX  = textAlign === 'left' ? refDim * 0.04 : 0
   const quoteBottom = wrapText(ctx, card.text || '', contentX + indentX, headY + refDim * 0.025, contentW - indentX, qLineH, maxLines, textAlign)
 
-  /* Closing quote — right-anchored */
   ctx.fillStyle = accentColor; ctx.globalAlpha = 0.25
   ctx.font      = `${Math.round(refDim * 0.07)}px 'Georgia',serif`
   ctx.direction = 'ltr'; ctx.textAlign = 'right'
-  ctx.fillText('"', contentX + contentW, quoteBottom)
+  ctx.fillText('”', contentX + contentW, quoteBottom)
   ctx.globalAlpha = 1
 
-  /* Attribution */
   let finalBottom = quoteBottom
   const attribY   = Math.min(quoteBottom + refDim * 0.07, h * 0.87)
   if (metaShown.title !== false && card.title) {
@@ -351,8 +348,108 @@ function drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logo
   drawBottomChrome(ctx, w, h, PAD, accentColor, finalBottom, logoImg)
 }
 
+/* ── Book note / quote card (from My Library book shelf) ── */
+function drawBookNoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, formatId) {
+  const refDim = Math.min(w, h)
+
+  // ── Top rule ──
+  ctx.save()
+  ctx.globalAlpha = 0.35; ctx.strokeStyle = accentColor
+  ctx.lineWidth = Math.round(refDim * 0.003)
+  ctx.beginPath(); ctx.moveTo(PAD, PAD * 0.6); ctx.lineTo(w - PAD, PAD * 0.6); ctx.stroke()
+  ctx.restore()
+
+  // ── Book title badge ──
+  const badgeFontSz = Math.round(refDim * 0.028)
+  ctx.font = `600 ${badgeFontSz}px 'DM Sans', sans-serif`
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
+  const titleText  = card.bookTitle || 'Unknown Book'
+  const badgePadX  = Math.round(refDim * 0.022), badgePadY = Math.round(refDim * 0.012)
+  const badgeH     = badgeFontSz + badgePadY * 2, badgeW = ctx.measureText(titleText).width + badgePadX * 2
+  const badgeY     = Math.round(PAD * 0.75), badgeR = badgeH / 2
+  const showBookTitle = metaShown.bookTitle !== false
+
+  if (showBookTitle) {
+    ctx.save(); ctx.globalAlpha = 0.3; ctx.fillStyle = accentColor
+    roundRect(ctx, PAD, badgeY, badgeW, badgeH, badgeR); ctx.fill(); ctx.restore()
+    ctx.fillStyle = accentColor
+    ctx.fillText(LTR + titleText, PAD + badgePadX, badgeY + badgePadY + badgeFontSz * 0.78)
+  }
+
+  // Note-type badge
+  const typeBadgeX = showBookTitle ? PAD + badgeW + Math.round(refDim * 0.015) : PAD
+  const typeLabel  = card.noteType === 'quote' ? '❝ Quote' : '✍ Note'
+  ctx.font = `500 ${badgeFontSz}px 'DM Sans', sans-serif`
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
+  ctx.save(); ctx.globalAlpha = 0.2; ctx.fillStyle = textColor
+  roundRect(ctx, typeBadgeX, badgeY, ctx.measureText(typeLabel).width + badgePadX * 2, badgeH, badgeR); ctx.fill(); ctx.restore()
+  ctx.fillStyle = textColor; ctx.globalAlpha = 0.7
+  ctx.fillText(LTR + typeLabel, typeBadgeX + badgePadX, badgeY + badgePadY + badgeFontSz * 0.78)
+  ctx.globalAlpha = 1
+
+  // ── Content block geometry ──
+  const badgeBottom = badgeY + badgeH
+  const { contentX, contentW, blockStartY } = contentGeometry(textPosition, w, h, PAD, refDim, badgeBottom + Math.round(refDim * 0.08), formatId)
+
+  // ── Category tags ──
+  let catBottom = blockStartY
+  const showCategory = metaShown.category !== false && card.bookLabels?.length
+  if (showCategory) {
+    const catSz = Math.round(refDim * 0.020)
+    ctx.font = `500 ${catSz}px 'DM Sans', sans-serif`
+    ctx.fillStyle = accentColor; ctx.globalAlpha = 0.7
+    wrapText(ctx, card.bookLabels.join(' · '), contentX, blockStartY, contentW, catSz * 1.5, 1, textAlign)
+    ctx.globalAlpha = 1
+    catBottom = blockStartY + catSz * 1.5
+  }
+
+  // ── Decorative open-quote ──
+  const textY = catBottom
+  const quoteFontSz = Math.round(refDim * 0.18)
+  ctx.save(); ctx.globalAlpha = 0.15; ctx.fillStyle = accentColor
+  ctx.font = `bold ${quoteFontSz}px Georgia, serif`
+  ctx.direction = 'ltr'; ctx.textAlign = 'left'
+  ctx.fillText('“', contentX - Math.round(refDim * 0.01), textY + quoteFontSz * 0.75)
+  ctx.restore()
+
+  // ── Main text ──
+  const mainFontSz   = Math.round(refDim * 0.048 * scale)
+  const mainLineH    = mainFontSz * 1.55
+  const maxLines     = Math.max(3, Math.floor((h * 0.52) / mainLineH))
+  ctx.fillStyle = textColor
+  ctx.font = card.noteType === 'quote'
+    ? `italic ${mainFontSz}px Georgia, serif`
+    : `${mainFontSz}px 'DM Sans', sans-serif`
+  const endY = wrapText(ctx, card.text || '', contentX, textY, contentW, mainLineH, maxLines, textAlign)
+
+  // ── Author attribution ──
+  let finalBottom = endY
+  const showAuthor = metaShown.author !== false && card.bookAuthor
+  if (showAuthor) {
+    const attrFontSz = Math.round(refDim * 0.032)
+    const attrY      = endY + Math.round(refDim * 0.035)
+    ctx.fillStyle = accentColor
+    ctx.font = `500 ${attrFontSz}px 'DM Sans', sans-serif`
+    wrapText(ctx, `— ${card.bookAuthor}`, contentX, attrY, contentW, attrFontSz * 1.4, 1, textAlign)
+    finalBottom = attrY + attrFontSz * 0.3
+    const locParts = []
+    if (card.page) locParts.push(`p. ${card.page}`)
+    if (card.percent != null) locParts.push(`${card.percent}%`)
+    if (locParts.length) {
+      const subFontSz = Math.round(refDim * 0.026)
+      ctx.font = `${subFontSz}px 'DM Sans', sans-serif`
+      ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
+      wrapText(ctx, locParts.join(' · '), contentX, attrY + attrFontSz * 1.6, contentW, subFontSz * 1.4, 1, textAlign)
+      ctx.globalAlpha = 1
+      finalBottom = attrY + attrFontSz * 1.6 + subFontSz * 0.3
+    }
+  }
+
+  drawBottomChrome(ctx, w, h, PAD, accentColor, finalBottom, logoImg)
+}
+
 /* ── Master draw dispatcher ── */
-async function drawCard(canvas, card, preset, format, customBg, customText, scale, logoImg, textPosition, textAlign, metaShown, coverPhoto) {
+async function drawCard(canvas, card, preset, format, customBg, customText, scale, logoImg, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg) {
   const { w, h } = format
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
@@ -360,9 +457,20 @@ async function drawCard(canvas, card, preset, format, customBg, customText, scal
   let textColor   = preset.id === 'custom' ? (customText || '#1a1410') : preset.textColor
   let accentColor = preset.accentColor
 
-  if (coverPhoto) {
+  const isBook = card.type === 'book_note' || card.type === 'book_quote'
+
+  // Determine background photo source
+  let bgSrc = null
+  if (isBook && useCoverBg && (card.bookCoverData || card.bookCoverUrl)) {
+    bgSrc = card.bookCoverData || card.bookCoverUrl
+  } else if (!isBook && uploadedPhoto) {
+    bgSrc = uploadedPhoto
+  }
+
+  if (bgSrc) {
     await new Promise(resolve => {
       const img = new Image()
+      if (typeof bgSrc === 'string' && bgSrc.startsWith('http')) img.crossOrigin = 'anonymous'
       img.onload = () => {
         const imgRatio = img.width / img.height
         const canvasRatio = w / h
@@ -377,15 +485,18 @@ async function drawCard(canvas, card, preset, format, customBg, customText, scal
         resolve()
       }
       img.onerror = () => { applyBackground(ctx, preset, w, h, customBg); resolve() }
-      img.src = coverPhoto
+      img.src = bgSrc
     })
-    textColor = '#f5f0e8'; accentColor = '#c9a84c'
+    textColor   = '#f5f0e8'
+    accentColor = isBook ? '#d4a84c' : '#c9a84c'
   } else {
     applyBackground(ctx, preset, w, h, customBg)
   }
 
   ctx.textBaseline = 'alphabetic'
-  if (card.type === 'quote') {
+  if (isBook) {
+    drawBookNoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, format.id)
+  } else if (card.type === 'quote') {
     drawQuoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, format.id)
   } else {
     drawReadingCard(ctx, card, w, h, PAD, textColor, accentColor, scale, logoImg, textPosition, textAlign, metaShown, format.id)
@@ -399,15 +510,33 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   const [preset,       setPreset]    = useState(PRESETS[0])
   const [format,       setFormat]    = useState(FORMATS[0])
   const [customBg,     setCustomBg]  = useState('#f5f0e8')
-  const [customText, setCustomText]  = useState('#1a1410')
-  const [cardScale,  setCardScale]   = useState(CARD_SCALE_DEFAULT)
+  const [customText,   setCustomText]  = useState('#1a1410')
+  const [cardScale,    setCardScale]   = useState(CARD_SCALE_DEFAULT)
   const [textPosition, setTextPosition] = useState('top')
   const [textAlign,    setTextAlign]    = useState('left')
   const [metaShown,    setMetaShown]    = useState({ title:true, version:true, label:true, refs:true })
-  const [coverPhoto,   setCoverPhoto]   = useState(null)   // dataURL | null
+  const [uploadedPhoto, setUploadedPhoto] = useState(null)   // dataURL — for non-book types
+
+  const isBook = card?.type === 'book_note' || card?.type === 'book_quote'
+  const hasCover = isBook && !!(card?.bookCoverData || card?.bookCoverUrl)
+
+  // For book types: toggle to use book cover as bg (default on if cover exists)
+  const [useCoverBg, setUseCoverBg] = useState(false)
+
+  // Reset useCoverBg whenever a new card opens
+  useEffect(() => {
+    if (isOpen && card) setUseCoverBg(hasCover)
+  }, [isOpen, card]) // eslint-disable-line
 
   const availableMeta = useMemo(() => {
     if (!card) return {}
+    if (isBook) {
+      return {
+        bookTitle: !!(card.bookTitle),
+        author:    !!(card.bookAuthor),
+        category:  !!(card.bookLabels?.length),
+      }
+    }
     const isQuote = card.type === 'quote'
     return {
       title:   !!(card.title),
@@ -415,14 +544,27 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
       label:   !!(card.label),
       refs:    !!(card.refs),
     }
-  }, [card])
+  }, [card, isBook])
 
-  const metaLabels = useMemo(() => ({
-    title:   card?.type === 'quote' ? 'Author'        : 'Reference',
-    version: card?.type === 'quote' ? 'Work / Source' : 'Version',
-    label:   'Section Label',
-    refs:    'Proof Texts',
-  }), [card])
+  const metaLabels = useMemo(() => {
+    if (isBook) return { bookTitle: 'Book Title', author: 'Author', category: 'Category' }
+    return {
+      title:   card?.type === 'quote' ? 'Author'        : 'Reference',
+      version: card?.type === 'quote' ? 'Work / Source' : 'Version',
+      label:   'Section Label',
+      refs:    'Proof Texts',
+    }
+  }, [card, isBook])
+
+  // Reset metaShown when card type changes
+  useEffect(() => {
+    if (!card) return
+    if (isBook) {
+      setMetaShown({ bookTitle: true, author: true, category: !!(card.bookLabels?.length) })
+    } else {
+      setMetaShown({ title: true, version: true, label: true, refs: true })
+    }
+  }, [card?.type]) // eslint-disable-line
 
   useEffect(() => {
     if (!isOpen || !card) return
@@ -430,13 +572,13 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
       const canvas = canvasRef.current; if (!canvas) return
       try {
         const logo = await getLogoImg()
-        await drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo, textPosition, textAlign, metaShown, coverPhoto)
+        await drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg)
       } catch (err) { console.error('[ShareCard]', err) }
     }
     render()
     const t = setTimeout(render, 120)
     return () => clearTimeout(t)
-  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown, coverPhoto])
+  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg])
 
   useEffect(() => {
     if (!isOpen) return
@@ -449,8 +591,9 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
 
   function getBlob() { return new Promise(r => canvasRef.current.toBlob(r, 'image/png')) }
   function filename() {
-    const slug = card?.type === 'quote' ? 'quote' : card?.type === 'note' ? 'note' : 'reading'
-    return `pb-${slug}-day${card?.day || ''}-${preset.id}.png`
+    const slug = isBook ? (card?.noteType === 'quote' ? 'book-quote' : 'book-note')
+               : card?.type === 'quote' ? 'quote' : card?.type === 'note' ? 'note' : 'reading'
+    return `pb-${slug}-${preset.id}.png`
   }
   async function shareNative() {
     setSharing(true)
@@ -474,7 +617,9 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
 
   if (!isOpen) return null
 
-  const typeLabel  = card?.type === 'quote' ? 'Quote' : card?.type === 'note' ? 'My Reflection' : card?.source
+  const typeLabel  = isBook
+    ? (card?.noteType === 'quote' ? 'Book Quote' : 'Book Note')
+    : card?.type === 'quote' ? 'Quote' : card?.type === 'note' ? 'My Reflection' : card?.source
   const metaKeys   = Object.entries(availableMeta).filter(([, v]) => v).map(([k]) => k)
   const toggleMeta = key => setMetaShown(p => ({ ...p, [key]: p[key] === false }))
 
@@ -524,7 +669,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             <div style={m.hint}>{format.hint}</div>
           </div>
 
-          {/* Position + Align dropdowns in one row */}
+          {/* Position + Align */}
           <div style={{ display:'flex', gap:10 }}>
             <div style={{ ...m.section, flex:1 }}>
               <label style={m.label} htmlFor="sc-position">Text Position</label>
@@ -556,7 +701,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             </div>
           </div>
 
-          {/* Show Fields — checkbox toggles */}
+          {/* Show Fields */}
           {metaKeys.length > 0 && (
             <div style={m.section}>
               <div style={m.label}>Show Fields</div>
@@ -567,15 +712,10 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
                     <label key={key} style={m.fieldRow}>
                       <span style={{ fontSize:12, color:'var(--ink-muted)', flex:1 }}>{metaLabels[key]}</span>
                       <div
-                        style={{
-                          ...m.toggle,
-                          background: on ? 'var(--teal)' : 'var(--border-strong)',
-                        }}
+                        style={{ ...m.toggle, background: on ? 'var(--teal)' : 'var(--border-strong)' }}
                         onClick={() => toggleMeta(key)}
-                        role="switch"
-                        aria-checked={on}
-                        tabIndex={0}
-                        onKeyDown={e => e.key === 'Enter' || e.key === ' ' ? toggleMeta(key) : null}
+                        role="switch" aria-checked={on} tabIndex={0}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleMeta(key)}
                       >
                         <div style={{ ...m.toggleThumb, transform: on ? 'translateX(14px)' : 'translateX(2px)' }} />
                       </div>
@@ -586,46 +726,89 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             </div>
           )}
 
-          {/* Background Photo */}
+          {/* Background section — conditional on card type */}
           <div style={m.section}>
-            <div style={m.label}>Background Photo <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— overrides color preset</span></div>
-            {coverPhoto ? (
-              <div style={{display:'flex', alignItems:'center', gap:10}}>
-                <img src={coverPhoto} alt="" style={{width:44, height:44, objectFit:'cover', borderRadius:6, border:'1.5px solid var(--border)', flexShrink:0}} />
-                <span style={{fontSize:12, color:'var(--ink-muted)', flex:1}}>Custom photo applied</span>
-                <button onClick={() => setCoverPhoto(null)} style={{fontSize:12, color:'#c0392b', background:'none', border:'1px solid #c0392b', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", flexShrink:0}}>Remove</button>
-              </div>
+            {isBook ? (
+              <>
+                <div style={m.label}>Background</div>
+                {/* Book cover toggle */}
+                {hasCover && (
+                  <div style={m.fieldsList}>
+                    <label style={m.fieldRow}>
+                      <div style={{display:'flex', alignItems:'center', gap:8, flex:1}}>
+                        <img
+                          src={card.bookCoverData || card.bookCoverUrl}
+                          alt=""
+                          style={{width:28, height:36, objectFit:'cover', borderRadius:3, border:'1px solid var(--border)', flexShrink:0}}
+                        />
+                        <span style={{fontSize:12, color:'var(--ink-muted)'}}>Use book cover as background</span>
+                      </div>
+                      <div
+                        style={{ ...m.toggle, background: useCoverBg ? 'var(--teal)' : 'var(--border-strong)' }}
+                        onClick={() => setUseCoverBg(v => !v)}
+                        role="switch" aria-checked={useCoverBg} tabIndex={0}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setUseCoverBg(v => !v)}
+                      >
+                        <div style={{ ...m.toggleThumb, transform: useCoverBg ? 'translateX(14px)' : 'translateX(2px)' }} />
+                      </div>
+                    </label>
+                  </div>
+                )}
+                {/* Preset swatches when not using cover */}
+                {!useCoverBg && (
+                  <>
+                    <div style={m.row}>
+                      {PRESETS.map(p => (
+                        <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
+                          ...m.swatch,
+                          background: p.id === 'custom' ? 'conic-gradient(#ff6b6b 0deg,#ffd93d 90deg,#6bcb77 180deg,#4d96ff 270deg,#ff6b6b 360deg)' : Array.isArray(p.bg) ? `linear-gradient(135deg,${p.bg[0]},${p.bg[1]})` : p.bg,
+                          outline: preset.id === p.id ? '2.5px solid var(--teal)' : '2px solid transparent', outlineOffset:2,
+                        }} />
+                      ))}
+                    </div>
+                    <div style={m.presetName}>{preset.label}</div>
+                  </>
+                )}
+              </>
             ) : (
-              <button onClick={() => fileInputRef.current?.click()} style={{...m.chip, display:'inline-flex', alignItems:'center', gap:6, width:'fit-content'}}>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 5l3.5-4L10 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 10.5h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                Upload Photo
-              </button>
-            )}
-            <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={e => {
-              const file = e.target.files?.[0]; if (!file) return
-              const reader = new FileReader()
-              reader.onload = ev => setCoverPhoto(ev.target.result)
-              reader.readAsDataURL(file)
-              e.target.value = ''
-            }} />
-          </div>
-
-          {/* Background */}
-          <div style={m.section}>
-            <div style={m.label}>Background</div>
-            <div style={m.row}>
-              {PRESETS.map(p => (
-                <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
-                  ...m.swatch,
-                  background: p.id === 'custom' ? 'conic-gradient(#ff6b6b 0deg,#ffd93d 90deg,#6bcb77 180deg,#4d96ff 270deg,#ff6b6b 360deg)' : Array.isArray(p.bg) ? `linear-gradient(135deg,${p.bg[0]},${p.bg[1]})` : p.bg,
-                  outline: preset.id === p.id ? '2.5px solid var(--teal)' : '2px solid transparent', outlineOffset:2,
+              <>
+                <div style={m.label}>Background Photo <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,color:'var(--ink-faint)'}}>— overrides color preset</span></div>
+                {uploadedPhoto ? (
+                  <div style={{display:'flex', alignItems:'center', gap:10}}>
+                    <img src={uploadedPhoto} alt="" style={{width:44, height:44, objectFit:'cover', borderRadius:6, border:'1.5px solid var(--border)', flexShrink:0}} />
+                    <span style={{fontSize:12, color:'var(--ink-muted)', flex:1}}>Custom photo applied</span>
+                    <button onClick={() => setUploadedPhoto(null)} style={{fontSize:12, color:'#c0392b', background:'none', border:'1px solid #c0392b', borderRadius:6, padding:'4px 10px', cursor:'pointer', fontFamily:"'DM Sans',sans-serif", flexShrink:0}}>Remove</button>
+                  </div>
+                ) : (
+                  <button onClick={() => fileInputRef.current?.click()} style={{...m.chip, display:'inline-flex', alignItems:'center', gap:6, width:'fit-content'}}>
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 5l3.5-4L10 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 10.5h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                    Upload Photo
+                  </button>
+                )}
+                <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={e => {
+                  const file = e.target.files?.[0]; if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = ev => setUploadedPhoto(ev.target.result)
+                  reader.readAsDataURL(file)
+                  e.target.value = ''
                 }} />
-              ))}
-            </div>
-            <div style={m.presetName}>{preset.label}</div>
+                {/* Color presets */}
+                <div style={m.row}>
+                  {PRESETS.map(p => (
+                    <button key={p.id} title={p.label} onClick={() => setPreset(p)} style={{
+                      ...m.swatch,
+                      background: p.id === 'custom' ? 'conic-gradient(#ff6b6b 0deg,#ffd93d 90deg,#6bcb77 180deg,#4d96ff 270deg,#ff6b6b 360deg)' : Array.isArray(p.bg) ? `linear-gradient(135deg,${p.bg[0]},${p.bg[1]})` : p.bg,
+                      outline: preset.id === p.id ? '2.5px solid var(--teal)' : '2px solid transparent', outlineOffset:2,
+                    }} />
+                  ))}
+                </div>
+                <div style={m.presetName}>{preset.label}</div>
+              </>
+            )}
           </div>
 
-          {preset.id === 'custom' && (
+          {/* Custom colors (non-book only when not using cover, or book when not using cover) */}
+          {(!useCoverBg) && preset.id === 'custom' && (
             <div style={m.section}>
               <div style={m.colorRow}>
                 <label style={m.colorLabel}><span style={m.label}>Background</span><input type="color" value={customBg} onChange={e => setCustomBg(e.target.value)} style={m.colorInput} /></label>
@@ -686,7 +869,7 @@ const m = {
   scaleBtn: { width:40, height:40, borderRadius:'var(--radius)', border:'1.5px solid var(--border)', cursor:'pointer', fontFamily:"'Georgia',serif", display:'flex', alignItems:'center', justifyContent:'center', background:'var(--parchment)', color:'var(--ink)' },
   scaleCurrent: { flex:1, textAlign:'center', fontSize:12, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif", fontWeight:600 },
   fieldsList: { display:'flex', flexDirection:'column', gap:0, border:'1px solid var(--border)', borderRadius:'var(--radius)', overflow:'hidden' },
-  fieldRow:   { display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:'var(--parchment)', cursor:'pointer', borderBottom:'1px solid var(--border)', ':lastChild':{ borderBottom:'none' } },
+  fieldRow:   { display:'flex', alignItems:'center', gap:10, padding:'9px 12px', background:'var(--parchment)', cursor:'pointer', borderBottom:'1px solid var(--border)' },
   toggle:     { width:30, height:18, borderRadius:9, position:'relative', flexShrink:0, cursor:'pointer', transition:'background 0.2s' },
   toggleThumb:{ position:'absolute', top:2, width:14, height:14, borderRadius:'50%', background:'white', transition:'transform 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.25)' },
   swatch:     { width:34, height:34, borderRadius:8, cursor:'pointer', flexShrink:0, border:'none', transition:'outline 0.12s' },

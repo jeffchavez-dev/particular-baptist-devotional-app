@@ -2048,28 +2048,61 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function shareSelection() {
-    const { lines, hebrewRefs, script } = buildSelectionLines()
+    const isMorphVers = version === 'greek' || version === 'hebrew'
+    const isGreek  = version === 'greek'
+    const isHebrew = version === 'hebrew'
+    const pool = isMorphVers ? morphSegments : segments
     const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
-    const isHebrew = script === 'hebrew'
 
-    // For Hebrew: body = pure script text (no mixed LTR ref), refs go into label
-    // This lets the canvas render the body cleanly RTL without bidi fighting
-    const shareText = isHebrew
-      ? lines.map(l => {
-          // Strip the "Book Ch:V — " prefix that was added for copy; keep only script
-          const dashIdx = l.indexOf(' — ')
-          return dashIdx >= 0 ? l.slice(dashIdx + 3) : l
-        }).join('\n')
-      : lines.join('\n\n')
+    // Sort selected verses by chapter then verse number
+    const sortedKeys = [...selectedVerses].sort((a, b) => {
+      const [,, ca, va] = a.split('|')
+      const [,, cb, vb] = b.split('|')
+      if (Number(ca) !== Number(cb)) return Number(ca) - Number(cb)
+      return Number(va) - Number(vb)
+    })
+
+    // Build clean verse texts (no "Book Ch:V — " prefix) + Hebrew refs
+    const verseTexts = []
+    const hebrewRefs = []
+    for (const vk of sortedKeys) {
+      const [, b, ch, v] = vk.split('|')
+      for (const seg of pool) {
+        if (seg.book === b && String(seg.chapter) === ch) {
+          const vObj = seg.verses.find(ve => String(ve.verse) === v)
+          if (vObj) {
+            const scriptText = isMorphVers ? vObj.words.map(w => w.w).join(' ') : null
+            if (isHebrew) {
+              hebrewRefs.push(`${b} ${ch}:${v}`)
+              verseTexts.push(scriptText)
+            } else {
+              verseTexts.push(isGreek ? scriptText : (vObj.text || ''))
+            }
+          }
+        }
+      }
+    }
+
+    // Build proper verse reference for the title (e.g. "John 3:16" or "John 3:16–18")
+    let verseRef = `${visBookRef.current} ${visChapterRef.current}`
+    if (sortedKeys.length > 0) {
+      const [, b, ch] = sortedKeys[0].split('|')
+      const vNums = sortedKeys.map(vk => vk.split('|')[3])
+      verseRef = vNums.length === 1
+        ? `${b} ${ch}:${vNums[0]}`
+        : `${b} ${ch}:${vNums[0]}–${vNums[vNums.length - 1]}`
+    }
+
+    const shareText = isHebrew ? verseTexts.join('\n') : verseTexts.join('\n\n')
 
     setShareCard({
       type:     'reading',
-      title:    `${visBookRef.current} ${visChapterRef.current}`,
+      title:    verseRef,
       subtitle: versMeta?.label || 'King James Version',
       source:   versMeta?.abbreviation || 'KJV',
       text:     shareText,
       label:    isHebrew ? hebrewRefs.join('  ·  ') : '',
-      script,
+      script:   isHebrew ? 'hebrew' : isGreek ? 'greek' : null,
     })
     setSelectedVerses(new Set())
   }
