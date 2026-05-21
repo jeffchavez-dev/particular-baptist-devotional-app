@@ -700,6 +700,7 @@ export default function ConfessionsPage() {
   const headerRef     = useRef(null)
   const prefsSizeRef  = useRef(prefs.sizePx)
   const didInitAnchorRef = useRef(false)
+  const searchInputRef = useRef(null)
 
   const [headerH,   setHeaderH]   = useState(53)
   const [chromeVis, setChromeVis] = useState(true)
@@ -772,6 +773,11 @@ export default function ConfessionsPage() {
       window.removeEventListener('pb-note-changed', onNoteChanged)
     }
   }, [])
+
+  /* Focus search input when panel opens (avoid keyboard popup on page load) */
+  useEffect(() => {
+    if (searchPanelOpen) searchInputRef.current?.focus()
+  }, [searchPanelOpen])
 
   /* Fetch chapter descriptions whenever the active tab changes */
   useEffect(() => {
@@ -1369,7 +1375,7 @@ export default function ConfessionsPage() {
             <path d="M9.5 9.5L12 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
           </svg>
           <input
-            autoFocus
+            ref={searchInputRef}
             style={srp.input}
             value={search}
             onChange={e => {

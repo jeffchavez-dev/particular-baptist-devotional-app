@@ -177,12 +177,14 @@ export default function ScripturePage() {
   }, []) // intentionally empty — all values accessed via refs
 
   /* Deep-link from devotional/confessional: navigate to specific book/chapter/verse.
-     If the link also specifies a version (e.g. from KjvModal), switch to it first. */
+     If the link also specifies a version (e.g. from KjvModal), switch to it first.
+     NOTE: pendingDeepLinkRef.current is NOT cleared until inside the setTimeout so
+     that React StrictMode's double-invocation (cleanup → re-run) doesn't consume the
+     ref before the timer actually fires. */
   const pendingDeepLinkRef = useRef(locationState?.book ? locationState : null)
   useEffect(() => {
     if (!pendingDeepLinkRef.current) return
     const { book: b, chapter: ch, verse: v, version: ver } = pendingDeepLinkRef.current
-    pendingDeepLinkRef.current = null
 
     // Auto-enable study mode when deep-linked to a specific verse
     // (so the user's note on that verse is immediately visible)
@@ -202,6 +204,9 @@ export default function ScripturePage() {
     }
 
     const timer = setTimeout(() => {
+      // Clear the ref here — inside the callback — so StrictMode's second effect
+      // invocation still has a ref to read and can start its own (surviving) timer.
+      pendingDeepLinkRef.current = null
       kjvRef.current?.navigateTo(b, ch, v)
     }, needsVersionSwitch ? 250 : 150) // extra time when version is also switching
     return () => clearTimeout(timer)
