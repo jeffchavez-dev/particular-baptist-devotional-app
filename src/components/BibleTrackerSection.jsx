@@ -452,7 +452,10 @@ function PlanTab({ userId }) {
 
 function PlanTabAuth({ userId }) {
   /* ── State ── */
-  const [plans,      setPlans]      = useState(() => getAllPlans())
+  // Sync legacy pb-plan-progress → pb-bible-plans on mount so that any progress
+  // recorded while this component wasn't mounted (e.g. checks from Dashboard) is
+  // reflected immediately when the user opens My Plan.
+  const [plans,      setPlans]      = useState(() => { syncActivePlanFromLegacy(); return getAllPlans() })
   const [activeId,   setActiveId]   = useState(() => getActivePlanId())
   const [editorOpen, setEditorOpen] = useState(() => !getAllPlans().length)
   const [editingId,  setEditingId]  = useState(null) // null=creating new, string=editing existing
@@ -485,9 +488,30 @@ function PlanTabAuth({ userId }) {
   const activePlan        = plans.find(p => p.id === effectiveActiveId) || plans[0] || null
   const activeConfig      = activePlan ? planToConfig(activePlan) : null
   const activeProgress    = activePlan ? planToProgress(activePlan) : null
-  const todayChapters     = activeConfig ? getCurrentPlanChapters(activeConfig, activeProgress) : null
   const isRest            = activeConfig ? isTodayRestDay(activeConfig) : false
   const isComplete        = activeConfig ? isPlanComplete(activeConfig, activeProgress) : false
+
+  // When all chapters for today have been marked done, currentIndex has already
+  // advanced to the next day's reading. Show the just-completed day's chapters
+  // instead so the card reads "Today's reading ✓ Done — Matthew 1" rather than
+  // confusingly showing "✓ Done — Matthew 2".
+  const planDoneToday = activeProgress?.lastAdvancedDate === new Date().toISOString().slice(0, 10)
+  const cpd           = activeConfig?.chaptersPerDay || 1
+  const todayChapters = useMemo(() => {
+    if (!activeConfig) return null
+    if (planDoneToday) {
+      const completedStartIdx = (activeProgress?.currentIndex ?? 0) - cpd
+      if (completedStartIdx < 0) return null
+      const allChapters = computePlanChapters(activeConfig)
+      const result = []
+      for (let i = 0; i < cpd; i++) {
+        const ch = allChapters[completedStartIdx + i]
+        if (ch) result.push(ch)
+      }
+      return result.length ? result : null
+    }
+    return getCurrentPlanChapters(activeConfig, activeProgress)
+  }, [activeConfig, planDoneToday, activeProgress?.currentIndex, cpd])
 
   /* ── Actions ── */
   function refresh() {

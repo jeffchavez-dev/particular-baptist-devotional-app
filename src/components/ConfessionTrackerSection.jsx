@@ -311,8 +311,21 @@ function ConfActivePlanCard({ config, progress, onEdit, onAdvance, onRetreat, on
   const doneToday = progress?.lastAdvancedDate === todayStr
   const isRest    = isTodayConfRestDay(config)
   const complete  = isConfPlanComplete(config, progress)
-  const todayItem = (!complete && !isRest) ? getCurrentConfItem(config, progress) : null
   const stats     = getConfPlanStats(config, progress)
+
+  // When done today, currentIndex has already advanced to the next item.
+  // Resolve back to the item that was actually completed today so the card
+  // shows "Today's reading ✓ Done — Article 1" rather than "✓ Done — Article 2".
+  const todayItem = useMemo(() => {
+    if (complete || isRest) return null
+    if (doneToday && (progress?.currentIndex ?? 0) > 0) {
+      const items = computeConfItems(config.planId)
+      const completedIdx = (progress?.currentIndex ?? 0) - 1
+      if (config.mode === 'year') return items[completedIdx % items.length] || null
+      return items[completedIdx] || null
+    }
+    return getCurrentConfItem(config, progress)
+  }, [config, progress, complete, isRest, doneToday])
 
   return (
     <div style={{ ...c.card, ...c.cardActive }}>
