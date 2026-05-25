@@ -117,13 +117,20 @@ function buildOrthodoxItems() {
 
 /**
  * Returns the ordered list of items for a given planId.
- * 'all' = 2LBCF → Catechism → 1LBCF → Orthodox (default order)
+ * 'three' = 2LBCF → Catechism → 1LBCF  (default companion plan)
+ * 'all'   = 2LBCF → Catechism → 1LBCF → Orthodox (legacy / all four)
  */
 export function computeConfItems(planId) {
-  if (planId === '1lbcf')    return buildLBCF1Items()
-  if (planId === '2lbcf')    return buildLBCF2Items()
+  if (planId === '1lbcf')     return buildLBCF1Items()
+  if (planId === '2lbcf')     return buildLBCF2Items()
   if (planId === 'catechism') return buildCatechismItems()
   if (planId === 'orthodox')  return buildOrthodoxItems()
+  if (planId === 'three')
+    return [
+      ...buildLBCF2Items(),
+      ...buildCatechismItems(),
+      ...buildLBCF1Items(),
+    ]
   if (planId === 'all')
     return [
       ...buildLBCF2Items(),

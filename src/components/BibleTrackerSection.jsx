@@ -179,7 +179,7 @@ function PlanCard({
         </div>
       )}
 
-      {/* Active plan: today's reading + mark done */}
+      {/* Active plan: today's reading (check-off is handled by the Chapter Tracker / Dashboard / Scripture page) */}
       {isActive && (
         <>
           {isComplete && (
@@ -190,22 +190,17 @@ function PlanCard({
           )}
           {!isComplete && !isRest && todayChapters && (
             <div style={p.todayBox}>
-              <div style={p.todayLabel}>Today&apos;s reading</div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:4, marginBottom:8 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
+                <div style={p.todayLabel}>Today&apos;s reading</div>
+                {doneToday && (
+                  <span style={{ fontSize:11, color:'var(--teal)', fontWeight:600 }}>✓ Done</span>
+                )}
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                 {todayChapters.map(ch => (
                   <span key={ch} style={p.todayChip}>{ch}</span>
                 ))}
               </div>
-              {doneToday ? (
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>✓ Marked done</span>
-                  <button onClick={onRetreat} style={p.undoBtn}>Undo</button>
-                </div>
-              ) : (
-                <button onClick={onMarkDone} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px' }}>
-                  Mark done ✓
-                </button>
-              )}
             </div>
           )}
         </>

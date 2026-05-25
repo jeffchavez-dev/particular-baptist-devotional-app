@@ -14,7 +14,6 @@ import {
   getConfPlanStats, isTodayConfRestDay, computeConfItems,
 } from '../lib/confessionPlan'
 import { getLocalProgress, buildSchedule, getOrthodoxForDay, ORTHODOX_Q_COUNT } from '../lib/supabase'
-import { loadPrefs } from '../components/FontPrefsPanel'
 
 const SCHEDULE = buildSchedule()
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -36,9 +35,6 @@ const CONF_META = {
 
 function useConfessionStats(supabaseProgress) {
   return useMemo(() => {
-    const prefs = loadPrefs()
-    const includeOrthodox = !!prefs.includeOrthodox
-
     const completedDays = new Set()
     if (supabaseProgress) {
       supabaseProgress.forEach(r => { if (r.completed) completedDays.add(r.day_number) })
@@ -54,19 +50,16 @@ function useConfessionStats(supabaseProgress) {
       stats[src] = { total: days.length, done, pct: days.length ? Math.round(done / days.length * 100) : 0 }
     }
 
-    if (includeOrthodox) {
-      const covered = new Set()
-      completedDays.forEach(day => covered.add(getOrthodoxForDay(day)))
-      stats['Orthodox'] = {
-        total: ORTHODOX_Q_COUNT,
-        done:  covered.size,
-        pct:   Math.round(covered.size / ORTHODOX_Q_COUNT * 100),
-      }
+    // Orthodox Catechism — always shown; tracked via modular day mapping
+    const covered = new Set()
+    completedDays.forEach(day => covered.add(getOrthodoxForDay(day)))
+    stats['Orthodox'] = {
+      total: ORTHODOX_Q_COUNT,
+      done:  covered.size,
+      pct:   Math.round(covered.size / ORTHODOX_Q_COUNT * 100),
     }
 
-    const activeKeys = includeOrthodox
-      ? ['2LBCF', 'Catechism', '1LBCF', 'Orthodox']
-      : ['2LBCF', 'Catechism', '1LBCF']
+    const activeKeys = ['2LBCF', 'Catechism', '1LBCF', 'Orthodox']
 
     const complete = activeKeys.filter(k => {
       const s = stats[k]; return s && s.total > 0 && s.done === s.total
@@ -129,7 +122,7 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onAdvan
     if (isGuest) return
     const newConfig = {
       planId:      plan.id,
-      mode:        'once',
+      mode:        plan.defaultMode || 'once',
       restDays:    [],
       startedDate: new Date().toISOString().slice(0, 10),
     }
@@ -327,6 +320,7 @@ export default function ConfessionTrackerSection({ supabaseProgress = null }) {
     setDraftRest(newConfig.restDays || [])
     setSettingsOpen(false)
   }
+
 
   function handleApplySettings(e) {
     e.preventDefault()

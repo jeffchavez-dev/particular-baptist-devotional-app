@@ -5,17 +5,19 @@
 
 export const CONF_PLANS = [
   {
-    id: 'all',
-    label: 'All Confessions',
-    description: 'All 4 in order: 2LBCF, Baptist Catechism, 1LBCF, Orthodox Catechism',
-    cyclic: false,   // read through once
+    id: 'three',
+    label: 'Three Confessions',
+    short: '3 Conf.',
+    description: '2LBCF · Baptist Catechism · 1LBCF — ~1 year companion plan',
+    cyclic: true,
+    defaultMode: 'year',  // spread evenly over 365 days by default
   },
   {
     id: '2lbcf',
     label: '2nd London Confession',
     short: '2LBCF',
     description: '32 chapters · 160 sections',
-    cyclic: true,    // supports yearly cycling
+    cyclic: true,
   },
   {
     id: 'catechism',
@@ -35,9 +37,21 @@ export const CONF_PLANS = [
     id: 'orthodox',
     label: 'Orthodox Catechism',
     short: 'Orthodox',
-    description: '148 Q&As',
+    description: '148 Q&As — An Orthodox Catechism by Hercules Collins',
     cyclic: true,
   },
 ]
 
-export const CONF_PLAN_BY_ID = Object.fromEntries(CONF_PLANS.map(p => [p.id, p]))
+// Legacy 'all' entry kept for backward-compat (users who had it saved)
+const LEGACY_ALL = {
+  id: 'all',
+  label: 'All Four Confessions',
+  short: 'All',
+  description: '2LBCF · Catechism · 1LBCF · Orthodox — read through once',
+  cyclic: false,
+}
+
+export const CONF_PLAN_BY_ID = {
+  ...Object.fromEntries(CONF_PLANS.map(p => [p.id, p])),
+  all: LEGACY_ALL,
+}
