@@ -196,20 +196,57 @@ export default function Dashboard() {
     return () => window.removeEventListener('pb-memorize-changed', sync)
   }, [])
 
+  /* ── Shared date string ── */
+  const todayStr = new Date().toISOString().slice(0, 10)
+
   /* ── Derived: scripture ── */
-  const todayChapters   = bibleConfig ? getCurrentPlanChapters(bibleConfig, bibleProgress) : null
-  const hasActiveBible  = !!bibleConfig && !!todayChapters
-  const bibleDay        = (bibleProgress?.currentIndex ?? 0) + 1
-  const bibleTotalDays  = bibleConfig ? computePlanChapters(bibleConfig).length : 0
+  const todayChapters  = bibleConfig ? getCurrentPlanChapters(bibleConfig, bibleProgress) : null
+  const bibleDoneToday = bibleProgress?.lastAdvancedDate === todayStr
+  const cpd            = bibleConfig?.chaptersPerDay || 1
+
+  /**
+   * When the user just checked all today's chapters, bibleProgress.currentIndex
+   * has already advanced to the NEXT day's reading. bibleDisplayChapters resolves
+   * back to the chapters that were completed today so the view stays on
+   * "Day 1 ✓ done" rather than jumping to "Day 2" immediately.
+   * The day resets to the new assignment when the calendar date changes.
+   */
+  const bibleDisplayChapters = useMemo(() => {
+    if (!bibleConfig) return null
+    if (bibleDoneToday) {
+      const completedStartIdx = (bibleProgress?.currentIndex ?? 0) - cpd
+      if (completedStartIdx < 0) return null
+      const allChapters = computePlanChapters(bibleConfig)
+      const result = []
+      for (let i = 0; i < cpd; i++) {
+        const ch = allChapters[completedStartIdx + i]
+        if (ch) result.push(ch)
+      }
+      return result.length ? result : null
+    }
+    return todayChapters
+  }, [bibleConfig, bibleDoneToday, bibleProgress?.currentIndex, cpd, todayChapters])
+
+  const hasActiveBible  = !!bibleConfig && !!bibleDisplayChapters
+  // Display index = first chapter index of the day being shown (today or just-completed day)
+  const bibleDisplayIdx = bibleDoneToday
+    ? Math.max(0, (bibleProgress?.currentIndex ?? 0) - cpd)
+    : (bibleProgress?.currentIndex ?? 0)
+  // Day number = which reading day we're on (1-based, accounts for multi-chapter days)
+  const bibleDay       = bibleConfig ? Math.floor(bibleDisplayIdx / cpd) + 1 : 1
+  // Total days = total chapters ÷ chapters-per-day
+  const bibleTotalDays = bibleConfig ? Math.ceil(computePlanChapters(bibleConfig).length / cpd) : 0
 
   /* ── Derived: confession ── */
   const confComplete  = confConfig ? isConfPlanComplete(confConfig, confProgress) : false
   const confRestDay   = confConfig ? isTodayConfRestDay(confConfig) : false
   const confItem      = (confConfig && !confComplete && !confRestDay) ? getCurrentConfItem(confConfig, confProgress) : null
   const hasActiveConf = !!confConfig && !confComplete && !confRestDay && !!confItem
-  const confDay       = (confProgress?.currentIndex ?? 0) + 1
-  const todayStr      = new Date().toISOString().slice(0, 10)
   const confDoneToday = confProgress?.lastAdvancedDate === todayStr
+  // When done today, show the day that was just completed (currentIndex − 1), not the next day
+  const confDay       = confDoneToday
+    ? (confProgress?.currentIndex ?? 0)
+    : (confProgress?.currentIndex ?? 0) + 1
 
   /**
    * When the user just marked today's item done, confItem points to the NEXT
@@ -289,7 +326,7 @@ export default function Dashboard() {
 
           {hasActiveBible ? (
             <div style={s.readingCard}>
-              {todayChapters.map(ch => {
+              {bibleDisplayChapters.map(ch => {
                 const done = !!bibleProgress2[ch]
                 return (
                   <div key={ch} style={s.assignedRow}>
@@ -310,6 +347,11 @@ export default function Dashboard() {
                   </div>
                 )
               })}
+              {bibleDoneToday && (
+                <div style={{ fontSize:11, color:'var(--teal)', fontWeight:600, paddingTop:2 }}>
+                  ✓ All done for today — next reading shows tomorrow
+                </div>
+              )}
             </div>
           ) : (
             <div style={s.noPlanCard}>
