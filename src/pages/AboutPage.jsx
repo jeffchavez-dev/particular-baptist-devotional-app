@@ -294,9 +294,10 @@ export default function AboutPage() {
   const handleReset = useCallback(async () => {
     setResetting(true)
     try {
-      // Devotional progress (365-day plan)
+      // ── Local storage ──────────────────────────────────────────────────────
+      // Bible chapter tracker (chapter-level checkmarks)
       localStorage.removeItem('pb-bible-progress')
-      // Bible tracker progress (chapter-level + multi-plan)
+      // Bible reading plans (multi-plan array + active-plan pointer)
       localStorage.removeItem('pb-bible-plans')
       localStorage.removeItem('pb-plan-active-id')
       clearPlanConfig()
@@ -305,11 +306,24 @@ export default function AboutPage() {
       clearConfPlanConfig()
       resetConfPlanProgress()
 
+      // ── Cloud (Supabase) ───────────────────────────────────────────────────
       if (session) {
-        await supabase.from('progress')
-          .update({ completed: false, updated_at: new Date().toISOString() })
-          .eq('user_id', session.user.id)
+        await Promise.all([
+          // Devotional day checkmarks — mark uncompleted (keep notes)
+          supabase.from('progress')
+            .update({ completed: false, updated_at: new Date().toISOString() })
+            .eq('user_id', session.user.id),
+          // Bible chapter tracker — delete all rows so syncDown won't restore them
+          supabase.from('pb_bible_progress')
+            .delete()
+            .eq('user_id', session.user.id),
+          // Bible reading plans — delete so syncMultiPlansDown won't restore old progress
+          supabase.from('pb_bible_plans')
+            .delete()
+            .eq('user_id', session.user.id),
+        ])
       } else {
+        // Guest: strip completed flags but keep any written notes
         const local = getLocalProgress()
         const cleaned = {}
         Object.entries(local).forEach(([day, d]) => {
@@ -317,6 +331,11 @@ export default function AboutPage() {
         })
         localStorage.setItem('devotional_guest_progress', JSON.stringify(cleaned))
       }
+
+      // Notify open pages to refresh their state
+      window.dispatchEvent(new CustomEvent('pb-plans-changed'))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'pb-bible-progress' }))
+
       setResetDone(true)
       setConfirmReset(false)
       setTimeout(() => setResetDone(false), 3500)
