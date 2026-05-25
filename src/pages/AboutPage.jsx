@@ -31,12 +31,17 @@ import {
 class SectionErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(err) { return { error: err } }
+  componentDidCatch(err, info) {
+    console.error('[SectionErrorBoundary]', err, info?.componentStack)
+  }
   render() {
     if (this.state.error) {
       return (
         <div style={{ padding:'16px', color:'var(--ink-muted)', fontSize:13, lineHeight:1.6 }}>
           <strong>Something went wrong</strong> loading this section.
-          <br />
+          <span style={{ display:'block', fontSize:11, color:'var(--ink-faint)', marginTop:4, fontFamily:'monospace', wordBreak:'break-all' }}>
+            {this.state.error?.message}
+          </span>
           <button
             onClick={() => this.setState({ error: null })}
             style={{ marginTop:8, fontSize:12, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0, textDecoration:'underline' }}

@@ -11,7 +11,7 @@ import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
 import { READING_PLANS, PLAN_BY_ID } from '../data/bibleReadingPlans'
 import {
-  getPlanProgress, savePlanProgress,
+  getPlanConfig, getPlanProgress, savePlanProgress,
   computePlanChapters, getCurrentPlanChapters,
   isTodayRestDay, isPlanComplete, getPlanStats, getPlanCompletions,
   advancePlan, retreatPlan,

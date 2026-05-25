@@ -114,13 +114,8 @@ export default function BottomNav() {
 
   function getTargetPath(tab) {
     if (tab.path !== '/') return tab.path
-    // Already reading a specific day → one tap takes you back to the dashboard
-    if (pathname.startsWith('/day/')) return '/'
-    // Already on the dashboard → stay
-    if (pathname === '/') return '/'
-    // Coming from another tab (scripture, confessions, library, about)
-    // → restore the last devotional page visited (specific day or dashboard)
-    try { return localStorage.getItem('pb-last-devotional-path') || '/' } catch { return '/' }
+    // Home always goes to the Dashboard (/)
+    return '/'
   }
 
   const desktopNav = isDesktop ? {
