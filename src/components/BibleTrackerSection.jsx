@@ -762,7 +762,7 @@ function CategoryBox({ cat, planByBook, bibBooks, progress, onToggle, isOpen, on
   )
 }
 
-function TestamentSection({ testament, categories, bibBooks, progress, onToggle, openCats, setOpenCat }) {
+function TestamentSection({ testament, categories, bibBooks, progress, onToggle, planByBook, openCats, setOpenCat }) {
   const isOT = testament === 'OT'
   const { total, done } = bibBooks.filter(b => b.testament === testament).reduce((acc, bk) => {
     acc.total += bk.chapters
@@ -806,7 +806,7 @@ function TestamentSection({ testament, categories, bibBooks, progress, onToggle,
         {categories.map(cat => (
           <CategoryBox
             key={cat.id} cat={cat}
-            planByBook={PLAN_BY_BOOK} bibBooks={bibBooks}
+            planByBook={planByBook} bibBooks={bibBooks}
             progress={progress}
             onToggle={onToggle}
             isOpen={openCats.has(cat.id)}
@@ -827,10 +827,11 @@ export default function BibleTrackerSection() {
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
 
-  const [activeTab, setActiveTab] = useState(() => getPlanConfig() ? 'plan' : 'tracker')
-  const [progress,  setProgress]  = useState(() => getBibleProgress())
-  const [openCats,  setOpenCats]  = useState(new Set())
+  const [activeTab,  setActiveTab]  = useState(() => getPlanConfig() ? 'plan' : 'tracker')
+  const [progress,   setProgress]   = useState(() => getBibleProgress())
+  const [openCats,   setOpenCats]   = useState(new Set())
   const [celebration, setCelebration] = useState(null)
+  const [planConfig, setPlanConfig] = useState(() => getPlanConfig())
 
   useEffect(() => {
     function onStorage(e) {
@@ -839,6 +840,32 @@ export default function BibleTrackerSection() {
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
+
+  // Keep planConfig in sync when the active plan changes
+  useEffect(() => {
+    function onPlanChanged() { setPlanConfig(getPlanConfig()) }
+    window.addEventListener('pb-plan-changed',  onPlanChanged)
+    window.addEventListener('pb-plans-changed', onPlanChanged)
+    return () => {
+      window.removeEventListener('pb-plan-changed',  onPlanChanged)
+      window.removeEventListener('pb-plans-changed', onPlanChanged)
+    }
+  }, [])
+
+  // Build a book→chapters map from the user's active plan (for "in plan" highlighting)
+  const activePlanByBook = useMemo(() => {
+    if (!planConfig) return {}
+    const chapters = computePlanChapters(planConfig)
+    const m = {}
+    chapters.forEach(chStr => {
+      const idx  = chStr.lastIndexOf(' ')
+      const book = chStr.slice(0, idx)
+      const ch   = parseInt(chStr.slice(idx + 1), 10)
+      if (!m[book]) m[book] = []
+      if (!m[book].includes(ch)) m[book].push(ch)
+    })
+    return m
+  }, [planConfig])
 
   function setOpenCat(id) {
     setOpenCats(prev => {
@@ -887,7 +914,9 @@ export default function BibleTrackerSection() {
               Track your personal Bible reading progress across all {TOTAL_CHAPTERS} chapters.
               <span style={{marginLeft:8, display:'inline-flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
                 <span style={t.legend}><span style={{...t.dot, background:'var(--teal)'}} />Read</span>
-                <span style={t.legend}><span style={{...t.dot, background:'var(--teal-light)', border:'1.5px solid rgba(29,107,90,0.35)'}} />In plan</span>
+                {planConfig && (
+                  <span style={t.legend}><span style={{...t.dot, background:'var(--teal-light)', border:'1.5px solid rgba(29,107,90,0.35)'}} />In your plan</span>
+                )}
                 <span style={t.legend}><span style={{...t.dot, background:'var(--surface)', border:'1.5px solid var(--border)'}} />Unread</span>
               </span>
             </p>
@@ -895,11 +924,13 @@ export default function BibleTrackerSection() {
           <TestamentSection
             testament="OT" categories={OT_CATEGORIES} bibBooks={BIBLE_BOOKS}
             progress={progress} onToggle={toggleChapter}
+            planByBook={activePlanByBook}
             openCats={openCats} setOpenCat={setOpenCat}
           />
           <TestamentSection
             testament="NT" categories={NT_CATEGORIES} bibBooks={BIBLE_BOOKS}
             progress={progress} onToggle={toggleChapter}
+            planByBook={activePlanByBook}
             openCats={openCats} setOpenCat={setOpenCat}
           />
         </div>
