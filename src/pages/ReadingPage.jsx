@@ -13,6 +13,11 @@ import CopyBtn from '../components/CopyBtn'
 import { parseRefs } from '../lib/parseRefs'
 import KjvModal from '../components/KjvModal'
 import { saveScroll, restoreScroll } from '../lib/pageState'
+import {
+  getPlanConfig, getPlanProgress, savePlanProgress,
+  getCurrentPlanChapters, advancePlan, retreatPlan,
+  isTodayRestDay, isPlanComplete, areTodayChaptersDone,
+} from '../lib/biblePlan'
 
 const SCHEDULE = buildSchedule()
 
@@ -483,24 +488,60 @@ export default function ReadingPage() {
   const isDesktopRef = useRef(window.innerWidth >= 768)
   const { prefs, updatePrefs } = usePrefs()
   const orthodoxContent = prefs.includeOrthodox ? getOrthodoxContent(day) : null
-  const bibleChapter = entry?.bibleChapter
+  // ── Bible reading plan integration ──────────────────────────────
+  const [planConfig,   setPlanConfig]   = useState(() => getPlanConfig())
+  const [planProgress, setPlanProgress] = useState(() => getPlanProgress())
+
+  // Re-read plan config/progress when another tab writes it
+  useEffect(() => {
+    function onPlanChanged() {
+      setPlanConfig(getPlanConfig())
+      setPlanProgress(getPlanProgress())
+    }
+    window.addEventListener('pb-plan-changed', onPlanChanged)
+    return () => window.removeEventListener('pb-plan-changed', onPlanChanged)
+  }, [])
+
+  // Decide which chapter to show: active plan → plan chapter; else → schedule chapter
+  const isRestDay    = isTodayRestDay(planConfig)
+  const planComplete = isPlanComplete(planConfig, planProgress)
+  const planChapters = (!isRestDay && !planComplete)
+    ? getCurrentPlanChapters(planConfig, planProgress)   // array or null
+    : null
+  const usingPlan = !!(planConfig && planChapters !== null && !planComplete)
+
+  // Primary chapter shown in the UI (first of planChapters, or schedule fallback)
+  const scheduleChapter = entry?.bibleChapter
     ? entry.bibleChapter.replace(/^(.*?)\s+(\d+)$/, (_, b, n) => `${normalizeBookName(b)} ${n}`)
     : null
+  const bibleChapter = usingPlan ? (planChapters?.[0] ?? null) : scheduleChapter
   const parsedBibleChapter = parseBibleChapterRef(bibleChapter)
-  const [bibleChapterDone, setBibleChapterDone] = useState(() =>
-    bibleChapter ? !!getBibleProgress()[bibleChapter] : false
-  )
+
+  // Done state: for plan mode check ALL of today's chapters; for schedule check one
+  const [bibleChapterDone, setBibleChapterDone] = useState(() => {
+    if (usingPlan && planChapters?.length) {
+      const prog = getBibleProgress()
+      return planChapters.every(ch => !!prog[ch])
+    }
+    return bibleChapter ? !!getBibleProgress()[bibleChapter] : false
+  })
+
   const [bookmarked, setBookmarked] = useState(() => isBookmarked(day))
 
-  /* Sync bibleChapterDone when KJV reader or Bible Tracker marks it externally */
+  /* Sync bibleChapterDone when KJV reader or Bible Tracker marks a chapter externally */
   useEffect(() => {
-    if (!bibleChapter) return
     function onStorage(e) {
-      if (e.key === BIBLE_KEY) setBibleChapterDone(!!getBibleProgress()[bibleChapter])
+      if (e.key !== BIBLE_KEY) return
+      const prog = getBibleProgress()
+      if (usingPlan && planChapters?.length) {
+        setBibleChapterDone(planChapters.every(ch => !!prog[ch]))
+      } else if (bibleChapter) {
+        setBibleChapterDone(!!prog[bibleChapter])
+      }
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [bibleChapter])
+  }, [bibleChapter, usingPlan, planChapters?.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     try { localStorage.setItem('pb-last-devotional-path', `/day/${day}`) } catch {}
@@ -583,8 +624,14 @@ export default function ReadingPage() {
     const newVal = !completed
     setCompleted(newVal)
     // Auto-mark the linked bible chapter when day is completed
-    if (newVal && bibleChapter && !bibleChapterDone) {
-      setBibleChapter(bibleChapter, true, session?.user?.id)
+    if (newVal && !bibleChapterDone) {
+      if (usingPlan && planChapters?.length) {
+        const { progress: newProg } = advancePlan(planConfig, planProgress, session?.user?.id)
+        savePlanProgress(newProg)
+        setPlanProgress(newProg)
+      } else if (bibleChapter) {
+        setBibleChapter(bibleChapter, true, session?.user?.id)
+      }
       setBibleChapterDone(true)
     }
     // Always write to localStorage so the next visit is instant / works offline
@@ -603,7 +650,23 @@ export default function ReadingPage() {
   function toggleBibleChapter() {
     const newVal = !bibleChapterDone
     setBibleChapterDone(newVal)
-    if (bibleChapter) setBibleChapter(bibleChapter, newVal, session?.user?.id)
+
+    if (usingPlan && planChapters?.length) {
+      if (newVal) {
+        // Advance plan: mark chapters done, move index forward
+        const { progress: newProg } = advancePlan(planConfig, planProgress, session?.user?.id)
+        savePlanProgress(newProg)
+        setPlanProgress(newProg)
+      } else {
+        // Un-check: retreat plan index
+        const newProg = retreatPlan(planConfig, planProgress, session?.user?.id)
+        savePlanProgress(newProg)
+        setPlanProgress(newProg)
+      }
+    } else if (bibleChapter) {
+      setBibleChapter(bibleChapter, newVal, session?.user?.id)
+    }
+
     // Checking the scripture chapter also marks the day as complete
     if (newVal && !completed) {
       setCompleted(true)
@@ -681,43 +744,81 @@ export default function ReadingPage() {
           <p style={s.readingDetail}>{entry.detail}</p>
         </div>
 
-        {/* Scripture Reading — shown first so the reader opens the passage before the confession */}
-        {bibleChapter && (
+        {/* Scripture Reading ─ plan mode / schedule fallback / rest day */}
+        {(bibleChapter || planConfig) && (
           <div className="card" style={s.bibleCard}>
-            <div style={s.bibleCardInner}>
-              <div style={s.bibleLeft}>
+
+            {/* Rest day */}
+            {isRestDay && (
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <span style={s.bibleLabel}>Scripture Reading</span>
-                <button
-                  style={s.bibleChapterBtn}
-                  onClick={() => parsedBibleChapter && setKjvModal(parsedBibleChapter)}
-                  title="Read chapter in KJV"
-                >
-                  {bibleChapter}
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{opacity:0.6, flexShrink:0}}>
-                    <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                  </svg>
-                </button>
-                <span style={s.bibleHint}>Tap to read · check when done</span>
+                <span style={{ fontSize:12, color:'var(--ink-faint)', fontStyle:'italic' }}>Rest day · no reading today</span>
               </div>
-              <button
-                onClick={toggleBibleChapter}
-                style={{
-                  ...s.bibleCheck,
-                  background: bibleChapterDone ? 'var(--teal)' : 'white',
-                  borderColor: bibleChapterDone ? 'var(--teal)' : 'var(--border-strong)',
-                }}
-                title={bibleChapterDone ? 'Mark unread' : 'Mark as read'}
-                aria-label={bibleChapterDone ? 'Mark unread' : 'Mark chapter as read'}
-              >
-                {bibleChapterDone && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            </div>
-            {bibleChapterDone && (
-              <div style={s.bibleReadBadge}>✓ Chapter read</div>
+            )}
+
+            {/* Plan complete */}
+            {!isRestDay && planComplete && (
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={s.bibleLabel}>Bible Plan</span>
+                <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>🎉 Plan complete!</span>
+              </div>
+            )}
+
+            {/* Normal reading card */}
+            {!isRestDay && !planComplete && bibleChapter && (
+              <div style={s.bibleCardInner}>
+                <div style={s.bibleLeft}>
+                  {/* Label row: "Scripture Reading" + plan badge if applicable */}
+                  <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                    <span style={s.bibleLabel}>Scripture Reading</span>
+                    {usingPlan && (
+                      <span style={s.planBadge}>My Plan</span>
+                    )}
+                  </div>
+
+                  {/* Chapter button(s) */}
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:2 }}>
+                    {(usingPlan ? planChapters : [bibleChapter]).map(ch => {
+                      const parsed = parseBibleChapterRef(ch)
+                      return (
+                        <button
+                          key={ch}
+                          style={s.bibleChapterBtn}
+                          onClick={() => parsed && setKjvModal(parsed)}
+                          title={`Read ${ch} in KJV`}
+                        >
+                          {ch}
+                          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{opacity:0.6, flexShrink:0}}>
+                            <path d="M2 9L9 2M9 2H5.5M9 2v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <span style={s.bibleHint}>Tap to read · check when done</span>
+                </div>
+
+                <button
+                  onClick={toggleBibleChapter}
+                  style={{
+                    ...s.bibleCheck,
+                    background: bibleChapterDone ? 'var(--teal)' : 'white',
+                    borderColor: bibleChapterDone ? 'var(--teal)' : 'var(--border-strong)',
+                  }}
+                  title={bibleChapterDone ? 'Mark unread' : 'Mark as read'}
+                  aria-label={bibleChapterDone ? 'Mark unread' : 'Mark chapter as read'}
+                >
+                  {bibleChapterDone && (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <polyline points="2,7 5.5,11 12,3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {bibleChapterDone && !isRestDay && !planComplete && (
+              <div style={s.bibleReadBadge}>✓ {usingPlan && planChapters?.length > 1 ? 'Chapters read' : 'Chapter read'}</div>
             )}
           </div>
         )}
@@ -1001,6 +1102,7 @@ const s = {
     textUnderlineOffset:3,
   },
   bibleHint: { fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" },
+  planBadge: { fontSize:9, fontWeight:700, letterSpacing:'0.06em', color:'var(--teal)', background:'var(--teal-light)', border:'1px solid rgba(29,107,90,0.25)', borderRadius:99, padding:'2px 7px' },
   bibleCheck: {
     width:36, height:36, borderRadius:'50%', border:'2px solid',
     cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',

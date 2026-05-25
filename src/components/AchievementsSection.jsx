@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { getLocalProgress, buildSchedule, getBibleProgress, getOrthodoxForDay, ORTHODOX_Q_COUNT, BIBLE_KEY } from '../lib/supabase'
 import { TOTAL_CHAPTERS } from '../lib/bibleBooks'
 import { loadPrefs } from '../components/FontPrefsPanel'
+import { getPlanCompletions, PLAN_COMPLETE_KEY } from '../lib/biblePlan'
 
 const SCHEDULE = buildSchedule()
 
@@ -242,8 +243,9 @@ function CompletionCard({ completion, index, onRemove, onUpdate }) {
    Main component
    ═══════════════════════════════════════════ */
 export default function AchievementsSection({ supabaseProgress, hideHeader = false }) {
-  const [open,        setOpen]        = useState(false)
-  const [completions, setCompletions] = useState(() => getCompletions())
+  const [open,           setOpen]           = useState(false)
+  const [completions,    setCompletions]    = useState(() => getCompletions())
+  const [planCompletions, setPlanCompletions] = useState(() => getPlanCompletions())
 
   // Track total bible chapters for auto-completion detection
   const [bibleDone, setBibleDone] = useState(() => Object.keys(getBibleProgress()).length)
@@ -264,8 +266,15 @@ export default function AchievementsSection({ supabaseProgress, hideHeader = fal
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  // Refresh plan completions when the plan engine fires
+  useEffect(() => {
+    function onPlanChanged() { setPlanCompletions(getPlanCompletions()) }
+    window.addEventListener('pb-plan-changed', onPlanChanged)
+    return () => window.removeEventListener('pb-plan-changed', onPlanChanged)
+  }, [])
+
   const { stats: confStats, activeKeys, complete: confComplete } = useConfessionStats(supabaseProgress)
-  const totalEarned = confComplete + completions.length
+  const totalEarned = confComplete + completions.length + planCompletions.length
 
   function handleAddCompletion() {
     setCompletions(addCompletion())
@@ -350,6 +359,38 @@ export default function AchievementsSection({ supabaseProgress, hideHeader = fal
           Record a Bible completion manually
         </button>
       </div>
+
+      {/* ── Reading Plan Completions ── */}
+      {planCompletions.length > 0 && (
+        <div>
+          <div style={a.groupLabel}>
+            Reading Plan Completions
+            <span style={a.groupSub}>{planCompletions.length} plan{planCompletions.length !== 1 ? 's' : ''} finished</span>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {planCompletions.map((c, i) => (
+              <div key={c.id} style={{
+                display:'flex', alignItems:'center', gap:14,
+                background: i === 0 ? 'var(--teal-light)' : 'var(--parchment)',
+                border: `2px solid ${i === 0 ? 'var(--teal)' : 'var(--border)'}`,
+                borderRadius:'var(--radius-lg)', padding:'12px 14px',
+              }}>
+                <span style={{ fontSize:28, flexShrink:0, lineHeight:1 }}>{i === 0 ? '🏆' : '📖'}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color: i === 0 ? 'var(--teal)' : 'var(--ink)' }}>
+                    {c.label} · {c.chaptersPerDay} ch/day
+                  </div>
+                  {c.startedDate && (
+                    <div style={{ fontSize:11, color:'var(--ink-muted)', marginTop:2 }}>
+                      {fmtDate(c.startedDate)} → {fmtDate(c.completedDate)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   )
