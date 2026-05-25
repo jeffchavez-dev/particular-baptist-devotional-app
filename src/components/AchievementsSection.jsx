@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { getLocalProgress, buildSchedule, getBibleProgress, getOrthodoxForDay, ORTHODOX_Q_COUNT, BIBLE_KEY } from '../lib/supabase'
+import React, { useState, useEffect, useRef } from 'react'
+import { getBibleProgress, BIBLE_KEY } from '../lib/supabase'
 import { TOTAL_CHAPTERS } from '../lib/bibleBooks'
-import { loadPrefs } from '../components/FontPrefsPanel'
-import { getPlanCompletions, PLAN_COMPLETE_KEY } from '../lib/biblePlan'
-
-const SCHEDULE = buildSchedule()
+import { getPlanCompletions } from '../lib/biblePlan'
 
 /* ════════════════════════════════════════════════════════════
    Scripture completion log (localStorage)
@@ -50,90 +47,6 @@ function fmtDate(isoStr) {
   if (!isoStr) return ''
   // Add noon to avoid timezone offset flipping the date
   return new Date(isoStr + 'T12:00:00').toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
-}
-
-/* ── Confession meta ── */
-const CONF_META = {
-  '2LBCF':    { label:'2LBCF',    fullName:'2nd London Baptist Confession', color:'var(--purple-ink)', bg:'var(--purple-soft)', border:'rgba(93,63,155,0.25)' },
-  'Catechism':{ label:'Catechism',fullName:"Keach's Baptist Catechism",      color:'var(--teal)',       bg:'var(--teal-light)',  border:'rgba(29,107,90,0.25)' },
-  '1LBCF':    { label:'1LBCF',    fullName:'1st London Baptist Confession',  color:'var(--amber-ink)', bg:'var(--amber-soft)', border:'rgba(163,107,42,0.25)' },
-  'Orthodox': { label:'Orthodox', fullName:'An Orthodox Catechism',          color:'var(--sky)',        bg:'var(--sky-light)',  border:'rgba(14,116,144,0.25)' },
-}
-
-/* ── Compute confession stats ── */
-function useConfessionStats(supabaseProgress) {
-  return useMemo(() => {
-    const prefs = loadPrefs()
-    const includeOrthodox = !!prefs.includeOrthodox
-
-    const completedDays = new Set()
-    if (supabaseProgress) {
-      supabaseProgress.forEach(r => { if (r.completed) completedDays.add(r.day_number) })
-    } else {
-      const local = getLocalProgress()
-      Object.entries(local).forEach(([day, d]) => { if (d.completed) completedDays.add(parseInt(day)) })
-    }
-
-    const stats = {}
-
-    for (const src of ['2LBCF', 'Catechism', '1LBCF']) {
-      const days = SCHEDULE.filter(e => e.src === src)
-      const done = days.filter(e => completedDays.has(e.day)).length
-      stats[src] = { total: days.length, done, pct: days.length ? Math.round(done / days.length * 100) : 0 }
-    }
-
-    if (includeOrthodox) {
-      // Map completed days → unique Orthodox Q&A numbers covered
-      const covered = new Set()
-      completedDays.forEach(day => covered.add(getOrthodoxForDay(day)))
-      stats['Orthodox'] = {
-        total: ORTHODOX_Q_COUNT,
-        done:  covered.size,
-        pct:   Math.round(covered.size / ORTHODOX_Q_COUNT * 100),
-      }
-    }
-
-    const activeKeys = includeOrthodox
-      ? ['2LBCF', 'Catechism', '1LBCF', 'Orthodox']
-      : ['2LBCF', 'Catechism', '1LBCF']
-
-    const complete = activeKeys.filter(k => {
-      const s = stats[k]; return s && s.total > 0 && s.done === s.total
-    }).length
-
-    return { stats, activeKeys, complete }
-  }, [supabaseProgress])
-}
-
-/* ── Confession progress card ── */
-function ConfCard({ src, stats }) {
-  const meta = CONF_META[src]
-  if (!meta || stats.total === 0) return null
-  const done = stats.done === stats.total
-  return (
-    <div style={{
-      background: done ? meta.bg : 'var(--surface)',
-      border: `1.5px solid ${done ? meta.border : 'var(--border)'}`,
-      borderRadius: 'var(--radius-lg)', padding:'12px 14px',
-      display:'flex', flexDirection:'column', gap:8, transition:'all 0.15s',
-    }}>
-      <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{
-          fontSize:10, fontWeight:700, letterSpacing:'0.06em', color:meta.color,
-          background:meta.bg, border:`1px solid ${meta.border}`,
-          padding:'2px 8px', borderRadius:99,
-        }}>{meta.label}</span>
-        <span style={{ fontSize:12, color:'var(--ink-muted)', flex:1 }}>{meta.fullName}</span>
-        {done && <span style={{ fontSize:14 }}>✓</span>}
-        <span style={{ fontSize:12, fontWeight:700, color:meta.color, fontVariantNumeric:'tabular-nums' }}>
-          {stats.done}/{stats.total}
-        </span>
-      </div>
-      <div style={{ height:6, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
-        <div style={{ height:'100%', borderRadius:99, background:meta.color, width:`${stats.pct}%`, transition:'width 0.4s', opacity: done ? 1 : 0.8 }} />
-      </div>
-    </div>
-  )
 }
 
 /* ── Edit completion form ── */
@@ -242,7 +155,7 @@ function CompletionCard({ completion, index, onRemove, onUpdate }) {
 /* ═══════════════════════════════════════════
    Main component
    ═══════════════════════════════════════════ */
-export default function AchievementsSection({ supabaseProgress, hideHeader = false }) {
+export default function AchievementsSection({ hideHeader = false }) {
   const [open,           setOpen]           = useState(false)
   const [completions,    setCompletions]    = useState(() => getCompletions())
   const [planCompletions, setPlanCompletions] = useState(() => getPlanCompletions())
@@ -273,8 +186,7 @@ export default function AchievementsSection({ supabaseProgress, hideHeader = fal
     return () => window.removeEventListener('pb-plan-changed', onPlanChanged)
   }, [])
 
-  const { stats: confStats, activeKeys, complete: confComplete } = useConfessionStats(supabaseProgress)
-  const totalEarned = confComplete + completions.length + planCompletions.length
+  const totalEarned = completions.length + planCompletions.length
 
   function handleAddCompletion() {
     setCompletions(addCompletion())
@@ -290,19 +202,6 @@ export default function AchievementsSection({ supabaseProgress, hideHeader = fal
 
   const content = (
     <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
-
-      {/* ── Confession Reading Progress ── */}
-      <div>
-        <div style={a.groupLabel}>
-          Confession Reading
-          <span style={a.groupSub}>{confComplete} / {activeKeys.length} complete</span>
-        </div>
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {activeKeys.map(src => (
-            <ConfCard key={src} src={src} stats={confStats[src] || { done:0, total:1, pct:0 }} />
-          ))}
-        </div>
-      </div>
 
       {/* ── Scripture Completions ── */}
       <div>

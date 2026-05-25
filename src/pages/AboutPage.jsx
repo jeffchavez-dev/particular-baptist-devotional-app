@@ -454,7 +454,7 @@ export default function AboutPage() {
           defaultOpen={false}
         >
           <SectionErrorBoundary>
-            <ConfessionTrackerSection />
+            <ConfessionTrackerSection supabaseProgress={session ? progressData : null} />
           </SectionErrorBoundary>
         </CollapseSection>
 
@@ -470,7 +470,7 @@ export default function AboutPage() {
           title="Achievements"
           defaultOpen={false}
         >
-          <AchievementsSection supabaseProgress={session ? progressData : null} hideHeader />
+          <AchievementsSection hideHeader />
         </CollapseSection>
 
         {/* ════ 2. SETTINGS ════ */}
