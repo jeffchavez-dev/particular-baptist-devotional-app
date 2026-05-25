@@ -11,6 +11,7 @@ import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
 import BibleTrackerSection from '../components/BibleTrackerSection'
+import ConfessionTrackerSection from '../components/ConfessionTrackerSection'
 import {
   clearAllHighlights, clearAllNotes,
   syncAnnotationsUp, syncAnnotationsDown,
@@ -389,6 +390,22 @@ export default function AboutPage() {
           defaultOpen={false}
         >
           <BibleTrackerSection />
+        </CollapseSection>
+
+        {/* ════ 0b. CONFESSION TRACKER ════ */}
+        <CollapseSection
+          id="confession-tracker"
+          icon={
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="1.5" width="9" height="12" rx="1.3" stroke="var(--teal)" strokeWidth="1.3"/>
+              <path d="M5 5h5M5 8h5M5 11h3" stroke="var(--teal)" strokeWidth="1.1" strokeLinecap="round"/>
+              <path d="M11 9l1.5 1.5L15 8" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          }
+          title="Confession Tracker"
+          defaultOpen={false}
+        >
+          <ConfessionTrackerSection />
         </CollapseSection>
 
         {/* ════ 1. ACHIEVEMENTS ════ */}
