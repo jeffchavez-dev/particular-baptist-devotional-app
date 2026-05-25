@@ -307,22 +307,45 @@ export default function ConfessionTrackerSection() {
                   <div style={c.settingsLabel}>Reading mode</div>
                   <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:6 }}>
                     {[
-                      { v:'once', label:'Read through once',    hint:'One item per day until finished' },
-                      { v:'year', label:'Complete in 1 year',   hint:'Repeats items to fill all reading days in a year' },
-                    ].map(opt => (
-                      <label key={opt.v} style={{ display:'flex', gap:8, cursor:'pointer', alignItems:'flex-start' }}>
-                        <input
-                          type="radio" name="cmode-global"
-                          value={opt.v} checked={draftMode === opt.v}
-                          onChange={() => setDraftMode(opt.v)}
-                          style={{ accentColor:'var(--teal)', marginTop:2, flexShrink:0 }}
-                        />
-                        <div>
-                          <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)' }}>{opt.label}</div>
-                          <div style={{ fontSize:11, color:'var(--ink-faint)' }}>{opt.hint}</div>
-                        </div>
-                      </label>
-                    ))}
+                      { v:'once', label:'Read through once',  hint:'One item per day until finished' },
+                      { v:'year', label:'Complete in 1 year', hint:'Repeats items to fill all reading days in a year' },
+                    ].map(opt => {
+                      const selected = draftMode === opt.v
+                      return (
+                        <button
+                          key={opt.v}
+                          onClick={e => { e.preventDefault(); setDraftMode(opt.v) }}
+                          style={{
+                            display:'flex', alignItems:'flex-start', gap:10,
+                            background: selected ? 'rgba(29,107,90,0.07)' : 'var(--surface)',
+                            border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--border)'}`,
+                            borderRadius:8, padding:'10px 12px', cursor:'pointer',
+                            textAlign:'left', width:'100%', transition:'all 0.15s',
+                            fontFamily:"'DM Sans',sans-serif",
+                          }}
+                        >
+                          {/* Custom check circle */}
+                          <span style={{
+                            width:18, height:18, borderRadius:'50%', flexShrink:0, marginTop:1,
+                            border: `2px solid ${selected ? 'var(--teal)' : 'var(--border)'}`,
+                            background: selected ? 'var(--teal)' : 'transparent',
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            transition:'all 0.15s',
+                          }}>
+                            {selected && (
+                              <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                                <polyline points="1.5,4.5 3.5,6.5 7.5,2" stroke="white" strokeWidth="1.8"
+                                  strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </span>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)', lineHeight:1.3 }}>{opt.label}</div>
+                            <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2 }}>{opt.hint}</div>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}

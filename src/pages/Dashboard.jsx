@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
+import { getBibleProgress, setBibleChapter, BIBLE_KEY, getTodayDayNum, setLocalProgress, supabase } from '../lib/supabase'
 import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChapters } from '../lib/biblePlan'
 import {
   getConfPlanConfig, getConfPlanProgress,
@@ -15,7 +15,6 @@ import { useAuth, usePrefs } from '../App'
 import { getFontCss }        from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
-import { setItemNote } from '../lib/annotations'
 import ShareCardModal from '../components/ShareCardModal'
 
 /* ── Reflection localStorage ── */
@@ -116,13 +115,24 @@ export default function Dashboard() {
     navigate('/scripture', { state: { book, chapter } })
   }
 
-  /* ── Save today's reflection to Library ── */
+  /* ── Save today's reflection to Devotional Notes ── */
   function handleSaveReflection() {
     if (!reflection.trim()) return
-    const today = new Date().toISOString().slice(0, 10)
-    const key   = `lib|${new Date().toISOString()}`
-    const text  = `[Reflection — ${today}]\n\n${reflection.trim()}`
-    setItemNote(key, text, userId)
+    const dayNum = getTodayDayNum()
+    const text   = reflection.trim()
+    // Save locally first — instant, works offline
+    setLocalProgress(dayNum, { notes: text })
+    // Notify LibraryPage to refresh its devNotes list
+    window.dispatchEvent(new CustomEvent('pb-progress-updated'))
+    // Sync to Supabase if signed in
+    if (session) {
+      supabase.from('progress').upsert({
+        user_id: session.user.id,
+        day_number: dayNum,
+        notes: text,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,day_number' }).catch(() => {})
+    }
     setReflectionSaved(true)
     setTimeout(() => setReflectionSaved(false), 3000)
   }

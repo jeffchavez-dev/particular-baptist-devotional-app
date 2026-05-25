@@ -10,7 +10,7 @@ import {
   HIGHLIGHT_COLORS, getHlStyle,
   setHighlight, setItemNote,
 } from '../lib/annotations'
-import { supabase, getLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
+import { supabase, getLocalProgress, setLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { loadBibleVersion, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { getDefaultReaderVersion, resolveVersion } from '../lib/readerPrefs'
@@ -2939,7 +2939,7 @@ const SESSION_FILTER_KEY   = 'pb-lib-filter-label'
 const VIEW_KEY             = 'pb-lib-note-view'
 const SESSION_SECTIONS_KEY = 'pb-lib-notes-sections'
 
-function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, searchQuery = '' }) {
+function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, session, onRemoveKjvNote, onRemoveConfNote, onRemoveLibNote, onRemoveDevNote, searchQuery = '' }) {
   /* Persist create-form open state across navigation */
   const [showCreateForm, setShowCreateFormRaw] = useState(() => {
     try { return sessionStorage.getItem(SESSION_CREATE_KEY) === '1' } catch { return false }
@@ -3059,6 +3059,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     if (type === 'lib')  onRemoveLibNote(key)
     if (type === 'kjv')  onRemoveKjvNote(key)
     if (type === 'conf') onRemoveConfNote(key)
+    if (type === 'dev')  onRemoveDevNote(key)
     setPendingDelete(null)
   }
 
@@ -3462,6 +3463,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                         date={n.entry.date}
                         onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
                         onOpen={() => navigate(`/day/${n.day_number}`)}
+                        onDelete={() => requestDelete(n.day_number, 'dev')}
                         query={isSearching ? searchQuery.trim() : ''}
                       />
                     )
@@ -3556,7 +3558,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         const vn = viewingNote
         const shareableKey = vn.key && vn.type !== 'dev' ? vn.key : null
         const currentToken = shareableKey ? getLibShareToken(shareableKey) : null
-        const sourceLabel  = vn.type === 'lib' ? 'Personal Note' : vn.type === 'kjv' ? 'Scripture Note' : vn.type === 'conf' ? 'Confession Note' : 'Note'
+        const sourceLabel  = vn.type === 'lib' ? 'Personal Note' : vn.type === 'kjv' ? 'Scripture Note' : vn.type === 'conf' ? 'Confession Note' : vn.type === 'dev' ? 'Devotional Note' : 'Note'
 
         async function handleShareLibLink() {
           if (!shareableKey || !session?.user?.id) return
@@ -3589,7 +3591,13 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 setEditingNote({ key: vn.key, note: vn.note })
               }
             } : null}
-            onDelete={vn.key ? () => requestDelete(vn.key, vn.type) : null}
+            onDelete={
+              vn.key
+                ? () => requestDelete(vn.key, vn.type)
+                : vn.type === 'dev' && vn.extra?.dayNumber != null
+                  ? () => { requestDelete(vn.extra.dayNumber, 'dev'); setViewingNote(null) }
+                  : null
+            }
             onOpen={vn.extra ? () => {
               if (vn.type === 'kjv' || (vn.type === 'lib' && vn.extra.book)) {
                 const { book, chapter, verse } = vn.extra
@@ -4005,6 +4013,18 @@ export default function LibraryPage() {
   const handleRemoveKjvNote       = useCallback(key  => setItemNote(key, null, session?.user?.id),  [session?.user?.id])
   const handleRemoveConfNote      = useCallback(key  => setItemNote(key, null, session?.user?.id),  [session?.user?.id])
   const handleRemoveLibNote       = useCallback(key  => setItemNote(key, null, session?.user?.id),  [session?.user?.id])
+  const handleRemoveDevNote       = useCallback(dayNumber => {
+    setLocalProgress(dayNumber, { notes: '' })
+    setDevNotes(prev => prev.filter(n => n.day_number !== dayNumber))
+    if (session) {
+      supabase.from('progress').upsert({
+        user_id: session.user.id,
+        day_number: dayNumber,
+        notes: '',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,day_number' }).catch(() => {})
+    }
+  }, [session])
 
   return (
     <div style={s.page}>
@@ -4107,6 +4127,7 @@ export default function LibraryPage() {
             onRemoveKjvNote={handleRemoveKjvNote}
             onRemoveConfNote={handleRemoveConfNote}
             onRemoveLibNote={handleRemoveLibNote}
+            onRemoveDevNote={handleRemoveDevNote}
             searchQuery={libSearch}
           />
         )}
