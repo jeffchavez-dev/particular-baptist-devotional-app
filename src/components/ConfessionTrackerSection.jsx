@@ -1,8 +1,7 @@
 /**
  * ConfessionTrackerSection
- * Card-list UI similar to BibleTrackerSection.
- * Each preset confession plan is shown as a selectable card.
- * The active plan card shows settings, progress, and today's reading inline.
+ * Card-list UI with a SINGLE global settings panel for the active plan.
+ * Settings (mode + rest days) apply to the currently active plan.
  */
 import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../App'
@@ -22,88 +21,31 @@ function fmtDate(iso) {
 }
 
 /* ══════════════════════════════════════════════
-   Single plan card
+   Single plan card (no embedded settings)
    ══════════════════════════════════════════════ */
-function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveSettings }) {
+function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onAdvance, onRetreat, onStop }) {
   const preset = CONF_PLAN_BY_ID[plan.id]
-
-  /* Local draft state for settings panel */
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [draftMode,    setDraftMode]    = useState(config?.mode     || 'once')
-  const [draftRest,    setDraftRest]    = useState(config?.restDays || [])
-  const [confirmStop,  setConfirmStop]  = useState(false)
-
-  /* Re-sync drafts when config changes (e.g. after switching active plan) */
-  useEffect(() => {
-    if (isActive && config) {
-      setDraftMode(config.mode     || 'once')
-      setDraftRest(config.restDays || [])
-    }
-  }, [isActive, config])
+  const [confirmStop, setConfirmStop] = useState(false)
 
   /* Derived */
   const todayStr  = new Date().toISOString().slice(0, 10)
   const doneToday = isActive && progress?.lastAdvancedDate === todayStr
   const isRest    = isActive && config ? isTodayConfRestDay(config) : false
-  const complete  = isActive && config ? isConfPlanComplete(config, progress)  : false
+  const complete  = isActive && config ? isConfPlanComplete(config, progress) : false
   const todayItem = (isActive && !complete && !isRest && config) ? getCurrentConfItem(config, progress) : null
   const stats     = isActive && config ? getConfPlanStats(config, progress) : null
 
-  /* Item count for description augmentation */
   const itemCount = useMemo(() => computeConfItems(plan.id).length, [plan.id])
 
-  /* ── Handlers ── */
   function handleSelect() {
     if (isGuest) return
     const newConfig = {
       planId:      plan.id,
-      mode:        preset?.cyclic ? 'once' : 'once',
+      mode:        'once',
       restDays:    [],
       startedDate: new Date().toISOString().slice(0, 10),
     }
     onSelect(newConfig)
-  }
-
-  function handleApplySettings(e) {
-    e.preventDefault()
-    const newConfig = {
-      planId:      plan.id,
-      mode:        preset?.cyclic ? draftMode : 'once',
-      restDays:    draftRest,
-      startedDate: config?.startedDate || new Date().toISOString().slice(0, 10),
-    }
-    onSaveSettings(newConfig)
-    setSettingsOpen(false)
-  }
-
-  function handleAdvance(e) {
-    e.preventDefault()
-    if (!config || !progress) return
-    const { progress: newProg } = advanceConfPlan(config, progress)
-    saveConfPlanProgress(newProg)
-    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
-  }
-
-  function handleRetreat(e) {
-    e.preventDefault()
-    if (!progress) return
-    const newProg = retreatConfPlan(progress)
-    saveConfPlanProgress(newProg)
-    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
-  }
-
-  function handleStop(e) {
-    e.preventDefault()
-    clearConfPlanConfig()
-    resetConfPlanProgress()
-    setConfirmStop(false)
-    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
-  }
-
-  function handleReadAgain(e) {
-    e.preventDefault()
-    resetConfPlanProgress()
-    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
   }
 
   return (
@@ -128,8 +70,8 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveS
             {plan.short && !isActive && <span style={c.shortBadge}>{plan.short}</span>}
           </div>
           <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2, lineHeight:1.5 }}>
-            {plan.description}
-            {plan.cyclic && <span style={{ marginLeft:5 }}>· yearly cycle supported</span>}
+            {plan.description} · {itemCount} items
+            {plan.cyclic && <span style={{ marginLeft:5 }}>· yearly cycle</span>}
           </div>
         </div>
       </div>
@@ -138,69 +80,18 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveS
       {isActive && !isGuest && (
         <div style={{ display:'flex', flexDirection:'column', gap:10, marginLeft:25 }}>
 
-          {/* Meta badges + Settings button */}
-          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-            {config && preset?.cyclic && (
-              <span style={c.metaTag}>{config.mode === 'year' ? '1-year cycle' : 'Read once'}</span>
-            )}
-            {config?.restDays?.length > 0 && (
-              <span style={c.metaTag}>Rest: {config.restDays.map(d => DAY_NAMES[d]).join(', ')}</span>
-            )}
-            {config?.startedDate && (
-              <span style={c.metaTag}>Started {fmtDate(config.startedDate)}</span>
-            )}
-            <button onClick={e => { e.preventDefault(); setSettingsOpen(o => !o) }} style={c.settingsBtn}>
-              {settingsOpen ? 'Close' : 'Settings'}
-            </button>
-          </div>
-
-          {/* ── Settings panel ── */}
-          {settingsOpen && (
-            <div style={c.settingsPanel}>
-              {preset?.cyclic && (
-                <div>
-                  <div style={c.settingsLabel}>Reading mode</div>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:6 }}>
-                    {[
-                      { v:'once', label:'Read through once',    hint:'One item per day until finished' },
-                      { v:'year', label:'Complete in 1 year',   hint:'Repeats items to fill all reading days in a year' },
-                    ].map(opt => (
-                      <label key={opt.v} style={{ display:'flex', gap:8, cursor:'pointer', alignItems:'flex-start' }}>
-                        <input
-                          type="radio" name={`cmode-${plan.id}`}
-                          value={opt.v} checked={draftMode === opt.v}
-                          onChange={() => setDraftMode(opt.v)}
-                          style={{ accentColor:'var(--teal)', marginTop:2, flexShrink:0 }}
-                        />
-                        <div>
-                          <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)' }}>{opt.label}</div>
-                          <div style={{ fontSize:11, color:'var(--ink-faint)' }}>{opt.hint}</div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+          {/* Meta badges */}
+          {(config?.mode || config?.restDays?.length > 0 || config?.startedDate) && (
+            <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              {config && preset?.cyclic && (
+                <span style={c.metaTag}>{config.mode === 'year' ? '1-year cycle' : 'Read once'}</span>
               )}
-              <div>
-                <div style={c.settingsLabel}>Rest days <span style={{ fontWeight:400, fontSize:11 }}>(no reading)</span></div>
-                <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
-                  {DAY_NAMES.map((d, i) => {
-                    const on = draftRest.includes(i)
-                    return (
-                      <button key={i} onClick={e => {
-                        e.preventDefault()
-                        setDraftRest(prev => on ? prev.filter(x => x !== i) : [...prev, i])
-                      }} style={{ ...c.dayBtn, background: on ? 'var(--teal)' : 'var(--surface)', color: on ? 'white' : 'var(--ink-muted)', borderColor: on ? 'var(--teal)' : 'var(--border)' }}>
-                        {d}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:8, marginTop:4 }}>
-                <button onClick={handleApplySettings} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px' }}>Apply</button>
-                <button onClick={e => { e.preventDefault(); setSettingsOpen(false) }} className="btn btn-ghost" style={{ fontSize:12, padding:'6px 12px' }}>Cancel</button>
-              </div>
+              {config?.restDays?.length > 0 && (
+                <span style={c.metaTag}>Rest: {config.restDays.map(d => DAY_NAMES[d]).join(', ')}</span>
+              )}
+              {config?.startedDate && (
+                <span style={c.metaTag}>Started {fmtDate(config.startedDate)}</span>
+              )}
             </div>
           )}
 
@@ -226,7 +117,12 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveS
           {complete && (
             <div style={c.completeBox}>
               <span>🎉 Plan complete!</span>
-              <button onClick={handleReadAgain} style={c.readAgainBtn}>Read again</button>
+              <button
+                onClick={e => { e.preventDefault(); resetConfPlanProgress(); window.dispatchEvent(new CustomEvent('pb-conf-plan-changed')) }}
+                style={c.readAgainBtn}
+              >
+                Read again
+              </button>
             </div>
           )}
 
@@ -253,10 +149,10 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveS
               {doneToday ? (
                 <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:8 }}>
                   <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>✓ Done for today</span>
-                  <button onClick={handleRetreat} style={c.undoBtn}>Undo</button>
+                  <button onClick={onRetreat} style={c.undoBtn}>Undo</button>
                 </div>
               ) : (
-                <button onClick={handleAdvance} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px', marginTop:8 }}>
+                <button onClick={onAdvance} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px', marginTop:8 }}>
                   Mark done ✓
                 </button>
               )}
@@ -272,14 +168,18 @@ function PlanCard({ plan, isActive, isGuest, config, progress, onSelect, onSaveS
             ) : (
               <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
                 <span style={{ fontSize:12, color:'var(--ink-muted)' }}>Stop and clear progress?</span>
-                <button onClick={handleStop}
+                <button
+                  onClick={e => { e.preventDefault(); onStop(); setConfirmStop(false) }}
                   className="btn btn-outline"
-                  style={{ fontSize:12, color:'#b33', borderColor:'rgba(180,50,50,0.4)', padding:'4px 10px' }}>
+                  style={{ fontSize:12, color:'#b33', borderColor:'rgba(180,50,50,0.4)', padding:'4px 10px' }}
+                >
                   Yes, stop
                 </button>
-                <button onClick={e => { e.preventDefault(); setConfirmStop(false) }}
+                <button
+                  onClick={e => { e.preventDefault(); setConfirmStop(false) }}
                   className="btn btn-ghost"
-                  style={{ fontSize:12, padding:'4px 10px' }}>
+                  style={{ fontSize:12, padding:'4px 10px' }}
+                >
                   Cancel
                 </button>
               </div>
@@ -301,17 +201,29 @@ export default function ConfessionTrackerSection() {
   const [config,   setConfig]   = useState(() => getConfPlanConfig())
   const [progress, setProgress] = useState(() => getConfPlanProgress())
 
+  /* ── Global settings state ── */
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [draftMode,    setDraftMode]    = useState(() => getConfPlanConfig()?.mode     || 'once')
+  const [draftRest,    setDraftRest]    = useState(() => getConfPlanConfig()?.restDays || [])
+
+  /* Sync when config changes externally */
   useEffect(() => {
     function onChanged() {
-      setConfig(getConfPlanConfig())
+      const cfg = getConfPlanConfig()
+      setConfig(cfg)
       setProgress(getConfPlanProgress())
+      if (cfg) {
+        setDraftMode(cfg.mode     || 'once')
+        setDraftRest(cfg.restDays || [])
+      }
     }
     window.addEventListener('pb-conf-plan-changed', onChanged)
     return () => window.removeEventListener('pb-conf-plan-changed', onChanged)
   }, [])
 
+  const activePlan = config ? CONF_PLAN_BY_ID[config.planId] : null
+
   function handleSelect(newConfig) {
-    /* Reset progress when switching to a different plan */
     const switchingPlan = newConfig.planId !== config?.planId
     saveConfPlanConfig(newConfig)
     if (switchingPlan) {
@@ -319,11 +231,49 @@ export default function ConfessionTrackerSection() {
       setProgress({ currentIndex: 0, lastAdvancedDate: null })
     }
     setConfig(newConfig)
+    setDraftMode(newConfig.mode     || 'once')
+    setDraftRest(newConfig.restDays || [])
+    setSettingsOpen(false)
   }
 
-  function handleSaveSettings(newConfig) {
+  function handleApplySettings(e) {
+    e.preventDefault()
+    if (!config) return
+    const newConfig = {
+      ...config,
+      mode:     activePlan?.cyclic ? draftMode : 'once',
+      restDays: draftRest,
+    }
     saveConfPlanConfig(newConfig)
     setConfig(newConfig)
+    setSettingsOpen(false)
+  }
+
+  function handleAdvance(e) {
+    e.preventDefault()
+    if (!config || !progress) return
+    const { progress: newProg } = advanceConfPlan(config, progress)
+    saveConfPlanProgress(newProg)
+    setProgress(newProg)
+    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
+  }
+
+  function handleRetreat(e) {
+    if (e) e.preventDefault()
+    if (!progress) return
+    const newProg = retreatConfPlan(progress)
+    saveConfPlanProgress(newProg)
+    setProgress(newProg)
+    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
+  }
+
+  function handleStop() {
+    clearConfPlanConfig()
+    resetConfPlanProgress()
+    setConfig(null)
+    setProgress({ currentIndex: 0, lastAdvancedDate: null })
+    setSettingsOpen(false)
+    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
   }
 
   return (
@@ -334,6 +284,77 @@ export default function ConfessionTrackerSection() {
         </div>
       )}
 
+      {/* ── Global Settings Panel ── */}
+      {config && !isGuest && (
+        <div style={c.settingsWrap}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' }}>
+              Reading Settings
+            </div>
+            <button
+              onClick={() => setSettingsOpen(o => !o)}
+              style={c.settingsToggleBtn}
+            >
+              {settingsOpen ? 'Close ↑' : 'Edit settings ↓'}
+            </button>
+          </div>
+
+          {settingsOpen && (
+            <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:10 }}>
+              {/* Reading mode (only for cyclic plans) */}
+              {activePlan?.cyclic && (
+                <div>
+                  <div style={c.settingsLabel}>Reading mode</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:6 }}>
+                    {[
+                      { v:'once', label:'Read through once',    hint:'One item per day until finished' },
+                      { v:'year', label:'Complete in 1 year',   hint:'Repeats items to fill all reading days in a year' },
+                    ].map(opt => (
+                      <label key={opt.v} style={{ display:'flex', gap:8, cursor:'pointer', alignItems:'flex-start' }}>
+                        <input
+                          type="radio" name="cmode-global"
+                          value={opt.v} checked={draftMode === opt.v}
+                          onChange={() => setDraftMode(opt.v)}
+                          style={{ accentColor:'var(--teal)', marginTop:2, flexShrink:0 }}
+                        />
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)' }}>{opt.label}</div>
+                          <div style={{ fontSize:11, color:'var(--ink-faint)' }}>{opt.hint}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Rest days */}
+              <div>
+                <div style={c.settingsLabel}>Rest days <span style={{ fontWeight:400, fontSize:11 }}>(no reading)</span></div>
+                <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+                  {DAY_NAMES.map((d, i) => {
+                    const on = draftRest.includes(i)
+                    return (
+                      <button key={i} onClick={e => {
+                        e.preventDefault()
+                        setDraftRest(prev => on ? prev.filter(x => x !== i) : [...prev, i])
+                      }} style={{ ...c.dayBtn, background: on ? 'var(--teal)' : 'var(--surface)', color: on ? 'white' : 'var(--ink-muted)', borderColor: on ? 'var(--teal)' : 'var(--border)' }}>
+                        {d}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display:'flex', gap:8, marginTop:2 }}>
+                <button onClick={handleApplySettings} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px' }}>Apply</button>
+                <button onClick={e => { e.preventDefault(); setSettingsOpen(false) }} className="btn btn-ghost" style={{ fontSize:12, padding:'6px 12px' }}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Plan cards ── */}
       {CONF_PLANS.map(plan => (
         <PlanCard
           key={plan.id}
@@ -343,7 +364,9 @@ export default function ConfessionTrackerSection() {
           config={config?.planId === plan.id ? config   : null}
           progress={config?.planId === plan.id ? progress : null}
           onSelect={handleSelect}
-          onSaveSettings={handleSaveSettings}
+          onAdvance={handleAdvance}
+          onRetreat={handleRetreat}
+          onStop={handleStop}
         />
       ))}
     </div>
@@ -374,15 +397,17 @@ const c = {
     fontSize:11, color:'var(--ink-faint)', background:'var(--parchment)',
     border:'1px solid var(--border)', borderRadius:99, padding:'2px 8px',
   },
-  settingsBtn: {
-    marginLeft:'auto', fontSize:11, fontWeight:600, color:'var(--teal)',
+
+  /* Global settings panel */
+  settingsWrap: {
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:8, padding:'10px 14px', marginBottom:4,
+  },
+  settingsToggleBtn: {
+    fontSize:11, fontWeight:600, color:'var(--teal)',
     background:'none', border:'1px solid rgba(29,107,90,0.3)',
     borderRadius:6, padding:'3px 8px', cursor:'pointer', flexShrink:0,
     fontFamily:"'DM Sans',sans-serif",
-  },
-  settingsPanel: {
-    background:'var(--parchment)', border:'1px solid var(--border)',
-    borderRadius:8, padding:'12px 14px', display:'flex', flexDirection:'column', gap:12,
   },
   settingsLabel: {
     fontSize:11, fontWeight:700, textTransform:'uppercase',
@@ -393,6 +418,7 @@ const c = {
     fontSize:11, fontWeight:700, cursor:'pointer', transition:'all 0.15s',
     fontFamily:"'DM Sans',sans-serif",
   },
+
   barBg:   { height:6, borderRadius:99, background:'var(--border)', overflow:'hidden' },
   barFill: { height:'100%', borderRadius:99, background:'var(--teal)', transition:'width 0.4s ease' },
   completeBox: {
@@ -427,10 +453,11 @@ const c = {
   stopLink: {
     fontSize:11, color:'var(--ink-faint)', background:'none', border:'none',
     cursor:'pointer', textDecoration:'underline', textDecorationStyle:'dashed',
-    padding:0, fontFamily:"'DM Sans',sans-serif",
+    fontFamily:"'DM Sans',sans-serif",
   },
   guestNote: {
-    fontSize:12, color:'var(--ink-muted)', background:'var(--parchment)',
-    border:'1px solid var(--border)', borderRadius:8, padding:'10px 12px', lineHeight:1.6,
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:8, padding:'10px 14px', fontSize:12,
+    color:'var(--ink-muted)', lineHeight:1.5,
   },
 }

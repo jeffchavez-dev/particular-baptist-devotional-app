@@ -20,6 +20,8 @@
   --amber-ink: #633806;
   --gray-soft: #e8e6e0;
   --gray-ink: #444441;
+  --sky:       #0e7490;
+  --sky-light: #e0f2fe;
   --border: rgba(26,22,17,0.12);
   --border-strong: rgba(26,22,17,0.25);
   --radius: 6px;
@@ -53,6 +55,8 @@
   --amber-ink:      #d4a060;
   --gray-soft:      #2a2820;
   --gray-ink:       #b0a898;
+  --sky:            #38bdf8;
+  --sky-light:      #082f49;
   --border:         rgba(240,235,224,0.12);
   --border-strong:  rgba(240,235,224,0.22);
   --red:            #e57373;

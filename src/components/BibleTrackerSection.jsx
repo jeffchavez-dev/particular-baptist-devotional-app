@@ -446,10 +446,16 @@ function PlanEditorView({ draft, setDraft, duration, setDuration, isNew, onSave,
 }
 
 /* ══════════════════════════════════════════════
-   Multi-plan PlanTab
+   Multi-plan PlanTab — splits guest vs. auth to
+   avoid calling hooks conditionally (hooks rules).
    ══════════════════════════════════════════════ */
 function PlanTab({ userId }) {
+  // Keep PlanTab itself hook-free so the early branch never violates hook order.
   if (!userId) return <PlanTabGuest />
+  return <PlanTabAuth userId={userId} />
+}
+
+function PlanTabAuth({ userId }) {
   /* ── State ── */
   const [plans,      setPlans]      = useState(() => getAllPlans())
   const [activeId,   setActiveId]   = useState(() => getActivePlanId())

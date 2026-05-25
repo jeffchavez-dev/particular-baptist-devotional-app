@@ -9,6 +9,24 @@ function formatDate(iso) {
   } catch { return '' }
 }
 
+/* ── Scoped styles for rich content rendering ── */
+const RICH_STYLES = `
+  .pb-rich-note h1 { font-size:1.5em; font-weight:700; margin:0.6em 0 0.3em; font-family:'Cormorant Garamond',serif; }
+  .pb-rich-note h2 { font-size:1.25em; font-weight:700; margin:0.5em 0 0.25em; font-family:'Cormorant Garamond',serif; }
+  .pb-rich-note p  { margin:0 0 0.75em; }
+  .pb-rich-note ul, .pb-rich-note ol { padding-left:1.4em; margin:0 0 0.75em; }
+  .pb-rich-note li { margin-bottom:0.3em; }
+  .pb-rich-note blockquote {
+    border-left:3px solid #1d6b5a; margin:1em 0; padding:0.6em 1em;
+    background:rgba(29,107,90,0.06); border-radius:0 6px 6px 0;
+    font-style:italic; color:#2c2417;
+  }
+  .pb-rich-note blockquote em { font-style:normal; }
+  .pb-rich-note strong { font-weight:700; }
+  .pb-rich-note em { font-style:italic; }
+  .pb-rich-note a { color:#1d6b5a; }
+`
+
 export default function SharedNotePage() {
   const { token } = useParams()
   const [state, setState] = useState('loading') // 'loading' | 'found' | 'notfound' | 'error'
@@ -40,7 +58,7 @@ export default function SharedNotePage() {
           <div style={s.notFoundIcon}>🔍</div>
           <div style={s.notFoundTitle}>Note not found</div>
           <div style={s.notFoundSub}>This shared note may have been removed or the link is invalid.</div>
-          <Link to="/" style={s.homeLink}>← Go to Pilgrim's Bible</Link>
+          <Link to="/" style={s.homeLink}>← Go to Particular Baptist Devotional</Link>
         </div>
       </div>
     )
@@ -49,14 +67,19 @@ export default function SharedNotePage() {
   const note      = data.note_data  || {}
   const isQuote   = note.type === 'quote'
   const updatedAt = data.updated_at || note.updatedAt || note.createdAt
+  const noteText  = note.text || ''
+  const isRich    = noteText.startsWith('<!RICH>')
+  const richHtml  = isRich ? noteText.slice(7) : null
 
   return (
     <div style={s.page}>
+      {isRich && <style>{RICH_STYLES}</style>}
+
       {/* App branding header */}
       <div style={s.header}>
         <Link to="/" style={s.brandLink}>
-          <img src="/pwa-192.png" alt="Pilgrim's Bible" style={s.brandLogo} />
-          <span style={s.brandName}>Pilgrim's Bible</span>
+          <img src="/pwa-192.png" alt="Particular Baptist Devotional" style={s.brandLogo} />
+          <span style={s.brandName}>Particular Baptist Devotional</span>
         </Link>
       </div>
 
@@ -73,28 +96,39 @@ export default function SharedNotePage() {
           </div>
         )}
 
-        {/* Type badge */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
-          <span style={{
-            ...s.typeBadge,
-            background: isQuote ? 'rgba(212,168,76,0.12)' : 'rgba(29,107,90,0.1)',
-            color:       isQuote ? '#b8860b' : '#1d6b5a',
-          }}>
-            {isQuote ? '❝ Quote' : '✍ Note'}
-          </span>
-          {(note.page || note.percent != null) && (
-            <span style={s.locLabel}>
-              {[note.page && `p. ${note.page}`, note.percent != null && `${note.percent}%`].filter(Boolean).join(' · ')}
+        {/* Type badge (only for non-rich notes) */}
+        {!isRich && (
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+            <span style={{
+              ...s.typeBadge,
+              background: isQuote ? 'rgba(212,168,76,0.12)' : 'rgba(29,107,90,0.1)',
+              color:       isQuote ? '#b8860b' : '#1d6b5a',
+            }}>
+              {isQuote ? '❝ Quote' : '✍ Note'}
             </span>
-          )}
-        </div>
+            {(note.page || note.percent != null) && (
+              <span style={s.locLabel}>
+                {[note.page && `p. ${note.page}`, note.percent != null && `${note.percent}%`].filter(Boolean).join(' · ')}
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* Note text */}
-        <div style={{ ...s.noteText, fontStyle: isQuote ? 'italic' : 'normal' }}>
-          {isQuote && <span style={s.openQuote}>"</span>}
-          {note.text}
-          {isQuote && <span style={s.closeQuote}>"</span>}
-        </div>
+        {/* Rich note content */}
+        {isRich ? (
+          <div
+            className="pb-rich-note"
+            style={s.richContent}
+            dangerouslySetInnerHTML={{ __html: richHtml }}
+          />
+        ) : (
+          /* Plain text note */
+          <div style={{ ...s.noteText, fontStyle: isQuote ? 'italic' : 'normal' }}>
+            {isQuote && <span style={s.openQuote}>"</span>}
+            {noteText}
+            {isQuote && <span style={s.closeQuote}>"</span>}
+          </div>
+        )}
 
         {/* Updated at */}
         {updatedAt && (
@@ -104,7 +138,7 @@ export default function SharedNotePage() {
 
       {/* Footer */}
       <div style={s.footer}>
-        <Link to="/" style={s.footerLink}>Made with Pilgrim's Bible</Link>
+        <Link to="/" style={s.footerLink}>Made with Particular Baptist Devotional</Link>
       </div>
     </div>
   )
@@ -168,6 +202,12 @@ const s = {
     color: 'var(--ink, #2c2417)',
     whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     padding: '8px 0',
+  },
+  richContent: {
+    fontSize: 16, lineHeight: 1.8,
+    fontFamily: "'Cormorant Garamond', serif",
+    color: 'var(--ink, #2c2417)',
+    wordBreak: 'break-word',
   },
   openQuote:  { fontSize: 28, color: '#d4a84c', lineHeight: 1, marginRight: 2, fontFamily: 'Georgia, serif' },
   closeQuote: { fontSize: 28, color: '#d4a84c', lineHeight: 1, marginLeft:  2, fontFamily: 'Georgia, serif' },

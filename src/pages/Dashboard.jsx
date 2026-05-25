@@ -15,6 +15,7 @@ import { useAuth, usePrefs } from '../App'
 import { getFontCss }        from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
+import { setItemNote } from '../lib/annotations'
 import ShareCardModal from '../components/ShareCardModal'
 
 /* ── Reflection localStorage ── */
@@ -104,6 +105,33 @@ export default function Dashboard() {
 
   /* ── UI state ── */
   const [confTextExpanded, setConfTextExpanded] = useState(false)
+  const [reflectionSaved, setReflectionSaved] = useState(false)
+
+  /* ── Navigate to a specific scripture chapter ── */
+  function goToScripture(ch) {
+    // ch may be "Genesis 1" or "1 Kings 5" — use lastIndexOf to split
+    const spaceIdx = ch.lastIndexOf(' ')
+    const book    = ch.slice(0, spaceIdx)
+    const chapter = parseInt(ch.slice(spaceIdx + 1), 10)
+    navigate('/scripture', { state: { book, chapter } })
+  }
+
+  /* ── Save today's reflection to Library ── */
+  function handleSaveReflection() {
+    if (!reflection.trim()) return
+    const today = new Date().toISOString().slice(0, 10)
+    const key   = `lib|${new Date().toISOString()}`
+    const text  = `[Reflection — ${today}]\n\n${reflection.trim()}`
+    setItemNote(key, text, userId)
+    setReflectionSaved(true)
+    setTimeout(() => setReflectionSaved(false), 3000)
+  }
+
+  /* ── Open a Settings CollapseSection ── */
+  function openSettingsSection(id) {
+    try { sessionStorage.setItem(`pb-settings-${id}`, '1') } catch {}
+    navigate('/about')
+  }
 
   /* ── Sync plan changes fired by BibleTrackerSection / App bridge ── */
   useEffect(() => {
@@ -227,10 +255,7 @@ export default function Dashboard() {
                     </button>
                     <span style={{ ...s.chapterName, ...(done ? s.chapterDone : {}) }}>{ch}</span>
                     <button
-                      onClick={() => {
-                        const [book, num] = ch.split(' ')
-                        navigate(`/scripture?book=${encodeURIComponent(book)}&chapter=${num}`)
-                      }}
+                      onClick={() => goToScripture(ch)}
                       style={s.readLink}
                     >
                       Read →
@@ -246,7 +271,7 @@ export default function Dashboard() {
                 <div style={{ ...s.checkBtn, cursor:'default', opacity:0.4 }} />
                 <span style={s.chapterName}>{GUEST_SCRIPTURE}</span>
                 <button
-                  onClick={() => navigate('/scripture?book=Genesis&chapter=1')}
+                  onClick={() => navigate('/scripture', { state: { book: 'Genesis', chapter: 1 } })}
                   style={s.readLink}
                 >
                   Read →
@@ -257,7 +282,7 @@ export default function Dashboard() {
                   ? 'No active reading plan. Set one up in '
                   : 'Sign in to track progress. Default showing — '}
                 {session
-                  ? <button onClick={() => navigate('/about')} style={s.inlineLink}>Settings → Bible Tracker</button>
+                  ? <button onClick={() => openSettingsSection('bible-tracker')} style={s.inlineLink}>Settings → Bible Tracker</button>
                   : <button onClick={() => navigate('/auth')} style={s.inlineLink}>sign in</button>
                 }
               </div>
@@ -364,7 +389,7 @@ export default function Dashboard() {
               )}
               <div style={s.noPlanNote}>
                 {session
-                  ? <>Set up a plan in <button onClick={() => navigate('/about')} style={s.inlineLink}>Settings → Confession Tracker</button></>
+                  ? <>Set up a plan in <button onClick={() => openSettingsSection('confession-tracker')} style={s.inlineLink}>Settings → Confession Tracker</button></>
                   : <><button onClick={() => navigate('/auth')} style={s.inlineLink}>Sign in</button> to track your confession reading</>
                 }
               </div>
@@ -379,6 +404,11 @@ export default function Dashboard() {
           <div style={s.sectionHeader}>
             <span style={s.sectionIcon}>✍</span>
             <span style={s.sectionTitle}>Reflection</span>
+            {reflection.trim() && (
+              <button onClick={handleSaveReflection} style={s.saveReflectBtn}>
+                {reflectionSaved ? '✓ Saved to Library' : '+ Save to Library'}
+              </button>
+            )}
           </div>
           <textarea
             value={reflection}
@@ -393,14 +423,14 @@ export default function Dashboard() {
             ════════════════════════════════════════ */}
         {session && (
           <div style={s.trackerLinks}>
-            <button onClick={() => navigate('/about')} style={s.trackerLink}>
+            <button onClick={() => openSettingsSection('bible-tracker')} style={s.trackerLink}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0 }}>
                 <rect x="1" y="1" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
                 <path d="M4 6.5h5M7 4.5l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               Bible Reading Plans
             </button>
-            <button onClick={() => navigate('/about')} style={s.trackerLink}>
+            <button onClick={() => openSettingsSection('confession-tracker')} style={s.trackerLink}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0 }}>
                 <path d="M2 2.5A1 1 0 013 1.5h7a1 1 0 011 1v9l-4.5-2-4.5 2V2.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
               </svg>
@@ -582,6 +612,14 @@ const s = {
     background:'none', border:'none', color:'var(--teal)', fontWeight:600,
     cursor:'pointer', padding:0, fontSize:12, fontFamily:"'DM Sans',sans-serif",
     textDecoration:'underline',
+  },
+
+  /* Save reflection button */
+  saveReflectBtn: {
+    marginLeft:'auto', fontSize:11, fontWeight:600, color:'var(--teal)',
+    background:'none', border:'1px solid rgba(29,107,90,0.3)',
+    borderRadius:6, padding:'3px 8px', cursor:'pointer', flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif",
   },
 
   /* Reflection */

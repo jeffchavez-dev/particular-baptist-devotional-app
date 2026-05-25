@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { Component, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
@@ -20,6 +20,35 @@ import {
 import {
   getDefaultReaderVersion, setDefaultReaderVersion, DEFAULT_VERSION_OPTIONS,
 } from '../lib/readerPrefs'
+import {
+  clearPlanConfig, resetPlanProgress,
+} from '../lib/biblePlan'
+import {
+  clearConfPlanConfig, resetConfPlanProgress,
+} from '../lib/confessionPlan'
+
+/* ── Error boundary: catches crashes inside tracker sections ── */
+class SectionErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(err) { return { error: err } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding:'16px', color:'var(--ink-muted)', fontSize:13, lineHeight:1.6 }}>
+          <strong>Something went wrong</strong> loading this section.
+          <br />
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{ marginTop:8, fontSize:12, color:'var(--teal)', background:'none', border:'none', cursor:'pointer', padding:0, textDecoration:'underline' }}
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const CONFESSIONS = [
   {
@@ -260,7 +289,17 @@ export default function AboutPage() {
   const handleReset = useCallback(async () => {
     setResetting(true)
     try {
+      // Devotional progress (365-day plan)
       localStorage.removeItem('pb-bible-progress')
+      // Bible tracker progress (chapter-level + multi-plan)
+      localStorage.removeItem('pb-bible-plans')
+      localStorage.removeItem('pb-plan-active-id')
+      clearPlanConfig()
+      resetPlanProgress()
+      // Confession tracker progress
+      clearConfPlanConfig()
+      resetConfPlanProgress()
+
       if (session) {
         await supabase.from('progress')
           .update({ completed: false, updated_at: new Date().toISOString() })
@@ -391,7 +430,9 @@ export default function AboutPage() {
           title="Bible Tracker"
           defaultOpen={false}
         >
-          <BibleTrackerSection />
+          <SectionErrorBoundary>
+            <BibleTrackerSection />
+          </SectionErrorBoundary>
         </CollapseSection>
 
         {/* ════ 0b. CONFESSION TRACKER ════ */}
@@ -407,7 +448,9 @@ export default function AboutPage() {
           title="Confession Tracker"
           defaultOpen={false}
         >
-          <ConfessionTrackerSection />
+          <SectionErrorBoundary>
+            <ConfessionTrackerSection />
+          </SectionErrorBoundary>
         </CollapseSection>
 
         {/* ════ 1. ACHIEVEMENTS ════ */}
@@ -546,32 +589,6 @@ export default function AboutPage() {
                   sampleKey="sample"
                 />
               </div>
-            </div>
-
-            {/* Orthodox Catechism in Daily Reading */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Include Orthodox Catechism</span>
-                <span style={s.settingHint}>Add "An Orthodox Catechism" (1680) to your daily devotional alongside the 2LBCF, Keach, and 1LBCF readings</span>
-              </div>
-              <button
-                onClick={() => updatePrefs({ ...prefs, includeOrthodox: !prefs.includeOrthodox })}
-                style={{
-                  position:'relative', width:44, height:24, borderRadius:12, flexShrink:0,
-                  background: prefs.includeOrthodox ? '#0c4a6e' : 'var(--border-strong)',
-                  border:'none', cursor:'pointer', padding:0, transition:'background 0.2s',
-                }}
-                role="switch"
-                aria-checked={prefs.includeOrthodox}
-                title={prefs.includeOrthodox ? 'Disable Orthodox Catechism' : 'Enable Orthodox Catechism'}
-              >
-                <span style={{
-                  position:'absolute', top:3, left: prefs.includeOrthodox ? 23 : 3,
-                  width:18, height:18, borderRadius:'50%',
-                  background:'white', boxShadow:'0 1px 4px rgba(0,0,0,0.25)',
-                  transition:'left 0.2s',
-                }} />
-              </button>
             </div>
 
             {/* Default Bible Translation */}
