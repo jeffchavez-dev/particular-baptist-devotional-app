@@ -56,9 +56,39 @@ function fmtDate(iso) {
 }
 
 /* ══════════════════════════════════════════════
+   Guest locked state for Plan tab
+   ══════════════════════════════════════════════ */
+function PlanTabGuest() {
+  return (
+    <div style={{
+      display:'flex', flexDirection:'column', alignItems:'center', gap:14,
+      padding:'28px 16px', textAlign:'center',
+    }}>
+      <div style={{ fontSize:36 }}>🔒</div>
+      <div style={{ fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' }}>
+        Sign in to use My Plan
+      </div>
+      <div style={{ fontSize:12, color:'var(--ink-faint)', maxWidth:280, lineHeight:1.6 }}>
+        Set up a personal Bible reading plan, track your daily progress, and earn achievements. Sign in to unlock this feature.
+      </div>
+      <div style={{
+        background:'var(--parchment)', border:'1px solid var(--border)',
+        borderRadius:10, padding:'12px 16px', width:'100%', maxWidth:280,
+        display:'flex', flexDirection:'column', gap:4, textAlign:'left',
+      }}>
+        <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' }}>Default plan (guest)</div>
+        <div style={{ fontSize:14, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' }}>Whole Bible</div>
+        <div style={{ fontSize:11, color:'var(--ink-faint)' }}>All 1,189 chapters · 1 chapter / day · ~3.3 years</div>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
    Plan configurator
    ══════════════════════════════════════════════ */
 function PlanTab({ userId }) {
+  if (!userId) return <PlanTabGuest />
   const [config,   setConfig]   = useState(() => getPlanConfig())
   const [progress, setProgress] = useState(() => getPlanProgress())
   const [editing,  setEditing]  = useState(!getPlanConfig()) // start in edit mode if no plan
@@ -72,6 +102,7 @@ function PlanTab({ userId }) {
     endChapter: 22,
   })
   const [confirmReset, setConfirmReset] = useState(false)
+  const [confirmStop,  setConfirmStop]  = useState(false)
   const completions = useMemo(() => getPlanCompletions(), [config])
 
   // Sync when plan engine writes from devotional page
@@ -214,7 +245,15 @@ function PlanTab({ userId }) {
         </div>
 
         {/* Stop plan */}
-        <button onClick={stopPlan} style={p.stopBtn}>Stop this plan</button>
+        {confirmStop ? (
+          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+            <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Stop this plan? Your progress will be lost.</span>
+            <button onClick={() => { stopPlan(); setConfirmStop(false) }} style={{ ...p.stopBtn }}>Yes, stop</button>
+            <button onClick={() => setConfirmStop(false)} style={p.editBtn}>Cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmStop(true)} style={p.stopBtn}>Stop this plan</button>
+        )}
 
         {/* Completion log */}
         {completions.length > 0 && (
@@ -257,6 +296,7 @@ function PlanTab({ userId }) {
                 ...p.planOption,
                 borderColor: draft.planId === plan.id ? 'var(--teal)' : 'var(--border)',
                 background: draft.planId === plan.id ? 'var(--teal-light)' : 'var(--surface)',
+                overflow:'hidden',
               }}>
                 <input
                   type="radio"
@@ -264,11 +304,11 @@ function PlanTab({ userId }) {
                   value={plan.id}
                   checked={draft.planId === plan.id}
                   onChange={() => patchDraft({ planId: plan.id })}
-                  style={{ accentColor:'var(--teal)', flexShrink:0 }}
+                  style={{ accentColor:'var(--teal)', flexShrink:0, marginTop:2 }}
                 />
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)' }}>{plan.label}</div>
-                  <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2 }}>{plan.description}</div>
+                <div style={{ flex:1, minWidth:0, overflow:'hidden' }}>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{plan.label}</div>
+                  <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2, wordBreak:'break-word', whiteSpace:'normal' }}>{plan.description}</div>
                 </div>
               </label>
             ))}
@@ -337,27 +377,23 @@ function PlanTab({ userId }) {
         {/* Pace */}
         <div style={p.section}>
           <div style={p.sectionLabel}>Reading Pace</div>
-          <div style={{ display:'flex', gap:8 }}>
-            {[1, 2].map(n => (
-              <button
-                key={n}
-                onClick={() => patchDraft({ chaptersPerDay: n })}
-                style={{
-                  ...p.paceBtn,
-                  background: draft.chaptersPerDay === n ? 'var(--teal)' : 'var(--surface)',
-                  color: draft.chaptersPerDay === n ? 'white' : 'var(--ink)',
-                  borderColor: draft.chaptersPerDay === n ? 'var(--teal)' : 'var(--border)',
-                }}
-              >
-                {n} chapter{n > 1 ? 's' : ''} / day
-              </button>
+          <select
+            value={draft.chaptersPerDay}
+            onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
+            style={p.select}
+          >
+            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+              <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* Rest days */}
         <div style={p.section}>
-          <div style={p.sectionLabel}>Rest Days <span style={{ fontWeight:400, color:'var(--ink-faint)' }}>(no reading)</span></div>
+          <div style={p.sectionLabel}>Rest Days</div>
+          <div style={{ fontSize:11, color:'var(--ink-faint)', lineHeight:1.5 }}>
+            Select the days of the week when you won't read. The plan skips these days when assigning your daily reading.
+          </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {DAY_NAMES.map((name, idx) => {
               const active = draft.restDays?.includes(idx)
@@ -746,10 +782,6 @@ const p = {
     width:'100%', padding:'7px 10px', borderRadius:6, fontSize:12, fontWeight:500,
     border:'1.5px solid var(--border)', background:'var(--parchment)', color:'var(--ink)',
     fontFamily:"'DM Sans',sans-serif", outline:'none', cursor:'pointer',
-  },
-  paceBtn: {
-    flex:1, padding:'8px 12px', borderRadius:8, border:'1.5px solid', cursor:'pointer',
-    fontSize:13, fontWeight:600, fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
   },
   dayBtn: {
     padding:'5px 10px', borderRadius:99, border:'1.5px solid', cursor:'pointer',
