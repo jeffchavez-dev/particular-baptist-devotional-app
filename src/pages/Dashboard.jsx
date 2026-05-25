@@ -1,79 +1,59 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, buildSchedule, getLocalProgress, setLocalProgress, getTodayDayNum, getBookmarks, toggleBookmark } from '../lib/supabase'
+import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
+import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChapters } from '../lib/biblePlan'
+import {
+  getConfPlanConfig, getConfPlanProgress,
+  getCurrentConfItem, isConfPlanComplete, advanceConfPlan, retreatConfPlan,
+  saveConfPlanProgress, isTodayConfRestDay,
+} from '../lib/confessionPlan'
+import { LBCF2 }             from '../data/lbcf2'
+import { CATECHISM }         from '../data/catechism'
+import { LBCF1 }             from '../data/lbcf1'
+import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { useAuth, usePrefs } from '../App'
-import { getFontCss } from '../components/FontPrefsPanel'
+import { getFontCss }        from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
 import ShareCardModal from '../components/ShareCardModal'
 
-/* ── Progress sessionStorage cache ─────────────────────────────────── */
-const DASH_CACHE_KEY = 'pb-dash-progress'
-function saveDashProgress(map) {
-  try { sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify(map)) } catch {}
+/* ── Reflection localStorage ── */
+const REFLECT_PREFIX = 'pb-reflection-'
+function getTodayKey() { return REFLECT_PREFIX + new Date().toISOString().slice(0, 10) }
+function loadReflection() {
+  try { return localStorage.getItem(getTodayKey()) || '' } catch { return '' }
 }
-function loadDashProgress() {
-  try {
-    const raw = sessionStorage.getItem(DASH_CACHE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
+function saveReflection(text) {
+  try { localStorage.setItem(getTodayKey(), text) } catch {}
 }
-import { QUOTES } from '../data/quotes'
-import { LBCF2 } from '../data/lbcf2'
-import { CATECHISM } from '../data/catechism'
-import { LBCF1 } from '../data/lbcf1'
-import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
-import { getOrthodoxForDay } from '../lib/supabase'
 
-const SCHEDULE  = buildSchedule()
-const TODAY_DAY = Math.min(getTodayDayNum(), 365)
-const PAGE      = 30
-
-/* ── derive quote key per schedule entry ── */
-function getQuoteKey(entry) {
-  if (entry.src === '2LBCF') {
-    const m = entry.reading.match(/Ch\.\s*(\d+)\s*§(\d+)/)
-    return m ? `${m[1]}.${m[2]}` : null
+/* ── Full text resolver for a confession item ── */
+function getConfItemText(item) {
+  if (!item) return null
+  if (item.planId === '2lbcf') {
+    return LBCF2[item.key]?.text || null
   }
-  if (entry.src === '1LBCF') {
-    const m = entry.reading.match(/Article\s*(\d+)/)
-    return m ? `lbcf1.${parseInt(m[1])}` : null
+  if (item.planId === 'catechism') {
+    const entry = CATECHISM[item.key]
+    return entry ? `Q. ${entry.q}\n\nA. ${entry.a}` : null
+  }
+  if (item.planId === '1lbcf') {
+    const entry = LBCF1[parseInt(item.key)]
+    return entry?.text || null
+  }
+  if (item.planId === 'orthodox') {
+    const entry = ORTHODOX_CATECHISM[item.key]
+    return entry ? `Q. ${entry.q}\n\nA. ${entry.a}` : null
   }
   return null
 }
 
-/* ── precompute static quote search text per day ── */
-const STATIC_QUOTE_SEARCH = {}
-SCHEDULE.forEach(r => {
-  const key = getQuoteKey(r)
-  if (key && QUOTES[key]) {
-    const q = QUOTES[key]
-    STATIC_QUOTE_SEARCH[r.day] = `${q.heading||''} ${q.quote||''} ${q.author||''} ${q.work||''}`.toLowerCase()
-  }
-})
+/* ── Default items shown to guests / no-plan users ── */
+const GUEST_SCRIPTURE = 'Genesis 1'
+const GUEST_CONF_ITEM = { planId:'2lbcf', key:'1.1', label:'Ch. 1 §1' }
+const GUEST_CONF_TEXT = LBCF2['1.1']?.text || ''
 
-function highlight(text, q) {
-  if (!q || !text) return text
-  const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  try {
-    const parts = String(text).split(new RegExp(`(${escaped})`, 'gi'))
-    if (parts.length === 1) return text
-    return parts.map((p, i) =>
-      p.toLowerCase() === q.toLowerCase()
-        ? <mark key={i} style={{background:'var(--gold-light)',color:'var(--ink)',borderRadius:2,padding:'0 1px',opacity:0.8}}>{p}</mark>
-        : p
-    )
-  } catch { return text }
-}
-
-function badgeClass(src) {
-  if (src === '2LBCF')     return 'badge badge-2lbcf'
-  if (src === 'Catechism')  return 'badge badge-cat'
-  if (src === '1LBCF')     return 'badge badge-1lbcf'
-  if (src === 'Orthodox')   return 'badge badge-orthodox'
-  return 'badge badge-review'
-}
-
+/* ── Small icon ── */
 function CheckIcon() {
   return (
     <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -83,54 +63,74 @@ function CheckIcon() {
   )
 }
 
-const SOURCES = [
-  { label:'2LBCF',     name:'Second London Baptist Confession', year:'1689',
-    internalHref:'/confessions?t=2lbcf',
-    href:'https://www.the1689confession.com/', color:'var(--purple-ink)', bg:'var(--purple-soft)' },
-  { label:'Catechism', name:"Keach's Baptist Catechism",        year:'1693',
-    internalHref:'/confessions?t=catechism',
-    href:'https://baptistcatechism.org/', color:'var(--teal)', bg:'var(--teal-light)' },
-  { label:'1LBCF',    name:'First London Baptist Confession',   year:'1644',
-    internalHref:'/confessions?t=1lbcf',
-    href:'https://london1644.info/en/fulltext.html', color:'var(--amber-ink)', bg:'var(--amber-soft)' },
-  { label:'Orthodox', name:'An Orthodox Catechism',             year:'1680',
-    internalHref:'/confessions?t=orthodox',
-    href:'https://1689.com/an-orthodox-catechism/', color:'#0c4a6e', bg:'rgba(12,74,110,0.12)' },
-]
-
-/* ─────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════
+   Main Dashboard
+   ═══════════════════════════════════════════════════ */
 export default function Dashboard() {
-  const { session }  = useAuth()
-  const { prefs }    = usePrefs()
-  const navigate     = useNavigate()
+  const { session } = useAuth()
+  const { prefs }   = usePrefs()
+  const navigate    = useNavigate()
+  const userId      = session?.user?.id ?? null
 
-  /* Seed from sessionStorage (fast) or fall back to localStorage (persistent) — never blank */
-  const _cached = loadDashProgress() ?? (() => {
-    const local = getLocalProgress()
-    const map = {}
-    Object.entries(local).forEach(([d, v]) => { map[parseInt(d)] = !!v.completed })
-    return Object.keys(map).length ? map : null
-  })()
-  const [progress, setProgress] = useState(_cached || {})
-  const [loading,  setLoading]  = useState(false)  // no spinner — content renders from cache
-  const [search,       setSearch]       = useState('')
-  const [filterSrc,    setFilterSrc]    = useState('')
-  const [filterStatus, setFilterStatus] = useState(() => {
-    try { return localStorage.getItem('pb-show-completed') === '1' ? '' : 'todo' } catch { return 'todo' }
-  })
-  const [page,         setPage]         = useState(() => Math.ceil(TODAY_DAY / PAGE))
-  const [toggling,     setToggling]     = useState(new Set())
-  const [bookmarks,    setBookmarks]    = useState(() => getBookmarks())
-  const [isMobile,     setIsMobile]     = useState(() => window.innerWidth < 768)
-  const [todaySeeMore, setTodaySeeMore] = useState(false)
+  /* ── Scroll save/restore ── */
+  useEffect(() => {
+    restoreScroll('dashboard')
+    return () => saveScroll('dashboard')
+  }, [])
+
+  /* ── Bible plan ── */
+  const [bibleConfig,   setBibleConfig]   = useState(() => getPlanConfig())
+  const [bibleProgress, setBibleProgress] = useState(() => getPlanProgress())
+  const [bibleProgress2, setBibleProgress2] = useState(() => getBibleProgress()) // chapter done map
+
+  /* ── Confession plan ── */
+  const [confConfig,   setConfConfig]   = useState(() => getConfPlanConfig())
+  const [confProgress, setConfProgress] = useState(() => getConfPlanProgress())
 
   /* ── Memory slots ── */
   const [memorizeVerse, setMemorizeVerseState] = useState(() => getMemorizeVerse())
   const [memorizeNote,  setMemorizeNoteState]  = useState(() => getMemorizeNote())
-  const [shareMemVerse, setShareMemVerse] = useState(false)   // open ShareCardModal for verse
-  const [shareMemNote,  setShareMemNote]  = useState(false)   // open ShareCardModal for note
+  const [shareMemVerse, setShareMemVerse] = useState(false)
+  const [shareMemNote,  setShareMemNote]  = useState(false)
 
-  // Keep in sync when other pages write to the slots
+  /* ── Reflection ── */
+  const [reflection,    setReflection]    = useState(() => loadReflection())
+  const reflectTimer = useRef(null)
+  function onReflectionChange(text) {
+    setReflection(text)
+    clearTimeout(reflectTimer.current)
+    reflectTimer.current = setTimeout(() => saveReflection(text), 600)
+  }
+
+  /* ── UI state ── */
+  const [confTextExpanded, setConfTextExpanded] = useState(false)
+
+  /* ── Sync plan changes fired by BibleTrackerSection / App bridge ── */
+  useEffect(() => {
+    function onPlanChanged() {
+      setBibleConfig(getPlanConfig())
+      setBibleProgress(getPlanProgress())
+    }
+    function onBibleKey(e) {
+      if (e.key === BIBLE_KEY) setBibleProgress2(getBibleProgress())
+    }
+    function onConfChanged() {
+      setConfConfig(getConfPlanConfig())
+      setConfProgress(getConfPlanProgress())
+    }
+    window.addEventListener('pb-plan-changed',      onPlanChanged)
+    window.addEventListener('pb-plans-changed',     onPlanChanged)
+    window.addEventListener('storage',              onBibleKey)
+    window.addEventListener('pb-conf-plan-changed', onConfChanged)
+    return () => {
+      window.removeEventListener('pb-plan-changed',      onPlanChanged)
+      window.removeEventListener('pb-plans-changed',     onPlanChanged)
+      window.removeEventListener('storage',              onBibleKey)
+      window.removeEventListener('pb-conf-plan-changed', onConfChanged)
+    }
+  }, [])
+
+  /* Keep memorize slots in sync */
   useEffect(() => {
     function sync() {
       setMemorizeVerseState(getMemorizeVerse())
@@ -140,251 +140,278 @@ export default function Dashboard() {
     return () => window.removeEventListener('pb-memorize-changed', sync)
   }, [])
 
-  /* search: user's notes + quote data */
-  const [userNotes,    setUserNotes]    = useState([])         // [{day_number, notes}] from progress table
-  const [dbQuotes,     setDbQuotes]     = useState([])         // [{quote_key, quote, author, heading}]
+  /* ── Derived: scripture ── */
+  const todayChapters   = bibleConfig ? getCurrentPlanChapters(bibleConfig, bibleProgress) : null
+  const hasActiveBible  = !!bibleConfig && !!todayChapters
+  const bibleDay        = (bibleProgress?.currentIndex ?? 0) + 1
+  const bibleTotalDays  = bibleConfig ? computePlanChapters(bibleConfig).length : 0
 
-  const userName = session?.user?.user_metadata?.full_name?.split(' ')[0]
-    || session?.user?.email?.split('@')[0]
-    || 'friend'
+  /* ── Derived: confession ── */
+  const confComplete  = confConfig ? isConfPlanComplete(confConfig, confProgress) : false
+  const confRestDay   = confConfig ? isTodayConfRestDay(confConfig) : false
+  const confItem      = (confConfig && !confComplete && !confRestDay) ? getCurrentConfItem(confConfig, confProgress) : null
+  const hasActiveConf = !!confConfig && !confComplete && !confRestDay && !!confItem
+  const confText      = confItem ? getConfItemText(confItem) : null
+  const confDay       = (confProgress?.currentIndex ?? 0) + 1
+  const todayStr      = new Date().toISOString().slice(0, 10)
+  const confDoneToday = confProgress?.lastAdvancedDate === todayStr
 
-  /* ── track mobile resize ── */
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768)
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
-
-  /* ── Save scroll on unmount, restore on mount ── */
-  useEffect(() => {
-    restoreScroll('dashboard')
-    return () => saveScroll('dashboard')
-  }, [])
-
-  /* ── Keep sessionStorage cache in sync with progress state ── */
-  useEffect(() => {
-    saveDashProgress(progress)
-  }, [progress])
-
-  /* ── Background sync: render cached progress immediately, update from Supabase quietly ── */
-  useEffect(() => {
-    if (session) {
-      supabase.from('progress').select('day_number, completed, notes').eq('user_id', session.user.id)
-        .then(({ data }) => {
-          if (!data) return
-          const map = {}
-          const notes = []
-          data.forEach(r => {
-            map[r.day_number] = r.completed
-            if (r.notes && r.notes.trim()) notes.push({ day_number: r.day_number, notes: r.notes })
-          })
-          setProgress(map)
-          setUserNotes(notes)
-          // Mirror back to localStorage so offline / next cold-start reads are current
-          const lp = {}
-          data.forEach(r => { if (r.completed || r.notes) lp[r.day_number] = { completed: r.completed, notes: r.notes || '' } })
-          try { localStorage.setItem('devotional_guest_progress', JSON.stringify(lp)) } catch {}
-        })
-        .catch(() => {}) // silently stay offline-friendly
-    } else {
-      const local = getLocalProgress()
-      const map = {}
-      const notes = []
-      Object.entries(local).forEach(([day, d]) => {
-        map[parseInt(day)] = !!d.completed
-        if (d.notes && d.notes.trim()) notes.push({ day_number: parseInt(day), notes: d.notes })
-      })
-      setProgress(map)
-      setUserNotes(notes)
-    }
-  }, [session])
-
-  /* ── load quote overrides for search ── */
-  useEffect(() => {
-    supabase.from('quotes').select('quote_key, heading, quote, author, work')
-      .then(({ data }) => { if (data) setDbQuotes(data) })
-      .catch(() => {})
-  }, [])
-
-  /* ── build note + quote search index ── */
-  const noteIndex  = useMemo(() => {
-    const idx = {}
-    userNotes.forEach(n => { idx[n.day_number] = n.notes.toLowerCase() })
-    return idx
-  }, [userNotes])
-
-  const dbQuoteIndex = useMemo(() => {
-    const idx = {}
-    dbQuotes.forEach(q => {
-      const dayEntry = SCHEDULE.find(r => getQuoteKey(r) === q.quote_key)
-      if (dayEntry) {
-        idx[dayEntry.day] = `${q.heading||''} ${q.quote||''} ${q.author||''} ${q.work||''}`.toLowerCase()
-      }
+  /* ── Toggle a Bible chapter done/undone ── */
+  const toggleChapter = useCallback((ch) => {
+    const done = !!bibleProgress2[ch]
+    setBibleChapter(ch, !done, userId)
+    setBibleProgress2(prev => {
+      const next = { ...prev }
+      if (!done) next[ch] = true
+      else delete next[ch]
+      return next
     })
-    return idx
-  }, [dbQuotes])
+  }, [bibleProgress2, userId])
 
-  /* ── toggle completion ── */
-  const toggleDay = useCallback(async (day) => {
-    const newVal = !progress[day]
-    setProgress(p => ({ ...p, [day]: newVal }))
-    if (session) {
-      setToggling(s => new Set(s).add(day))
-      await supabase.from('progress').upsert({
-        user_id: session.user.id, day_number: day,
-        completed: newVal, updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,day_number' })
-      setToggling(s => { const ns = new Set(s); ns.delete(day); return ns })
-    } else {
-      setLocalProgress(day, { completed: newVal })
-    }
-  }, [progress, session])
+  /* ── Confession: mark done / undo ── */
+  function handleConfAdvance() {
+    if (!confConfig || !confProgress) return
+    const { progress: newProg } = advanceConfPlan(confConfig, confProgress)
+    saveConfPlanProgress(newProg)
+    setConfProgress(newProg)
+    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
+  }
+  function handleConfRetreat() {
+    if (!confProgress) return
+    const newProg = retreatConfPlan(confProgress)
+    saveConfPlanProgress(newProg)
+    setConfProgress(newProg)
+    window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
+  }
 
-  /* ── stats ── */
-  const completedCount = useMemo(() => Object.values(progress).filter(Boolean).length, [progress])
-  const pct = Math.round(completedCount / 365 * 100)
-  const streak = useMemo(() => {
-    let best = 0, cur = 0
-    SCHEDULE.forEach(r => { if (progress[r.day]) { cur++; best = Math.max(best, cur) } else cur = 0 })
-    return best
-  }, [progress])
-
-  /* ── filtered list (includes quotes + notes in search) ── */
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim()
-    return SCHEDULE.filter(r => {
-      if (q) {
-        const baseMatch = r.day.toString().includes(q) ||
-          r.date.toLowerCase().includes(q) ||
-          r.reading.toLowerCase().includes(q) ||
-          r.detail.toLowerCase().includes(q) ||
-          r.src.toLowerCase().includes(q)
-        const quoteMatch = (STATIC_QUOTE_SEARCH[r.day] || '').includes(q) ||
-                           (dbQuoteIndex[r.day] || '').includes(q)
-        const noteMatch  = (noteIndex[r.day] || '').includes(q)
-        if (!baseMatch && !quoteMatch && !noteMatch) return false
-      }
-      if (filterSrc    && r.src !== filterSrc) return false
-      const done = !!progress[r.day]
-      if (filterStatus && ((filterStatus === 'done' && !done) || (filterStatus === 'todo' && done))) return false
-      return true
-    })
-  }, [search, filterSrc, filterStatus, progress, noteIndex, dbQuoteIndex])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE))
-  const pageItems  = filtered.slice((page - 1) * PAGE, page * PAGE)
-
-  useEffect(() => { setPage(1) }, [search, filterSrc])
-  /* When status filter changes, if showing all days jump to today's page */
-  useEffect(() => {
-    setPage(filterStatus === 'todo' ? 1 : Math.ceil(TODAY_DAY / PAGE))
-  }, [filterStatus])
-
-  /* ── refresh bookmarks on focus (picks up changes from ReadingPage) ── */
-  useEffect(() => {
-    const handler = () => setBookmarks(getBookmarks())
-    window.addEventListener('focus', handler)
-    return () => window.removeEventListener('focus', handler)
-  }, [])
-
-  /* ── today entry ── */
-  const todayEntry = SCHEDULE.find(r => r.day === TODAY_DAY)
-
-  /* ── today confession snippet ── */
-  const todayConfession = useMemo(() => {
-    if (!todayEntry) return null
-    if (todayEntry.src === '2LBCF') {
-      const m = todayEntry.reading.match(/Ch\.\s*(\d+)\s*§(\d+)/)
-      if (!m) return null
-      const item = LBCF2[`${m[1]}.${m[2]}`]
-      return item ? item.text : null
-    }
-    if (todayEntry.src === 'Catechism') {
-      const m = todayEntry.reading.match(/Q&A\s*#(\d+)/)
-      if (!m) return null
-      const item = CATECHISM[parseInt(m[1])]
-      return item ? `Q. ${item.q}\n\nA. ${item.a}` : null
-    }
-    if (todayEntry.src === '1LBCF') {
-      const m = todayEntry.reading.match(/Article\s*(\d+)/)
-      if (!m) return null
-      const item = LBCF1[parseInt(m[1])]
-      return item ? item.text : null
-    }
-    return null
-  }, [todayEntry])
+  /* ── Guest default text expanded ── */
+  const [guestTextExpanded, setGuestTextExpanded] = useState(false)
 
   return (
     <>
     <div style={s.page}>
-
       <main style={s.main}>
 
-        {/* Today's Reading */}
-        {todayEntry && (
-          <div style={s.todayWrap}>
-            {/* Header row — always clickable to navigate */}
-            <div style={s.todayCard} onClick={() => navigate(`/day/${TODAY_DAY}`)}>
-              <div style={s.todayLeft}>
-                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:6}}>
-                  <span style={s.todayLabel}>Today's Reading</span>
-                  <span style={{fontSize:12, color:'var(--ink-faint)'}}>Day {TODAY_DAY} · {todayEntry.date}</span>
-                </div>
-                <div style={s.todayReading}>
-                  <span className={badgeClass(todayEntry.src)}>{todayEntry.src}</span>
-                  <span style={s.todayReadingText}>{todayEntry.reading}</span>
-                </div>
-                {prefs.includeOrthodox && (() => {
-                  const qNum = getOrthodoxForDay(TODAY_DAY)
-                  const item = ORTHODOX_CATECHISM[qNum]
-                  return item ? (
-                    <div style={{...s.todayReading, marginTop:4}}>
-                      <span className="badge badge-orthodox">Orthodox</span>
-                      <span style={{...s.todayReadingText, fontSize:13}}>Q&A #{qNum}</span>
-                    </div>
-                  ) : null
-                })()}
-                <div style={s.todayDetail}>{todayEntry.detail}</div>
+        {/* ════════════════════════════════════════
+            TODAY'S READING header
+            ════════════════════════════════════════ */}
+        <div style={s.todayHeader}>
+          <span style={s.todayHeaderLabel}>Today&apos;s Reading</span>
+          <span style={s.todayHeaderDate}>{new Date().toLocaleDateString(undefined, { weekday:'short', month:'long', day:'numeric' })}</span>
+        </div>
+
+        {/* ════════════════════════════════════════
+            SCRIPTURE section
+            ════════════════════════════════════════ */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <span style={s.sectionIcon}>📖</span>
+            <span style={s.sectionTitle}>Scripture</span>
+            {hasActiveBible && (
+              <span style={s.sectionMeta}>Day {bibleDay}{bibleTotalDays ? ` of ${bibleTotalDays}` : ''}</span>
+            )}
+          </div>
+
+          {hasActiveBible ? (
+            <div style={s.readingCard}>
+              {todayChapters.map(ch => {
+                const done = !!bibleProgress2[ch]
+                return (
+                  <div key={ch} style={s.assignedRow}>
+                    <button
+                      onClick={() => toggleChapter(ch)}
+                      style={{ ...s.checkBtn, ...(done ? s.checkBtnDone : {}) }}
+                      aria-label={done ? 'Mark unread' : 'Mark read'}
+                    >
+                      {done && <CheckIcon />}
+                    </button>
+                    <span style={{ ...s.chapterName, ...(done ? s.chapterDone : {}) }}>{ch}</span>
+                    <button
+                      onClick={() => {
+                        const [book, num] = ch.split(' ')
+                        navigate(`/scripture?book=${encodeURIComponent(book)}&chapter=${num}`)
+                      }}
+                      style={s.readLink}
+                    >
+                      Read →
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div style={s.noPlanCard}>
+              {/* Guest / no plan default */}
+              <div style={s.assignedRow}>
+                <div style={{ ...s.checkBtn, cursor:'default', opacity:0.4 }} />
+                <span style={s.chapterName}>{GUEST_SCRIPTURE}</span>
+                <button
+                  onClick={() => navigate('/scripture?book=Genesis&chapter=1')}
+                  style={s.readLink}
+                >
+                  Read →
+                </button>
               </div>
-              <div style={s.todayArrow}>
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M6 4l5 5-5 5" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
+              <div style={s.noPlanNote}>
+                {session
+                  ? 'No active reading plan. Set one up in '
+                  : 'Sign in to track progress. Default showing — '}
+                {session
+                  ? <button onClick={() => navigate('/about')} style={s.inlineLink}>Settings → Bible Tracker</button>
+                  : <button onClick={() => navigate('/auth')} style={s.inlineLink}>sign in</button>
+                }
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Inline confession preview — only for confession entries */}
-            {todayConfession && (
-              <div style={s.confessionPreview}>
-                <p style={{
-                  ...s.confessionText,
-                  fontSize: prefs.sizePx,
-                  fontFamily: getFontCss(prefs.fontId),
-                  WebkitLineClamp: todaySeeMore ? 'unset' : 4,
-                  display: '-webkit-box',
-                  WebkitBoxOrient: 'vertical',
-                  overflow: todaySeeMore ? 'visible' : 'hidden',
-                }}>
-                  {todayConfession}
-                </p>
-                <button
-                  onClick={e => { e.stopPropagation(); setTodaySeeMore(m => !m) }}
-                  style={s.seeMoreBtn}
-                >
-                  {todaySeeMore ? 'See less ↑' : 'See more ↓'}
-                </button>
-                <button
-                  onClick={() => navigate(`/day/${TODAY_DAY}`)}
-                  style={s.readFullBtn}
-                >
-                  Open full reading →
-                </button>
-              </div>
+        {/* ════════════════════════════════════════
+            CONFESSION / CATECHISM section
+            ════════════════════════════════════════ */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <span style={s.sectionIcon}>📜</span>
+            <span style={s.sectionTitle}>Confession &amp; Catechism</span>
+            {hasActiveConf && (
+              <span style={s.sectionMeta}>Day {confDay}</span>
             )}
+          </div>
+
+          {hasActiveConf ? (
+            <div style={s.readingCard}>
+              {/* Item row */}
+              <div style={s.assignedRow}>
+                <button
+                  onClick={confDoneToday ? handleConfRetreat : handleConfAdvance}
+                  style={{ ...s.checkBtn, ...(confDoneToday ? s.checkBtnDone : {}) }}
+                  aria-label={confDoneToday ? 'Mark unread' : 'Mark read'}
+                >
+                  {confDoneToday && <CheckIcon />}
+                </button>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <span style={{ ...s.chapterName, ...(confDoneToday ? s.chapterDone : {}) }}>
+                    {confItem.label}
+                  </span>
+                  {confItem.title && (
+                    <div style={{ fontSize:12, color:'var(--ink-faint)', fontStyle:'italic', marginTop:1 }}>
+                      {confItem.title}
+                    </div>
+                  )}
+                  {confItem.q && (
+                    <div style={{ fontSize:12, color:'var(--ink-muted)', marginTop:2, lineHeight:1.45 }}>
+                      Q: {confItem.q}
+                    </div>
+                  )}
+                </div>
+                {confDoneToday && (
+                  <span style={{ fontSize:11, color:'var(--teal)', fontWeight:600, flexShrink:0 }}>✓ Done</span>
+                )}
+              </div>
+
+              {/* Full text */}
+              {confText && (
+                <div style={s.confTextWrap}>
+                  <p style={{
+                    ...s.confText,
+                    fontSize: prefs.sizePx,
+                    fontFamily: getFontCss(prefs.fontId),
+                    WebkitLineClamp: confTextExpanded ? 'unset' : 5,
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    overflow: confTextExpanded ? 'visible' : 'hidden',
+                  }}>
+                    {confText}
+                  </p>
+                  <button onClick={() => setConfTextExpanded(e => !e)} style={s.seeMoreBtn}>
+                    {confTextExpanded ? 'Show less ↑' : 'Show more ↓'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : confComplete ? (
+            <div style={s.readingCard}>
+              <div style={s.completeNote}>🎉 Confession plan complete!</div>
+            </div>
+          ) : confRestDay ? (
+            <div style={s.readingCard}>
+              <div style={s.restNote}>📅 Rest day — no confession reading today</div>
+            </div>
+          ) : (
+            /* Guest / no confession plan */
+            <div style={s.noPlanCard}>
+              <div style={s.assignedRow}>
+                <div style={{ ...s.checkBtn, cursor:'default', opacity:0.4 }} />
+                <span style={s.chapterName}>{GUEST_CONF_ITEM.label} — 2nd London Confession</span>
+              </div>
+              {/* Full text preview */}
+              {GUEST_CONF_TEXT && (
+                <div style={s.confTextWrap}>
+                  <p style={{
+                    ...s.confText,
+                    fontSize: prefs.sizePx,
+                    fontFamily: getFontCss(prefs.fontId),
+                    WebkitLineClamp: guestTextExpanded ? 'unset' : 5,
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    overflow: guestTextExpanded ? 'visible' : 'hidden',
+                  }}>
+                    {GUEST_CONF_TEXT}
+                  </p>
+                  <button onClick={() => setGuestTextExpanded(e => !e)} style={s.seeMoreBtn}>
+                    {guestTextExpanded ? 'Show less ↑' : 'Show more ↓'}
+                  </button>
+                </div>
+              )}
+              <div style={s.noPlanNote}>
+                {session
+                  ? <>Set up a plan in <button onClick={() => navigate('/about')} style={s.inlineLink}>Settings → Confession Tracker</button></>
+                  : <><button onClick={() => navigate('/auth')} style={s.inlineLink}>Sign in</button> to track your confession reading</>
+                }
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ════════════════════════════════════════
+            REFLECTION box
+            ════════════════════════════════════════ */}
+        <div style={s.section}>
+          <div style={s.sectionHeader}>
+            <span style={s.sectionIcon}>✍</span>
+            <span style={s.sectionTitle}>Reflection</span>
+          </div>
+          <textarea
+            value={reflection}
+            onChange={e => onReflectionChange(e.target.value)}
+            placeholder="What did today's reading stir in you? Jot a prayer, question, or insight..."
+            style={{ ...s.reflectBox, fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx }}
+          />
+        </div>
+
+        {/* ════════════════════════════════════════
+            TRACKER LINKS (signed-in only)
+            ════════════════════════════════════════ */}
+        {session && (
+          <div style={s.trackerLinks}>
+            <button onClick={() => navigate('/about')} style={s.trackerLink}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0 }}>
+                <rect x="1" y="1" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+                <path d="M4 6.5h5M7 4.5l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Bible Reading Plans
+            </button>
+            <button onClick={() => navigate('/about')} style={s.trackerLink}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ flexShrink:0 }}>
+                <path d="M2 2.5A1 1 0 013 1.5h7a1 1 0 011 1v9l-4.5-2-4.5 2V2.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              </svg>
+              Confession Tracker
+            </button>
           </div>
         )}
 
-        {/* ── Memory section ── */}
+        {/* ════════════════════════════════════════
+            MEMORY section (unchanged)
+            ════════════════════════════════════════ */}
         {(memorizeVerse || memorizeNote) && (
           <div style={s.memorizeSection}>
             <div style={s.memorizeHeader}>
@@ -402,23 +429,15 @@ export default function Dashboard() {
                   <span style={s.memorizeTypeBadge}>✦ Scripture</span>
                   <span style={s.memorizeRef}>{memorizeVerse.ref}</span>
                   <span style={s.memorizeVersion}>{memorizeVerse.version}</span>
-                  <button
-                    style={s.memorizeShareBtn}
-                    onClick={() => setShareMemVerse(true)}
-                    title="Share this verse"
-                  >
+                  <button style={s.memorizeShareBtn} onClick={() => setShareMemVerse(true)} title="Share">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                       <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
                       <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
-                      <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="3"  cy="6.5"  r="1.5" stroke="currentColor" strokeWidth="1.1"/>
                       <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
                     </svg>
                   </button>
-                  <button
-                    style={s.memorizeClearBtn}
-                    onClick={() => { clearMemorizeVerse(); setMemorizeVerseState(null) }}
-                    title="Remove from memory"
-                  >×</button>
+                  <button style={s.memorizeClearBtn} onClick={() => { clearMemorizeVerse(); setMemorizeVerseState(null) }} title="Remove">×</button>
                 </div>
                 <p style={{ ...s.memorizeText, fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx }}>
                   {memorizeVerse.text}
@@ -429,29 +448,23 @@ export default function Dashboard() {
             {memorizeNote && (
               <div style={{ ...s.memorizeCard, borderLeftColor: memorizeNote.type === 'quote' ? '#d4a84c' : 'var(--teal)' }}>
                 <div style={s.memorizeCardTop}>
-                  <span style={{ ...s.memorizeTypeBadge, color: memorizeNote.type === 'quote' ? '#b8860b' : 'var(--teal)',
-                    background: memorizeNote.type === 'quote' ? 'rgba(212,168,76,0.1)' : 'rgba(0,139,139,0.08)' }}>
+                  <span style={{ ...s.memorizeTypeBadge,
+                    color:      memorizeNote.type === 'quote' ? '#b8860b' : 'var(--teal)',
+                    background: memorizeNote.type === 'quote' ? 'rgba(212,168,76,0.1)' : 'rgba(0,139,139,0.08)',
+                  }}>
                     {memorizeNote.type === 'quote' ? '❝ Quote' : '✍ Note'}
                   </span>
                   <span style={s.memorizeRef}>{memorizeNote.bookTitle}</span>
                   {memorizeNote.bookAuthor && <span style={s.memorizeVersion}>{memorizeNote.bookAuthor}</span>}
-                  <button
-                    style={s.memorizeShareBtn}
-                    onClick={() => setShareMemNote(true)}
-                    title="Share this note"
-                  >
+                  <button style={s.memorizeShareBtn} onClick={() => setShareMemNote(true)} title="Share">
                     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                       <circle cx="10" cy="2.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
                       <circle cx="10" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
-                      <circle cx="3" cy="6.5" r="1.5" stroke="currentColor" strokeWidth="1.1"/>
+                      <circle cx="3"  cy="6.5"  r="1.5" stroke="currentColor" strokeWidth="1.1"/>
                       <path d="M4.4 5.8l4.2-2.8M4.4 7.2l4.2 2.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
                     </svg>
                   </button>
-                  <button
-                    style={s.memorizeClearBtn}
-                    onClick={() => { clearMemorizeNote(); setMemorizeNoteState(null) }}
-                    title="Remove from memory"
-                  >×</button>
+                  <button style={s.memorizeClearBtn} onClick={() => { clearMemorizeNote(); setMemorizeNoteState(null) }} title="Remove">×</button>
                 </div>
                 <p style={{ ...s.memorizeText, fontStyle: memorizeNote.type === 'quote' ? 'italic' : 'normal',
                   fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx }}>
@@ -469,178 +482,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stats */}
-        <div style={s.statsGrid}>
-          {[
-            { label:'Completed',   value: completedCount, color:'var(--teal)' },
-            { label:'Remaining',   value: 365 - completedCount, color:'var(--ink)' },
-            { label:'Progress',    value: pct + '%', color:'var(--gold)' },
-            { label:'Best streak', value: streak, color:'var(--ink)' },
-          ].map(st => (
-            <div key={st.label} className="card" style={s.statCard}>
-              <div style={s.statLabel}>{st.label}</div>
-              <div style={{...s.statValue, color: st.color}}>{st.value}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Progress bar */}
-        <div style={s.barWrap}>
-          <div style={s.bar}>
-            <div style={{...s.barFill, width: pct + '%'}} />
-          </div>
-          <span style={s.barLabel}>{pct}% complete</span>
-        </div>
-
-        {/* Filters */}
-        <div style={s.controls}>
-          <select value={filterSrc} onChange={e => setFilterSrc(e.target.value)} style={s.select}>
-            <option value="">All sources</option>
-            <option value="2LBCF">2LBCF</option>
-            <option value="Catechism">Catechism</option>
-            <option value="1LBCF">1LBCF</option>
-            <option value="Review">Review</option>
-          </select>
-          <button
-            style={{
-              ...s.select, cursor:'pointer', background:'white',
-              display:'flex', alignItems:'center', gap:6,
-              color: filterStatus === '' ? 'var(--teal)' : 'var(--ink-muted)',
-              borderColor: filterStatus === '' ? 'var(--teal)' : 'var(--border-strong)',
-            }}
-            onClick={() => {
-              const next = filterStatus === 'todo' ? '' : 'todo'
-              setFilterStatus(next)
-              try { localStorage.setItem('pb-show-completed', next === '' ? '1' : '0') } catch {}
-            }}
-            title={filterStatus === 'todo' ? 'Completed days are hidden — click to show' : 'Click to hide completed days'}
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              {filterStatus === '' ? (
-                <><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2"/><polyline points="3.5,6.5 5.5,8.5 9.5,4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></>
-              ) : (
-                <><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2"/></>
-              )}
-            </svg>
-            {filterStatus === '' ? `Showing completed (${completedCount})` : `Show completed (${completedCount})`}
-          </button>
-        </div>
-
-        {/* Search hint */}
-        {search && (
-          <div style={s.searchHint}>
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''} for
-            <em style={{color:'var(--ink)',marginLeft:4}}>"{search}"</em>
-            <span style={{marginLeft:4,color:'var(--ink-faint)'}}>— including quotes &amp; notes</span>
-          </div>
-        )}
-
-        {/* Day list */}
-        <div style={s.listWrap}>
-          {pageItems.map(r => {
-            const done = !!progress[r.day]
-            const busy = toggling.has(r.day)
-            const hasNote  = !!noteIndex[r.day]
-            const hasQuote = !!(STATIC_QUOTE_SEARCH[r.day] || dbQuoteIndex[r.day])
-            const isMarked = !!bookmarks[r.day]
-            const isToday  = r.day === TODAY_DAY
-            return (
-              <div
-                key={r.day}
-                style={{
-                  ...s.row,
-                  ...(done ? s.rowDone : {}),
-                  ...(isToday ? s.rowToday : {}),
-                }}
-                onClick={() => navigate(`/day/${r.day}`)}
-              >
-                <button
-                  style={{...s.cb, ...(done ? s.cbDone : {})}}
-                  onClick={e => { e.stopPropagation(); toggleDay(r.day) }}
-                  aria-label={done ? 'Mark incomplete' : 'Mark complete'}
-                  disabled={busy}
-                >
-                  {done && <CheckIcon />}
-                </button>
-                <div style={{...s.dayNum, ...(isToday ? {color:'var(--teal)', fontWeight:700} : {})}}>
-                  Day {r.day}
-                  {isToday && <span style={{fontSize:9, background:'var(--teal)', color:'white', borderRadius:4, padding:'1px 4px', marginLeft:4, verticalAlign:'middle', fontWeight:700, letterSpacing:'0.04em'}}>TODAY</span>}
-                </div>
-                <div style={s.rowMain}>
-                  <div style={s.rowReading}>
-                    <span className={badgeClass(r.src)}>{r.src}</span>
-                    <span style={done ? {textDecoration:'line-through', opacity:.45} : {}}>{highlight(r.reading, search)}</span>
-                  </div>
-                  {prefs.includeOrthodox && (
-                    <div style={{...s.rowReading, marginTop:2}}>
-                      <span className="badge badge-orthodox">Orthodox</span>
-                      <span style={{fontSize:11, color:'var(--ink-faint)'}}>Q&A #{getOrthodoxForDay(r.day)}</span>
-                    </div>
-                  )}
-                  <div style={s.rowDetail}>
-                    {highlight(r.detail, search)}
-                    {hasNote && (
-                      <span style={s.rowPip} title="Has author's note">
-                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                          <path d="M1 1.5h7M1 4.5h5M1 7.5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                        </svg>
-                      </span>
-                    )}
-                    {hasQuote && (
-                      <span style={{...s.rowPip, color:'var(--gold)'}} title="Has quote">
-                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                          <path d="M1 2c0-.6.4-1 1-1h1c.6 0 1 .4 1 1v1.5c0 1-.6 1.8-1.5 2.5M5 2c0-.6.4-1 1-1h1c.6 0 1 .4 1 1v1.5c0 1-.6 1.8-1.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                        </svg>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div style={s.rowMeta}>
-                  {isMarked && (
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" title="Bookmarked" style={{color:'var(--teal)', flexShrink:0}}>
-                      <path d="M2.5 2A1.5 1.5 0 014 .5h6A1.5 1.5 0 0111.5 2v11L7 10.5 2.5 13V2z"
-                        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"
-                        fill="currentColor" fillOpacity="0.2"/>
-                    </svg>
-                  )}
-                  <span style={s.rowDate}>{r.date}</span>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{opacity:.3}}>
-                    <path d="M5 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </div>
-              </div>
-            )
-          })}
-          {pageItems.length === 0 && (
-            <div style={{textAlign:'center', padding:'3rem', color:'var(--ink-faint)'}}>
-              No days match your search.
-            </div>
-          )}
-        </div>
-
-        {/* Pagination */}
-        <div style={s.pag}>
-          <button className="btn btn-outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
-          <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
-            <span style={{fontSize:13,color:'var(--ink-muted)'}}>Page {page} of {totalPages} &nbsp;·&nbsp; {filtered.length} entries</span>
-            {!search && !filterSrc && (
-              <button
-                onClick={() => {
-                  setPage(Math.ceil(TODAY_DAY / PAGE))
-                }}
-                style={{
-                  fontSize:11, color:'var(--teal)', background:'none', border:'none',
-                  cursor:'pointer', padding:'0 4px', fontFamily:"'DM Sans',sans-serif",
-                  textDecoration:'underline', opacity: page === Math.ceil(TODAY_DAY / PAGE) ? 0.4 : 1,
-                }}
-                disabled={page === Math.ceil(TODAY_DAY / PAGE)}
-              >
-                Jump to Day {TODAY_DAY}
-              </button>
-            )}
-          </div>
-          <button className="btn btn-outline" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
-        </div>
       </main>
 
       <footer style={s.footer}>
@@ -649,216 +490,153 @@ export default function Dashboard() {
           <span style={s.footerDot}>·</span>
           <a href="https://theologycheck.blog" target="_blank" rel="noopener noreferrer" style={s.footerLink}>
             <img src="https://theologycheckblog.wordpress.com/wp-content/uploads/2022/02/tc-logo.png"
-              alt="TheologyCheck" style={{height:18, verticalAlign:'middle', marginRight:5}} />
+              alt="TheologyCheck" style={{ height:18, verticalAlign:'middle', marginRight:5 }} />
             theologycheck.blog
           </a>
         </div>
       </footer>
-
     </div>
 
-    {/* ── Share memorized verse ── */}
     {shareMemVerse && memorizeVerse && (
-      <ShareCardModal
-        isOpen
-        onClose={() => setShareMemVerse(false)}
-        card={{
-          type: 'reading',
-          title: memorizeVerse.ref,
-          subtitle: memorizeVerse.version,
-          source: memorizeVerse.version,
-          text: memorizeVerse.text,
-          label: '',
-        }}
-      />
+      <ShareCardModal isOpen onClose={() => setShareMemVerse(false)}
+        card={{ type:'reading', title:memorizeVerse.ref, subtitle:memorizeVerse.version,
+          source:memorizeVerse.version, text:memorizeVerse.text, label:'' }} />
     )}
-
-    {/* ── Share memorized note ── */}
     {shareMemNote && memorizeNote && (
-      <ShareCardModal
-        isOpen={shareMemNote && !!memorizeNote}
-        onClose={() => setShareMemNote(false)}
-        card={{
-          type:       memorizeNote.type === 'quote' ? 'book_quote' : 'book_note',
-          noteType:   memorizeNote.type,
-          text:       memorizeNote.text,
-          bookTitle:  memorizeNote.bookTitle,
-          bookAuthor: memorizeNote.bookAuthor,
-          bookLabels: null,
-          page:       memorizeNote.page,
-          percent:    memorizeNote.percent,
-        }}
-      />
+      <ShareCardModal isOpen onClose={() => setShareMemNote(false)}
+        card={{ type: memorizeNote.type === 'quote' ? 'book_quote' : 'book_note',
+          noteType:memorizeNote.type, text:memorizeNote.text, bookTitle:memorizeNote.bookTitle,
+          bookAuthor:memorizeNote.bookAuthor, bookLabels:null,
+          page:memorizeNote.page, percent:memorizeNote.percent }} />
     )}
     </>
   )
 }
 
-/* ─── Styles ─── */
+/* ── Styles ── */
 const s = {
   page: { minHeight:'100vh', background:'var(--parchment)', fontFamily:"'DM Sans',sans-serif", paddingTop:'env(safe-area-inset-top)' },
+  main: { maxWidth:720, margin:'0 auto', padding:'2rem 20px 3rem' },
 
-  /* header */
-  header: { borderBottom:'1px solid var(--border)', background:'var(--surface)', position:'sticky', top:0, zIndex:30 },
-  headerInner: { maxWidth:900, margin:'0 auto', padding:'14px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' },
-  siteTitle: { fontSize:20, fontFamily:"'Cormorant Garamond',serif", fontWeight:600, color:'var(--ink)' },
-  siteGreeting: { fontSize:12, color:'var(--ink-faint)', marginTop:1 },
+  /* Today header */
+  todayHeader: { display:'flex', alignItems:'baseline', gap:10, marginBottom:'1.5rem' },
+  todayHeaderLabel: { fontSize:20, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' },
+  todayHeaderDate:  { fontSize:13, color:'var(--ink-faint)' },
 
-  /* main */
-  main: { maxWidth:900, margin:'0 auto', padding:'2rem 24px' },
-
-  guestBanner: {
-    display:'flex', alignItems:'center', flexWrap:'wrap', gap:8,
-    background:'var(--gold-faint)', border:'1px solid var(--border)',
-    borderRadius:'var(--radius)', padding:'10px 14px', marginBottom:'1.25rem',
-    fontSize:13, color:'var(--ink-muted)',
+  /* Section */
+  section: { marginBottom:'1.25rem' },
+  sectionHeader: {
+    display:'flex', alignItems:'center', gap:7, marginBottom:8,
   },
-  guestBannerLink: { background:'none', border:'none', padding:0, color:'var(--gold)', fontWeight:500, fontSize:13, cursor:'pointer' },
+  sectionIcon:  { fontSize:15, flexShrink:0 },
+  sectionTitle: { fontSize:13, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em', color:'var(--ink-faint)', flex:1 },
+  sectionMeta:  { fontSize:11, color:'var(--ink-faint)', background:'var(--parchment)', border:'1px solid var(--border)', borderRadius:99, padding:'2px 8px' },
 
-  /* today */
-  todayWrap: { marginBottom:'1.25rem', border:'1.5px solid var(--teal)', borderRadius:'var(--radius-lg)', overflow:'hidden', boxShadow:'0 1px 4px rgba(68,153,136,0.10)' },
-  todayCard: {
-    display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-    background:'var(--surface)', padding:'16px 20px', cursor:'pointer',
-    transition:'background 0.15s',
+  /* Reading card */
+  readingCard: {
+    background:'var(--surface)', border:'1.5px solid var(--border)',
+    borderRadius:'var(--radius-lg)', padding:'14px 16px',
+    display:'flex', flexDirection:'column', gap:10,
   },
-  todayLeft: { flex:1, minWidth:0 },
-  todayLabel: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--teal)' },
-  todayReading: { display:'flex', alignItems:'center', gap:7, flexWrap:'wrap', marginBottom:3 },
-  todayReadingText: { fontSize:15, fontWeight:500, color:'var(--ink)' },
-  todayDetail: { fontSize:12, color:'var(--ink-faint)' },
-  todayArrow: { flexShrink:0 },
-  confessionPreview: {
-    borderTop:'1px solid var(--border)', background:'var(--parchment)',
-    padding:'14px 20px 12px',
+  noPlanCard: {
+    background:'var(--surface)', border:'1.5px dashed var(--border)',
+    borderRadius:'var(--radius-lg)', padding:'14px 16px',
+    display:'flex', flexDirection:'column', gap:10,
+    opacity:0.85,
   },
-  confessionText: {
+
+  /* Assigned reading row */
+  assignedRow: { display:'flex', alignItems:'flex-start', gap:10 },
+  checkBtn: {
+    width:20, height:20, borderRadius:5, border:'1.5px solid var(--border-strong)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    flexShrink:0, transition:'all 0.15s', background:'var(--surface)',
+    cursor:'pointer', marginTop:1,
+  },
+  checkBtnDone: { background:'var(--teal)', borderColor:'var(--teal)' },
+  chapterName: { fontSize:15, fontWeight:600, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)', flex:1 },
+  chapterDone: { textDecoration:'line-through', opacity:0.5 },
+  readLink: {
+    fontSize:12, color:'var(--teal)', fontWeight:600, background:'none',
+    border:'none', cursor:'pointer', padding:0, flexShrink:0, marginTop:2,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* Confession text */
+  confTextWrap: { borderTop:'1px solid var(--border)', paddingTop:10 },
+  confText: {
     fontSize:15, fontFamily:"'Cormorant Garamond',serif", lineHeight:1.85,
-    color:'var(--ink)', margin:'0 0 10px',
+    color:'var(--ink)', margin:'0 0 8px', whiteSpace:'pre-wrap',
   },
   seeMoreBtn: {
     background:'none', border:'none', cursor:'pointer', fontSize:12,
-    color:'var(--teal)', fontWeight:600, padding:0, marginRight:16,
+    color:'var(--teal)', fontWeight:600, padding:0,
     fontFamily:"'DM Sans',sans-serif",
   },
-  readFullBtn: {
-    background:'none', border:'none', cursor:'pointer', fontSize:12,
-    color:'var(--ink-faint)', padding:0, fontFamily:"'DM Sans',sans-serif",
+
+  /* Status notices */
+  completeNote: { fontSize:13, color:'var(--teal)', fontWeight:600 },
+  restNote:     { fontSize:13, color:'var(--ink-muted)', fontStyle:'italic' },
+  noPlanNote:   { fontSize:12, color:'var(--ink-faint)', lineHeight:1.6 },
+  inlineLink: {
+    background:'none', border:'none', color:'var(--teal)', fontWeight:600,
+    cursor:'pointer', padding:0, fontSize:12, fontFamily:"'DM Sans',sans-serif",
+    textDecoration:'underline',
   },
 
-  /* memory */
-  memorizeSection: {
-    marginBottom:'1.25rem',
+  /* Reflection */
+  reflectBox: {
+    width:'100%', minHeight:110, padding:'12px 14px',
+    border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)',
+    background:'var(--surface)', color:'var(--ink)',
+    fontSize:14, lineHeight:1.7, resize:'vertical',
+    outline:'none', boxSizing:'border-box',
+    fontFamily:"'Cormorant Garamond',serif",
+    transition:'border-color 0.15s',
   },
-  memorizeHeader: {
-    display:'flex', alignItems:'center', gap:6,
-    marginBottom:8,
+
+  /* Tracker links */
+  trackerLinks: {
+    display:'flex', gap:8, flexWrap:'wrap', marginBottom:'1.5rem',
   },
-  memorizeHeaderText: {
-    fontSize:10, fontWeight:700, textTransform:'uppercase',
-    letterSpacing:'0.09em', color:'var(--teal)',
+  trackerLink: {
+    display:'inline-flex', alignItems:'center', gap:6,
+    fontSize:12, fontWeight:600, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid rgba(29,107,90,0.25)',
+    borderRadius:8, padding:'7px 13px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'opacity 0.12s',
   },
+
+  /* Memory section */
+  memorizeSection: { marginBottom:'1.25rem' },
+  memorizeHeader:  { display:'flex', alignItems:'center', gap:6, marginBottom:8 },
+  memorizeHeaderText: { fontSize:10, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.09em', color:'var(--teal)' },
   memorizeCard: {
     background:'var(--surface)', border:'1px solid var(--border)',
     borderLeft:'3px solid var(--teal)',
-    borderRadius:'var(--radius)', padding:'12px 14px',
-    marginBottom:8,
+    borderRadius:'var(--radius)', padding:'12px 14px', marginBottom:8,
   },
-  memorizeCardTop: {
-    display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6,
-  },
+  memorizeCardTop:  { display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6 },
   memorizeTypeBadge: {
     fontSize:10, fontWeight:700, padding:'1px 7px', borderRadius:99,
     background:'rgba(0,139,139,0.08)', color:'var(--teal)',
     textTransform:'uppercase', letterSpacing:'0.06em', flexShrink:0,
   },
-  memorizeRef: {
-    fontSize:12, fontWeight:600, color:'var(--ink)', flexShrink:0,
-  },
-  memorizeVersion: {
-    fontSize:11, color:'var(--ink-faint)', flexShrink:0,
-  },
+  memorizeRef:     { fontSize:12, fontWeight:600, color:'var(--ink)', flexShrink:0 },
+  memorizeVersion: { fontSize:11, color:'var(--ink-faint)', flexShrink:0 },
   memorizeShareBtn: {
     marginLeft:'auto', background:'none', border:'1px solid var(--border)', cursor:'pointer',
     color:'var(--ink-muted)', padding:'3px 6px', borderRadius:6, lineHeight:1,
     display:'flex', alignItems:'center', flexShrink:0,
   },
-  memorizeClearBtn: {
-    background:'none', border:'none', cursor:'pointer',
-    fontSize:16, color:'var(--ink-faint)', padding:'0 2px', lineHeight:1, flexShrink:0,
-  },
-  memorizeText: {
-    margin:0, color:'var(--ink)', lineHeight:1.6,
-  },
-  memorizeLocation: {
-    margin:'6px 0 0', fontSize:11, color:'var(--ink-faint)',
-  },
+  memorizeClearBtn: { background:'none', border:'none', cursor:'pointer', fontSize:16, color:'var(--ink-faint)', padding:'0 2px', lineHeight:1, flexShrink:0 },
+  memorizeText:     { margin:0, color:'var(--ink)', lineHeight:1.6 },
+  memorizeLocation: { margin:'6px 0 0', fontSize:11, color:'var(--ink-faint)' },
 
-  /* stats */
-  statsGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:10, marginBottom:'1.25rem' },
-  statCard: { padding:'14px 16px' },
-  statLabel: { fontSize:11, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 },
-  statValue: { fontSize:26, fontFamily:"'Cormorant Garamond',serif", fontWeight:600 },
-
-  barWrap: { display:'flex', alignItems:'center', gap:12, marginBottom:'1.5rem' },
-  bar: { flex:1, height:5, background:'var(--parchment-dark)', borderRadius:99, overflow:'hidden' },
-  barFill: { height:'100%', background:'var(--teal)', borderRadius:99, transition:'width 0.4s ease' },
-  barLabel: { fontSize:12, color:'var(--ink-faint)', whiteSpace:'nowrap' },
-
-  /* controls */
-  controls: { display:'flex', gap:8, flexWrap:'wrap', marginBottom:'0.5rem' },
-  searchWrap: {
-    flex:1, minWidth:200, position:'relative', display:'flex', alignItems:'center',
-    background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:'var(--radius)',
-    padding:'0 10px',
-  },
-  searchIcon: { color:'var(--ink-faint)', flexShrink:0, marginRight:6 },
-  searchInput: {
-    flex:1, border:'none', background:'transparent', outline:'none',
-    fontSize:14, color:'var(--ink)', padding:'9px 0',
-    fontFamily:"'DM Sans',sans-serif",
-  },
-  searchClear: {
-    background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)',
-    display:'flex', alignItems:'center', padding:4, borderRadius:4,
-  },
-  select: {
-    padding:'9px 12px', fontSize:13, border:'1px solid var(--border-strong)',
-    borderRadius:'var(--radius)', background:'var(--surface)', color:'var(--ink)',
-    cursor:'pointer', minWidth:130,
-  },
-
-  searchHint: { fontSize:12, color:'var(--ink-faint)', marginBottom:'0.75rem' },
-
-  /* list */
-  listWrap: { display:'flex', flexDirection:'column', gap:0, borderRadius:'var(--radius-lg)', overflow:'hidden', border:'1px solid var(--border)', background:'var(--surface)' },
-  row: {
-    display:'flex', alignItems:'center', gap:12, padding:'12px 16px',
-    borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background 0.1s',
-  },
-  rowDone:  { background:'var(--parchment-dark)' },
-  rowToday: { borderColor:'var(--teal)', boxShadow:'inset 3px 0 0 var(--teal)' },
-  cb: {
-    width:20, height:20, borderRadius:5, border:'1.5px solid var(--border-strong)',
-    display:'flex', alignItems:'center', justifyContent:'center',
-    flexShrink:0, transition:'all 0.15s', background:'var(--surface)', cursor:'pointer',
-  },
-  cbDone: { background:'var(--teal)', borderColor:'var(--teal)' },
-  dayNum: { fontSize:11, color:'var(--ink-faint)', fontWeight:500, minWidth:38, flexShrink:0 },
-  rowMain: { flex:1, minWidth:0 },
-  rowReading: { fontSize:14, color:'var(--ink)', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' },
-  rowDetail: { fontSize:12, color:'var(--ink-faint)', marginTop:2, display:'flex', alignItems:'center', gap:5 },
-  rowPip: { display:'inline-flex', alignItems:'center', color:'var(--teal)', opacity:.7 },
-  rowMeta: { display:'flex', alignItems:'center', gap:4, flexShrink:0 },
-  rowDate: { fontSize:12, color:'var(--ink-faint)', whiteSpace:'nowrap' },
-
-  /* pagination */
-  pag: { display:'flex', alignItems:'center', justifyContent:'center', gap:12, marginTop:'1.5rem', flexWrap:'wrap' },
-
-  /* footer */
-  footer: { borderTop:'1px solid var(--border)', background:'var(--surface)', marginTop:'3rem', padding:'20px 24px' },
-  footerInner: { maxWidth:900, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'center', gap:10, flexWrap:'wrap' },
-  footerText: { fontSize:13, color:'var(--ink-faint)' },
-  footerDot:  { color:'var(--border-strong)' },
-  footerLink: { display:'inline-flex', alignItems:'center', color:'var(--ink-muted)', textDecoration:'none', fontWeight:500, fontSize:13 },
+  /* Footer */
+  footer:      { borderTop:'1px solid var(--border)', background:'var(--surface)', padding:'20px 24px' },
+  footerInner: { maxWidth:720, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'center', gap:10, flexWrap:'wrap' },
+  footerText:  { fontSize:13, color:'var(--ink-faint)' },
+  footerDot:   { color:'var(--border-strong)' },
+  footerLink:  { display:'inline-flex', alignItems:'center', color:'var(--ink-muted)', textDecoration:'none', fontWeight:500, fontSize:13 },
 }
