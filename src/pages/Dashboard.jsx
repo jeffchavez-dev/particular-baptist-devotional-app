@@ -5,7 +5,7 @@ import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChap
 import {
   getConfPlanConfig, getConfPlanProgress,
   getCurrentConfItem, isConfPlanComplete, advanceConfPlan, retreatConfPlan,
-  saveConfPlanProgress, isTodayConfRestDay,
+  saveConfPlanProgress, isTodayConfRestDay, computeConfItems,
 } from '../lib/confessionPlan'
 import { LBCF2 }             from '../data/lbcf2'
 import { CATECHISM }         from '../data/catechism'
@@ -207,11 +207,29 @@ export default function Dashboard() {
   const confRestDay   = confConfig ? isTodayConfRestDay(confConfig) : false
   const confItem      = (confConfig && !confComplete && !confRestDay) ? getCurrentConfItem(confConfig, confProgress) : null
   const hasActiveConf = !!confConfig && !confComplete && !confRestDay && !!confItem
-  const confText      = confItem ? getConfItemText(confItem)  : null
-  const confItemRefs  = confItem ? getConfItemRefs(confItem)  : null
   const confDay       = (confProgress?.currentIndex ?? 0) + 1
   const todayStr      = new Date().toISOString().slice(0, 10)
   const confDoneToday = confProgress?.lastAdvancedDate === todayStr
+
+  /**
+   * When the user just marked today's item done, confItem points to the NEXT
+   * unread item (currentIndex already incremented), which would wrongly appear
+   * as "already done". confDisplayItem resolves to the item that was actually
+   * completed today (currentIndex − 1) so the UI stays in sync.
+   */
+  const confDisplayItem = useMemo(() => {
+    if (!confConfig || confComplete || confRestDay) return null
+    if (confDoneToday && (confProgress?.currentIndex ?? 0) > 0) {
+      const items = computeConfItems(confConfig.planId)
+      const completedIdx = (confProgress?.currentIndex ?? 0) - 1
+      if (confConfig.mode === 'year') return items[completedIdx % items.length] || null
+      return items[completedIdx] || null
+    }
+    return confItem
+  }, [confConfig, confComplete, confRestDay, confDoneToday, confProgress?.currentIndex, confItem])
+
+  const confText     = confDisplayItem ? getConfItemText(confDisplayItem) : null
+  const confItemRefs = confDisplayItem ? getConfItemRefs(confDisplayItem) : null
 
   /* ── Toggle a Bible chapter done/undone ── */
   const toggleChapter = useCallback((ch) => {
@@ -344,16 +362,16 @@ export default function Dashboard() {
                 </button>
                 <div style={{ flex:1, minWidth:0 }}>
                   <span style={{ ...s.chapterName, ...(confDoneToday ? s.chapterDone : {}) }}>
-                    {confItem.label}
+                    {confDisplayItem?.label}
                   </span>
-                  {confItem.title && (
+                  {confDisplayItem?.title && (
                     <div style={{ fontSize:12, color:'var(--ink-faint)', fontStyle:'italic', marginTop:1 }}>
-                      {confItem.title}
+                      {confDisplayItem.title}
                     </div>
                   )}
-                  {confItem.q && (
+                  {confDisplayItem?.q && (
                     <div style={{ fontSize:12, color:'var(--ink-muted)', marginTop:2, lineHeight:1.45 }}>
-                      Q: {confItem.q}
+                      Q: {confDisplayItem.q}
                     </div>
                   )}
                 </div>
