@@ -101,6 +101,11 @@ function PlanTab({ userId }) {
     endBook: 'Revelation',
     endChapter: 22,
   })
+  // duration: 1 | 2 | 3 | null (null = custom chapters/day)
+  const [duration, setDuration] = useState(() => {
+    const cfg = getPlanConfig()
+    return cfg?.duration ?? 1
+  })
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmStop,  setConfirmStop]  = useState(false)
   const completions = useMemo(() => getPlanCompletions(), [config])
@@ -124,7 +129,33 @@ function PlanTab({ userId }) {
   /* Draft chapter count preview */
   const draftChapters = useMemo(() => computePlanChapters(draft), [draft])
 
+  const isPresetPlan = draft.planId !== 'custom'
+
+  /** Calculate chapters/day needed to finish in N years accounting for rest days */
+  function calcChaptersPerDay(totalChapters, years, restDays) {
+    const readDaysPerWeek = 7 - (restDays || []).length
+    if (readDaysPerWeek === 0 || years === 0) return 1
+    const totalReadDays = Math.round(365 * readDaysPerWeek / 7) * years
+    return Math.max(1, Math.ceil(totalChapters / totalReadDays))
+  }
+
+  /* Auto-set chaptersPerDay when duration or rest days change (preset plans only) */
+  useEffect(() => {
+    if (!isPresetPlan || duration === null) return
+    const cpd = calcChaptersPerDay(draftChapters.length, duration, draft.restDays)
+    setDraft(prev => ({ ...prev, chaptersPerDay: cpd, duration }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, draft.restDays?.join(','), draftChapters.length, isPresetPlan])
+
   function patchDraft(patch) { setDraft(prev => ({ ...prev, ...patch })) }
+
+  function selectDuration(years) {
+    setDuration(years)
+    if (years !== null && draftChapters.length > 0) {
+      const cpd = calcChaptersPerDay(draftChapters.length, years, draft.restDays)
+      patchDraft({ chaptersPerDay: cpd, duration: years })
+    }
+  }
 
   function startPlan() {
     const newConfig = { ...draft, startedDate: new Date().toISOString().slice(0, 10) }
@@ -301,7 +332,11 @@ function PlanTab({ userId }) {
                   name="planId"
                   value={plan.id}
                   checked={draft.planId === plan.id}
-                  onChange={() => patchDraft({ planId: plan.id })}
+                  onChange={() => {
+                    patchDraft({ planId: plan.id })
+                    if (plan.id !== 'custom') setDuration(prev => prev ?? 1)
+                    else setDuration(null)
+                  }}
                   style={{ accentColor:'var(--teal)', flexShrink:0, width:15, height:15 }}
                 />
                 <span style={{ fontSize:13, fontWeight: draft.planId === plan.id ? 600 : 400, color: draft.planId === plan.id ? 'var(--ink)' : 'var(--ink-muted)' }}>
@@ -372,18 +407,81 @@ function PlanTab({ userId }) {
           </div>
         )}
 
-        {/* Pace */}
+        {/* Duration / Pace */}
         <div style={p.section}>
-          <div style={p.sectionLabel}>Reading Pace</div>
-          <select
-            value={draft.chaptersPerDay}
-            onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
-            style={p.select}
-          >
-            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-              <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
-            ))}
-          </select>
+          <div style={p.sectionLabel}>{isPresetPlan ? 'Duration' : 'Reading Pace'}</div>
+
+          {isPresetPlan ? (
+            <>
+              {/* Year preset buttons */}
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {[1, 2, 3].map(yr => {
+                  const cpd = draftChapters.length > 0
+                    ? calcChaptersPerDay(draftChapters.length, yr, draft.restDays)
+                    : null
+                  const active = duration === yr
+                  return (
+                    <button
+                      key={yr}
+                      onClick={() => selectDuration(yr)}
+                      style={{
+                        ...p.durationBtn,
+                        background: active ? 'var(--teal)' : 'var(--surface)',
+                        color: active ? 'white' : 'var(--ink)',
+                        borderColor: active ? 'var(--teal)' : 'var(--border)',
+                      }}
+                    >
+                      <span style={{ fontWeight:700 }}>{yr} yr{yr > 1 ? 's' : ''}</span>
+                      {cpd && (
+                        <span style={{ fontSize:10, opacity: active ? 0.85 : 0.6, display:'block' }}>
+                          ~{cpd} ch/day
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+                {/* Custom button */}
+                <button
+                  onClick={() => selectDuration(null)}
+                  style={{
+                    ...p.durationBtn,
+                    background: duration === null ? 'var(--teal)' : 'var(--surface)',
+                    color: duration === null ? 'white' : 'var(--ink)',
+                    borderColor: duration === null ? 'var(--teal)' : 'var(--border)',
+                  }}
+                >
+                  <span style={{ fontWeight:700 }}>Custom</span>
+                  <span style={{ fontSize:10, opacity: duration === null ? 0.85 : 0.6, display:'block' }}>
+                    set pace
+                  </span>
+                </button>
+              </div>
+
+              {/* Manual pace when Custom selected */}
+              {duration === null && (
+                <select
+                  value={draft.chaptersPerDay}
+                  onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
+                  style={{ ...p.select, marginTop:4 }}
+                >
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
+                  ))}
+                </select>
+              )}
+            </>
+          ) : (
+            /* Custom plan: keep manual dropdown */
+            <select
+              value={draft.chaptersPerDay}
+              onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
+              style={p.select}
+            >
+              {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
+                <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Rest days */}
@@ -776,6 +874,11 @@ const p = {
     width:'100%', padding:'7px 10px', borderRadius:6, fontSize:12, fontWeight:500,
     border:'1.5px solid var(--border)', background:'var(--parchment)', color:'var(--ink)',
     fontFamily:"'DM Sans',sans-serif", outline:'none', cursor:'pointer',
+  },
+  durationBtn: {
+    flex:1, minWidth:64, padding:'8px 10px', borderRadius:8, border:'1.5px solid', cursor:'pointer',
+    fontSize:13, fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
+    textAlign:'center', lineHeight:1.3,
   },
   dayBtn: {
     padding:'5px 10px', borderRadius:99, border:'1.5px solid', cursor:'pointer',

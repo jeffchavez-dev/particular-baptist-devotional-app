@@ -476,6 +476,7 @@ function AddNoteModal({ book, note, onSave, onClose }) {
 function NoteCard({ note, book, onEdit, onDelete, onShare, onShareLink, shareLinkLoading, onCopy, onMemorize }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
+  const [copyFlash, setCopyFlash] = useState(false)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -495,41 +496,95 @@ function NoteCard({ note, book, onEdit, onDelete, onShare, onShareLink, shareLin
   if (note.page) locParts.push(`p. ${note.page}`)
   if (note.percent != null) locParts.push(`${note.percent}%`)
 
+  function handleCopyClick() {
+    onCopy(note)
+    setCopyFlash(true)
+    setTimeout(() => setCopyFlash(false), 1500)
+  }
+
   return (
     <div style={{ ...bnote.card, borderLeftColor: isQuote ? '#d4a84c' : 'var(--teal)' }}>
+      {/* Top row: badge + meta */}
       <div style={bnote.cardTop}>
         <span style={{ ...bnote.typeBadge, background: isQuote ? 'rgba(212,168,76,0.12)' : 'rgba(0,139,139,0.08)', color: isQuote ? '#b8860b' : 'var(--teal)' }}>
           {isQuote ? '❝ Quote' : '✍ Note'}
         </span>
         {locParts.length > 0 && <span style={bnote.locLabel}>{locParts.join(' · ')}</span>}
         {dateStr && <span style={bnote.dateLabel}>{dateStr}</span>}
-        {note.shareToken && (
-          <span title={'Shared link active'} style={{ fontSize:11, color:'var(--teal)', marginLeft:4, flexShrink:0 }}>🔗</span>
-        )}
+
+        {/* Overflow menu (Share image + Memorize) */}
         <div style={{ position: 'relative', marginLeft: 'auto' }} ref={menuRef}>
-          <button style={bnote.menuBtn} onClick={() => setMenuOpen(v => !v)}>
-            {shareLinkLoading ? '…' : '⋯'}
-          </button>
+          <button style={bnote.menuBtn} onClick={() => setMenuOpen(v => !v)}>⋯</button>
           {menuOpen && (
             <div style={bnote.menu}>
-              <button style={bnote.menuItem} onClick={() => { onCopy(note); setMenuOpen(false) }}>Copy text</button>
               <button style={bnote.menuItem} onClick={() => { onShare(note); setMenuOpen(false) }}>Share image</button>
-              {onShareLink && (
-                <button style={bnote.menuItem} onClick={() => { onShareLink(note); setMenuOpen(false) }}>
-                  {note.shareToken ? 'View share link' : 'Share link'}
-                </button>
-              )}
               <button style={bnote.menuItem} onClick={() => { onMemorize?.(note); setMenuOpen(false) }}>Memorize</button>
-              <button style={bnote.menuItem} onClick={() => { onEdit(note); setMenuOpen(false) }}>Edit</button>
-              <button style={{ ...bnote.menuItem, color: '#e53e3e' }} onClick={() => { onDelete(note); setMenuOpen(false) }}>Delete</button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Note text */}
       <div style={{ ...bnote.text, fontStyle: isQuote ? 'italic' : 'normal' }}>
-        {isQuote && <span style={bnote.openQuote}>”</span>}
+        {isQuote && <span style={bnote.openQuote}>"</span>}
         {note.text}
-        {isQuote && <span style={bnote.closeQuote}>”</span>}
+        {isQuote && <span style={bnote.closeQuote}>"</span>}
+      </div>
+
+      {/* Action row: Copy · Share link · Edit · Delete */}
+      <div style={bnote.actionRow}>
+        {/* Copy */}
+        <button
+          style={{ ...bnote.actionBtn, color: copyFlash ? 'var(--teal)' : undefined }}
+          onClick={handleCopyClick}
+          title={'Copy text'}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            {copyFlash
+              ? <polyline points="2,6.5 5.5,10 11,3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              : <><rect x="4.5" y="1.5" width="7" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2.5 4.5H1.5a1 1 0 00-1 1V12a1 1 0 001 1h6a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></>
+            }
+          </svg>
+          <span>{copyFlash ? 'Copied!' : 'Copy'}</span>
+        </button>
+
+        {/* Share link */}
+        {onShareLink && (
+          <button
+            style={{ ...bnote.actionBtn, color: note.shareToken ? 'var(--teal)' : undefined }}
+            onClick={() => onShareLink(note)}
+            title={note.shareToken ? 'View share link' : 'Create share link'}
+            disabled={shareLinkLoading}
+          >
+            {shareLinkLoading
+              ? <span style={{ fontSize:11 }}>…</span>
+              : (
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M7.5 5.5a3 3 0 010 4l-1 1a3 3 0 01-4-4l.5-.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  <path d="M5.5 7.5a3 3 0 010-4l1-1a3 3 0 014 4l-.5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                </svg>
+              )
+            }
+            <span>{note.shareToken ? 'Link shared' : 'Share link'}</span>
+          </button>
+        )}
+
+        {/* Edit */}
+        <button style={bnote.actionBtn} onClick={() => onEdit(note)} title={'Edit note'}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M9 1.5l2.5 2.5-7 7H2v-2.5l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>Edit</span>
+        </button>
+
+        {/* Delete */}
+        <button style={{ ...bnote.actionBtn, color:'#e53e3e' }} onClick={() => onDelete(note)} title={'Delete note'}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <polyline points="2,3.5 11,3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            <path d="M5 3.5V2h3v1.5M4.5 3.5v7a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          <span>Delete</span>
+        </button>
       </div>
     </div>
   )
@@ -1830,6 +1885,30 @@ const bnote = {
     fontSize: 14,
     color: 'var(--ink)',
     lineHeight: 1.65,
+  },
+  actionRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTop: '1px solid var(--border)',
+    flexWrap: 'wrap',
+  },
+  actionBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '4px 8px',
+    borderRadius: 6,
+    border: 'none',
+    background: 'none',
+    fontSize: 12,
+    fontWeight: 500,
+    color: 'var(--ink-faint)',
+    cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
+    transition: 'background 0.12s, color 0.12s',
   },
   openQuote: {
     fontSize: 22,
