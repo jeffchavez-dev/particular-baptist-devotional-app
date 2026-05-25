@@ -7,6 +7,7 @@ import { usePrefs } from '../App'
 import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
 import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
+import { syncMultiPlansUp, syncMultiPlansDown } from '../lib/multiPlan'
 import ExportModal from '../components/ExportModal'
 import NotificationSettings from '../components/NotificationSettings'
 import AchievementsSection from '../components/AchievementsSection'
@@ -289,11 +290,12 @@ export default function AboutPage() {
     setSyncMessage(null)
     try {
       const uid = session.user.id
-      // Run all syncs in parallel — devotional + bible + user data + books + annotations
+      // Run all syncs in parallel — devotional + bible + user data + books + annotations + plans
       const [baseResult, , annotResult] = await Promise.all([
         syncAll(uid),                                                          // devotional + bible + bookmarks/completions
         syncBooksUp(uid).then(() => syncBooksDown(uid)),                       // book library
         syncAnnotationsUp(uid).then(() => syncAnnotationsDown(uid)).then(() => ({ success: true })), // highlights + notes
+        syncMultiPlansUp(uid).then(() => syncMultiPlansDown(uid)),             // named reading plans
       ])
 
       const success = baseResult.success

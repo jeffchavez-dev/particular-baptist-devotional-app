@@ -79,14 +79,24 @@ export function getBibleProgress() {
   catch { return {} }
 }
 
-export function setBibleChapter(chapter, done, userId) {
+/**
+ * @param {boolean} [skipPlanSync=false] - Pass true when called from within
+ *   advancePlan/retreatPlan so we don't fire a plan-sync loop.
+ */
+export function setBibleChapter(chapter, done, userId, skipPlanSync = false) {
   const all = getBibleProgress()
   if (done) all[chapter] = true
   else delete all[chapter]
   try { localStorage.setItem(BIBLE_KEY, JSON.stringify(all)) } catch {}
-  
-  // Dispatch event for immediate UI updates
+
+  // Dispatch event for immediate UI updates (storage listeners)
   window.dispatchEvent(new StorageEvent('storage', { key: BIBLE_KEY }))
+
+  // Notify plan-sync bridge (KjvReader mark-read, tracker grid, etc.)
+  // Skip when called from advancePlan/retreatPlan to prevent double-advance.
+  if (!skipPlanSync) {
+    window.dispatchEvent(new CustomEvent('pb-bible-chapter-changed', { detail: { chapter, done } }))
+  }
   
   // Async Supabase sync with retry (fire-and-forget, but with proper error handling)
   if (userId) {

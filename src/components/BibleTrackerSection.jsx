@@ -9,13 +9,19 @@ import BookCelebration from './BookCelebration'
 import { BIBLE_BOOKS, TOTAL_CHAPTERS } from '../lib/bibleBooks'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
-import { READING_PLANS } from '../data/bibleReadingPlans'
+import { READING_PLANS, PLAN_BY_ID } from '../data/bibleReadingPlans'
 import {
-  getPlanConfig, savePlanConfig, clearPlanConfig,
-  getPlanProgress, savePlanProgress, resetPlanProgress,
+  getPlanProgress, savePlanProgress,
   computePlanChapters, getCurrentPlanChapters,
   isTodayRestDay, isPlanComplete, getPlanStats, getPlanCompletions,
+  advancePlan, retreatPlan,
 } from '../lib/biblePlan'
+import {
+  getAllPlans, getActivePlanId,
+  createPlan, updatePlan, deletePlan,
+  setActivePlan as setActivePlanFn,
+  syncActivePlanFromLegacy,
+} from '../lib/multiPlan'
 import { useAuth } from '../App'
 
 /* ── PLAN_BY_BOOK: books from the 365-day devotional schedule ── */
@@ -55,6 +61,26 @@ function fmtDate(iso) {
   return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' })
 }
 
+/* ─────────────── helpers ─────────────────────────────────── */
+const DEFAULT_DRAFT = {
+  name: 'My Plan',
+  planId: 'whole-canonical',
+  chaptersPerDay: 1,
+  restDays: [],
+  startBook: 'Genesis', startChapter: 1,
+  endBook:   'Revelation', endChapter: 22,
+  duration: 1,
+}
+
+function planToConfig(plan) {
+  // Strip multi-plan metadata; keep config fields that biblePlan understands
+  const { id: _i, name: _n, currentIndex: _c, lastAdvancedDate: _l, startedDate: _s, ...cfg } = plan
+  return cfg
+}
+function planToProgress(plan) {
+  return { currentIndex: plan.currentIndex ?? 0, lastAdvancedDate: plan.lastAdvancedDate ?? null }
+}
+
 /* ══════════════════════════════════════════════
    Guest locked state for Plan tab
    ══════════════════════════════════════════════ */
@@ -69,7 +95,7 @@ function PlanTabGuest() {
         Sign in to use My Plan
       </div>
       <div style={{ fontSize:12, color:'var(--ink-faint)', maxWidth:280, lineHeight:1.6 }}>
-        Set up a personal Bible reading plan, track your daily progress, and earn achievements. Sign in to unlock this feature.
+        Create named reading plans, track daily progress, and sync across devices. Sign in to unlock.
       </div>
       <div style={{
         background:'var(--parchment)', border:'1px solid var(--border)',
@@ -85,255 +111,175 @@ function PlanTabGuest() {
 }
 
 /* ══════════════════════════════════════════════
-   Plan configurator
+   Single plan card
    ══════════════════════════════════════════════ */
-function PlanTab({ userId }) {
-  if (!userId) return <PlanTabGuest />
-  const [config,   setConfig]   = useState(() => getPlanConfig())
-  const [progress, setProgress] = useState(() => getPlanProgress())
-  const [editing,  setEditing]  = useState(!getPlanConfig()) // start in edit mode if no plan
-  const [draft,    setDraft]    = useState(() => getPlanConfig() || {
-    planId: 'whole-canonical',
-    chaptersPerDay: 1,
-    restDays: [],
-    startBook: 'Genesis',
-    startChapter: 1,
-    endBook: 'Revelation',
-    endChapter: 22,
-  })
-  // duration: 1 | 2 | 3 | null (null = custom chapters/day)
-  const [duration, setDuration] = useState(() => {
-    const cfg = getPlanConfig()
-    return cfg?.duration ?? 1
-  })
-  const [confirmReset, setConfirmReset] = useState(false)
-  const [confirmStop,  setConfirmStop]  = useState(false)
-  const completions = useMemo(() => getPlanCompletions(), [config])
+function PlanCard({
+  plan, isActive, config, progress,
+  todayChapters, isRest, isComplete, stats,
+  confirmDel, onConfirmDel,
+  onEdit, onDelete, onSetActive, onMarkDone, onRetreat, onReset,
+}) {
+  const preset    = PLAN_BY_ID[plan.planId]
+  const today     = new Date().toISOString().slice(0, 10)
+  const doneToday = progress?.lastAdvancedDate === today
 
-  // Sync when plan engine writes from devotional page
-  useEffect(() => {
-    function onChanged() {
-      setConfig(getPlanConfig())
-      setProgress(getPlanProgress())
-    }
-    window.addEventListener('pb-plan-changed', onChanged)
-    return () => window.removeEventListener('pb-plan-changed', onChanged)
-  }, [])
+  return (
+    <div style={{ ...p.planCard, ...(isActive ? p.planCardActive : {}) }}>
+      {/* Header row */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+        <span style={p.planName}>{plan.name}</span>
+        {isActive && <span style={p.activeBadge}>ACTIVE</span>}
+        <div style={{ marginLeft:'auto', display:'flex', gap:5, alignItems:'center', flexShrink:0 }}>
+          {!isActive && (
+            <button onClick={onSetActive} style={p.setActiveBtn}>Set active</button>
+          )}
+          <button onClick={onEdit} style={p.editBtn}>Edit</button>
+          {confirmDel ? (
+            <>
+              <button onClick={onDelete}
+                style={{ ...p.editBtn, color:'#b33', borderColor:'rgba(180,50,50,0.4)' }}>
+                Delete?
+              </button>
+              <button onClick={() => onConfirmDel(null)} style={p.editBtn}>No</button>
+            </>
+          ) : (
+            <button onClick={() => onConfirmDel(plan.id)}
+              style={{ ...p.editBtn, color:'var(--ink-faint)' }}>✕</button>
+          )}
+        </div>
+      </div>
 
-  const planChapters  = useMemo(() => computePlanChapters(config), [config])
-  const stats         = getPlanStats(config, progress)
-  const todayChapters = config ? getCurrentPlanChapters(config, progress) : null
-  const isRest        = isTodayRestDay(config)
-  const isComplete    = isPlanComplete(config, progress)
+      {/* Meta row */}
+      <div style={{ display:'flex', flexWrap:'wrap', gap:5, fontSize:11, color:'var(--ink-faint)' }}>
+        <span style={p.tag}>{preset?.label || 'Custom'}</span>
+        <span style={p.tag}>{plan.chaptersPerDay} ch/day</span>
+        {plan.restDays?.length > 0 && (
+          <span style={p.tag}>Rest: {plan.restDays.map(d => DAY_NAMES[d]).join(', ')}</span>
+        )}
+        {plan.startedDate && (
+          <span style={p.tag}>Started {fmtDate(plan.startedDate)}</span>
+        )}
+      </div>
 
-  /* Draft chapter count preview */
-  const draftChapters = useMemo(() => computePlanChapters(draft), [draft])
-
-  const isPresetPlan = draft.planId !== 'custom'
-
-  /** Calculate chapters/day needed to finish in N years accounting for rest days */
-  function calcChaptersPerDay(totalChapters, years, restDays) {
-    const readDaysPerWeek = 7 - (restDays || []).length
-    if (readDaysPerWeek === 0 || years === 0) return 1
-    const totalReadDays = Math.round(365 * readDaysPerWeek / 7) * years
-    return Math.max(1, Math.ceil(totalChapters / totalReadDays))
-  }
-
-  /* Auto-set chaptersPerDay when duration or rest days change (preset plans only) */
-  useEffect(() => {
-    if (!isPresetPlan || duration === null) return
-    const cpd = calcChaptersPerDay(draftChapters.length, duration, draft.restDays)
-    setDraft(prev => ({ ...prev, chaptersPerDay: cpd, duration }))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duration, draft.restDays?.join(','), draftChapters.length, isPresetPlan])
-
-  function patchDraft(patch) { setDraft(prev => ({ ...prev, ...patch })) }
-
-  function selectDuration(years) {
-    setDuration(years)
-    if (years !== null && draftChapters.length > 0) {
-      const cpd = calcChaptersPerDay(draftChapters.length, years, draft.restDays)
-      patchDraft({ chaptersPerDay: cpd, duration: years })
-    }
-  }
-
-  function startPlan() {
-    const newConfig = { ...draft, startedDate: new Date().toISOString().slice(0, 10) }
-    savePlanConfig(newConfig)
-    savePlanProgress({ currentIndex: 0, lastAdvancedDate: null })
-    setConfig(newConfig)
-    setProgress({ currentIndex: 0, lastAdvancedDate: null })
-    setEditing(false)
-  }
-
-  function doReset() {
-    resetPlanProgress()
-    setProgress({ currentIndex: 0, lastAdvancedDate: null })
-    setConfirmReset(false)
-  }
-
-  function stopPlan() {
-    clearPlanConfig()
-    resetPlanProgress()
-    setConfig(null)
-    setProgress({ currentIndex: 0, lastAdvancedDate: null })
-    setEditing(true)
-    setDraft({
-      planId: 'whole-canonical',
-      chaptersPerDay: 1,
-      restDays: [],
-      startBook: 'Genesis',
-      startChapter: 1,
-      endBook: 'Revelation',
-      endChapter: 22,
-    })
-  }
-
-  /* ── Book selectors for custom range ── */
-  const allBooks = BIBLE_BOOKS.map(b => b.name)
-  const startBookObj = BIBLE_BOOKS.find(b => b.name === draft.startBook) || BIBLE_BOOKS[0]
-  const endBookObj   = BIBLE_BOOKS.find(b => b.name === draft.endBook)   || BIBLE_BOOKS[BIBLE_BOOKS.length - 1]
-
-  /* ── Active plan banner ── */
-  if (config && !editing) {
-    const preset = READING_PLANS.find(p => p.id === config.planId)
-    return (
-      <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-        {/* Status card */}
-        <div style={p.activeCard}>
-          <div style={p.activeHeader}>
-            <div>
-              <span style={p.activePlanLabel}>{preset?.label || 'Custom Plan'}</span>
-              {config.startedDate && (
-                <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2 }}>
-                  Started {fmtDate(config.startedDate)}
-                </div>
-              )}
-            </div>
-            <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => { setDraft({ ...config }); setEditing(true) }} style={p.editBtn}>Edit Plan</button>
-              {confirmReset ? (
-                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                  <span style={{ fontSize:11, color:'var(--ink-faint)' }}>Reset progress?</span>
-                  <button onClick={doReset} style={{ ...p.editBtn, background:'var(--rose-light)', color:'var(--rose)', border:'1px solid rgba(225,72,72,0.3)' }}>Yes</button>
-                  <button onClick={() => setConfirmReset(false)} style={p.editBtn}>No</button>
-                </div>
-              ) : (
-                <button onClick={() => setConfirmReset(true)} style={p.editBtn}>Reset</button>
-              )}
-            </div>
+      {/* Progress bar */}
+      {stats && (
+        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+            <span style={{ fontSize:11, color:'var(--ink-faint)' }}>{stats.done} / {stats.total} chapters</span>
+            <span style={{ fontSize:11, fontWeight:700, color:'var(--teal)' }}>{stats.pct}%</span>
           </div>
-
-          {/* Today's reading */}
-          {isComplete ? (
-            <div style={p.completeBox}>
-              🎉 Plan complete! You've finished reading {planChapters.length} chapters.
+          <div style={{ height:6, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
+            <div style={{ height:'100%', borderRadius:99, background:'var(--teal)', width:`${stats.pct}%`, transition:'width 0.4s' }} />
+          </div>
+          {stats.projectedEnd && !isComplete && (
+            <div style={{ fontSize:11, color:'var(--ink-faint)', textAlign:'right' }}>
+              Est. finish: {fmtDate(stats.projectedEnd)}
             </div>
-          ) : isRest ? (
+          )}
+        </div>
+      )}
+
+      {/* Active plan: today's reading + mark done */}
+      {isActive && (
+        <>
+          {isComplete && (
+            <div style={p.completeBox}>🎉 Plan complete! {stats?.total} chapters finished.</div>
+          )}
+          {isRest && !isComplete && (
             <div style={p.restBox}>🛌 Rest day · No reading today</div>
-          ) : todayChapters ? (
+          )}
+          {!isComplete && !isRest && todayChapters && (
             <div style={p.todayBox}>
-              <span style={p.todayLabel}>Today's reading</span>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:4 }}>
+              <div style={p.todayLabel}>Today&apos;s reading</div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:4, marginBottom:8 }}>
                 {todayChapters.map(ch => (
                   <span key={ch} style={p.todayChip}>{ch}</span>
                 ))}
               </div>
-            </div>
-          ) : null}
-
-          {/* Progress bar */}
-          {stats && (
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
-                <span style={{ fontSize:11, color:'var(--ink-faint)' }}>
-                  {stats.done} / {stats.total} chapters
-                </span>
-                <span style={{ fontSize:11, fontWeight:700, color:'var(--teal)' }}>{stats.pct}%</span>
-              </div>
-              <div style={{ height:8, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
-                <div style={{ height:'100%', borderRadius:99, background:'var(--teal)', width:`${stats.pct}%`, transition:'width 0.4s' }} />
-              </div>
-              {stats.projectedEnd && !isComplete && (
-                <div style={{ fontSize:11, color:'var(--ink-faint)', textAlign:'right' }}>
-                  Projected finish: {fmtDate(stats.projectedEnd)} · {stats.daysLeft} day{stats.daysLeft !== 1 ? 's' : ''} left
+              {doneToday ? (
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:12, color:'var(--teal)', fontWeight:600 }}>✓ Marked done</span>
+                  <button onClick={onRetreat} style={p.undoBtn}>Undo</button>
                 </div>
+              ) : (
+                <button onClick={onMarkDone} className="btn btn-primary" style={{ fontSize:12, padding:'6px 14px' }}>
+                  Mark done ✓
+                </button>
               )}
             </div>
           )}
+        </>
+      )}
 
-          {/* Config summary */}
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6, paddingTop:4, borderTop:'1px solid var(--border)' }}>
-            <span style={p.tag}>{config.chaptersPerDay} ch/day</span>
-            {config.restDays?.length > 0 && (
-              <span style={p.tag}>Rest: {config.restDays.map(d => DAY_NAMES[d]).join(', ')}</span>
-            )}
-            {config.planId === 'custom' && (
-              <span style={p.tag}>{config.startBook} {config.startChapter} → {config.endBook} {config.endChapter}</span>
-            )}
-          </div>
-        </div>
+      {/* Reset link */}
+      {isActive && !isComplete && (plan.currentIndex ?? 0) > 0 && (
+        <button onClick={onReset} style={p.resetLink}>Reset progress</button>
+      )}
+    </div>
+  )
+}
 
-        {/* Stop plan */}
-        {confirmStop ? (
-          <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-            <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Stop this plan? Your progress will be lost.</span>
-            <button onClick={() => { stopPlan(); setConfirmStop(false) }} style={{ ...p.stopBtn }}>Yes, stop</button>
-            <button onClick={() => setConfirmStop(false)} style={p.editBtn}>Cancel</button>
-          </div>
-        ) : (
-          <button onClick={() => setConfirmStop(true)} style={p.stopBtn}>Stop this plan</button>
-        )}
+/* ══════════════════════════════════════════════
+   Plan editor panel (new or edit)
+   ══════════════════════════════════════════════ */
+function PlanEditorView({ draft, setDraft, duration, setDuration, isNew, onSave, onCancel }) {
+  function patch(obj) { setDraft(prev => ({ ...prev, ...obj })) }
 
-        {/* Completion log */}
-        {completions.length > 0 && (
-          <div style={p.compLog}>
-            <div style={p.compLogLabel}>Plan completions</div>
-            {completions.map((c, i) => (
-              <div key={c.id} style={p.compRow}>
-                <span style={{ fontSize:18, flexShrink:0 }}>{i === 0 ? '🏆' : '📖'}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, fontWeight:600, color:'var(--ink)' }}>{c.label}</div>
-                  {c.startedDate && (
-                    <div style={{ fontSize:11, color:'var(--ink-faint)' }}>
-                      {fmtDate(c.startedDate)} → {fmtDate(c.completedDate)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    )
+  const draftChapters  = useMemo(() => computePlanChapters(draft), [draft])
+  const isPresetPlan   = draft.planId !== 'custom'
+  const allBooks       = BIBLE_BOOKS.map(b => b.name)
+  const startBookObj   = BIBLE_BOOKS.find(b => b.name === draft.startBook) || BIBLE_BOOKS[0]
+  const endBookObj     = BIBLE_BOOKS.find(b => b.name === draft.endBook)   || BIBLE_BOOKS[BIBLE_BOOKS.length - 1]
+
+  function calcCPD(total, years, restDays) {
+    const rpw = 7 - (restDays || []).length
+    if (rpw === 0 || years === 0) return 1
+    const totalDays = Math.round(365 * rpw / 7) * years
+    return Math.max(1, Math.ceil(total / totalDays))
+  }
+  function selectDuration(yr) {
+    setDuration(yr)
+    if (yr !== null && draftChapters.length > 0) {
+      patch({ chaptersPerDay: calcCPD(draftChapters.length, yr, draft.restDays), duration: yr })
+    }
   }
 
-  /* ── Plan editor form ── */
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+  /* Auto-recalc CPD when duration / rest days change */
+  useEffect(() => {
+    if (!isPresetPlan || duration === null) return
+    patch({ chaptersPerDay: calcCPD(draftChapters.length, duration, draft.restDays), duration })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, draft.restDays?.join(','), draftChapters.length, isPresetPlan])
 
-      {config && editing && (
-        <button onClick={() => setEditing(false)} style={p.backBtn}>← Back to active plan</button>
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+      {!isNew && (
+        <button onClick={onCancel} style={p.backBtn}>← Back to plans</button>
       )}
 
       <div style={p.editorCard}>
-        {/* Preset selector */}
+        {/* Plan name */}
+        <div style={p.section}>
+          <div style={p.sectionLabel}>Plan name</div>
+          <input
+            value={draft.name || ''}
+            onChange={e => patch({ name: e.target.value })}
+            placeholder="e.g. Family Reading, Personal Plan…"
+            style={{ ...p.select, padding:'8px 10px' }}
+          />
+        </div>
+
+        {/* Reading plan preset */}
         <div style={p.section}>
           <div style={p.sectionLabel}>Reading Plan</div>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {READING_PLANS.map(plan => (
-              <label key={plan.id} style={{
-                display:'flex', alignItems:'center', gap:8,
-                padding:'5px 0', cursor:'pointer',
-              }}>
+              <label key={plan.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 0', cursor:'pointer' }}>
                 <input
-                  type="radio"
-                  name="planId"
-                  value={plan.id}
+                  type="radio" name="planId" value={plan.id}
                   checked={draft.planId === plan.id}
                   onChange={() => {
-                    patchDraft({ planId: plan.id })
+                    patch({ planId: plan.id })
                     if (plan.id !== 'custom') setDuration(prev => prev ?? 1)
                     else setDuration(null)
                   }}
@@ -355,20 +301,12 @@ function PlanTab({ userId }) {
             <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', alignItems:'end', gap:10 }}>
               <div>
                 <div style={p.fieldLabel}>Start book</div>
-                <select
-                  value={draft.startBook}
-                  onChange={e => patchDraft({ startBook: e.target.value, startChapter: 1 })}
-                  style={p.select}
-                >
+                <select value={draft.startBook} onChange={e => patch({ startBook: e.target.value, startChapter: 1 })} style={p.select}>
                   {allBooks.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
                 <div style={{ marginTop:6 }}>
                   <div style={p.fieldLabel}>Chapter</div>
-                  <select
-                    value={draft.startChapter}
-                    onChange={e => patchDraft({ startChapter: parseInt(e.target.value) })}
-                    style={p.select}
-                  >
+                  <select value={draft.startChapter} onChange={e => patch({ startChapter: parseInt(e.target.value) })} style={p.select}>
                     {Array.from({ length: startBookObj.chapters }, (_, i) => i + 1).map(ch => (
                       <option key={ch} value={ch}>{ch}</option>
                     ))}
@@ -378,20 +316,12 @@ function PlanTab({ userId }) {
               <span style={{ fontSize:18, color:'var(--ink-faint)', paddingBottom:4 }}>→</span>
               <div>
                 <div style={p.fieldLabel}>End book</div>
-                <select
-                  value={draft.endBook}
-                  onChange={e => patchDraft({ endBook: e.target.value, endChapter: BIBLE_BOOKS.find(b => b.name === e.target.value)?.chapters || 1 })}
-                  style={p.select}
-                >
+                <select value={draft.endBook} onChange={e => patch({ endBook: e.target.value, endChapter: BIBLE_BOOKS.find(b => b.name === e.target.value)?.chapters || 1 })} style={p.select}>
                   {allBooks.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
                 <div style={{ marginTop:6 }}>
                   <div style={p.fieldLabel}>Chapter</div>
-                  <select
-                    value={draft.endChapter}
-                    onChange={e => patchDraft({ endChapter: parseInt(e.target.value) })}
-                    style={p.select}
-                  >
+                  <select value={draft.endChapter} onChange={e => patch({ endChapter: parseInt(e.target.value) })} style={p.select}>
                     {Array.from({ length: endBookObj.chapters }, (_, i) => i + 1).map(ch => (
                       <option key={ch} value={ch}>{ch}</option>
                     ))}
@@ -410,60 +340,36 @@ function PlanTab({ userId }) {
         {/* Duration / Pace */}
         <div style={p.section}>
           <div style={p.sectionLabel}>{isPresetPlan ? 'Duration' : 'Reading Pace'}</div>
-
           {isPresetPlan ? (
             <>
-              {/* Year preset buttons */}
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {[1, 2, 3].map(yr => {
-                  const cpd = draftChapters.length > 0
-                    ? calcChaptersPerDay(draftChapters.length, yr, draft.restDays)
-                    : null
+                  const cpd    = draftChapters.length > 0 ? calcCPD(draftChapters.length, yr, draft.restDays) : null
                   const active = duration === yr
                   return (
-                    <button
-                      key={yr}
-                      onClick={() => selectDuration(yr)}
-                      style={{
-                        ...p.durationBtn,
-                        background: active ? 'var(--teal)' : 'var(--surface)',
-                        color: active ? 'white' : 'var(--ink)',
-                        borderColor: active ? 'var(--teal)' : 'var(--border)',
-                      }}
-                    >
+                    <button key={yr} onClick={() => selectDuration(yr)} style={{
+                      ...p.durationBtn,
+                      background:  active ? 'var(--teal)' : 'var(--surface)',
+                      color:       active ? 'white' : 'var(--ink)',
+                      borderColor: active ? 'var(--teal)' : 'var(--border)',
+                    }}>
                       <span style={{ fontWeight:700 }}>{yr} yr{yr > 1 ? 's' : ''}</span>
-                      {cpd && (
-                        <span style={{ fontSize:10, opacity: active ? 0.85 : 0.6, display:'block' }}>
-                          ~{cpd} ch/day
-                        </span>
-                      )}
+                      {cpd && <span style={{ fontSize:10, opacity: active ? 0.85 : 0.6, display:'block' }}>~{cpd} ch/day</span>}
                     </button>
                   )
                 })}
-                {/* Custom button */}
-                <button
-                  onClick={() => selectDuration(null)}
-                  style={{
-                    ...p.durationBtn,
-                    background: duration === null ? 'var(--teal)' : 'var(--surface)',
-                    color: duration === null ? 'white' : 'var(--ink)',
-                    borderColor: duration === null ? 'var(--teal)' : 'var(--border)',
-                  }}
-                >
+                <button onClick={() => selectDuration(null)} style={{
+                  ...p.durationBtn,
+                  background:  duration === null ? 'var(--teal)' : 'var(--surface)',
+                  color:       duration === null ? 'white' : 'var(--ink)',
+                  borderColor: duration === null ? 'var(--teal)' : 'var(--border)',
+                }}>
                   <span style={{ fontWeight:700 }}>Custom</span>
-                  <span style={{ fontSize:10, opacity: duration === null ? 0.85 : 0.6, display:'block' }}>
-                    set pace
-                  </span>
+                  <span style={{ fontSize:10, opacity: duration === null ? 0.85 : 0.6, display:'block' }}>set pace</span>
                 </button>
               </div>
-
-              {/* Manual pace when Custom selected */}
               {duration === null && (
-                <select
-                  value={draft.chaptersPerDay}
-                  onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
-                  style={{ ...p.select, marginTop:4 }}
-                >
+                <select value={draft.chaptersPerDay} onChange={e => patch({ chaptersPerDay: parseInt(e.target.value) })} style={{ ...p.select, marginTop:4 }}>
                   {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
                     <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
                   ))}
@@ -471,12 +377,7 @@ function PlanTab({ userId }) {
               )}
             </>
           ) : (
-            /* Custom plan: keep manual dropdown */
-            <select
-              value={draft.chaptersPerDay}
-              onChange={e => patchDraft({ chaptersPerDay: parseInt(e.target.value) })}
-              style={p.select}
-            >
+            <select value={draft.chaptersPerDay} onChange={e => patch({ chaptersPerDay: parseInt(e.target.value) })} style={p.select}>
               {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
                 <option key={n} value={n}>{n} chapter{n > 1 ? 's' : ''} / day</option>
               ))}
@@ -488,26 +389,22 @@ function PlanTab({ userId }) {
         <div style={p.section}>
           <div style={p.sectionLabel}>Rest Days</div>
           <div style={{ fontSize:11, color:'var(--ink-faint)', lineHeight:1.5 }}>
-            Select the days of the week when you won't read. The plan skips these days when assigning your daily reading.
+            Days when no reading is assigned. The plan skips these when calculating your daily chapter.
           </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {DAY_NAMES.map((name, idx) => {
               const active = draft.restDays?.includes(idx)
               return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    const curr = draft.restDays || []
-                    patchDraft({ restDays: active ? curr.filter(d => d !== idx) : [...curr, idx] })
-                  }}
-                  style={{
-                    ...p.dayBtn,
-                    background: active ? 'var(--border)' : 'var(--surface)',
-                    color: active ? 'var(--ink)' : 'var(--ink-faint)',
-                    borderColor: active ? 'var(--ink-faint)' : 'var(--border)',
-                    fontWeight: active ? 700 : 400,
-                  }}
-                >{name}</button>
+                <button key={idx} onClick={() => {
+                  const curr = draft.restDays || []
+                  patch({ restDays: active ? curr.filter(d => d !== idx) : [...curr, idx] })
+                }} style={{
+                  ...p.dayBtn,
+                  background:  active ? 'var(--border)' : 'var(--surface)',
+                  color:       active ? 'var(--ink)' : 'var(--ink-faint)',
+                  borderColor: active ? 'var(--ink-faint)' : 'var(--border)',
+                  fontWeight:  active ? 700 : 400,
+                }}>{name}</button>
               )
             })}
           </div>
@@ -515,19 +412,15 @@ function PlanTab({ userId }) {
 
         {/* Duration estimate */}
         {draftChapters.length > 0 && (() => {
-          const cpd  = draft.chaptersPerDay || 1
-          const rest = (draft.restDays || []).length
-          const rpw  = 7 - rest
+          const cpd        = draft.chaptersPerDay || 1
+          const rest       = (draft.restDays || []).length
+          const rpw        = 7 - rest
           const daysNeeded = rpw > 0 ? Math.ceil(draftChapters.length / (cpd * rpw) * 7) : 0
-          const months = daysNeeded > 0 ? (daysNeeded / 30).toFixed(1) : '—'
+          const months     = daysNeeded > 0 ? (daysNeeded / 30).toFixed(1) : '—'
           return (
             <div style={p.estimate}>
-              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>
-                Estimated duration:
-              </span>
-              <span style={{ fontSize:13, fontWeight:700, color:'var(--ink)' }}>
-                ~{daysNeeded} days ({months} months)
-              </span>
+              <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Estimated duration:</span>
+              <span style={{ fontSize:13, fontWeight:700, color:'var(--ink)' }}>~{daysNeeded} days ({months} months)</span>
               <span style={{ fontSize:11, color:'var(--ink-faint)' }}>
                 {draftChapters.length.toLocaleString()} chapters · {cpd} ch/day · {rpw} reading days/week
               </span>
@@ -535,14 +428,211 @@ function PlanTab({ userId }) {
           )
         })()}
 
-        <button
-          onClick={startPlan}
-          disabled={draftChapters.length === 0}
-          style={{ ...p.startBtn, opacity: draftChapters.length === 0 ? 0.4 : 1 }}
-        >
-          {config ? 'Restart with this plan' : 'Start Plan'}
-        </button>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          <button
+            onClick={onSave}
+            disabled={draftChapters.length === 0}
+            style={{ ...p.startBtn, opacity: draftChapters.length === 0 ? 0.4 : 1 }}
+          >
+            {isNew ? 'Add plan' : 'Save changes'}
+          </button>
+          <button onClick={onCancel} className="btn btn-ghost" style={{ fontSize:14 }}>
+            Cancel
+          </button>
+        </div>
       </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════
+   Multi-plan PlanTab
+   ══════════════════════════════════════════════ */
+function PlanTab({ userId }) {
+  if (!userId) return <PlanTabGuest />
+  /* ── State ── */
+  const [plans,      setPlans]      = useState(() => getAllPlans())
+  const [activeId,   setActiveId]   = useState(() => getActivePlanId())
+  const [editorOpen, setEditorOpen] = useState(() => !getAllPlans().length)
+  const [editingId,  setEditingId]  = useState(null) // null=creating new, string=editing existing
+  const [draft,      setDraft]      = useState({ ...DEFAULT_DRAFT })
+  const [duration,   setDuration]   = useState(1)
+  const [confirmDel, setConfirmDel] = useState(null)
+  const completions = useMemo(() => getPlanCompletions(), [plans])
+
+  /* ── Sync: when devotional/scripture advance the plan, pull back into array ── */
+  useEffect(() => {
+    function onPlanChanged() {
+      syncActivePlanFromLegacy()
+      setPlans(getAllPlans())
+      setActiveId(getActivePlanId())
+    }
+    function onPlansChanged() {
+      setPlans(getAllPlans())
+      setActiveId(getActivePlanId())
+    }
+    window.addEventListener('pb-plan-changed',  onPlanChanged)
+    window.addEventListener('pb-plans-changed', onPlansChanged)
+    return () => {
+      window.removeEventListener('pb-plan-changed',  onPlanChanged)
+      window.removeEventListener('pb-plans-changed', onPlansChanged)
+    }
+  }, [])
+
+  /* ── Derived from active plan ── */
+  const effectiveActiveId = activeId || plans[0]?.id || null
+  const activePlan        = plans.find(p => p.id === effectiveActiveId) || plans[0] || null
+  const activeConfig      = activePlan ? planToConfig(activePlan) : null
+  const activeProgress    = activePlan ? planToProgress(activePlan) : null
+  const todayChapters     = activeConfig ? getCurrentPlanChapters(activeConfig, activeProgress) : null
+  const isRest            = activeConfig ? isTodayRestDay(activeConfig) : false
+  const isComplete        = activeConfig ? isPlanComplete(activeConfig, activeProgress) : false
+
+  /* ── Actions ── */
+  function refresh() {
+    setPlans(getAllPlans())
+    setActiveId(getActivePlanId())
+  }
+
+  function openNewEditor() {
+    setEditingId(null)
+    setDraft({ ...DEFAULT_DRAFT })
+    setDuration(1)
+    setEditorOpen(true)
+  }
+
+  function openEditEditor(plan) {
+    setEditingId(plan.id)
+    const { id: _i, name: _n, currentIndex: _c, lastAdvancedDate: _l, startedDate: _s, ...cfg } = plan
+    setDraft({ name: plan.name, ...cfg })
+    setDuration(cfg.duration ?? (cfg.planId !== 'custom' ? 1 : null))
+    setEditorOpen(true)
+  }
+
+  function handleSave() {
+    const { name, ...cfg } = draft
+    if (editingId) {
+      updatePlan(editingId, { name: name || 'My Plan', ...cfg })
+    } else {
+      createPlan({ ...cfg }, name || 'My Plan')
+    }
+    setEditorOpen(false)
+    setEditingId(null)
+    refresh()
+  }
+
+  function handleDelete(id) {
+    deletePlan(id)
+    setConfirmDel(null)
+    refresh()
+  }
+
+  function handleSetActive(id) {
+    setActivePlanFn(id)
+    refresh()
+  }
+
+  function handleMarkDone() {
+    if (!activeConfig || !activeProgress) return
+    const { progress: newProg } = advancePlan(activeConfig, activeProgress, userId)
+    savePlanProgress(newProg)
+    syncActivePlanFromLegacy()
+    refresh()
+  }
+
+  function handleRetreat() {
+    if (!activeConfig || !activeProgress) return
+    const newProg = retreatPlan(activeConfig, activeProgress, userId)
+    savePlanProgress(newProg)
+    syncActivePlanFromLegacy()
+    refresh()
+  }
+
+  function handleReset(planId) {
+    updatePlan(planId, { currentIndex: 0, lastAdvancedDate: null })
+    if (planId === effectiveActiveId) savePlanProgress({ currentIndex: 0, lastAdvancedDate: null })
+    refresh()
+  }
+
+  /* ── Editor view ── */
+  if (editorOpen) {
+    return (
+      <PlanEditorView
+        draft={draft}
+        setDraft={setDraft}
+        duration={duration}
+        setDuration={setDuration}
+        isNew={!editingId}
+        onSave={handleSave}
+        onCancel={() => {
+          setEditorOpen(false)
+          setEditingId(null)
+          if (!plans.length) setEditorOpen(true) // stay open if no plans
+        }}
+      />
+    )
+  }
+
+  /* ── Plan list view ── */
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      {plans.length === 0 && (
+        <div style={{ textAlign:'center', padding:'24px 16px', color:'var(--ink-faint)', fontSize:13 }}>
+          No plans yet. Add your first reading plan below.
+        </div>
+      )}
+
+      {plans.map(plan => {
+        const isPlanActive = plan.id === effectiveActiveId
+        const planConfig   = planToConfig(plan)
+        const planProgress = planToProgress(plan)
+        const planStats    = getPlanStats(planConfig, planProgress)
+        return (
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            isActive={isPlanActive}
+            config={planConfig}
+            progress={planProgress}
+            todayChapters={isPlanActive ? todayChapters : null}
+            isRest={isPlanActive ? isRest : false}
+            isComplete={isPlanActive ? isComplete : false}
+            stats={planStats}
+            confirmDel={confirmDel === plan.id}
+            onConfirmDel={setConfirmDel}
+            onEdit={() => openEditEditor(plan)}
+            onDelete={() => handleDelete(plan.id)}
+            onSetActive={() => handleSetActive(plan.id)}
+            onMarkDone={handleMarkDone}
+            onRetreat={handleRetreat}
+            onReset={() => handleReset(plan.id)}
+          />
+        )
+      })}
+
+      <button onClick={openNewEditor} style={p.addPlanBtn}>
+        + Add reading plan
+      </button>
+
+      {/* Completion log */}
+      {completions.length > 0 && (
+        <div style={p.compLog}>
+          <div style={p.compLogLabel}>Plan completions</div>
+          {completions.map((c, i) => (
+            <div key={c.id} style={p.compRow}>
+              <span style={{ fontSize:18, flexShrink:0 }}>{i === 0 ? '🏆' : '📖'}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:12, fontWeight:600, color:'var(--ink)' }}>{c.label}</div>
+                {c.startedDate && (
+                  <div style={{ fontSize:11, color:'var(--ink-faint)' }}>
+                    {fmtDate(c.startedDate)} → {fmtDate(c.completedDate)}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -814,12 +904,44 @@ export default function BibleTrackerSection() {
 
 /* ── Plan tab styles ── */
 const p = {
-  activeCard: {
-    background:'var(--surface)', border:'1.5px solid var(--teal)',
-    borderRadius:'var(--radius-lg)', padding:'16px', display:'flex', flexDirection:'column', gap:12,
+  /* Multi-plan list */
+  planCard: {
+    background:'var(--surface)', border:'1.5px solid var(--border)',
+    borderRadius:'var(--radius-lg)', padding:'14px 16px',
+    display:'flex', flexDirection:'column', gap:10,
   },
-  activeHeader: { display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, flexWrap:'wrap' },
-  activePlanLabel: { fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)' },
+  planCardActive: {
+    borderColor:'var(--teal)',
+  },
+  planName: {
+    fontSize:15, fontWeight:700, fontFamily:"'Cormorant Garamond',serif", color:'var(--ink)',
+  },
+  activeBadge: {
+    fontSize:9, fontWeight:800, letterSpacing:'0.08em', textTransform:'uppercase',
+    color:'white', background:'var(--teal)', borderRadius:99, padding:'2px 7px', flexShrink:0,
+  },
+  setActiveBtn: {
+    fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:6,
+    background:'var(--teal-light)', border:'1px solid rgba(29,107,90,0.35)',
+    cursor:'pointer', color:'var(--teal)', fontFamily:"'DM Sans',sans-serif",
+  },
+  addPlanBtn: {
+    width:'100%', padding:'11px', borderRadius:8,
+    background:'var(--parchment)', border:'1.5px dashed var(--border)',
+    color:'var(--teal)', fontWeight:700, fontSize:13, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'all 0.15s',
+  },
+  undoBtn: {
+    fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:6,
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    cursor:'pointer', color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
+  },
+  resetLink: {
+    fontSize:11, color:'var(--ink-faint)', background:'none', border:'none',
+    cursor:'pointer', textDecoration:'underline', textDecorationStyle:'dashed',
+    padding:0, fontFamily:"'DM Sans',sans-serif", alignSelf:'flex-start',
+  },
+  /* Legacy (still used by PlanCard actions) */
   editBtn: {
     fontSize:11, fontWeight:600, padding:'4px 10px', borderRadius:6,
     background:'var(--parchment)', border:'1px solid var(--border)', cursor:'pointer',

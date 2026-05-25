@@ -48,13 +48,14 @@ export function resetPlanProgress() {
 export function getPlanCompletions() {
   try { return JSON.parse(localStorage.getItem(PLAN_COMPLETE_KEY) || '[]') } catch { return [] }
 }
-function addPlanCompletion(config) {
+export function addPlanCompletion(config) {
   const all = getPlanCompletions()
   const preset = PLAN_BY_ID[config.planId]
   all.push({
     id: Date.now(),
     planId: config.planId,
-    label: preset?.label || config.planId,
+    // Use custom plan name if set, otherwise fall back to preset label
+    label: config.name || preset?.label || config.planId,
     chaptersPerDay: config.chaptersPerDay,
     startedDate: config.startedDate,
     completedDate: new Date().toISOString().slice(0, 10),
@@ -168,10 +169,12 @@ export function advancePlan(config, progress, userId = null) {
   const idx      = progress?.currentIndex ?? 0
   const today    = new Date().toISOString().slice(0, 10)
 
-  // Mark each chapter done in the Bible tracker
+  // Mark each chapter done in the Bible tracker.
+  // skipPlanSync = true prevents the global plan-sync listener from firing
+  // again (we're already advancing the plan here).
   for (let i = 0; i < cpd; i++) {
     const ch = chapters[idx + i]
-    if (ch) setBibleChapter(ch, true, userId)
+    if (ch) setBibleChapter(ch, true, userId, true)
   }
 
   const newIndex    = idx + cpd
@@ -191,10 +194,10 @@ export function retreatPlan(config, progress, userId = null) {
   const cpd      = config.chaptersPerDay || 1
   const idx      = progress?.currentIndex ?? 0
 
-  // Un-mark chapters in the tracker
+  // Un-mark chapters in the tracker (skipPlanSync = true to avoid loop)
   for (let i = 0; i < cpd; i++) {
     const ch = chapters[idx - cpd + i]
-    if (ch) setBibleChapter(ch, false, userId)
+    if (ch) setBibleChapter(ch, false, userId, true)
   }
 
   const newIndex    = Math.max(0, idx - cpd)
@@ -240,4 +243,46 @@ export function areTodayChaptersDone(config, progress) {
   if (!todays?.length) return false
   const bibleProgress = getBibleProgress()
   return todays.every(ch => !!bibleProgress[ch])
+}
+
+/**
+ * Called from the global pb-bible-chapter-changed listener whenever a chapter
+ * is marked done/undone externally (scripture mark-read, tracker grid checkbox).
+ *
+ * If the chapter matches today's active-plan chapter(s) and all of them are
+ * now done, advances the plan index automatically (without re-calling
+ * setBibleChapter since the chapter is already written).  If unchecked and the
+ * plan was advanced today, retreats the index.
+ */
+export function tryAdvancePlanForChapter(chapter, done) {
+  const config = getPlanConfig()
+  if (!config) return
+
+  const progress = getPlanProgress()
+  const today    = new Date().toISOString().slice(0, 10)
+
+  const todays = getCurrentPlanChapters(config, progress)
+  if (!todays?.length || !todays.includes(chapter)) return
+
+  if (done) {
+    // Guard: already advanced today (e.g. via devotional checkmark)
+    if (progress.lastAdvancedDate === today) return
+    // Only advance once ALL of today's chapters are marked
+    const bp      = getBibleProgress()
+    const allDone = todays.every(ch => !!bp[ch])
+    if (!allDone) return
+
+    const cpd      = config.chaptersPerDay || 1
+    const chapters = computePlanChapters(config)
+    const newIndex = progress.currentIndex + cpd
+    const complete = newIndex >= chapters.length
+    if (complete) addPlanCompletion(config)
+    savePlanProgress({ currentIndex: newIndex, lastAdvancedDate: today })
+  } else {
+    // Retreat only if the plan was already advanced today
+    if (progress.lastAdvancedDate !== today) return
+    const cpd      = config.chaptersPerDay || 1
+    const newIndex = Math.max(0, progress.currentIndex - cpd)
+    savePlanProgress({ currentIndex: newIndex, lastAdvancedDate: null })
+  }
 }

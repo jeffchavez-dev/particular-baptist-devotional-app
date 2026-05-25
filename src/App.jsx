@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgressDown } from './lib/supabase'
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { syncBooksUp, syncBooksDown } from './lib/bookLibrary'
+import { tryAdvancePlanForChapter } from './lib/biblePlan'
+import { migrateOldPlan, syncMultiPlansUp, syncMultiPlansDown } from './lib/multiPlan'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -30,6 +32,23 @@ export default function App() {
   const prevUser = useRef(null)
   const [showSplash, setShowSplash] = useState(true)
 
+  /* ── Migrate old single-plan → multi-plan on first load ── */
+  useEffect(() => { migrateOldPlan() }, [])
+
+  /* ── Global bible-chapter → plan sync bridge ──────────────────────
+     When KjvReader or the tracker grid marks a chapter done/undone,
+     tryAdvancePlanForChapter checks if it matches today's plan and
+     advances/retreats the plan index automatically.
+  ── */
+  useEffect(() => {
+    function onBibleChapterChanged(e) {
+      const { chapter, done } = e.detail || {}
+      if (chapter != null) tryAdvancePlanForChapter(chapter, !!done)
+    }
+    window.addEventListener('pb-bible-chapter-changed', onBibleChapterChanged)
+    return () => window.removeEventListener('pb-bible-chapter-changed', onBibleChapterChanged)
+  }, [])
+
   /* ── Online/offline detection ── */
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   useEffect(() => {
@@ -50,6 +69,7 @@ export default function App() {
         syncAnnotationsDown(prevUser.current.id)
         syncBibleProgressDown(prevUser.current.id)
         syncBooksDown(prevUser.current.id)
+        syncMultiPlansDown(prevUser.current.id)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -97,6 +117,10 @@ export default function App() {
         syncBooksUp(s.user.id)
           .then(() => syncBooksDown(s.user.id))
           .catch(e => console.warn('[auth-sync-books] error:', e?.message))
+        /* Sync named Bible reading plans */
+        syncMultiPlansUp(s.user.id)
+          .then(() => syncMultiPlansDown(s.user.id))
+          .catch(e => console.warn('[auth-sync-plans] error:', e?.message))
       }
       prevUser.current = s?.user ?? null
       setSession(s)
