@@ -4,6 +4,7 @@ import { useAuth } from '../App'
 import BookCelebration from './BookCelebration'
 import { getMemorizeNote, setMemorizeNote } from '../lib/memorize'
 import ShareCardModal from './ShareCardModal'
+import { shareNote, syncSharedNote, unshareNote, noteShareUrl } from '../lib/noteShare'
 
 /* ── Logo preloader (shared cache) ── */
 let _logoImg = null
@@ -472,7 +473,7 @@ function AddNoteModal({ book, note, onSave, onClose }) {
 
 /* ── NoteCard ───────────────────────────────────────────────────────────────── */
 
-function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy, onMemorize }) {
+function NoteCard({ note, book, onEdit, onDelete, onShare, onShareLink, shareLinkLoading, onCopy, onMemorize }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -502,12 +503,22 @@ function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy, onMemorize })
         </span>
         {locParts.length > 0 && <span style={bnote.locLabel}>{locParts.join(' · ')}</span>}
         {dateStr && <span style={bnote.dateLabel}>{dateStr}</span>}
+        {note.shareToken && (
+          <span title={'Shared link active'} style={{ fontSize:11, color:'var(--teal)', marginLeft:4, flexShrink:0 }}>🔗</span>
+        )}
         <div style={{ position: 'relative', marginLeft: 'auto' }} ref={menuRef}>
-          <button style={bnote.menuBtn} onClick={() => setMenuOpen(v => !v)}>⋯</button>
+          <button style={bnote.menuBtn} onClick={() => setMenuOpen(v => !v)}>
+            {shareLinkLoading ? '…' : '⋯'}
+          </button>
           {menuOpen && (
             <div style={bnote.menu}>
-              <button style={bnote.menuItem} onClick={() => { onCopy(note); setMenuOpen(false) }}>Copy</button>
-              <button style={bnote.menuItem} onClick={() => { onShare(note); setMenuOpen(false) }}>Share</button>
+              <button style={bnote.menuItem} onClick={() => { onCopy(note); setMenuOpen(false) }}>Copy text</button>
+              <button style={bnote.menuItem} onClick={() => { onShare(note); setMenuOpen(false) }}>Share image</button>
+              {onShareLink && (
+                <button style={bnote.menuItem} onClick={() => { onShareLink(note); setMenuOpen(false) }}>
+                  {note.shareToken ? 'View share link' : 'Share link'}
+                </button>
+              )}
               <button style={bnote.menuItem} onClick={() => { onMemorize?.(note); setMenuOpen(false) }}>Memorize</button>
               <button style={bnote.menuItem} onClick={() => { onEdit(note); setMenuOpen(false) }}>Edit</button>
               <button style={{ ...bnote.menuItem, color: '#e53e3e' }} onClick={() => { onDelete(note); setMenuOpen(false) }}>Delete</button>
@@ -516,9 +527,88 @@ function NoteCard({ note, book, onEdit, onDelete, onShare, onCopy, onMemorize })
         </div>
       </div>
       <div style={{ ...bnote.text, fontStyle: isQuote ? 'italic' : 'normal' }}>
-        {isQuote && <span style={bnote.openQuote}>“</span>}
+        {isQuote && <span style={bnote.openQuote}>”</span>}
         {note.text}
         {isQuote && <span style={bnote.closeQuote}>”</span>}
+      </div>
+    </div>
+  )
+}
+
+/* ── ShareLinkModal ─────────────────────────────────────────────────────────── */
+
+function ShareLinkModal({ token, noteId, onUnshare, onClose }) {
+  const url = noteShareUrl(token)
+  const [copied, setCopied] = useState(false)
+  const [unsharing, setUnsharing] = useState(false)
+  const [confirmUnshare, setConfirmUnshare] = useState(false)
+
+  function copyLink() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => {})
+  }
+
+  async function doUnshare() {
+    setUnsharing(true)
+    await onUnshare(token, noteId)
+    setUnsharing(false)
+  }
+
+  return (
+    <div style={bmodal.overlay} onClick={onClose}>
+      <div style={{ ...bmodal.sheet, maxWidth: 380, gap: 0 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 16px 12px' }}>
+          <span style={{ fontSize:15, fontWeight:700, fontFamily:'DM Sans,sans-serif', color:'var(--ink)' }}>
+            🔗 Shared link
+          </span>
+          <button onClick={onClose} style={{ background:'none', border:'none', fontSize:20, cursor:'pointer', color:'var(--ink-faint)', lineHeight:1 }}>×</button>
+        </div>
+        <div style={{ padding:'0 16px 16px', display:'flex', flexDirection:'column', gap:12 }}>
+          <p style={{ fontSize:12, color:'var(--ink-faint)', margin:0, lineHeight:1.6 }}>
+            Anyone with this link can view the note. The link reflects your latest edits automatically.
+          </p>
+          <div style={{ display:'flex', gap:8, alignItems:'stretch' }}>
+            <div style={{
+              flex:1, fontSize:11, color:'var(--ink)', background:'var(--parchment)',
+              border:'1px solid var(--border)', borderRadius:8, padding:'8px 10px',
+              wordBreak:'break-all', lineHeight:1.5, fontFamily:'monospace',
+            }}>
+              {url}
+            </div>
+            <button onClick={copyLink} style={{
+              flexShrink:0, padding:'8px 14px', borderRadius:8,
+              background: copied ? 'var(--teal)' : 'var(--surface)',
+              color: copied ? 'white' : 'var(--ink)',
+              border:'1.5px solid var(--border)', cursor:'pointer',
+              fontSize:12, fontWeight:600, fontFamily:'DM Sans,sans-serif',
+              transition:'all 0.15s', whiteSpace:'nowrap',
+            }}>
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+          {confirmUnshare ? (
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:12, color:'var(--ink-faint)', flex:1 }}>Remove this shared link? It will stop working.</span>
+              <button
+                onClick={doUnshare}
+                disabled={unsharing}
+                style={{ fontSize:11, fontWeight:600, color:'var(--rose)', background:'var(--rose-light)', border:'1px solid rgba(225,72,72,0.3)', borderRadius:6, padding:'4px 10px', cursor:'pointer' }}
+              >{unsharing ? 'Removing…' : 'Yes, remove'}</button>
+              <button onClick={() => setConfirmUnshare(false)} style={{ fontSize:11, fontWeight:600, color:'var(--ink-faint)', background:'var(--parchment)', border:'1px solid var(--border)', borderRadius:6, padding:'4px 10px', cursor:'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmUnshare(true)}
+              style={{ fontSize:11, fontWeight:600, color:'var(--rose)', background:'none', border:'none', cursor:'pointer', padding:0, textAlign:'left' }}
+            >
+              Remove shared link
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -598,6 +688,8 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
   const [addNoteOpen, setAddNoteOpen] = useState(false)
   const [editNote, setEditNote] = useState(null)
   const [shareCard, setShareCard] = useState(null)
+  const [shareLink, setShareLink] = useState(null) // { token, noteId } | null
+  const [shareLinkLoading, setShareLinkLoading] = useState(false)
   const [deleteNote, setDeleteNote] = useState(null)
   const [celebrating, setCelebrating] = useState(false)
   const [memorizeConfirm, setMemorizeConfirm] = useState(null) // { incoming, existing } | null
@@ -699,12 +791,15 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
   }
 
   function handleEditNote(noteData) {
-    const updatedNotes = (book.notes || []).map(n =>
-      n.id === editNote.id ? { ...n, ...noteData, updatedAt: new Date().toISOString() } : n
-    )
+    const updatedNote = { ...editNote, ...noteData, updatedAt: new Date().toISOString() }
+    const updatedNotes = (book.notes || []).map(n => n.id === editNote.id ? updatedNote : n)
     const updated = { ...book, notes: updatedNotes }
     mutateBook(updated)
     setEditNote(null)
+    // Keep shared link in sync if note was shared
+    if (updatedNote.shareToken && userId) {
+      syncSharedNote({ note: updatedNote, book, userId }).catch(() => {})
+    }
     checkAutoComplete(updated)
   }
 
@@ -712,7 +807,49 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
     const updatedNotes = (book.notes || []).filter(n => n.id !== note.id)
     const updated = { ...book, notes: updatedNotes }
     mutateBook(updated)
+    // Remove share from Supabase if it had one
+    if (note.shareToken && userId) {
+      unshareNote({ token: note.shareToken, userId }).catch(() => {})
+    }
     setDeleteNote(null)
+  }
+
+  async function handleShareLink(note) {
+    if (!userId) return
+    // If already shared just show the link
+    if (note.shareToken) {
+      setShareLink({ token: note.shareToken, noteId: note.id })
+      return
+    }
+    setShareLinkLoading(note.id)
+    try {
+      const token = await shareNote({ note, book, userId })
+      // Persist the shareToken on the note
+      const updatedNote = { ...note, shareToken: token }
+      const updatedNotes = (book.notes || []).map(n => n.id === note.id ? updatedNote : n)
+      const updated = { ...book, notes: updatedNotes }
+      mutateBook(updated)
+      setShareLink({ token, noteId: note.id })
+    } catch (e) {
+      console.error('[shareLink]', e)
+    } finally {
+      setShareLinkLoading(null)
+    }
+  }
+
+  async function handleUnshare(token, noteId) {
+    if (!userId) return
+    try {
+      await unshareNote({ token, userId })
+      // Remove shareToken from note
+      const updatedNotes = (book.notes || []).map(n =>
+        n.id === noteId ? (() => { const { shareToken: _, ...rest } = n; return rest })() : n
+      )
+      mutateBook({ ...book, notes: updatedNotes })
+      setShareLink(null)
+    } catch (e) {
+      console.error('[unshare]', e)
+    }
   }
 
   function handleCopy(note) {
@@ -817,6 +954,8 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
                 page:          note.page,
                 percent:       note.percent,
               })}
+            onShareLink={userId ? handleShareLink : null}
+            shareLinkLoading={shareLinkLoading === note.id}
             onCopy={handleCopy}
             onMemorize={handleMemorize}
           />
@@ -834,6 +973,14 @@ function BookDetail({ book: initialBook, onBack, onChange, searchQuery, userId }
         onClose={() => setShareCard(null)}
         card={shareCard}
       />
+      {shareLink && (
+        <ShareLinkModal
+          token={shareLink.token}
+          noteId={shareLink.noteId}
+          onUnshare={handleUnshare}
+          onClose={() => setShareLink(null)}
+        />
+      )}
       {deleteNote && (
         <div style={bmodal.overlay} onClick={() => setDeleteNote(null)}>
           <div style={bmodal.sheet} onClick={e => e.stopPropagation()}>

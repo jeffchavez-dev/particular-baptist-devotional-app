@@ -85,6 +85,24 @@ function parseBibleChapterRef(str) {
   return { book, chapter: parseInt(m[2]), refDisplay: str }
 }
 
+/** Returns a human-friendly goal label for today's plan chapters */
+function planGoalLabel(chapters) {
+  if (!chapters?.length) return ''
+  const n = chapters.length
+  if (n === 1) return `Goal for today · 1 chapter`
+  // Try abbreviated range display e.g. "Reading Gen 1–2 today"
+  const firstParts = chapters[0].split(' ')
+  const lastParts  = chapters[n - 1].split(' ')
+  const firstCh    = firstParts[firstParts.length - 1]
+  const lastCh     = lastParts[lastParts.length - 1]
+  const firstBook  = firstParts.slice(0, -1).join(' ')
+  const lastBook   = lastParts.slice(0, -1).join(' ')
+  if (firstBook === lastBook) {
+    return `Reading ${firstBook} ${firstCh}–${lastCh} today`
+  }
+  return `Goal for today · ${n} chapters`
+}
+
 function BodyText({ text, textStyle = {} }) {
   const style = { ...s.bodyText, ...textStyle }
   const lines = text.split('\\n').map(l => l.trim()).filter(Boolean)
@@ -795,6 +813,10 @@ export default function ReadingPage() {
                       )
                     })}
                   </div>
+                  {/* Goal label */}
+                  {usingPlan && planChapters?.length > 0 && (
+                    <span style={s.bibleGoal}>{planGoalLabel(planChapters)}</span>
+                  )}
                   <span style={s.bibleHint}>Tap to read · check when done</span>
                 </div>
 
@@ -1102,6 +1124,7 @@ const s = {
     textUnderlineOffset:3,
   },
   bibleHint: { fontSize:11, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif" },
+  bibleGoal: { fontSize:11, fontWeight:600, color:'var(--teal)', fontFamily:"'DM Sans',sans-serif" },
   planBadge: { fontSize:9, fontWeight:700, letterSpacing:'0.06em', color:'var(--teal)', background:'var(--teal-light)', border:'1px solid rgba(29,107,90,0.25)', borderRadius:99, padding:'2px 7px' },
   bibleCheck: {
     width:36, height:36, borderRadius:'50%', border:'2px solid',

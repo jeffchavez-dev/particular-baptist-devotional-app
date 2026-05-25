@@ -290,13 +290,11 @@ function PlanTab({ userId }) {
         {/* Preset selector */}
         <div style={p.section}>
           <div style={p.sectionLabel}>Reading Plan</div>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {READING_PLANS.map(plan => (
               <label key={plan.id} style={{
-                ...p.planOption,
-                borderColor: draft.planId === plan.id ? 'var(--teal)' : 'var(--border)',
-                background: draft.planId === plan.id ? 'var(--teal-light)' : 'var(--surface)',
-                overflow:'hidden',
+                display:'flex', alignItems:'center', gap:8,
+                padding:'5px 0', cursor:'pointer',
               }}>
                 <input
                   type="radio"
@@ -304,12 +302,12 @@ function PlanTab({ userId }) {
                   value={plan.id}
                   checked={draft.planId === plan.id}
                   onChange={() => patchDraft({ planId: plan.id })}
-                  style={{ accentColor:'var(--teal)', flexShrink:0, marginTop:2 }}
+                  style={{ accentColor:'var(--teal)', flexShrink:0, width:15, height:15 }}
                 />
-                <div style={{ flex:1, minWidth:0, overflow:'hidden' }}>
-                  <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{plan.label}</div>
-                  <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:2, wordBreak:'break-word', whiteSpace:'normal' }}>{plan.description}</div>
-                </div>
+                <span style={{ fontSize:13, fontWeight: draft.planId === plan.id ? 600 : 400, color: draft.planId === plan.id ? 'var(--ink)' : 'var(--ink-muted)' }}>
+                  {plan.label}
+                </span>
+                <span style={{ fontSize:11, color:'var(--ink-faint)' }}>— {plan.description}</span>
               </label>
             ))}
           </div>
@@ -774,10 +772,6 @@ const p = {
   section: { display:'flex', flexDirection:'column', gap:10 },
   sectionLabel: { fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--ink-faint)' },
   fieldLabel: { fontSize:11, color:'var(--ink-faint)', marginBottom:4 },
-  planOption: {
-    display:'flex', alignItems:'flex-start', gap:10, padding:'10px 12px',
-    border:'1.5px solid', borderRadius:8, cursor:'pointer', transition:'all 0.12s',
-  },
   select: {
     width:'100%', padding:'7px 10px', borderRadius:6, fontSize:12, fontWeight:500,
     border:'1.5px solid var(--border)', background:'var(--parchment)', color:'var(--ink)',

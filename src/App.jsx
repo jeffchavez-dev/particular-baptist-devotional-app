@@ -12,6 +12,7 @@ import ScripturePage from './pages/ScripturePage'
 import ConfessionsPage from './pages/ConfessionsPage'
 import AboutPage from './pages/AboutPage'
 import LibraryPage from './pages/LibraryPage'
+import SharedNotePage from './pages/SharedNotePage'
 import BottomNav from './components/BottomNav'
 import SplashScreen from './components/SplashScreen'
 
@@ -120,33 +121,41 @@ export default function App() {
     <ThemeContext.Provider value={{ dark, toggleDark }}>
       <PrefsContext.Provider value={{ prefs, updatePrefs }}>
         <AuthContext.Provider value={{ session }}>
-          {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-          {/* Offline banner */}
-          {!isOnline && (
-            <div id="pwa-offline-banner" style={{
-              position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
-              background: '#7a5c1e', color: 'white',
-              fontSize: 12, fontWeight: 500, textAlign: 'center',
-              padding: '6px 16px 6px', fontFamily: "'DM Sans', sans-serif",
-              letterSpacing: '0.02em',
-            }}>
-              ✈ Offline — all readings available, sync paused
-            </div>
-          )}
-          <div style={!isOnline ? { paddingTop: 34 } : {}}>
+          {/* Public shared-note route — no splash, no nav, no offline banner */}
           <Routes>
-            <Route path="/auth"    element={session ? <Navigate to="/" /> : <AuthPage />} />
-            <Route path="/"        element={<Dashboard />} />
-            <Route path="/day/:dayNum" element={<ReadingPage />} />
-            <Route path="/quiz"    element={<QuizPage />} />
-            <Route path="/scripture"  element={<ScripturePage />} />
-            <Route path="/confessions" element={<ConfessionsPage />} />
-            <Route path="/about"   element={<AboutPage />} />
-            <Route path="/library" element={<LibraryPage />} />
-            <Route path="*"        element={<Navigate to="/" />} />
+            <Route path="/share/note/:token" element={<SharedNotePage />} />
+            <Route path="*" element={
+              <>
+                {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+                {/* Offline banner */}
+                {!isOnline && (
+                  <div id="pwa-offline-banner" style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+                    background: '#7a5c1e', color: 'white',
+                    fontSize: 12, fontWeight: 500, textAlign: 'center',
+                    padding: '6px 16px 6px', fontFamily: "'DM Sans', sans-serif",
+                    letterSpacing: '0.02em',
+                  }}>
+                    ✈ Offline — all readings available, sync paused
+                  </div>
+                )}
+                <div style={!isOnline ? { paddingTop: 34 } : {}}>
+                  <Routes>
+                    <Route path="/auth"        element={session ? <Navigate to="/" /> : <AuthPage />} />
+                    <Route path="/"            element={<Dashboard />} />
+                    <Route path="/day/:dayNum" element={<ReadingPage />} />
+                    <Route path="/quiz"        element={<QuizPage />} />
+                    <Route path="/scripture"   element={<ScripturePage />} />
+                    <Route path="/confessions" element={<ConfessionsPage />} />
+                    <Route path="/about"       element={<AboutPage />} />
+                    <Route path="/library"     element={<LibraryPage />} />
+                    <Route path="*"            element={<Navigate to="/" />} />
+                  </Routes>
+                  <BottomNav />
+                </div>
+              </>
+            } />
           </Routes>
-          <BottomNav />
-          </div>
         </AuthContext.Provider>
       </PrefsContext.Provider>
     </ThemeContext.Provider>
