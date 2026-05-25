@@ -1,13 +1,15 @@
 /**
  * memorize.js
  *
- * Two memory slots:
+ * Three memory slots:
  *   pb-memorize-verse  — a single scripture verse
  *   pb-memorize-note   — a single book note or quote
+ *   pb-memorize-conf   — a single confession/catechism item
  *
  * Shape:
  *   verse: { verseKey, ref, text, version, savedAt }
  *   note:  { noteId, bookId, bookTitle, bookAuthor, type, text, page, percent, savedAt }
+ *   conf:  { planId, key, label, text, source, savedAt }
  *
  * Any component that writes a slot dispatches 'pb-memorize-changed' so the
  * Dashboard can refresh without a page reload.
@@ -15,6 +17,7 @@
 
 const VERSE_KEY = 'pb-memorize-verse'
 const NOTE_KEY  = 'pb-memorize-note'
+const CONF_KEY  = 'pb-memorize-conf'
 
 function dispatch() {
   window.dispatchEvent(new Event('pb-memorize-changed'))
@@ -58,4 +61,24 @@ export function setMemorizeNote(note) {
 
 export function clearMemorizeNote() {
   try { localStorage.removeItem(NOTE_KEY); dispatch() } catch {}
+}
+
+// ── Confession/Catechism slot ─────────────────────────────────────────────
+export function getMemorizeConf() {
+  try {
+    const raw = localStorage.getItem(CONF_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+/** @param {{ planId, key, label, text, source }} conf */
+export function setMemorizeConf(conf) {
+  try {
+    localStorage.setItem(CONF_KEY, JSON.stringify({ ...conf, savedAt: new Date().toISOString() }))
+    dispatch()
+  } catch {}
+}
+
+export function clearMemorizeConf() {
+  try { localStorage.removeItem(CONF_KEY); dispatch() } catch {}
 }

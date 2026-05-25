@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom'
 import { getFontCss } from '../components/FontPrefsPanel'
 import { usePrefs, useAuth } from '../App'
@@ -25,6 +25,7 @@ import {
   upsertChapterDesc,
   deleteChapterDesc,
 } from '../lib/authorContent'
+import { getMemorizeConf, setMemorizeConf, clearMemorizeConf } from '../lib/memorize'
 
 /* ── 2LBCF chapter titles ── */
 const CHAPTER_TITLES = {
@@ -461,14 +462,37 @@ function ItemActions({
   itemKey, label, copyText, shareTitle, shareSource,
   onOpenKjv, refs,
   highlights, itemNotes, onHighlight, onNote, onShare,
+  memorizePayload,
   isActive,
 }) {
-  const [showPicker, setShowPicker] = useState(false)
-  const [editingNote, setEditingNote] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [showPicker,      setShowPicker]      = useState(false)
+  const [editingNote,     setEditingNote]      = useState(false)
+  const [draft,           setDraft]            = useState('')
+  const [memConfirm,      setMemConfirm]       = useState(null) // { incoming, existing } | null
+  const [memSaved,        setMemSaved]         = useState(false)
   const currentColor = highlights[itemKey] || null
   const note = itemNotes[itemKey] || null
   const hlStyle = currentColor ? getHlStyle(currentColor) : null
+
+  function handleMemorize() {
+    if (!memorizePayload) return
+    const existing = getMemorizeConf()
+    if (existing && existing.key !== memorizePayload.key) {
+      setMemConfirm({ incoming: memorizePayload, existing })
+    } else {
+      setMemorizeConf(memorizePayload)
+      setMemSaved(true)
+      setTimeout(() => setMemSaved(false), 2000)
+    }
+  }
+
+  function confirmMemorize() {
+    if (!memConfirm) return
+    setMemorizeConf(memConfirm.incoming)
+    setMemConfirm(null)
+    setMemSaved(true)
+    setTimeout(() => setMemSaved(false), 2000)
+  }
 
   function openNote() {
     setDraft(note || '')
@@ -571,7 +595,46 @@ function ItemActions({
 
         {/* Copy button */}
         <CopyBtn getText={() => copyText} label="" />
+
+        {/* Memory button */}
+        {memorizePayload && (
+          <button
+            style={{
+              ...ia.btn,
+              ...(memSaved ? { color:'var(--teal)', borderColor:'rgba(29,107,90,0.4)', background:'rgba(29,107,90,0.08)' } : {}),
+            }}
+            onClick={handleMemorize}
+            title="Add to Memory"
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1.5C4.52 1.5 2.5 3.52 2.5 6c0 1.62.88 3.04 2.2 3.8V11h4.6V9.8A4.5 4.5 0 0011.5 6c0-2.48-2.02-4.5-4.5-4.5z"
+                stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"
+                fill={memSaved ? 'rgba(29,107,90,0.15)' : 'none'}/>
+              <path d="M4.7 11h4.6M5.5 12.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            {memSaved ? ' Saved' : ''}
+          </button>
+        )}
       </div>}
+
+      {/* Memory replace confirm */}
+      {memConfirm && (
+        <div style={ia.memConfirm}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--ink-faint)', marginBottom:6 }}>
+            Replace memory?
+          </div>
+          <div style={{ fontSize:11, color:'var(--ink-muted)', marginBottom:4 }}>
+            Current: <strong>{memConfirm.existing.label}</strong> — {memConfirm.existing.source}
+          </div>
+          <div style={{ fontSize:11, color:'var(--ink-muted)', marginBottom:8 }}>
+            New: <strong>{memConfirm.incoming.label}</strong> — {memConfirm.incoming.source}
+          </div>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={confirmMemorize} style={ia.saveBtn}>Replace</button>
+            <button onClick={() => setMemConfirm(null)} style={ia.cancelBtn}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Saved note display */}
       {note && !editingNote && (
@@ -619,6 +682,11 @@ function ItemActions({
 
 const ia = {
   row: { display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', marginTop:6 },
+  memConfirm: {
+    marginTop:8, padding:'10px 12px',
+    background:'var(--parchment)', border:'1px solid var(--border)',
+    borderRadius:8, fontSize:12,
+  },
   btn: {
     display:'inline-flex', alignItems:'center', justifyContent:'center',
     fontSize:11, fontWeight:500, color:'var(--ink-muted)',
@@ -1622,6 +1690,7 @@ export default function ConfessionsPage() {
                                 onHighlight={handleHighlight}
                                 onNote={handleNote}
                                 onShare={setShareCard}
+                                memorizePayload={{ planId:'2lbcf', key:p.key, label:`2LBCF ${p.key}`, text:p.text, source:'2nd London Baptist Confession' }}
                                 isActive={activeItemKey === itemKey}
                               />
                             </div>
@@ -1676,6 +1745,7 @@ export default function ConfessionsPage() {
                           onHighlight={handleHighlight}
                           onNote={handleNote}
                           onShare={setShareCard}
+                          memorizePayload={{ planId:'catechism', key:num, label:`Q.${num}`, text:`Q. ${item.q}\n\nA. ${item.a}`, source:"Keach's Baptist Catechism" }}
                           isActive={activeItemKey === itemKey}
                         />
                       </div>
@@ -1738,6 +1808,7 @@ export default function ConfessionsPage() {
                           onHighlight={handleHighlight}
                           onNote={handleNote}
                           onShare={setShareCard}
+                          memorizePayload={{ planId:'1lbcf', key:num, label:`1LBCF Art. ${num}`, text:`${item.title}\n\n${item.text.split('\n')[0]}`, source:'1st London Baptist Confession' }}
                           isActive={activeItemKey === itemKey}
                         />
                       </div>
@@ -1789,6 +1860,7 @@ export default function ConfessionsPage() {
                           onHighlight={handleHighlight}
                           onNote={handleNote}
                           onShare={setShareCard}
+                          memorizePayload={{ planId:'orthodox', key:num, label:`Q.${num}`, text:`Q. ${item.q}\n\nA. ${item.a}`, source:'An Orthodox Catechism' }}
                           isActive={activeItemKey === itemKey}
                         />
                       </div>

@@ -14,7 +14,10 @@ import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { useAuth, usePrefs } from '../App'
 import { getFontCss }        from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
-import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote } from '../lib/memorize'
+import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote,
+         getMemorizeConf, clearMemorizeConf } from '../lib/memorize'
+import { parseRefs } from '../lib/parseRefs'
+import KjvModal from '../components/KjvModal'
 import ShareCardModal from '../components/ShareCardModal'
 
 /* ── Reflection localStorage ── */
@@ -45,6 +48,16 @@ function getConfItemText(item) {
     const entry = ORTHODOX_CATECHISM[item.key]
     return entry ? `Q. ${entry.q}\n\nA. ${entry.a}` : null
   }
+  return null
+}
+
+/* ── Proof refs resolver for a confession item ── */
+function getConfItemRefs(item) {
+  if (!item) return null
+  if (item.planId === '2lbcf')     return LBCF2[item.key]?.refs     || null
+  if (item.planId === 'catechism') return CATECHISM[item.key]?.refs  || null
+  if (item.planId === '1lbcf')     return LBCF1[parseInt(item.key)]?.refs || null
+  if (item.planId === 'orthodox')  return ORTHODOX_CATECHISM[item.key]?.refs || null
   return null
 }
 
@@ -90,6 +103,7 @@ export default function Dashboard() {
   /* ── Memory slots ── */
   const [memorizeVerse, setMemorizeVerseState] = useState(() => getMemorizeVerse())
   const [memorizeNote,  setMemorizeNoteState]  = useState(() => getMemorizeNote())
+  const [memorizeConf,  setMemorizeConfState]  = useState(() => getMemorizeConf())
   const [shareMemVerse, setShareMemVerse] = useState(false)
   const [shareMemNote,  setShareMemNote]  = useState(false)
 
@@ -105,6 +119,7 @@ export default function Dashboard() {
   /* ── UI state ── */
   const [confTextExpanded, setConfTextExpanded] = useState(false)
   const [reflectionSaved, setReflectionSaved] = useState(false)
+  const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, verse, refDisplay }
 
   /* ── Navigate to a specific scripture chapter ── */
   function goToScripture(ch) {
@@ -150,7 +165,9 @@ export default function Dashboard() {
       setBibleProgress(getPlanProgress())
     }
     function onBibleKey(e) {
-      if (e.key === BIBLE_KEY) setBibleProgress2(getBibleProgress())
+      if (e.key === BIBLE_KEY)                setBibleProgress2(getBibleProgress())
+      if (e.key === 'pb-conf-plan-progress')  setConfProgress(getConfPlanProgress())
+      if (e.key === 'pb-conf-plan-config')    setConfConfig(getConfPlanConfig())
     }
     function onConfChanged() {
       setConfConfig(getConfPlanConfig())
@@ -173,6 +190,7 @@ export default function Dashboard() {
     function sync() {
       setMemorizeVerseState(getMemorizeVerse())
       setMemorizeNoteState(getMemorizeNote())
+      setMemorizeConfState(getMemorizeConf())
     }
     window.addEventListener('pb-memorize-changed', sync)
     return () => window.removeEventListener('pb-memorize-changed', sync)
@@ -189,7 +207,8 @@ export default function Dashboard() {
   const confRestDay   = confConfig ? isTodayConfRestDay(confConfig) : false
   const confItem      = (confConfig && !confComplete && !confRestDay) ? getCurrentConfItem(confConfig, confProgress) : null
   const hasActiveConf = !!confConfig && !confComplete && !confRestDay && !!confItem
-  const confText      = confItem ? getConfItemText(confItem) : null
+  const confText      = confItem ? getConfItemText(confItem)  : null
+  const confItemRefs  = confItem ? getConfItemRefs(confItem)  : null
   const confDay       = (confProgress?.currentIndex ?? 0) + 1
   const todayStr      = new Date().toISOString().slice(0, 10)
   const confDoneToday = confProgress?.lastAdvancedDate === todayStr
@@ -360,6 +379,22 @@ export default function Dashboard() {
                   <button onClick={() => setConfTextExpanded(e => !e)} style={s.seeMoreBtn}>
                     {confTextExpanded ? 'Show less ↑' : 'Show more ↓'}
                   </button>
+                  {confItemRefs && (
+                    <div style={s.proofsWrap}>
+                      <span style={s.proofsLabel}>Proof texts:</span>
+                      <div style={s.proofsChips}>
+                        {parseRefs(confItemRefs).map(({ book, chapter, verse, display }) => (
+                          <button
+                            key={`${book}|${chapter}|${verse ?? 0}`}
+                            style={s.proofChip}
+                            onClick={() => setKjvModal({ book, chapter, verse: verse ?? null, refDisplay: display })}
+                          >
+                            {display}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -452,7 +487,7 @@ export default function Dashboard() {
         {/* ════════════════════════════════════════
             MEMORY section (unchanged)
             ════════════════════════════════════════ */}
-        {(memorizeVerse || memorizeNote) && (
+        {(memorizeVerse || memorizeNote || memorizeConf) && (
           <div style={s.memorizeSection}>
             <div style={s.memorizeHeader}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink:0 }}>
@@ -519,6 +554,24 @@ export default function Dashboard() {
                 )}
               </div>
             )}
+
+            {memorizeConf && (
+              <div style={{ ...s.memorizeCard, borderLeftColor: '#7c5cbf' }}>
+                <div style={s.memorizeCardTop}>
+                  <span style={{ ...s.memorizeTypeBadge, color:'#7c5cbf', background:'rgba(124,92,191,0.1)' }}>
+                    📜 Confession
+                  </span>
+                  <span style={s.memorizeRef}>{memorizeConf.label}</span>
+                  {memorizeConf.source && (
+                    <span style={s.memorizeVersion}>{memorizeConf.source}</span>
+                  )}
+                  <button style={s.memorizeClearBtn} onClick={() => { clearMemorizeConf(); setMemorizeConfState(null) }} title="Remove">×</button>
+                </div>
+                <p style={{ ...s.memorizeText, fontFamily: getFontCss(prefs.fontId), fontSize: prefs.sizePx, whiteSpace:'pre-wrap' }}>
+                  {memorizeConf.text}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -548,6 +601,15 @@ export default function Dashboard() {
           noteType:memorizeNote.type, text:memorizeNote.text, bookTitle:memorizeNote.bookTitle,
           bookAuthor:memorizeNote.bookAuthor, bookLabels:null,
           page:memorizeNote.page, percent:memorizeNote.percent }} />
+    )}
+    {kjvModal && (
+      <KjvModal
+        book={kjvModal.book}
+        chapter={kjvModal.chapter}
+        verse={kjvModal.verse}
+        refDisplay={kjvModal.refDisplay}
+        onClose={() => setKjvModal(null)}
+      />
     )}
     </>
   )
@@ -612,6 +674,17 @@ const s = {
     background:'none', border:'none', cursor:'pointer', fontSize:12,
     color:'var(--teal)', fontWeight:600, padding:0,
     fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* Proof texts */
+  proofsWrap:  { display:'flex', alignItems:'flex-start', gap:6, flexWrap:'wrap', marginTop:8, paddingTop:8, borderTop:'1px solid var(--border)' },
+  proofsLabel: { fontSize:10, fontWeight:700, color:'var(--ink-faint)', textTransform:'uppercase', letterSpacing:'0.06em', flexShrink:0, paddingTop:4 },
+  proofsChips: { display:'flex', flexWrap:'wrap', gap:4 },
+  proofChip: {
+    fontSize:11, fontWeight:500, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid transparent',
+    borderRadius:99, padding:'3px 9px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.4,
   },
 
   /* Status notices */
