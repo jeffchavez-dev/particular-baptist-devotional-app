@@ -2708,9 +2708,18 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
   const { note, badge, badgeStyle, title } = noteData
   const [scripturePreview,  setScripturePreview]  = useState(null)
   const [confessionPreview, setConfessionPreview] = useState(null)
+  const [copied, setCopied] = useState(false)
 
   function handleScriptureClick(sc)   { setScripturePreview(sc) }
   function handleConfessionClick(c)   { setConfessionPreview(c) }
+
+  function handleCopy() {
+    const text = noteToPlainText(note)
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }
 
   return (
     <div style={nv.backdrop} onClick={onClose}>
@@ -2742,6 +2751,12 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
                 Edit
               </button>
             )}
+            <button style={{ ...nv.copyBtn, ...(copied ? nv.copyBtnDone : {}) }} onClick={handleCopy} title="Copy note text" aria-label="Copy note">
+              {copied
+                ? <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><polyline points="2,7 5,10 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                : <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="7" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 9V2.5A1.5 1.5 0 0 1 3.5 1H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+              }
+            </button>
             {onDelete && (
               <button style={nv.deleteBtn} onClick={() => { onDelete(); onClose() }}>
                 <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -4591,6 +4606,15 @@ const nv = {
     borderRadius: 7, padding: '5px 10px', cursor: 'pointer',
     fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)',
     fontFamily: "'DM Sans', sans-serif",
+  },
+  copyBtn: {
+    display: 'inline-flex', alignItems: 'center',
+    background: 'var(--parchment-dark)', border: '1px solid var(--border)',
+    borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--ink-muted)',
+    transition: 'color 0.15s, background 0.15s',
+  },
+  copyBtnDone: {
+    color: 'var(--teal)', background: 'var(--teal-light)', borderColor: 'var(--teal)',
   },
   deleteBtn: {
     display: 'inline-flex', alignItems: 'center',

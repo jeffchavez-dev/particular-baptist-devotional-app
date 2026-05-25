@@ -101,16 +101,6 @@ export const BIBLE_VERSIONS = [
     description: 'The first major scholarly revision of the KJV, using earlier manuscripts',
     dataFile: '/rv.json',
   },
-  {
-    id: 'tnt',
-    label: 'Tyndale New Testament (1534)',
-    abbreviation: 'TNT',
-    language: 'English',
-    year: '1534',
-    description: 'William Tyndale\'s groundbreaking English New Testament — the foundation of all English Bibles',
-    dataFile: '/tnt.json',
-    scope: 'NT',
-  },
 ]
 
 // ── Version Data Cache ────────────────────────────────────────────────────

@@ -942,7 +942,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
   // Which text-version parallel is selected (if any) — supports all English text translations
-  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb', 'bsb', 'gnv', 'rv', 'tnt'])
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb', 'bsb', 'gnv', 'rv'])
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
@@ -1588,10 +1588,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           // LXX is OT-only — if currently on a NT book, jump to Genesis
           if (version === 'lxx' && NT_BOOKS.has(book)) {
             setBook('Genesis'); setChapter(1)
-          }
-          // TNT is NT-only — if currently on an OT book, jump to Matthew
-          if (version === 'tnt' && !NT_BOOKS.has(book)) {
-            setBook('Matthew'); setChapter(1)
           }
         })
         .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
@@ -2559,7 +2555,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   { id: 'bsb',  label: 'BSB',  title: 'Berean Standard Bible' },
                   { id: 'gnv',  label: 'GNV',  title: 'Geneva Bible (1599)' },
                   { id: 'rv',   label: 'RV',   title: 'Revised Version (1895)' },
-                  { id: 'tnt',  label: 'TNT',  title: 'Tyndale New Testament (NT only)' },
                 ].filter(v => v.id !== version),
                 { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
                 { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
@@ -2588,13 +2583,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           selectedBook={book}
           selectedChapter={chapter}
           onNavigate={(b, ch) => {
-            if ((version === 'greek' || version === 'tnt') && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
+            if (version === 'greek' && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
             if ((version === 'hebrew' || version === 'lxx') && !OT_BOOKS.has(b)) { navigate('Genesis', 1); return }
             navigate(b, ch)
           }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
-          ntOnly={version === 'greek' || version === 'tnt'}
+          ntOnly={version === 'greek'}
           otOnly={version === 'hebrew' || version === 'lxx'}
         />
       </aside>

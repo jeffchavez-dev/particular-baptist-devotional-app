@@ -9,7 +9,7 @@
  * versions and lexicons are already in the SW CacheFirst runtime cache
  * and load instantly.
  *
- * Larger / optional files (lxx, lxx-words, bsb, gnv, rv, tnt) are
+ * Larger / optional files (lxx, lxx-words, bsb, gnv, rv) are
  * intentionally excluded here. They're loaded on demand the first time
  * the user opens those modes, and cached by the SW thereafter.
  */
