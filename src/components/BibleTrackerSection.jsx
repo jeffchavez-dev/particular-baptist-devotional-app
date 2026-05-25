@@ -444,44 +444,22 @@ function PlanEditorView({ draft, setDraft, duration, setDuration, isNew, onSave,
    Multi-plan PlanTab — splits guest vs. auth to
    avoid calling hooks conditionally (hooks rules).
    ══════════════════════════════════════════════ */
-function PlanTab({ userId }) {
+function PlanTab({ userId, plans, setPlans, activeId, setActiveId }) {
   // Keep PlanTab itself hook-free so the early branch never violates hook order.
   if (!userId) return <PlanTabGuest />
-  return <PlanTabAuth userId={userId} />
+  return <PlanTabAuth userId={userId} plans={plans} setPlans={setPlans} activeId={activeId} setActiveId={setActiveId} />
 }
 
-function PlanTabAuth({ userId }) {
+function PlanTabAuth({ userId, plans, setPlans, activeId, setActiveId }) {
   /* ── State ── */
-  // Sync legacy pb-plan-progress → pb-bible-plans on mount so that any progress
-  // recorded while this component wasn't mounted (e.g. checks from Dashboard) is
-  // reflected immediately when the user opens My Plan.
-  const [plans,      setPlans]      = useState(() => { syncActivePlanFromLegacy(); return getAllPlans() })
-  const [activeId,   setActiveId]   = useState(() => getActivePlanId())
-  const [editorOpen, setEditorOpen] = useState(() => !getAllPlans().length)
+  // plans / activeId / setPlans / setActiveId are lifted to BibleTrackerSection
+  // so they stay in sync even when this component is unmounted (Chapter Tracker tab).
+  const [editorOpen, setEditorOpen] = useState(() => !plans.length)
   const [editingId,  setEditingId]  = useState(null) // null=creating new, string=editing existing
   const [draft,      setDraft]      = useState({ ...DEFAULT_DRAFT })
   const [duration,   setDuration]   = useState(1)
   const [confirmDel, setConfirmDel] = useState(null)
   const completions = useMemo(() => getPlanCompletions(), [plans])
-
-  /* ── Sync: when devotional/scripture advance the plan, pull back into array ── */
-  useEffect(() => {
-    function onPlanChanged() {
-      syncActivePlanFromLegacy()
-      setPlans(getAllPlans())
-      setActiveId(getActivePlanId())
-    }
-    function onPlansChanged() {
-      setPlans(getAllPlans())
-      setActiveId(getActivePlanId())
-    }
-    window.addEventListener('pb-plan-changed',  onPlanChanged)
-    window.addEventListener('pb-plans-changed', onPlansChanged)
-    return () => {
-      window.removeEventListener('pb-plan-changed',  onPlanChanged)
-      window.removeEventListener('pb-plans-changed', onPlansChanged)
-    }
-  }, [])
 
   /* ── Derived from active plan ── */
   const effectiveActiveId = activeId || plans[0]?.id || null
@@ -852,6 +830,13 @@ export default function BibleTrackerSection() {
   const [celebration, setCelebration] = useState(null)
   const [planConfig, setPlanConfig] = useState(() => getPlanConfig())
 
+  // ── Lifted plan state (always in sync regardless of which inner tab is active) ──
+  // PlanTabAuth used to own this state, but it is only mounted on the My Plan tab.
+  // By lifting it here we guarantee the sync listener is always active while
+  // BibleTrackerSection is mounted (i.e. while Settings is open).
+  const [plans,    setPlans]    = useState(() => { syncActivePlanFromLegacy(); return getAllPlans() })
+  const [activeId, setActiveId] = useState(() => getActivePlanId())
+
   useEffect(() => {
     function onStorage(e) {
       if (e.key === BIBLE_KEY) setProgress(getBibleProgress())
@@ -860,14 +845,25 @@ export default function BibleTrackerSection() {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  // Keep planConfig in sync when the active plan changes
+  // Keep planConfig + multi-plan state in sync whenever any plan event fires.
+  // syncActivePlanFromLegacy() copies pb-plan-progress → pb-bible-plans so that
+  // progress recorded from Dashboard / Chapter Tracker is never lost.
   useEffect(() => {
-    function onPlanChanged() { setPlanConfig(getPlanConfig()) }
+    function onPlanChanged() {
+      syncActivePlanFromLegacy()
+      setPlanConfig(getPlanConfig())
+      setPlans(getAllPlans())
+      setActiveId(getActivePlanId())
+    }
+    function onPlansChanged() {
+      setPlans(getAllPlans())
+      setActiveId(getActivePlanId())
+    }
     window.addEventListener('pb-plan-changed',  onPlanChanged)
-    window.addEventListener('pb-plans-changed', onPlanChanged)
+    window.addEventListener('pb-plans-changed', onPlansChanged)
     return () => {
       window.removeEventListener('pb-plan-changed',  onPlanChanged)
-      window.removeEventListener('pb-plans-changed', onPlanChanged)
+      window.removeEventListener('pb-plans-changed', onPlansChanged)
     }
   }, [])
 
@@ -924,7 +920,7 @@ export default function BibleTrackerSection() {
       </div>
 
       {activeTab === 'plan' ? (
-        <PlanTab userId={userId} />
+        <PlanTab userId={userId} plans={plans} setPlans={setPlans} activeId={activeId} setActiveId={setActiveId} />
       ) : (
         <div style={t.section}>
           <div style={t.progressCard}>
