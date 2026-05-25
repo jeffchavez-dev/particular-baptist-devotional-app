@@ -228,7 +228,8 @@
       "Bash(grep -n \"^  }\\\\s*$\\\\|^}\" src/pages/Dashboard.jsx)",
       "Bash(git commit -m 'Change book completion button text to '\\\\''Soli Deo Gloria'\\\\'' *)",
       "Bash(git checkout *)",
-      "Bash(node -e \"const fs=require\\('fs'\\);let c=fs.readFileSync\\('src/components/BibleTrackerSection.jsx','utf8'\\);c=c.replace\\(/“/g,'\\\\\"'\\).replace\\(/”/g,'\\\\\"'\\);fs.writeFileSync\\('src/components/BibleTrackerSection.jsx',c,'utf8'\\);console.log\\('quotes fixed'\\)\")"
+      "Bash(node -e \"const fs=require\\('fs'\\);let c=fs.readFileSync\\('src/components/BibleTrackerSection.jsx','utf8'\\);c=c.replace\\(/“/g,'\\\\\"'\\).replace\\(/”/g,'\\\\\"'\\);fs.writeFileSync\\('src/components/BibleTrackerSection.jsx',c,'utf8'\\);console.log\\('quotes fixed'\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);let c=fs.readFileSync\\('src/pages/LibraryPage.jsx','utf8'\\);c=c.replace\\(/“/g,'\\\\\"'\\).replace\\(/”/g,'\\\\\"'\\);fs.writeFileSync\\('src/pages/LibraryPage.jsx',c,'utf8'\\);console.log\\('ok'\\)\")"
     ]
   }
 }

@@ -19,6 +19,7 @@ import { LBCF1 } from '../data/lbcf1'
 import { CATECHISM } from '../data/catechism'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import BookLibraryTab from '../components/BookLibraryTab'
+import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSharedNote } from '../lib/noteShare'
 import { getAllBooks as getBookLibraryBooks } from '../lib/bookLibrary'
 
 const SCHEDULE = buildSchedule()
@@ -2701,14 +2702,49 @@ function NoteCard({ badge, badgeStyle, title, labels, chapterBadge, chapterBadge
   )
 }
 
+/* ── Share URL inline panel ── */
+function NoteShareUrlPanel({ token, urlCopied, onCopy, onUnshare }) {
+  const url = noteShareUrl(token)
+  const [confirmRemove, setConfirmRemove] = useState(false)
+  return (
+    <div style={{ padding: '8px 16px 10px', borderBottom: '1px solid var(--border)', background: 'var(--teal-light)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+        <div style={{ flex: 1, fontSize: 11, color: 'var(--ink)', background: 'white', border: '1px solid var(--border)', borderRadius: 7, padding: '7px 10px', wordBreak: 'break-all', lineHeight: 1.4, fontFamily: 'monospace' }}>
+          {url}
+        </div>
+        <button
+          onClick={onCopy}
+          style={{ flexShrink: 0, padding: '7px 12px', borderRadius: 7, border: '1.5px solid var(--border)', background: urlCopied ? 'var(--teal)' : 'white', color: urlCopied ? 'white' : 'var(--ink)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          {urlCopied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, color: 'var(--teal)', flex: 1 }}>Anyone with this link can view the note.</span>
+        {confirmRemove ? (
+          <>
+            <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Remove link?</span>
+            <button onClick={onUnshare} style={{ fontSize: 11, fontWeight: 600, color: '#e53e3e', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Yes</button>
+            <button onClick={() => setConfirmRemove(false)} style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Cancel</button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmRemove(true)} style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>Remove link</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ══════════════════════════════════════════════════════════════
    Note View Modal  (read-only, full-screen bottom sheet)
 ══════════════════════════════════════════════════════════════ */
-function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }) {
+function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate, onShareLink, shareToken, shareLinkLoading, onUnshare }) {
   const { note, badge, badgeStyle, title } = noteData
   const [scripturePreview,  setScripturePreview]  = useState(null)
   const [confessionPreview, setConfessionPreview] = useState(null)
-  const [copied, setCopied] = useState(false)
+  const [copied,      setCopied]      = useState(false)
+  const [urlCopied,   setUrlCopied]   = useState(false)
+  const [showUrlPanel, setShowUrlPanel] = useState(false)
 
   function handleScriptureClick(sc)   { setScripturePreview(sc) }
   function handleConfessionClick(c)   { setConfessionPreview(c) }
@@ -2721,13 +2757,30 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
     }).catch(() => {})
   }
 
+  async function handleShareLink() {
+    if (shareToken) {
+      setShowUrlPanel(v => !v)
+    } else if (onShareLink) {
+      await onShareLink()
+      setShowUrlPanel(true)
+    }
+  }
+
+  function copyShareUrl() {
+    if (!shareToken) return
+    navigator.clipboard.writeText(noteShareUrl(shareToken)).then(() => {
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
+    }).catch(() => {})
+  }
+
   return (
     <div style={nv.backdrop} onClick={onClose}>
       <div style={nv.sheet} onClick={e => e.stopPropagation()}>
         {/* Drag handle */}
         <div style={nv.handle} />
 
-        {/* Header row */}
+        {/* Header row — title + close only */}
         <div style={nv.header}>
           <div style={nv.headerLeft}>
             {badge
@@ -2737,32 +2790,9 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
                 : <span style={nv.titleFaint}>Untitled</span>
             }
           </div>
-          <div style={nv.headerActions}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {onOpen && (
-              <button style={nv.openBtn} onClick={() => { onOpen(); onClose() }}>
-                Open →
-              </button>
-            )}
-            {onEdit && (
-              <button style={nv.editBtn} onClick={() => { onEdit(); onClose() }}>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <path d="M2 11l1.2-2.4 5.5-5.5 1.6 1.6-5.5 5.5L2 11Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                </svg>
-                Edit
-              </button>
-            )}
-            <button style={{ ...nv.copyBtn, ...(copied ? nv.copyBtnDone : {}) }} onClick={handleCopy} title="Copy note text" aria-label="Copy note">
-              {copied
-                ? <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><polyline points="2,7 5,10 11,3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                : <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="7" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 9V2.5A1.5 1.5 0 0 1 3.5 1H9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
-              }
-            </button>
-            {onDelete && (
-              <button style={nv.deleteBtn} onClick={() => { onDelete(); onClose() }}>
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <path d="M2 3h9M5 3V2h3v1M4 3l.5 8h4L9 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
+              <button style={nv.openBtn} onClick={() => { onOpen(); onClose() }}>Open →</button>
             )}
             <button style={nv.closeBtn} onClick={onClose} aria-label="Close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -2771,6 +2801,66 @@ function NoteViewModal({ noteData, onClose, onEdit, onDelete, onOpen, navigate }
             </button>
           </div>
         </div>
+
+        {/* ── Visible action bar ── */}
+        <div style={nv.actionBar}>
+          {/* Copy */}
+          <button style={{ ...nv.actionBtn, ...(copied ? { color: 'var(--teal)' } : {}) }} onClick={handleCopy}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              {copied
+                ? <polyline points="2,6.5 5.5,10 11,3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                : <><rect x="4.5" y="1.5" width="7" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2.5 4.5H1.5a1 1 0 00-1 1V12a1 1 0 001 1h6a1 1 0 001-1v-1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></>
+              }
+            </svg>
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+
+          {/* Share link */}
+          {onShareLink && (
+            <button
+              style={{ ...nv.actionBtn, ...(shareToken ? { color: 'var(--teal)' } : {}) }}
+              onClick={handleShareLink}
+              disabled={shareLinkLoading}
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M7.5 5.5a3 3 0 010 4l-1 1a3 3 0 01-4-4l.5-.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M5.5 7.5a3 3 0 010-4l1-1a3 3 0 014 4l-.5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              {shareLinkLoading ? 'Sharing…' : shareToken ? 'Link shared' : 'Share link'}
+            </button>
+          )}
+
+          {/* Edit */}
+          {onEdit && (
+            <button style={nv.actionBtn} onClick={() => { onEdit(); onClose() }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M9 1.5l2.5 2.5-7 7H2v-2.5l7-7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Edit
+            </button>
+          )}
+
+          {/* Delete */}
+          {onDelete && (
+            <button style={{ ...nv.actionBtn, color: '#e53e3e' }} onClick={() => { onDelete(); onClose() }}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <polyline points="2,3.5 11,3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <path d="M5 3.5V2h3v1.5M4.5 3.5v7a.5.5 0 00.5.5h3a.5.5 0 00.5-.5v-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Delete
+            </button>
+          )}
+        </div>
+
+        {/* Share URL panel — shown after creating a link */}
+        {showUrlPanel && shareToken && (
+          <NoteShareUrlPanel
+            token={shareToken}
+            urlCopied={urlCopied}
+            onCopy={copyShareUrl}
+            onUnshare={() => { onUnshare && onUnshare(); setShowUrlPanel(false) }}
+          />
+        )}
 
         {/* Note content */}
         <div style={nv.body}>
@@ -2890,7 +2980,9 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     }
   }, [libNotes]) // eslint-disable-line
 
-  const [viewingNote,    setViewingNote]    = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
+  const [viewingNote,       setViewingNote]       = useState(null) // { note, key, badge?, badgeStyle?, title?, type, extra? }
+  const [shareLibLink,      setShareLibLink]      = useState(null) // token string | null
+  const [shareLinkLoading,  setShareLinkLoading]  = useState(false)
   const [sortBy, setSortByRaw] = useState(() => {
     try { return sessionStorage.getItem(SESSION_SORT_KEY) || 'date-desc' } catch { return 'date-desc' }
   })
@@ -3460,34 +3552,62 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
       />
 
       {/* Note view modal */}
-      {viewingNote && (
-        <NoteViewModal
-          noteData={viewingNote}
-          navigate={navigate}
-          onClose={() => setViewingNote(null)}
-          onEdit={viewingNote.key ? () => {
-            if (viewingNote.type === 'lib') {
-              // Find the full lib note object to pass into edit form
-              const n = libNotes.find(x => x.key === viewingNote.key)
-              if (n) setEditingNote(n)
-            } else {
-              setEditingNote({ key: viewingNote.key, note: viewingNote.note })
-            }
-          } : null}
-          onDelete={viewingNote.key ? () => requestDelete(viewingNote.key, viewingNote.type) : null}
-          onOpen={viewingNote.extra ? () => {
-            if (viewingNote.type === 'kjv' || (viewingNote.type === 'lib' && viewingNote.extra.book)) {
-              const { book, chapter, verse } = viewingNote.extra
-              navigate('/scripture', { state: { book, chapter, verse } })
-            } else if (viewingNote.type === 'dev') {
-              navigate(`/day/${viewingNote.extra.dayNumber}`)
-            } else if (viewingNote.type === 'conf') {
-              const { source, itemKey } = viewingNote.extra
-              navigate(`/confessions?t=${source}`, { state: { itemKey, source } })
-            }
-          } : null}
-        />
-      )}
+      {viewingNote && (() => {
+        const vn = viewingNote
+        const shareableKey = vn.key && vn.type !== 'dev' ? vn.key : null
+        const currentToken = shareableKey ? getLibShareToken(shareableKey) : null
+        const sourceLabel  = vn.type === 'lib' ? 'Personal Note' : vn.type === 'kjv' ? 'Scripture Note' : vn.type === 'conf' ? 'Confession Note' : 'Note'
+
+        async function handleShareLibLink() {
+          if (!shareableKey || !session?.user?.id) return
+          setShareLinkLoading(true)
+          try {
+            const text  = noteToPlainText(vn.note)
+            const token = await shareLibNote({ noteKey: shareableKey, text, title: vn.badge || vn.title || '', source: sourceLabel, userId: session.user.id })
+            setShareLibLink(token)
+          } catch (e) { console.error('[shareLibLink]', e) }
+          finally { setShareLinkLoading(false) }
+        }
+
+        async function handleUnshareLibLink() {
+          if (!shareableKey || !session?.user?.id) return
+          try { await unshareLibNote({ noteKey: shareableKey, userId: session.user.id }) }
+          catch (e) { console.error('[unshareLibLink]', e) }
+          setShareLibLink(null)
+        }
+
+        return (
+          <NoteViewModal
+            noteData={vn}
+            navigate={navigate}
+            onClose={() => { setViewingNote(null); setShareLibLink(null) }}
+            onEdit={vn.key ? () => {
+              if (vn.type === 'lib') {
+                const n = libNotes.find(x => x.key === vn.key)
+                if (n) setEditingNote(n)
+              } else {
+                setEditingNote({ key: vn.key, note: vn.note })
+              }
+            } : null}
+            onDelete={vn.key ? () => requestDelete(vn.key, vn.type) : null}
+            onOpen={vn.extra ? () => {
+              if (vn.type === 'kjv' || (vn.type === 'lib' && vn.extra.book)) {
+                const { book, chapter, verse } = vn.extra
+                navigate('/scripture', { state: { book, chapter, verse } })
+              } else if (vn.type === 'dev') {
+                navigate(`/day/${vn.extra.dayNumber}`)
+              } else if (vn.type === 'conf') {
+                const { source, itemKey } = vn.extra
+                navigate(`/confessions?t=${source}`, { state: { itemKey, source } })
+              }
+            } : null}
+            onShareLink={shareableKey && session?.user?.id ? handleShareLibLink : null}
+            shareToken={shareLibLink || currentToken}
+            shareLinkLoading={shareLinkLoading}
+            onUnshare={handleUnshareLibLink}
+          />
+        )
+      })()}
 
       {/* Delete confirmation modal */}
       {pendingDelete && (
@@ -4624,6 +4744,16 @@ const nv = {
   closeBtn: {
     background: 'none', border: 'none', cursor: 'pointer',
     color: 'var(--ink-faint)', padding: 4, display: 'flex', alignItems: 'center',
+  },
+  actionBar: {
+    display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap',
+    padding: '8px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+  },
+  actionBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '5px 10px', borderRadius: 7, border: 'none', background: 'none',
+    fontSize: 13, fontWeight: 500, color: 'var(--ink-faint)', cursor: 'pointer',
+    fontFamily: "'DM Sans', sans-serif",
   },
   body: {
     flex: 1, overflowY: 'auto', padding: '16px 20px 24px',
