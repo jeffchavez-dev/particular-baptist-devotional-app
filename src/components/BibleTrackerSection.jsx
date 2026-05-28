@@ -16,6 +16,7 @@ import {
   isTodayRestDay, isPlanComplete, getPlanStats, getPlanCompletions,
   advancePlan, retreatPlan,
 } from '../lib/biblePlan'
+import { localDateStr } from '../lib/dateUtils'
 import {
   getAllPlans, getActivePlanId,
   createPlan, updatePlan, deletePlan,
@@ -120,7 +121,7 @@ function PlanCard({
   onEdit, onDelete, onSetActive, onMarkDone, onRetreat, onReset,
 }) {
   const preset    = PLAN_BY_ID[plan.planId]
-  const today     = new Date().toISOString().slice(0, 10)
+  const today     = localDateStr()
   const doneToday = progress?.lastAdvancedDate === today
 
   return (
@@ -473,7 +474,7 @@ function PlanTabAuth({ userId, plans, setPlans, activeId, setActiveId }) {
   // advanced to the next day's reading. Show the just-completed day's chapters
   // instead so the card reads "Today's reading ✓ Done — Matthew 1" rather than
   // confusingly showing "✓ Done — Matthew 2".
-  const planDoneToday = activeProgress?.lastAdvancedDate === new Date().toISOString().slice(0, 10)
+  const planDoneToday = activeProgress?.lastAdvancedDate === localDateStr()
   const cpd           = activeConfig?.chaptersPerDay || 1
   const todayChapters = useMemo(() => {
     if (!activeConfig) return null

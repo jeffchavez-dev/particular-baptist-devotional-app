@@ -17,6 +17,7 @@ import { LBCF2 }             from '../data/lbcf2'
 import { CATECHISM }         from '../data/catechism'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { CONF_PLAN_BY_ID }   from '../data/confessionPlans'
+import { localDateStr }      from './dateUtils'
 
 /* ── Storage ──────────────────────────────────────────────────────── */
 const CONF_CONFIG_KEY   = 'pb-conf-plan-config'
@@ -196,7 +197,7 @@ export function isConfPlanComplete(config, progress) {
 export function advanceConfPlan(config, progress) {
   const items    = computeConfItems(config.planId)
   const idx      = progress?.currentIndex ?? 0
-  const today    = new Date().toISOString().slice(0, 10)
+  const today    = localDateStr()
   const newIndex = idx + 1
   const complete = config.mode === 'year'
     ? newIndex >= yearReadingDays(config.restDays)

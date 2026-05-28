@@ -12,6 +12,7 @@
 import { BIBLE_BOOKS } from './bibleBooks'
 import { READING_PLANS, PLAN_BY_ID } from '../data/bibleReadingPlans'
 import { getBibleProgress, setBibleChapter } from './supabase'
+import { localDateStr } from './dateUtils'
 
 /* ── Storage ──────────────────────────────────────────────────────── */
 const CONFIG_KEY   = 'pb-plan-config'
@@ -167,7 +168,7 @@ export function advancePlan(config, progress, userId = null) {
   const chapters = computePlanChapters(config)
   const cpd      = config.chaptersPerDay || 1
   const idx      = progress?.currentIndex ?? 0
-  const today    = new Date().toISOString().slice(0, 10)
+  const today    = localDateStr()
 
   // Mark each chapter done in the Bible tracker.
   // skipPlanSync = true prevents the global plan-sync listener from firing
@@ -259,7 +260,7 @@ export function tryAdvancePlanForChapter(chapter, done) {
   if (!config) return
 
   const progress = getPlanProgress()
-  const today    = new Date().toISOString().slice(0, 10)
+  const today    = localDateStr()
 
   const todays = getCurrentPlanChapters(config, progress)
   if (!todays?.length || !todays.includes(chapter)) return

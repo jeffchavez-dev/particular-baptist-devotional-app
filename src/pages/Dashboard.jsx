@@ -14,6 +14,7 @@ import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { useAuth, usePrefs } from '../App'
 import { getFontCss }        from '../components/FontPrefsPanel'
 import { saveScroll, restoreScroll } from '../lib/pageState'
+import { localDateStr } from '../lib/dateUtils'
 import { getMemorizeVerse, getMemorizeNote, clearMemorizeVerse, clearMemorizeNote,
          getMemorizeConf, clearMemorizeConf } from '../lib/memorize'
 import { parseRefs } from '../lib/parseRefs'
@@ -22,7 +23,7 @@ import ShareCardModal from '../components/ShareCardModal'
 
 /* ── Reflection localStorage ── */
 const REFLECT_PREFIX = 'pb-reflection-'
-function getTodayKey() { return REFLECT_PREFIX + new Date().toISOString().slice(0, 10) }
+function getTodayKey() { return REFLECT_PREFIX + localDateStr() }
 function loadReflection() {
   try { return localStorage.getItem(getTodayKey()) || '' } catch { return '' }
 }
@@ -196,8 +197,8 @@ export default function Dashboard() {
     return () => window.removeEventListener('pb-memorize-changed', sync)
   }, [])
 
-  /* ── Shared date string ── */
-  const todayStr = new Date().toISOString().slice(0, 10)
+  /* ── Shared date string (local timezone, not UTC) ── */
+  const todayStr = localDateStr()
 
   /* ── Derived: scripture ── */
   const todayChapters  = bibleConfig ? getCurrentPlanChapters(bibleConfig, bibleProgress) : null

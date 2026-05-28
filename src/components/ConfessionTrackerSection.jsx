@@ -14,6 +14,7 @@ import {
   getConfPlanStats, isTodayConfRestDay, computeConfItems,
 } from '../lib/confessionPlan'
 import { getLocalProgress, buildSchedule, getOrthodoxForDay, ORTHODOX_Q_COUNT } from '../lib/supabase'
+import { localDateStr } from '../lib/dateUtils'
 
 const SCHEDULE = buildSchedule()
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -307,7 +308,7 @@ function ConfActivePlanCard({ config, progress, onEdit, onAdvance, onRetreat, on
   const preset       = CONF_PLAN_BY_ID[config.planId]
   const [confirmStop, setConfirmStop] = useState(false)
 
-  const todayStr  = new Date().toISOString().slice(0, 10)
+  const todayStr  = localDateStr()
   const doneToday = progress?.lastAdvancedDate === todayStr
   const isRest    = isTodayConfRestDay(config)
   const complete  = isConfPlanComplete(config, progress)
@@ -495,7 +496,7 @@ export default function ConfessionTrackerSection({ supabaseProgress = null }) {
       mode:        selectedPlan?.cyclic ? draftMode : 'once',
       restDays:    draftRest,
       startedDate: (switchingPlan || !config?.startedDate)
-        ? new Date().toISOString().slice(0, 10)
+        ? localDateStr()
         : config.startedDate,
     }
     saveConfPlanConfig(newConfig)
