@@ -1,0 +1,5 @@
+{
+  "version": "1.1",
+  "date": "2026-05-30",
+  "changelog": "Fixed Bible Tracker crash, improved offline support (Bible files now cached at install), redesigned dashboard to Today's Reading view, added multi-plan Bible reading, confession tracker redesign, and in-app update notifications."
+}

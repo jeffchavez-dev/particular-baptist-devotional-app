@@ -26,6 +26,9 @@ import {
 import {
   clearConfPlanConfig, resetConfPlanProgress,
 } from '../lib/confessionPlan'
+import {
+  fetchRemoteVersion, getInstalledVersion, setInstalledVersion,
+} from '../lib/versionCheck'
 
 /* ── Error boundary: catches crashes inside tracker sections ── */
 class SectionErrorBoundary extends Component {
@@ -277,6 +280,67 @@ export default function AboutPage() {
   const [progressData, setProgressData] = useState(null)
   const [syncMessage, setSyncMessage] = useState(null)
   const [syncing, setSyncing] = useState(false)
+
+  /* ── App version / update detection ── */
+  const [installedVersion,  setInstalledVersionState] = useState(() => getInstalledVersion())
+  const [remoteVersion,     setRemoteVersion]     = useState(null)   // { version, date, changelog }
+  const [checkingUpdate,    setCheckingUpdate]     = useState(false)
+  const [updateCheckMsg,    setUpdateCheckMsg]     = useState(null)   // 'up-to-date' | null
+  const [swUpdateReady,     setSwUpdateReady]      = useState(false)  // new SW waiting
+
+  // Check for update: fetch version.json from the network and compare
+  const checkForUpdate = useCallback(async () => {
+    setCheckingUpdate(true)
+    setUpdateCheckMsg(null)
+    const data = await fetchRemoteVersion()
+    setCheckingUpdate(false)
+    if (!data) {
+      setUpdateCheckMsg('offline')
+      return
+    }
+    const current = getInstalledVersion() || '1.0'
+    if (data.version !== current) {
+      setRemoteVersion(data)
+    } else {
+      setUpdateCheckMsg('up-to-date')
+      setTimeout(() => setUpdateCheckMsg(null), 3000)
+    }
+  }, [])
+
+  // Apply update: mark new version installed and reload (new SW is already active)
+  const applyUpdate = useCallback(() => {
+    if (remoteVersion) {
+      setInstalledVersion(remoteVersion.version)
+      setInstalledVersionState(remoteVersion.version)
+    }
+    window.location.reload()
+  }, [remoteVersion])
+
+  // Auto-check on mount + listen for SW controller change (new SW activated in background)
+  useEffect(() => {
+    checkForUpdate()
+
+    function onControllerChange() {
+      // A new service worker silently took control — fetch the new version info
+      setSwUpdateReady(true)
+      fetchRemoteVersion().then(data => {
+        if (data) {
+          const current = getInstalledVersion() || '1.0'
+          if (data.version !== current) setRemoteVersion(data)
+        }
+      })
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange)
+    }
+    return () => {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* Restore scroll on mount, save on unmount — so back-navigation returns to same spot */
   useEffect(() => {
@@ -709,6 +773,63 @@ export default function AboutPage() {
                 {syncMessage.text}
               </div>
             )}
+
+            {/* App Version / Update */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>App Version</span>
+                <span style={s.settingHint}>
+                  {remoteVersion
+                    ? `v${installedVersion || '1.0'} installed · v${remoteVersion.version} available`
+                    : `v${installedVersion || '1.0'}`}
+                </span>
+                {remoteVersion && (
+                  <span style={{
+                    display:'block', marginTop:4, fontSize:11,
+                    color:'var(--ink-faint)', fontStyle:'italic', lineHeight:1.5,
+                  }}>
+                    {remoteVersion.changelog}
+                  </span>
+                )}
+                {(swUpdateReady && !remoteVersion) && (
+                  <span style={{ display:'block', marginTop:3, fontSize:11, color:'var(--teal)' }}>
+                    New version ready — click Update to apply
+                  </span>
+                )}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                {checkingUpdate && (
+                  <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Checking…</span>
+                )}
+                {updateCheckMsg === 'up-to-date' && (
+                  <span style={{ fontSize:12, color:'var(--teal)' }}>✓ Up to date</span>
+                )}
+                {updateCheckMsg === 'offline' && (
+                  <span style={{ fontSize:12, color:'var(--ink-faint)' }}>Offline</span>
+                )}
+                {(remoteVersion || swUpdateReady) ? (
+                  <button
+                    onClick={applyUpdate}
+                    className="btn btn-outline"
+                    style={{ fontSize:13, flexShrink:0, color:'var(--teal)', borderColor:'var(--teal)', fontWeight:700 }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ marginRight:4, flexShrink:0 }}>
+                      <path d="M6 1v7M3.5 5.5L6 8.5l2.5-3M2 10h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Update
+                  </button>
+                ) : (
+                  <button
+                    onClick={checkForUpdate}
+                    disabled={checkingUpdate}
+                    className="btn btn-outline"
+                    style={{ fontSize:13, flexShrink:0, opacity: checkingUpdate ? 0.5 : 1 }}
+                  >
+                    Check for Updates
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* Reset */}
             <div style={{...s.settingRow, borderBottom:'none', paddingBottom:0}}>

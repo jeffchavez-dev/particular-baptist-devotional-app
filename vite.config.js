@@ -53,15 +53,18 @@ export default defineConfig({
         // Inject push notification handler into the generated service worker
         importScripts: ['push-handler.js'],
 
-        // Pre-cache the app shell (JS, CSS, HTML, fonts, icons).
-        // Bible JSON files are NOT in globPatterns — they are large (up to 28 MB)
-        // and are pre-warmed at app startup via preloadBible.js instead, so the
-        // service-worker CacheFirst handler caches them on first fetch online.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        // Pre-cache the full app: shell (JS, CSS, HTML, icons) + ALL Bible JSON
+        // data files.  Workbox downloads and caches these during the PWA install
+        // event, so the app — including the Bible reader — works completely
+        // offline after a single install, with no per-launch fetching required.
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2,json}'],
 
-        // Raise the per-file size ceiling so Workbox never silently drops a file
-        // from the precache manifest. Default is 2 MB which would exclude most
-        // of our Bible data if they were ever added to globPatterns in the future.
+        // Exclude version.json from the precache so the app always fetches it
+        // fresh from the network — this is how update detection works.
+        globIgnores: ['**/version.json'],
+
+        // Raise the per-file ceiling so Workbox never silently drops a large
+        // Bible file.  Largest current file: tahot.json ~27 MB.
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024, // 30 MB ceiling
 
         // Don't cache Supabase auth tokens or user-specific API calls
@@ -109,20 +112,10 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // All large JSON data files — cache on first fetch, serve offline thereafter
-          // Current files (13): kjv, abab, nasb, bsb, gnv, rv, tnt,
-          //   tagnt, tahot, lxx, lxx-words, strongs-greek, strongs-hebrew
-          // maxEntries must exceed the total file count or Workbox will evict the
-          // least-recently-used entries, breaking offline access for those translations.
-          {
-            urlPattern: ({ url }) => url.pathname.endsWith('.json') && url.origin === self.location.origin,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'app-json-data',
-              expiration: { maxEntries: 25, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+          // NOTE: Bible JSON files (kjv.json, abab.json, etc.) are now included
+          // in globPatterns above and are precached during SW installation.
+          // No runtime handler needed — they are served directly from the
+          // precache just like the app shell.
         ],
       },
     }),
