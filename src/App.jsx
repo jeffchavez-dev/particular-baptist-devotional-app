@@ -105,7 +105,15 @@ export default function App() {
 
   /* ── Auth ── */
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    // Race getSession() against a 1.5 s timeout so an expired token that needs
+    // a network refresh (offline → SW NetworkFirst waits up to 5 s) does NOT
+    // block the Dashboard.  onAuthStateChange below will update the session
+    // once the refresh eventually resolves — even after this early render.
+    const sessionTimeout = new Promise(resolve =>
+      setTimeout(() => resolve({ data: { session: null } }), 1500)
+    )
+    Promise.race([supabase.auth.getSession(), sessionTimeout])
+      .then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
       if (s?.user && !prevUser.current) {
         migrateLocalToSupabase(s.user.id)
