@@ -4,7 +4,7 @@ import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgres
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { syncBooksUp, syncBooksDown } from './lib/bookLibrary'
 import { tryAdvancePlanForChapter } from './lib/biblePlan'
-import { migrateOldPlan, syncMultiPlansUp, syncMultiPlansDown } from './lib/multiPlan'
+import { migrateOldPlan, ensureActivePlanMirrored, syncMultiPlansUp, syncMultiPlansDown } from './lib/multiPlan'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -33,7 +33,11 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true)
 
   /* ── Migrate old single-plan → multi-plan on first load ── */
-  useEffect(() => { migrateOldPlan() }, [])
+  /* ── Then ensure the legacy keys match the active plan     ── */
+  useEffect(() => {
+    migrateOldPlan()
+    ensureActivePlanMirrored()
+  }, [])
 
   /* ── Global bible-chapter → plan sync bridge ──────────────────────
      When KjvReader or the tracker grid marks a chapter done/undone,

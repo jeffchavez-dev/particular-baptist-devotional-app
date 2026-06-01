@@ -100,6 +100,25 @@ export function syncActivePlanFromLegacy() {
   _savePlansRaw(plans)
 }
 
+/**
+ * Ensure the legacy pb-plan-config / pb-plan-progress keys match the active
+ * plan in the multi-plan array.  Call this on app startup so the Dashboard
+ * and other legacy consumers always see the correct active plan — even after
+ * a fresh install where the legacy keys were never written.
+ */
+export function ensureActivePlanMirrored() {
+  const plans = getAllPlans()
+  if (!plans.length) return
+  const id   = getActivePlanId()
+  const plan = plans.find(p => p.id === id) || plans[0]
+  if (!plan) return
+  // Only write if the legacy key is missing or points to a different plan
+  const existingConfig = getPlanConfig()
+  if (!existingConfig || existingConfig.planId !== plan.planId) {
+    _mirrorToLegacy(plan)
+  }
+}
+
 /* ── Migration ────────────────────────────────────────────────────── */
 
 /**
@@ -194,20 +213,36 @@ export function setActivePlan(id) {
 /* ── Supabase sync ────────────────────────────────────────────────── */
 
 export async function syncMultiPlansUp(userId) {
-  const plans = getAllPlans()
-  if (!plans.length) return { success: true, count: 0 }
+  const plans   = getAllPlans()
   const activeId = getActivePlanId()
   try {
+    // Step 1 — fetch remote plan IDs so we can detect deletions
+    const { data: remoteRows, error: fetchErr } = await supabase
+      .from('pb_bible_plans').select('id').eq('user_id', userId)
+    if (fetchErr) throw fetchErr
+
+    // Step 2 — delete any remote plans that no longer exist locally
+    // (user deleted them; without this they reappear on next syncDown)
+    const localIds  = new Set(plans.map(p => p.id))
+    const toDelete  = (remoteRows || []).map(r => r.id).filter(id => !localIds.has(id))
+    if (toDelete.length > 0) {
+      const { error: delErr } = await supabase.from('pb_bible_plans')
+        .delete().eq('user_id', userId).in('id', toDelete)
+      if (delErr) console.warn('[multiPlan] syncUp delete:', delErr.message)
+    }
+
+    // Step 3 — upsert remaining local plans
+    if (!plans.length) return { success: true, count: 0 }
     const rows = plans.map(({ id, name, currentIndex, lastAdvancedDate, startedDate, ...rest }) => ({
       id,
-      user_id:           userId,
+      user_id:            userId,
       name,
-      config:            rest,
-      current_index:     currentIndex ?? 0,
+      config:             rest,
+      current_index:      currentIndex ?? 0,
       last_advanced_date: lastAdvancedDate ?? null,
-      started_date:      startedDate ?? null,
-      is_active:         id === activeId,
-      updated_at:        new Date().toISOString(),
+      started_date:       startedDate ?? null,
+      is_active:          id === activeId,
+      updated_at:         new Date().toISOString(),
     }))
     const { error } = await supabase.from('pb_bible_plans')
       .upsert(rows, { onConflict: 'user_id,id' })
@@ -242,11 +277,15 @@ export async function syncMultiPlansDown(userId) {
         startedDate:      row.started_date ?? null,
       }
       if (!existing) {
-        // New plan from another device
+        // Plan exists on server but not locally.
+        // This means it came from another device — add it.
+        // Note: syncUp runs before syncDown and already removed any plans
+        // the user deleted on THIS device, so anything missing here is
+        // genuinely new from another device and should be restored.
         localMap[row.id] = remote
         changed = true
       } else {
-        // Keep whichever has more progress
+        // Plan exists locally — keep whichever has more progress
         if ((row.current_index ?? 0) > (existing.currentIndex ?? 0)) {
           localMap[row.id] = { ...existing, ...remote }
           changed = true
@@ -260,7 +299,7 @@ export async function syncMultiPlansDown(userId) {
     _savePlansRaw(merged)
 
     // If active plan was updated, mirror to legacy
-    const activeId  = getActivePlanId()
+    const activeId   = getActivePlanId()
     const activePlan = merged.find(p => p.id === activeId)
     if (activePlan) _mirrorToLegacy(activePlan)
 
