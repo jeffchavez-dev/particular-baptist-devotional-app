@@ -20,7 +20,7 @@ import { CATECHISM } from '../data/catechism'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import BookLibraryTab from '../components/BookLibraryTab'
 import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSharedNote } from '../lib/noteShare'
-import { getAllBooks as getBookLibraryBooks } from '../lib/bookLibrary'
+import { getAllQuotes } from '../lib/quoteLibrary'
 
 const SCHEDULE = buildSchedule()
 
@@ -3823,7 +3823,7 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState('notes')
   // If the user signs out while on the Books tab, fall back to Notes
   useEffect(() => {
-    if (!session && activeTab === 'books') setActiveTab('notes')
+    if (!session && activeTab === 'quotes') setActiveTab('notes')
   }, [session, activeTab])
   const [libSearch,     setLibSearch]     = useState('')
   const [bookLibraryCount, setBookLibraryCount] = useState(0)
@@ -3924,12 +3924,11 @@ export default function LibraryPage() {
       setBookLibraryCount(0)
       return
     }
-    const calc = () =>
-      Object.values(getBookLibraryBooks()).reduce((sum, b) => sum + (b.notes?.length || 0), 0)
+    const calc = () => Object.keys(getAllQuotes()).length
     setBookLibraryCount(calc())
     const handler = () => setBookLibraryCount(calc())
-    window.addEventListener('pb-book-library-updated', handler)
-    return () => window.removeEventListener('pb-book-library-updated', handler)
+    window.addEventListener('pb-quote-library-updated', handler)
+    return () => window.removeEventListener('pb-quote-library-updated', handler)
   }, [session])
 
   /* Show/hide nav & header when note editor is focused */
@@ -4003,7 +4002,7 @@ export default function LibraryPage() {
     { id: 'bookmarks',  label: 'Bookmarks',  count: bookmarksCount  },
     { id: 'highlights', label: 'Highlights', count: highlightsCount },
     // Books tab is only available to signed-in users
-    ...(session ? [{ id: 'books', label: 'Books', count: bookLibraryCount }] : []),
+    ...(session ? [{ id: 'quotes', label: 'Quotes', count: bookLibraryCount }] : []),
   ]
 
   const handleRemoveSavedDay      = useCallback(day  => { toggleBookmark(day); setSavedDays(prev => { const n = {...prev}; delete n[day]; return n }) }, [])
@@ -4149,7 +4148,7 @@ export default function LibraryPage() {
             onRemoveConfHighlight={handleRemoveConfHighlight}
           />
         )}
-        {activeTab === 'books' && (
+        {activeTab === 'quotes' && (
           session ? (
             <BookLibraryTab searchQuery={libSearch} />
           ) : (
