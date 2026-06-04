@@ -422,16 +422,36 @@ function drawBookNoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, l
     : `${mainFontSz}px 'DM Sans', sans-serif`
   const endY = wrapText(ctx, card.text || '', contentX, textY, contentW, mainLineH, maxLines, textAlign)
 
-  // ── Author attribution ──
+  // ── Author + Book title attribution ──
   let finalBottom = endY
   const showAuthor = metaShown.author !== false && card.bookAuthor
-  if (showAuthor) {
+  const showBookTitleAttr = metaShown.bookTitle !== false && card.bookTitle
+  if (showAuthor || showBookTitleAttr) {
     const attrFontSz = Math.round(refDim * 0.032)
     const attrY      = endY + Math.round(refDim * 0.035)
-    ctx.fillStyle = accentColor
-    ctx.font = `500 ${attrFontSz}px 'DM Sans', sans-serif`
-    wrapText(ctx, `— ${card.bookAuthor}`, contentX, attrY, contentW, attrFontSz * 1.4, 1, textAlign)
-    finalBottom = attrY + attrFontSz * 0.3
+    let   nextY      = attrY
+
+    // Author line
+    if (showAuthor) {
+      ctx.fillStyle = accentColor; ctx.globalAlpha = 1
+      ctx.font = `500 ${attrFontSz}px 'DM Sans', sans-serif`
+      wrapText(ctx, `— ${card.bookAuthor}`, contentX, nextY, contentW, attrFontSz * 1.4, 1, textAlign)
+      nextY += attrFontSz * 1.5
+    }
+
+    // Book title line — italic, slightly smaller, below the author
+    if (showBookTitleAttr) {
+      const titleFontSz = Math.round(refDim * 0.026)
+      ctx.font = `italic ${titleFontSz}px 'Georgia', serif`
+      ctx.fillStyle = textColor; ctx.globalAlpha = 0.6
+      wrapText(ctx, card.bookTitle, contentX, nextY, contentW, titleFontSz * 1.45, 2, textAlign)
+      ctx.globalAlpha = 1
+      nextY += titleFontSz * 1.5
+    }
+
+    finalBottom = nextY
+
+    // Page / percent
     const locParts = []
     if (card.page) locParts.push(`p. ${card.page}`)
     if (card.percent != null) locParts.push(`${card.percent}%`)
@@ -439,9 +459,9 @@ function drawBookNoteCard(ctx, card, w, h, PAD, textColor, accentColor, scale, l
       const subFontSz = Math.round(refDim * 0.026)
       ctx.font = `${subFontSz}px 'DM Sans', sans-serif`
       ctx.fillStyle = textColor; ctx.globalAlpha = 0.5
-      wrapText(ctx, locParts.join(' · '), contentX, attrY + attrFontSz * 1.6, contentW, subFontSz * 1.4, 1, textAlign)
+      wrapText(ctx, locParts.join(' · '), contentX, nextY, contentW, subFontSz * 1.4, 1, textAlign)
       ctx.globalAlpha = 1
-      finalBottom = attrY + attrFontSz * 1.6 + subFontSz * 0.3
+      finalBottom = nextY + subFontSz * 0.3
     }
   }
 

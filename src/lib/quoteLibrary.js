@@ -28,10 +28,14 @@ export function saveQuote(quote, userId) {
   _persist(quotes)
 
   if (userId) {
-    supabase.from('pb_book_library').upsert(
-      { user_id: userId, book_id: quote.id, book_data: quote, updated_at: new Date().toISOString() },
-      { onConflict: 'user_id,book_id' }
-    ).catch(e => console.warn('[saveQuote] upsert failed:', e?.message))
+    ;(async () => {
+      try {
+        await supabase.from('pb_book_library').upsert(
+          { user_id: userId, book_id: quote.id, book_data: quote, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,book_id' }
+        )
+      } catch (e) { console.warn('[saveQuote] upsert failed:', e?.message) }
+    })()
   }
 }
 
@@ -41,9 +45,11 @@ export function deleteQuote(id, userId) {
   _persist(quotes)
 
   if (userId) {
-    supabase.from('pb_book_library').delete()
-      .match({ user_id: userId, book_id: id })
-      .catch(e => console.warn('[deleteQuote] delete failed:', e?.message))
+    ;(async () => {
+      try {
+        await supabase.from('pb_book_library').delete().match({ user_id: userId, book_id: id })
+      } catch (e) { console.warn('[deleteQuote] delete failed:', e?.message) }
+    })()
   }
 }
 
