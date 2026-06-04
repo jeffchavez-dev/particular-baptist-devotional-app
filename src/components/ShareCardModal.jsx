@@ -516,6 +516,7 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
   const [textAlign,    setTextAlign]    = useState('left')
   const [metaShown,    setMetaShown]    = useState({ title:true, version:true, label:true, refs:true })
   const [uploadedPhoto, setUploadedPhoto] = useState(null)   // dataURL — for non-book types
+  const [showLogo,     setShowLogo]     = useState(true)
 
   const isBook = card?.type === 'book_note' || card?.type === 'book_quote'
   const hasCover = isBook && !!(card?.bookCoverData || card?.bookCoverUrl)
@@ -571,14 +572,14 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
     async function render() {
       const canvas = canvasRef.current; if (!canvas) return
       try {
-        const logo = await getLogoImg()
+        const logo = showLogo ? await getLogoImg() : null
         await drawCard(canvas, card, preset, format, customBg, customText, cardScale, logo, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg)
       } catch (err) { console.error('[ShareCard]', err) }
     }
     render()
     const t = setTimeout(render, 120)
     return () => clearTimeout(t)
-  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg])
+  }, [isOpen, card, preset, format, customBg, customText, cardScale, textPosition, textAlign, metaShown, uploadedPhoto, useCoverBg, showLogo])
 
   useEffect(() => {
     if (!isOpen) return
@@ -702,29 +703,39 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
           </div>
 
           {/* Show Fields */}
-          {metaKeys.length > 0 && (
-            <div style={m.section}>
-              <div style={m.label}>Show Fields</div>
-              <div style={m.fieldsList}>
-                {metaKeys.map(key => {
-                  const on = metaShown[key] !== false
-                  return (
-                    <label key={key} style={m.fieldRow}>
-                      <span style={{ fontSize:12, color:'var(--ink-muted)', flex:1 }}>{metaLabels[key]}</span>
-                      <div
-                        style={{ ...m.toggle, background: on ? 'var(--teal)' : 'var(--border-strong)' }}
-                        onClick={() => toggleMeta(key)}
-                        role="switch" aria-checked={on} tabIndex={0}
-                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleMeta(key)}
-                      >
-                        <div style={{ ...m.toggleThumb, transform: on ? 'translateX(14px)' : 'translateX(2px)' }} />
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
+          <div style={m.section}>
+            <div style={m.label}>Show Fields</div>
+            <div style={m.fieldsList}>
+              {metaKeys.map(key => {
+                const on = metaShown[key] !== false
+                return (
+                  <label key={key} style={m.fieldRow}>
+                    <span style={{ fontSize:12, color:'var(--ink-muted)', flex:1 }}>{metaLabels[key]}</span>
+                    <div
+                      style={{ ...m.toggle, background: on ? 'var(--teal)' : 'var(--border-strong)' }}
+                      onClick={() => toggleMeta(key)}
+                      role="switch" aria-checked={on} tabIndex={0}
+                      onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && toggleMeta(key)}
+                    >
+                      <div style={{ ...m.toggleThumb, transform: on ? 'translateX(14px)' : 'translateX(2px)' }} />
+                    </div>
+                  </label>
+                )
+              })}
+              {/* App logo toggle — always shown */}
+              <label style={m.fieldRow}>
+                <span style={{ fontSize:12, color:'var(--ink-muted)', flex:1 }}>App Logo</span>
+                <div
+                  style={{ ...m.toggle, background: showLogo ? 'var(--teal)' : 'var(--border-strong)' }}
+                  onClick={() => setShowLogo(v => !v)}
+                  role="switch" aria-checked={showLogo} tabIndex={0}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setShowLogo(v => !v)}
+                >
+                  <div style={{ ...m.toggleThumb, transform: showLogo ? 'translateX(14px)' : 'translateX(2px)' }} />
+                </div>
+              </label>
             </div>
-          )}
+          </div>
 
           {/* Background section — conditional on card type */}
           <div style={m.section}>
