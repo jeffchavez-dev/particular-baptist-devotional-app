@@ -2081,7 +2081,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
     const parts = []
     let pos = 0
-    for (const { start, end, colorId, isPending } of allRanges) {
+    for (const { start, end, colorId, isPending, isStart } of allRanges) {
       if (start > pos) parts.push(<span key={`p${pos}`}>{text.slice(pos, start)}</span>)
       const s = Math.max(start, pos)
       const e = Math.min(end, text.length)
