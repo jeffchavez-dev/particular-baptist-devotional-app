@@ -2039,9 +2039,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const offset = getWordOffsetInEl(textEl, e)
     if (!offset) return
     if (!wordSelStart) {
-      // First tap — mark start word, add verse to selection so it shows teal bg
+      // First tap — just mark start word, toolbar shows via wordSelStart check
       setWordSelStart({ verseKey, ...offset })
-      setSelectedVerses(new Set([verseKey]))
     } else {
       // Second tap — finalise range
       const sameVerse = wordSelStart.verseKey === verseKey
@@ -2049,9 +2048,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         const start = Math.min(wordSelStart.start, offset.start)
         const end   = Math.max(wordSelStart.end,   offset.end)
         setPartialRange({ verseKey, start, end })
+        setSelectedVerses(new Set([verseKey]))
       } else {
-        // Cross-verse: just add second verse to full-verse selection
-        setSelectedVerses(prev => { const n = new Set(prev); n.add(verseKey); return n })
+        // Cross-verse: full-verse select both
+        setSelectedVerses(new Set([wordSelStart.verseKey, verseKey]))
       }
       setWordSelStart(null)
       setColorBarOpen(true)
@@ -4037,7 +4037,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       </div>
 
       {/* ── Floating action bar — tap to select verses, then act ── */}
-      {selectedVerses.size > 0 && (
+      {(selectedVerses.size > 0 || !!wordSelStart) && (
         <div style={r.floatingBar}>
           <div style={r.floatingBarMain}>
             {/* Deselect */}
