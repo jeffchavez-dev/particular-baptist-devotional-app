@@ -2006,10 +2006,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* ── Partial (text-selection) highlight helpers ── */
   function handleVerseTextMouseUp(verseKey, e) {
     const sel = window.getSelection()
-    if (!sel || sel.isCollapsed || !sel.toString().trim()) return
-    const range = sel.getRangeAt(0)
-    // Compute char offset from start of this verse's text span
+    if (!sel) return
     const el = e.currentTarget
+    // Single click — expand collapsed cursor to the word under it
+    if (sel.isCollapsed && sel.rangeCount > 0) {
+      sel.modify('move', 'backward', 'word')
+      sel.modify('extend', 'forward', 'word')
+    }
+    if (sel.isCollapsed || !sel.toString().trim()) return
+    const range = sel.getRangeAt(0)
     if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) return
     const preRange = document.createRange()
     preRange.selectNodeContents(el)
