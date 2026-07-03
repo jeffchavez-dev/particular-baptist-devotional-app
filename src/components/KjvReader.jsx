@@ -2053,7 +2053,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         const end   = Math.max(wordSelStart.end,   offset.end)
         const phraseText = textEl ? textEl.textContent.slice(start, end) : ''
         setPartialRange({ verseKey, start, end, text: phraseText })
-        setSelectedVerses(new Set([verseKey]))
+        // Don't add to selectedVerses — toolbar shows via partialRange; verse won't go fully teal
       } else {
         // Cross-verse: full-verse select both
         setSelectedVerses(new Set([wordSelStart.verseKey, verseKey]))
@@ -2063,29 +2063,48 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     }
   }
 
-  /* Split plain verse text into segments for partial highlight rendering */
+  /* Split plain verse text into segments for partial + pending-selection rendering */
   function renderWithPartialHighlights(text, verseKey) {
-    const ranges = partialHighlights[verseKey]
-    if (!ranges || !ranges.length) return text
+    const saved   = partialHighlights[verseKey] || []
+    const pending = partialRange?.verseKey === verseKey ? partialRange : null
+
+    // Merge saved ranges + pending selection into one sorted list
+    const allRanges = [
+      ...saved.map(r => ({ ...r, isPending: false })),
+      ...(pending ? [{ start: pending.start, end: pending.end, colorId: null, isPending: true }] : []),
+    ].sort((a, b) => a.start - b.start)
+
+    if (!allRanges.length) return text
+
     const parts = []
     let pos = 0
-    for (const { start, end, colorId } of ranges) {
+    for (const { start, end, colorId, isPending } of allRanges) {
       if (start > pos) parts.push(<span key={`p${pos}`}>{text.slice(pos, start)}</span>)
-      const hlSt = getHlStyle(colorId)
-      parts.push(
-        <mark
-          key={`h${start}`}
-          style={{ background: hlSt.rowBg, borderBottom: `2px solid ${hlSt.border}`, borderRadius: 2, padding: '0 1px', cursor: 'pointer' }}
-          onClick={e => {
-            e.stopPropagation()
-            setPartialRange({ verseKey, start, end })
-            setSelectedVerses(new Set([verseKey]))
-            setColorBarOpen(true)
-          }}
-          title="Tap to edit highlight"
-        >{text.slice(start, Math.min(end, text.length))}</mark>
-      )
-      pos = Math.min(end, text.length)
+      const s = Math.max(start, pos)
+      const e = Math.min(end, text.length)
+      if (isPending) {
+        parts.push(
+          <mark
+            key={`sel${s}`}
+            style={{ background: 'var(--teal-light)', borderBottom: '2px solid var(--teal)', borderRadius: 2, padding: '0 1px' }}
+          >{text.slice(s, e)}</mark>
+        )
+      } else {
+        const hlSt = getHlStyle(colorId)
+        parts.push(
+          <mark
+            key={`h${s}`}
+            style={{ background: hlSt.rowBg, borderBottom: `2px solid ${hlSt.border}`, borderRadius: 2, padding: '0 1px', cursor: 'pointer' }}
+            onClick={ev => {
+              ev.stopPropagation()
+              setPartialRange({ verseKey, start: s, end: e, text: text.slice(s, e) })
+              setColorBarOpen(true)
+            }}
+            title="Tap to edit highlight"
+          >{text.slice(s, e)}</mark>
+        )
+      }
+      pos = Math.max(pos, e)
     }
     if (pos < text.length) parts.push(<span key={`p${pos}`}>{text.slice(pos)}</span>)
     return parts
@@ -3407,7 +3426,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
                                     }}
                                     onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
-                                  >{partialHighlights[verseKey]?.length ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
+                                  >{(partialHighlights[verseKey]?.length || partialRange?.verseKey === verseKey) ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
                                 )}
 
                                 {studyMode && verseRefs.length > 0 && (
@@ -4047,7 +4066,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       </div>
 
       {/* ── Floating action bar — tap to select verses, then act ── */}
-      {(selectedVerses.size > 0 || !!wordSelStart) && (
+      {(selectedVerses.size > 0 || !!wordSelStart || !!partialRange) && (
         <div style={r.floatingBar}>
           <div style={r.floatingBarMain}>
             {/* Deselect */}
