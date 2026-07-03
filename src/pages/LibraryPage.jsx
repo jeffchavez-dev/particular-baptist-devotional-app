@@ -9,6 +9,7 @@ import {
   getAllScriptureBookmarks, toggleScriptureBookmark,
   HIGHLIGHT_COLORS, getHlStyle,
   setHighlight, setItemNote,
+  loadPartialHighlights, removePartialHighlight,
 } from '../lib/annotations'
 import { supabase, getLocalProgress, setLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
@@ -3647,7 +3648,7 @@ const HL_SORT_OPTS = [
   { id: 'color',     label: 'By color' },
 ]
 
-function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHighlight, onRemoveConfHighlight }) {
+function HighlightsTab({ kjvHighlights, confHighlights, partialHighlights, navigate, onRemoveKjvHighlight, onRemoveConfHighlight, onRemovePartialHighlight }) {
   const [sortBy, setSortBy] = useState('date-desc')
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef(null)
@@ -3800,6 +3801,57 @@ function HighlightsTab({ kjvHighlights, confHighlights, navigate, onRemoveKjvHig
         )
       }
 
+      <div style={s.divider} />
+
+      {/* ── Highlighted Phrases ── */}
+      {(() => {
+        const phrases = Object.entries(partialHighlights || {}).flatMap(([verseKey, ranges]) => {
+          const parts = verseKey.split('|') // kjv|Book|chapter|verse
+          const book = parts[1], chapter = parts[2], verse = parts[3]
+          return (ranges || []).map((r, i) => ({ verseKey, book, chapter, verse, ...r, _idx: i }))
+        })
+        return (
+          <>
+            <SectionHeader
+              icon={
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 4h10M4 7h6M5 10h4" stroke="var(--gold)" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+              }
+              title="Highlighted Phrases"
+              count={phrases.length}
+            />
+            {phrases.length === 0
+              ? <EmptyMsg text="No phrase highlights yet. Tap a word in the Scripture reader to start." />
+              : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                  {phrases.map((p, i) => {
+                    const c = getHlStyle(p.colorId)
+                    return (
+                      <div key={`${p.verseKey}-${p.start}`} style={{ ...s.hlChip, background: c.rowBg, borderColor: c.border, flexDirection: 'column', alignItems: 'flex-start', gap: 4, padding: '8px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                          <button
+                            style={{ ...s.hlChipInner, color: c.numClr, fontSize: 11 }}
+                            onClick={() => navigate('/scripture', { state: { book: p.book, chapter: Number(p.chapter), verse: Number(p.verse) } })}
+                          >
+                            <HlDot colorId={p.colorId} />
+                            {p.book} {p.chapter}:{p.verse}
+                          </button>
+                          <button onClick={() => onRemovePartialHighlight(p.verseKey, p.start)} style={{ ...s.hlRemoveBtn, color: c.numClr }}>×</button>
+                        </div>
+                        <span style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.5, paddingLeft: 4 }}>
+                          "{p.text || '…'}"
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+          </>
+        )
+      })()}
+
       {/* Scripture verse preview modal — shown when a scripture highlight chip is tapped */}
       <ScriptureVerseModal
         sc={viewingHighlight}
@@ -3838,11 +3890,12 @@ export default function LibraryPage() {
   const [devNotes,       setDevNotes]       = useState([])
   const [savedDays,      setSavedDays]      = useState(() => getBookmarks())
   const [scBookmarks,    setScBookmarks]    = useState(() => getAllScriptureBookmarks())
-  const [kjvHighlights,  setKjvHighlights]  = useState(() => getAllKjvHighlights())
-  const [kjvNotes,       setKjvNotes]       = useState(() => getAllKjvNotes())
-  const [confHighlights, setConfHighlights] = useState(() => getAllConfHighlights())
-  const [confNotes,      setConfNotes]      = useState(() => getAllConfNotes())
-  const [libNotes,       setLibNotes]       = useState(() => getAllLibNotes())
+  const [kjvHighlights,      setKjvHighlights]      = useState(() => getAllKjvHighlights())
+  const [kjvNotes,           setKjvNotes]           = useState(() => getAllKjvNotes())
+  const [confHighlights,     setConfHighlights]     = useState(() => getAllConfHighlights())
+  const [confNotes,          setConfNotes]          = useState(() => getAllConfNotes())
+  const [libNotes,           setLibNotes]           = useState(() => getAllLibNotes())
+  const [partialHighlights,  setPartialHighlightsL] = useState(() => loadPartialHighlights())
 
   // Load devNotes from localStorage (always fast, works offline)
   function loadDevNotesFromLocal() {
@@ -3902,13 +3955,16 @@ export default function LibraryPage() {
       setConfNotes(getAllConfNotes())
       setLibNotes(getAllLibNotes())
     }
-    window.addEventListener('pb-highlight-changed',   refresh)
-    window.addEventListener('pb-note-changed',        refresh)
-    window.addEventListener('pb-annotations-updated', refresh)
+    const refreshPartial = () => setPartialHighlightsL(loadPartialHighlights())
+    window.addEventListener('pb-highlight-changed',          refresh)
+    window.addEventListener('pb-note-changed',               refresh)
+    window.addEventListener('pb-annotations-updated',        refresh)
+    window.addEventListener('pb-partial-highlight-changed',  refreshPartial)
     return () => {
-      window.removeEventListener('pb-highlight-changed',   refresh)
-      window.removeEventListener('pb-note-changed',        refresh)
-      window.removeEventListener('pb-annotations-updated', refresh)
+      window.removeEventListener('pb-highlight-changed',         refresh)
+      window.removeEventListener('pb-note-changed',              refresh)
+      window.removeEventListener('pb-annotations-updated',       refresh)
+      window.removeEventListener('pb-partial-highlight-changed', refreshPartial)
     }
   }, [])
 
@@ -4143,9 +4199,14 @@ export default function LibraryPage() {
           <HighlightsTab
             kjvHighlights={kjvHighlights}
             confHighlights={confHighlights}
+            partialHighlights={partialHighlights}
             navigate={navigate}
             onRemoveKjvHighlight={handleRemoveKjvHighlight}
             onRemoveConfHighlight={handleRemoveConfHighlight}
+            onRemovePartialHighlight={(verseKey, start) => {
+              removePartialHighlight(verseKey, start)
+              setPartialHighlightsL(loadPartialHighlights())
+            }}
           />
         )}
         {activeTab === 'quotes' && (

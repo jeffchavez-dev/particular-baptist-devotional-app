@@ -1999,8 +1999,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function applyHighlightToSelection(colorId) {
-    if (partialRange && colorId) {
-      savePartialHighlight(partialRange.verseKey, partialRange.start, partialRange.end, colorId)
+    if (partialRange) {
+      if (colorId) {
+        savePartialHighlight(partialRange.verseKey, partialRange.start, partialRange.end, colorId, partialRange.text || '')
+      } else {
+        removePartialHighlight(partialRange.verseKey, partialRange.start)
+      }
       setPartialHighlights(loadPartialHighlights())
     } else {
       selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
@@ -2047,7 +2051,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       if (sameVerse) {
         const start = Math.min(wordSelStart.start, offset.start)
         const end   = Math.max(wordSelStart.end,   offset.end)
-        setPartialRange({ verseKey, start, end })
+        const phraseText = textEl ? textEl.textContent.slice(start, end) : ''
+        setPartialRange({ verseKey, start, end, text: phraseText })
         setSelectedVerses(new Set([verseKey]))
       } else {
         // Cross-verse: full-verse select both
@@ -2071,8 +2076,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <mark
           key={`h${start}`}
           style={{ background: hlSt.rowBg, borderBottom: `2px solid ${hlSt.border}`, borderRadius: 2, padding: '0 1px', cursor: 'pointer' }}
-          onClick={e => { e.stopPropagation(); removePartialHighlight(verseKey, start); setPartialHighlights(loadPartialHighlights()) }}
-          title="Tap to remove highlight"
+          onClick={e => {
+            e.stopPropagation()
+            setPartialRange({ verseKey, start, end })
+            setSelectedVerses(new Set([verseKey]))
+            setColorBarOpen(true)
+          }}
+          title="Tap to edit highlight"
         >{text.slice(start, Math.min(end, text.length))}</mark>
       )
       pos = Math.min(end, text.length)
