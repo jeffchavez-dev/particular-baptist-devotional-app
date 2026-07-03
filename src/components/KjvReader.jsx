@@ -3321,10 +3321,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               ...(isLexNavMatch && !isFocusMatch && !isSelected ? { background:'var(--teal-light)' } : {}),
                             }}
                           >
-                            {/* ── main verse row — tap to select ── */}
-                            <div style={r.verseRow} onClick={() => { if (window.getSelection && !window.getSelection().isCollapsed) return; toggleVerse(verseKey) }}>
+                            {/* ── main verse row — verse number selects whole verse, text area for partial highlight ── */}
+                            <div style={r.verseRow}>
                               <span
-                                style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
+                                style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
+                                onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
                               >
                                 {verse}
                               </span>
