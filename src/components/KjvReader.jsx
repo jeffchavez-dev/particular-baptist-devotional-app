@@ -2068,10 +2068,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const saved   = partialHighlights[verseKey] || []
     const pending = partialRange?.verseKey === verseKey ? partialRange : null
 
-    // Merge saved ranges + pending selection into one sorted list
+    const startWord = wordSelStart?.verseKey === verseKey ? wordSelStart : null
+
+    // Merge saved ranges + pending selection + first-tap word into one sorted list
     const allRanges = [
-      ...saved.map(r => ({ ...r, isPending: false })),
-      ...(pending ? [{ start: pending.start, end: pending.end, colorId: null, isPending: true }] : []),
+      ...saved.map(r => ({ ...r, isPending: false, isStart: false })),
+      ...(pending   ? [{ start: pending.start,   end: pending.end,   colorId: null, isPending: true,  isStart: false }] : []),
+      ...(startWord ? [{ start: startWord.start, end: startWord.end, colorId: null, isPending: false, isStart: true  }] : []),
     ].sort((a, b) => a.start - b.start)
 
     if (!allRanges.length) return text
@@ -2082,7 +2085,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       if (start > pos) parts.push(<span key={`p${pos}`}>{text.slice(pos, start)}</span>)
       const s = Math.max(start, pos)
       const e = Math.min(end, text.length)
-      if (isPending) {
+      if (isStart) {
+        parts.push(
+          <mark
+            key={`start${s}`}
+            style={{ background: 'var(--gold-faint)', borderBottom: '2px dashed var(--gold)', borderRadius: 2, padding: '0 1px' }}
+          >{text.slice(s, e)}</mark>
+        )
+      } else if (isPending) {
         parts.push(
           <mark
             key={`sel${s}`}
@@ -3426,7 +3436,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
                                     }}
                                     onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
-                                  >{(partialHighlights[verseKey]?.length || partialRange?.verseKey === verseKey) ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
+                                  >{(partialHighlights[verseKey]?.length || partialRange?.verseKey === verseKey || wordSelStart?.verseKey === verseKey) ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
                                 )}
 
                                 {studyMode && verseRefs.length > 0 && (
