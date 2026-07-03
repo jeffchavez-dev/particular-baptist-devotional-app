@@ -753,8 +753,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [highlights,        setHighlights]        = useState(() => loadHighlights())
   const [itemNotes,         setItemNotes]         = useState(() => loadItemNotes())
   const [partialHighlights, setPartialHighlights] = useState(() => loadPartialHighlights())
-  /* Floating text-selection color picker: { verseKey, start, end, x, y } */
-  const [textSel, setTextSel] = useState(null)
+  /* Two-tap partial selection: first tap sets start word, second tap finalizes range */
+  const [wordSelStart, setWordSelStart] = useState(null) // { verseKey, start, end }
+  const [partialRange,  setPartialRange]  = useState(null) // { verseKey, start, end }
 
   /* Index lib| notes that have a verseTag — maps "Book|ch|v" → count */
   const libNoteIndex = useMemo(() => {
@@ -1977,7 +1978,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setColorBarOpen(false)
     setEditingNote(null)
     setSelectedWord(null)
-    setTextSel(null)
+    setWordSelStart(null)
+    setPartialRange(null)
   }
 
   /* ── Greek word tap ── */
@@ -1997,45 +1999,63 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function applyHighlightToSelection(colorId) {
-    selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
-    setHighlights(loadHighlights())   // explicit fresh read → all selected verses highlighted
+    if (partialRange && colorId) {
+      savePartialHighlight(partialRange.verseKey, partialRange.start, partialRange.end, colorId)
+      setPartialHighlights(loadPartialHighlights())
+    } else {
+      selectedVerses.forEach(vk => setHighlight(vk, colorId, userId))
+      setHighlights(loadHighlights())
+    }
     setColorBarOpen(false)
     setSelectedVerses(new Set())
+    setPartialRange(null)
+    setWordSelStart(null)
   }
 
-  /* ── Partial (text-selection) highlight helpers ── */
-  function handleVerseTextMouseUp(verseKey, textEl, e) {
-    if (!textEl) return
+  /* ── Partial (two-tap) highlight helpers ── */
+  function getWordOffsetInEl(textEl, e) {
     const sel = window.getSelection()
-    if (!sel) return
-    // Single click with no drag — expand to the word under the cursor
-    if (sel.isCollapsed && sel.rangeCount > 0) {
+    if (!sel) return null
+    // Place cursor at click point then expand to word
+    if (sel.rangeCount > 0) {
       sel.modify('move', 'backward', 'word')
       sel.modify('extend', 'forward', 'word')
     }
-    if (sel.isCollapsed || !sel.toString().trim()) return
+    const word = sel.toString().trim()
+    if (!word) return null
     const range = sel.getRangeAt(0)
-    // Only require that the selection starts inside the verse text span
-    if (!textEl.contains(range.startContainer)) return
+    if (!textEl || !textEl.contains(range.startContainer)) return null
     const preRange = document.createRange()
     preRange.selectNodeContents(textEl)
     preRange.setEnd(range.startContainer, range.startOffset)
     const start = preRange.toString().length
-    const end   = Math.min(start + sel.toString().length, textEl.textContent.length)
-    if (end <= start) return
-    const rect = range.getBoundingClientRect()
-    setTextSel({ verseKey, start, end, x: rect.left + rect.width / 2, y: rect.top })
-    e.stopPropagation()
+    const end   = Math.min(start + word.length, textEl.textContent.length)
+    window.getSelection()?.removeAllRanges()
+    return { start, end }
   }
 
-  function applyTextSelHighlight(colorId) {
-    if (!textSel) return
-    if (colorId) {
-      savePartialHighlight(textSel.verseKey, textSel.start, textSel.end, colorId)
-      setPartialHighlights(loadPartialHighlights())
+  function handleVerseTextClick(verseKey, textEl, e) {
+    e.stopPropagation()
+    const offset = getWordOffsetInEl(textEl, e)
+    if (!offset) return
+    if (!wordSelStart) {
+      // First tap — mark start word, add verse to selection so it shows teal bg
+      setWordSelStart({ verseKey, ...offset })
+      setSelectedVerses(new Set([verseKey]))
+    } else {
+      // Second tap — finalise range
+      const sameVerse = wordSelStart.verseKey === verseKey
+      if (sameVerse) {
+        const start = Math.min(wordSelStart.start, offset.start)
+        const end   = Math.max(wordSelStart.end,   offset.end)
+        setPartialRange({ verseKey, start, end })
+      } else {
+        // Cross-verse: just add second verse to full-verse selection
+        setSelectedVerses(prev => { const n = new Set(prev); n.add(verseKey); return n })
+      }
+      setWordSelStart(null)
+      setColorBarOpen(true)
     }
-    window.getSelection()?.removeAllRanges()
-    setTextSel(null)
   }
 
   /* Split plain verse text into segments for partial highlight rendering */
@@ -3322,11 +3342,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               ...(isLexNavMatch && !isFocusMatch && !isSelected ? { background:'var(--teal-light)' } : {}),
                             }}
                           >
-                            {/* ── main verse row — verse number selects whole verse, text area for partial highlight ── */}
-                            <div style={r.verseRow} onMouseUp={e => {
-                              const textEl = e.currentTarget.querySelector('[data-verse-text]')
-                              handleVerseTextMouseUp(verseKey, textEl, e)
-                            }}>
+                            {/* ── main verse row — verse number = full verse select; text = two-tap partial highlight ── */}
+                            <div style={r.verseRow}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
@@ -3371,14 +3388,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 ) : (
                                   /* ── Plain text (all non-LXX versions, and LXX fallback while loading) ── */
                                   <span
-                                    data-verse-text
                                     style={{
                                       ...r.verseText,
                                       fontSize: prefs.sizePx,
                                       fontFamily: version === 'lxx'
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
+                                      ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
                                     }}
+                                    onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
                                   >{partialHighlights[verseKey]?.length ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
                                 )}
 
@@ -4028,7 +4046,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
             </button>
-            <span style={r.floatingCount}>{selectedVerses.size} verse{selectedVerses.size !== 1 ? 's' : ''}</span>
+            <span style={r.floatingCount}>{partialRange ? 'Phrase selected' : wordSelStart ? 'Tap end word →' : `${selectedVerses.size} verse${selectedVerses.size !== 1 ? 's' : ''}`}</span>
 
             {/* Highlight */}
             <button
@@ -4139,48 +4157,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               >×</button>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Floating partial-highlight color picker */}
-      {textSel && (
-        <div
-          style={{
-            position: 'fixed',
-            left: Math.min(textSel.x - 90, window.innerWidth - 200),
-            top: Math.max(textSel.y - 52, 8),
-            zIndex: 9999,
-            background: 'var(--surface, #fff)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 10,
-            padding: '6px 10px',
-            display: 'flex', gap: 8, alignItems: 'center',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-          }}
-          onMouseDown={e => e.preventDefault()}
-        >
-          {HIGHLIGHT_COLORS.map(c => (
-            <button
-              key={c.id}
-              title={c.label}
-              onClick={() => applyTextSelHighlight(c.id)}
-              style={{
-                width: 24, height: 24, borderRadius: '50%',
-                background: c.dot, border: 'none', cursor: 'pointer', padding: 0,
-                transition: 'transform 0.1s',
-              }}
-            />
-          ))}
-          <button
-            title="Cancel"
-            onClick={() => { window.getSelection()?.removeAllRanges(); setTextSel(null) }}
-            style={{
-              width: 24, height: 24, borderRadius: '50%',
-              background: 'var(--border-strong)', border: 'none', cursor: 'pointer',
-              fontSize: 15, color: 'var(--ink-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-            }}
-          >×</button>
         </div>
       )}
 
