@@ -4686,8 +4686,8 @@ const r = {
     display:'flex', gap:6, alignItems:'flex-start',
     marginLeft:34, marginTop:1, marginBottom:4,
     padding:'5px 10px',
-    background:'rgba(210,160,0,0.16)',
-    borderLeft:'2px solid rgba(180,130,0,0.65)',
+    background:'rgba(210,155,0,0.28)',
+    borderLeft:'2px solid rgba(160,110,0,0.88)',
     borderRadius:'0 4px 4px 0',
     fontSize:12, color:'var(--ink-muted)', lineHeight:1.6,
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
@@ -4701,8 +4701,8 @@ const r = {
   },
   /* Library-tagged note overrides — teal accent, non-editable cursor */
   libNoteDisplay: {
-    background:'rgba(29,107,90,0.16)',
-    borderLeft:'2px solid rgba(29,107,90,0.70)',
+    background:'rgba(29,107,90,0.28)',
+    borderLeft:'2px solid rgba(18,85,68,0.88)',
     cursor:'default',
   },
   libNoteEditBtn: {
