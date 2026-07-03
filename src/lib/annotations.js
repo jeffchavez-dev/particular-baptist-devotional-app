@@ -109,6 +109,36 @@ export function getHlStyle(colorId) {
   return HIGHLIGHT_COLORS.find(c => c.id === colorId) || HIGHLIGHT_COLORS[0]
 }
 
+// ── Partial (text-selection) highlights ──────────────────────────────────────
+// Stored as { verseKey: [{ start, end, colorId }] }
+
+const PHL_KEY = 'pb-partial-highlights'
+
+export function loadPartialHighlights() {
+  try { return JSON.parse(localStorage.getItem(PHL_KEY) || '{}') } catch { return {} }
+}
+
+export function savePartialHighlight(verseKey, start, end, colorId) {
+  const all = loadPartialHighlights()
+  const existing = all[verseKey] || []
+  // Remove any ranges that fully overlap the new range
+  const kept = existing.filter(r => r.end <= start || r.start >= end)
+  kept.push({ start, end, colorId })
+  kept.sort((a, b) => a.start - b.start)
+  all[verseKey] = kept
+  try { localStorage.setItem(PHL_KEY, JSON.stringify(all)) } catch {}
+  window.dispatchEvent(new CustomEvent('pb-partial-highlight-changed', { detail: { verseKey, partial: all } }))
+}
+
+export function removePartialHighlight(verseKey, start) {
+  const all = loadPartialHighlights()
+  if (!all[verseKey]) return
+  all[verseKey] = all[verseKey].filter(r => r.start !== start)
+  if (!all[verseKey].length) delete all[verseKey]
+  try { localStorage.setItem(PHL_KEY, JSON.stringify(all)) } catch {}
+  window.dispatchEvent(new CustomEvent('pb-partial-highlight-changed', { detail: { verseKey, partial: all } }))
+}
+
 // ── Local storage helpers ─────────────────────────────────────────────────────
 
 function _migrateKjv(data) {

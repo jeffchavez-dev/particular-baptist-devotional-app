@@ -36,6 +36,7 @@ import {
   loadHighlights, loadItemNotes,
   setHighlight, setItemNote,
   addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
+  loadPartialHighlights, savePartialHighlight, removePartialHighlight,
 } from '../lib/annotations'
 import {
   isAuthor,
@@ -749,8 +750,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [memorizeConfirm, setMemorizeConfirm] = useState(null)
 
   /* Annotations — plain state, always written by reading fresh from localStorage */
-  const [highlights, setHighlights] = useState(() => loadHighlights())
-  const [itemNotes,  setItemNotes]  = useState(() => loadItemNotes())
+  const [highlights,        setHighlights]        = useState(() => loadHighlights())
+  const [itemNotes,         setItemNotes]         = useState(() => loadItemNotes())
+  const [partialHighlights, setPartialHighlights] = useState(() => loadPartialHighlights())
+  /* Floating text-selection color picker: { verseKey, start, end, x, y } */
+  const [textSel, setTextSel] = useState(null)
 
   /* Index lib| notes that have a verseTag — maps "Book|ch|v" → count */
   const libNoteIndex = useMemo(() => {
@@ -1416,13 +1420,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       setItemNotes(evt.detail.notes)
     }
     
+    function onPartialHighlightChanged(evt) {
+      setPartialHighlights(evt.detail.partial)
+    }
+
     window.addEventListener('pb-annotations-updated', onSync)
     window.addEventListener('pb-highlight-changed', onHighlightChanged)
     window.addEventListener('pb-note-changed', onNoteChanged)
+    window.addEventListener('pb-partial-highlight-changed', onPartialHighlightChanged)
     return () => {
       window.removeEventListener('pb-annotations-updated', onSync)
       window.removeEventListener('pb-highlight-changed', onHighlightChanged)
       window.removeEventListener('pb-note-changed', onNoteChanged)
+      window.removeEventListener('pb-partial-highlight-changed', onPartialHighlightChanged)
     }
   }, [])
 
@@ -1967,6 +1977,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setColorBarOpen(false)
     setEditingNote(null)
     setSelectedWord(null)
+    setTextSel(null)
   }
 
   /* ── Greek word tap ── */
@@ -1990,6 +2001,58 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setHighlights(loadHighlights())   // explicit fresh read → all selected verses highlighted
     setColorBarOpen(false)
     setSelectedVerses(new Set())
+  }
+
+  /* ── Partial (text-selection) highlight helpers ── */
+  function handleVerseTextMouseUp(verseKey, e) {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || !sel.toString().trim()) return
+    const range = sel.getRangeAt(0)
+    // Compute char offset from start of this verse's text span
+    const el = e.currentTarget
+    if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) return
+    const preRange = document.createRange()
+    preRange.selectNodeContents(el)
+    preRange.setEnd(range.startContainer, range.startOffset)
+    const start = preRange.toString().length
+    const end   = start + sel.toString().length
+    if (end <= start) return
+    const rect = range.getBoundingClientRect()
+    setTextSel({ verseKey, start, end, x: rect.left + rect.width / 2, y: rect.top })
+    e.stopPropagation()
+  }
+
+  function applyTextSelHighlight(colorId) {
+    if (!textSel) return
+    if (colorId) {
+      savePartialHighlight(textSel.verseKey, textSel.start, textSel.end, colorId)
+      setPartialHighlights(loadPartialHighlights())
+    }
+    window.getSelection()?.removeAllRanges()
+    setTextSel(null)
+  }
+
+  /* Split plain verse text into segments for partial highlight rendering */
+  function renderWithPartialHighlights(text, verseKey) {
+    const ranges = partialHighlights[verseKey]
+    if (!ranges || !ranges.length) return text
+    const parts = []
+    let pos = 0
+    for (const { start, end, colorId } of ranges) {
+      if (start > pos) parts.push(<span key={`p${pos}`}>{text.slice(pos, start)}</span>)
+      const hlSt = getHlStyle(colorId)
+      parts.push(
+        <mark
+          key={`h${start}`}
+          style={{ background: hlSt.rowBg, borderBottom: `2px solid ${hlSt.border}`, borderRadius: 2, padding: '0 1px', cursor: 'pointer' }}
+          onClick={e => { e.stopPropagation(); removePartialHighlight(verseKey, start); setPartialHighlights(loadPartialHighlights()) }}
+          title="Tap to remove highlight"
+        >{text.slice(start, Math.min(end, text.length))}</mark>
+      )
+      pos = Math.min(end, text.length)
+    }
+    if (pos < text.length) parts.push(<span key={`p${pos}`}>{text.slice(pos)}</span>)
+    return parts
   }
 
   function openNoteForSelection() {
@@ -3305,7 +3368,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
                                     }}
-                                  >{highlightSearchInText(text)}</span>
+                                    onMouseUp={e => handleVerseTextMouseUp(verseKey, e)}
+                                  >{partialHighlights[verseKey]?.length ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
                                 )}
 
                                 {studyMode && verseRefs.length > 0 && (
@@ -4065,6 +4129,48 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               >×</button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating partial-highlight color picker */}
+      {textSel && (
+        <div
+          style={{
+            position: 'fixed',
+            left: Math.min(textSel.x - 90, window.innerWidth - 200),
+            top: Math.max(textSel.y - 52, 8),
+            zIndex: 9999,
+            background: 'var(--surface, #fff)',
+            border: '1px solid var(--border-strong)',
+            borderRadius: 10,
+            padding: '6px 10px',
+            display: 'flex', gap: 8, alignItems: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+          }}
+          onMouseDown={e => e.preventDefault()}
+        >
+          {HIGHLIGHT_COLORS.map(c => (
+            <button
+              key={c.id}
+              title={c.label}
+              onClick={() => applyTextSelHighlight(c.id)}
+              style={{
+                width: 24, height: 24, borderRadius: '50%',
+                background: c.dot, border: 'none', cursor: 'pointer', padding: 0,
+                transition: 'transform 0.1s',
+              }}
+            />
+          ))}
+          <button
+            title="Cancel"
+            onClick={() => { window.getSelection()?.removeAllRanges(); setTextSel(null) }}
+            style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'var(--border-strong)', border: 'none', cursor: 'pointer',
+              fontSize: 15, color: 'var(--ink-muted)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+            }}
+          >×</button>
         </div>
       )}
 
