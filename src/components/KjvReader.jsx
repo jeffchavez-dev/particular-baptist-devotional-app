@@ -2004,23 +2004,24 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   /* ── Partial (text-selection) highlight helpers ── */
-  function handleVerseTextMouseUp(verseKey, e) {
+  function handleVerseTextMouseUp(verseKey, textEl, e) {
+    if (!textEl) return
     const sel = window.getSelection()
     if (!sel) return
-    const el = e.currentTarget
-    // Single click — expand collapsed cursor to the word under it
+    // Single click with no drag — expand to the word under the cursor
     if (sel.isCollapsed && sel.rangeCount > 0) {
       sel.modify('move', 'backward', 'word')
       sel.modify('extend', 'forward', 'word')
     }
     if (sel.isCollapsed || !sel.toString().trim()) return
     const range = sel.getRangeAt(0)
-    if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) return
+    // Only require that the selection starts inside the verse text span
+    if (!textEl.contains(range.startContainer)) return
     const preRange = document.createRange()
-    preRange.selectNodeContents(el)
+    preRange.selectNodeContents(textEl)
     preRange.setEnd(range.startContainer, range.startOffset)
     const start = preRange.toString().length
-    const end   = start + sel.toString().length
+    const end   = Math.min(start + sel.toString().length, textEl.textContent.length)
     if (end <= start) return
     const rect = range.getBoundingClientRect()
     setTextSel({ verseKey, start, end, x: rect.left + rect.width / 2, y: rect.top })
@@ -3322,7 +3323,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             }}
                           >
                             {/* ── main verse row — verse number selects whole verse, text area for partial highlight ── */}
-                            <div style={r.verseRow}>
+                            <div style={r.verseRow} onMouseUp={e => {
+                              const textEl = e.currentTarget.querySelector('[data-verse-text]')
+                              handleVerseTextMouseUp(verseKey, textEl, e)
+                            }}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
@@ -3367,6 +3371,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 ) : (
                                   /* ── Plain text (all non-LXX versions, and LXX fallback while loading) ── */
                                   <span
+                                    data-verse-text
                                     style={{
                                       ...r.verseText,
                                       fontSize: prefs.sizePx,
@@ -3374,7 +3379,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
                                     }}
-                                    onMouseUp={e => handleVerseTextMouseUp(verseKey, e)}
                                   >{partialHighlights[verseKey]?.length ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
                                 )}
 
