@@ -2000,10 +2000,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function applyHighlightToSelection(colorId) {
     if (partialRange) {
+      const ranges = Array.isArray(partialRange) ? partialRange : [partialRange]
       if (colorId) {
-        savePartialHighlight(partialRange.verseKey, partialRange.start, partialRange.end, colorId, partialRange.text || '')
+        ranges.forEach(r => savePartialHighlight(r.verseKey, r.start, r.end, colorId, r.text || ''))
       } else {
-        removePartialHighlight(partialRange.verseKey, partialRange.start)
+        ranges.forEach(r => removePartialHighlight(r.verseKey, r.start))
       }
       setPartialHighlights(loadPartialHighlights())
     } else {
@@ -2043,8 +2044,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const offset = getWordOffsetInEl(textEl, e)
     if (!offset) return
     if (!wordSelStart) {
-      // First tap — just mark start word, toolbar shows via wordSelStart check
-      setWordSelStart({ verseKey, ...offset })
+      // First tap — store start word + full verse text length for cross-verse support
+      setWordSelStart({ verseKey, ...offset, verseTextLen: textEl?.textContent.length ?? 0 })
     } else {
       // Second tap — finalise range
       const sameVerse = wordSelStart.verseKey === verseKey
@@ -2052,11 +2053,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         const start = Math.min(wordSelStart.start, offset.start)
         const end   = Math.max(wordSelStart.end,   offset.end)
         const phraseText = textEl ? textEl.textContent.slice(start, end) : ''
-        setPartialRange({ verseKey, start, end, text: phraseText })
-        // Don't add to selectedVerses — toolbar shows via partialRange; verse won't go fully teal
+        // Single-verse partial range (array with one entry)
+        setPartialRange([{ verseKey, start, end, text: phraseText }])
       } else {
-        // Cross-verse: full-verse select both
-        setSelectedVerses(new Set([wordSelStart.verseKey, verseKey]))
+        // Cross-verse: verse 1 from first word → its end; verse 2 from 0 → last word
+        const v1Text = textEl ? '' : '' // we don't have v1's el, but we have its length
+        const v2Text = textEl ? textEl.textContent.slice(0, offset.end) : ''
+        setPartialRange([
+          { verseKey: wordSelStart.verseKey, start: wordSelStart.start, end: wordSelStart.verseTextLen, text: '' },
+          { verseKey, start: 0, end: offset.end, text: v2Text },
+        ])
       }
       setWordSelStart(null)
       setColorBarOpen(true)
@@ -2066,7 +2072,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Split plain verse text into segments for partial + pending-selection rendering */
   function renderWithPartialHighlights(text, verseKey) {
     const saved   = partialHighlights[verseKey] || []
-    const pending = partialRange?.verseKey === verseKey ? partialRange : null
+    const pendingRanges = Array.isArray(partialRange) ? partialRange : (partialRange ? [partialRange] : [])
+    const pending = pendingRanges.find(r => r.verseKey === verseKey) || null
 
     const startWord = wordSelStart?.verseKey === verseKey ? wordSelStart : null
 
@@ -2107,7 +2114,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             style={{ background: hlSt.rowBg, borderBottom: `2px solid ${hlSt.border}`, borderRadius: 2, padding: '0 1px', cursor: 'pointer' }}
             onClick={ev => {
               ev.stopPropagation()
-              setPartialRange({ verseKey, start: s, end: e, text: text.slice(s, e) })
+              setPartialRange([{ verseKey, start: s, end: e, text: text.slice(s, e) }])
               setColorBarOpen(true)
             }}
             title="Tap to edit highlight"
@@ -3436,7 +3443,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
                                     }}
                                     onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
-                                  >{(partialHighlights[verseKey]?.length || partialRange?.verseKey === verseKey || wordSelStart?.verseKey === verseKey) ? renderWithPartialHighlights(text, verseKey) : highlightSearchInText(text)}</span>
+                                  >{(() => {
+                                    const pRanges = Array.isArray(partialRange) ? partialRange : (partialRange ? [partialRange] : [])
+                                    const hasPending = pRanges.some(r => r.verseKey === verseKey)
+                                    return (partialHighlights[verseKey]?.length || hasPending || wordSelStart?.verseKey === verseKey)
+                                      ? renderWithPartialHighlights(text, verseKey)
+                                      : highlightSearchInText(text)
+                                  })()}</span>
                                 )}
 
                                 {studyMode && verseRefs.length > 0 && (
@@ -4076,7 +4089,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       </div>
 
       {/* ── Floating action bar — tap to select verses, then act ── */}
-      {(selectedVerses.size > 0 || !!wordSelStart || !!partialRange) && (
+      {(selectedVerses.size > 0 || !!wordSelStart || (Array.isArray(partialRange) ? partialRange.length > 0 : !!partialRange)) && (
         <div style={r.floatingBar}>
           <div style={r.floatingBarMain}>
             {/* Deselect */}
@@ -4085,7 +4098,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
             </button>
-            <span style={r.floatingCount}>{partialRange ? 'Phrase selected' : wordSelStart ? 'Tap end word →' : `${selectedVerses.size} verse${selectedVerses.size !== 1 ? 's' : ''}`}</span>
+            <span style={r.floatingCount}>{(Array.isArray(partialRange) ? partialRange.length > 0 : !!partialRange) ? 'Phrase selected' : wordSelStart ? 'Tap end word →' : `${selectedVerses.size} verse${selectedVerses.size !== 1 ? 's' : ''}`}</span>
 
             {/* Highlight */}
             <button
