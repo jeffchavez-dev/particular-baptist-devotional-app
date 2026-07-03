@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY, getTodayDayNum, setLocalProgress, supabase } from '../lib/supabase'
-import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChapters } from '../lib/biblePlan'
+import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChapters, isTodayRestDay } from '../lib/biblePlan'
 import {
   getConfPlanConfig, getConfPlanProgress,
   getCurrentConfItem, isConfPlanComplete, advanceConfPlan, retreatConfPlan,
@@ -228,7 +228,8 @@ export default function Dashboard() {
     return todayChapters
   }, [bibleConfig, bibleDoneToday, bibleProgress?.currentIndex, cpd, todayChapters])
 
-  const hasActiveBible  = !!bibleConfig && !!bibleDisplayChapters
+  const bibleRestDay    = bibleConfig ? isTodayRestDay(bibleConfig) : false
+  const hasActiveBible  = !!bibleConfig && !!bibleDisplayChapters && !bibleRestDay
   // Display index = first chapter index of the day being shown (today or just-completed day)
   const bibleDisplayIdx = bibleDoneToday
     ? Math.max(0, (bibleProgress?.currentIndex ?? 0) - cpd)
@@ -325,7 +326,11 @@ export default function Dashboard() {
             )}
           </div>
 
-          {hasActiveBible ? (
+          {bibleRestDay ? (
+            <div style={s.readingCard}>
+              <div style={s.restNote}>🛌 Rest day — no reading today</div>
+            </div>
+          ) : hasActiveBible ? (
             <div style={s.readingCard}>
               {bibleDisplayChapters.map(ch => {
                 const done = !!bibleProgress2[ch]
