@@ -3317,7 +3317,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             }}
                           >
                             {/* ── main verse row — tap to select ── */}
-                            <div style={r.verseRow} onClick={() => toggleVerse(verseKey)}>
+                            <div style={r.verseRow} onClick={() => { if (window.getSelection && !window.getSelection().isCollapsed) return; toggleVerse(verseKey) }}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}) }}
                               >
