@@ -6,7 +6,8 @@
 const CACHE_NAME    = 'pb-commentary-v1'
 const MHC_BASE      = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
 const GILL_BASE     = 'https://bible.helloao.org/api/c/john-gill'
-const CALVIN_BASE   = 'https://biblehub.com/commentaries/calvin'
+// BibleHub blocks CORS — route through our own Vercel serverless proxy
+const CALVIN_PROXY  = '/api/commentary'
 
 // Books Calvin wrote on and their BibleHub URL slugs
 const CALVIN_BOOKS = {
@@ -166,7 +167,7 @@ export const COMMENTARIES = {
     hasBook: book => !!CALVIN_BOOKS[book],
     getUrl: (book, chapter) => {
       const slug = CALVIN_BOOKS[book]
-      return slug ? `${CALVIN_BASE}/${slug}/${chapter}.htm` : null
+      return slug ? `${CALVIN_PROXY}?src=calvin&book=${encodeURIComponent(book)}&chapter=${chapter}` : null
     },
     parse: html => {
       const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -216,15 +217,29 @@ export const COMMENTARIES = {
 }
 
 // ── Fetch with Cache API (offline-first) ─────────────────────────────────────
+function _makeTimeoutSignal(ms) {
+  // AbortSignal.timeout() not available in Safari < 16 — use AbortController
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms)
+  const ctrl = new AbortController()
+  setTimeout(() => ctrl.abort(), ms)
+  return ctrl.signal
+}
+
 async function _fetchCached(url) {
   try {
-    const cache = await caches.open(CACHE_NAME)
-    const hit   = await cache.match(url)
-    if (hit) return hit.text()
-    const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
-    if (!res.ok) return null
-    await cache.put(url, res.clone())
-    return res.text()
+    // Try Cache API first (offline-first)
+    if (typeof caches !== 'undefined') {
+      const cache = await caches.open(CACHE_NAME)
+      const hit   = await cache.match(url)
+      if (hit) return hit.text()
+      const res = await fetch(url, { signal: _makeTimeoutSignal(15000) })
+      if (!res.ok) return null
+      await cache.put(url, res.clone())
+      return res.text()
+    }
+    // Fallback: plain fetch when Cache API is unavailable
+    const res = await fetch(url, { signal: _makeTimeoutSignal(15000) })
+    return res.ok ? res.text() : null
   } catch {
     return null
   }
