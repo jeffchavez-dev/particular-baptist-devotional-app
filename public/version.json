@@ -1,5 +1,5 @@
 {
-  "version": "1.7",
+  "version": "1.8",
   "date": "2026-07-05",
-  "changelog": "Shortened confession chip labels — 1LBCF shows article number only (e.g. '2' instead of 'Article 2 — The Trinity'), 2LBCF shows chapter.paragraph (e.g. '4.1' instead of 'Ch. 4 §1')."
+  "changelog": "Commentary scripture references now navigate within the app instead of opening external BibleHub links. Tap any verse reference inside a commentary chip to jump directly to that verse."
 }

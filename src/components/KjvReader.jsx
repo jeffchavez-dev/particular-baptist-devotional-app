@@ -69,6 +69,32 @@ function extractStartVerse(heading) {
   return null
 }
 
+// Reverse map: BibleHub slug → app book name. Built from BIBLE_BOOKS + exceptions.
+const _SLUG_TO_BOOK = (() => {
+  const map = {}
+  for (const b of BIBLE_BOOKS) {
+    // Standard slug: lowercase, spaces→underscore, strip non-alphanumeric
+    const slug = b.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    map[slug] = b.name
+  }
+  // BibleHub-specific exceptions
+  map['songs']         = 'Song of Solomon'
+  map['song_of_songs'] = 'Song of Solomon'
+  map['psm']           = 'Psalms'
+  return map
+})()
+
+// Parse a BibleHub-format href into {book, chapter, verse} for in-app navigation.
+// Handles: //biblehub.com/john/1-14.htm  /acts/13-7.htm  //biblehub.com/1_john/1-1.htm
+function parseBibleHubHref(href) {
+  if (!href) return null
+  const m = href.match(/\/([a-z0-9_]+)\/(\d+)-(\d+)\.htm/i)
+  if (!m) return null
+  const book = _SLUG_TO_BOOK[m[1].toLowerCase()]
+  if (!book) return null
+  return { book, chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) }
+}
+
 async function loadBibleData(version = 'kjv') {
   return await loadBibleVersion(version)
 }
@@ -3479,7 +3505,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       </svg>
                                     </button>
                                     {isExp && (
-                                      <div style={r.comChipBody}>
+                                      <div style={r.comChipBody} onClick={e => {
+                                        const a = e.target.closest('a')
+                                        if (!a) return
+                                        const parsed = parseBibleHubHref(a.getAttribute('href'))
+                                        if (!parsed) return
+                                        e.preventDefault()
+                                        navigate(parsed.book, parsed.chapter)
+                                        if (parsed.verse) pendingVerseRef.current = parsed
+                                      }}>
                                         {sec.paragraphs.map((html, pi) => (
                                           <p key={pi} style={{ ...r.comPara, fontSize: prefs?.sizePx ? prefs.sizePx - 1 : 14 }} dangerouslySetInnerHTML={{ __html: html }} />
                                         ))}
