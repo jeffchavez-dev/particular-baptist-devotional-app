@@ -26,6 +26,7 @@ import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarke
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
 import ShareCardModal from './ShareCardModal'
+import CommentaryPanel from './CommentaryPanel'
 import BookCelebration from './BookCelebration'
 import ConfessionModal from './ConfessionModal'
 import StrongsModal from './StrongsModal'
@@ -796,7 +797,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [editingNote, setEditingNote]     = useState(null)
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
-  const [colorBarOpen,   setColorBarOpen]   = useState(false)
+  const [colorBarOpen,      setColorBarOpen]      = useState(false)
+  const [commentaryChapter, setCommentaryChapter] = useState(null) // { book, chapter } | null
 
   /* Search — full-Bible mode (inline in toolbar, always visible) */
   const [searchQuery,       setSearchQuery]       = useState('')
@@ -4035,6 +4037,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       const isDone = !!bibleProgress[chKey]
                       return (
                         <div style={r.chapterReadRow}>
+                          {/* Commentary toggle */}
+                          {_TEXT_VERSIONS.has(version) && (() => {
+                            const isOpen = commentaryChapter?.book === seg.book && commentaryChapter?.chapter === seg.chapter
+                            return (
+                              <button
+                                onClick={() => setCommentaryChapter(isOpen ? null : { book: seg.book, chapter: seg.chapter })}
+                                style={{
+                                  ...r.chapterReadBtn,
+                                  background: isOpen ? 'var(--gold-faint)' : 'transparent',
+                                  borderColor: isOpen ? 'var(--gold)' : 'var(--border-strong)',
+                                  color: isOpen ? 'var(--gold)' : 'var(--ink-faint)',
+                                }}
+                                title="Matthew Henry Commentary"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                  <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                                  <path d="M4 4.5h6M4 7h6M4 9.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                </svg>
+                                <span>Commentary</span>
+                              </button>
+                            )
+                          })()}
+
                           <button
                             onClick={() => {
                               const newDone = !isDone
@@ -4079,6 +4104,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         </div>
                       )
                     })()}
+
+                    {/* ── Commentary panel ── */}
+                    {commentaryChapter?.book === seg.book && commentaryChapter?.chapter === seg.chapter && (
+                      <div style={{ padding: '0 4px 16px' }}>
+                        <CommentaryPanel
+                          book={seg.book}
+                          chapter={seg.chapter}
+                          prefs={prefs}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
 
