@@ -172,23 +172,35 @@ export const COMMENTARIES = {
     parse: html => {
       const doc = new DOMParser().parseFromString(html, 'text/html')
       const sections = []
-      let current = null
 
-      // BibleHub Calvin: verse refs are <a> with text like "[Genesis 1:1]",
-      // commentary follows in sibling/nearby <p> tags — process in DOM order.
-      for (const el of doc.querySelectorAll('a, p')) {
-        if (el.tagName === 'A') {
-          const txt = el.textContent.trim()
-          if (/^\[.+\d+:\d+/.test(txt)) {
-            if (current) sections.push(current)
-            current = { heading: txt.replace(/^\[|\]$/g, ''), paragraphs: [] }
+      // BibleHub Calvin structure:
+      //   <div class="comm">
+      //     <div align="center"><b>Romans 1:1-7</b></div>
+      //     <p>1. English verse quote...</p>
+      //     <p>1. Latin verse quote...</p>  ← repeat for each verse
+      //     <p>1. Paul, etc. [11] -- Actual commentary text...</p>  ← starts here
+      //   </div>
+      // Commentary paragraphs contain " -- " or "[" footnote markers;
+      // verse-quote paragraphs do not.
+      for (const comm of doc.querySelectorAll('.comm')) {
+        const boldEl = comm.querySelector('b')
+        if (!boldEl) continue
+        const heading = boldEl.textContent.trim()
+        if (!heading) continue
+
+        const paragraphs = []
+        let inCommentary = false
+        for (const p of comm.querySelectorAll('p')) {
+          const text = p.textContent.trim()
+          if (!text || text.length < 10) continue
+          if (!inCommentary && (text.includes(' -- ') || text.includes('['))) {
+            inCommentary = true
           }
-        } else if (el.tagName === 'P' && current) {
-          const text = el.textContent.trim()
-          if (text.length > 20) current.paragraphs.push(el.innerHTML)
+          if (inCommentary) paragraphs.push(p.innerHTML)
         }
+
+        if (paragraphs.length > 0) sections.push({ heading, paragraphs })
       }
-      if (current) sections.push(current)
       return sections
     },
   },
