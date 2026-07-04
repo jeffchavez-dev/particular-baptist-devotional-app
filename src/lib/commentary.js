@@ -3,8 +3,9 @@
  * Add new commentaries by extending COMMENTARIES below.
  */
 
-const CACHE_NAME = 'pb-commentary-v1'
-const MHC_BASE   = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
+const CACHE_NAME  = 'pb-commentary-v1'
+const MHC_BASE    = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
+const GILL_BASE   = 'https://bible.helloao.org/api/c/john-gill'
 
 // ── Book → MHC path mapping ──────────────────────────────────────────────────
 const MHC_BOOKS = {
@@ -108,8 +109,28 @@ export const COMMENTARIES = {
       return sections
     },
   },
-  // Future commentaries go here, e.g.:
-  // gill: { id: 'gill', name: "Gill's Exposition", ... }
+  gill: {
+    id:          'gill',
+    name:        "Gill's Exposition",
+    shortName:   'Gill',
+    description: "Exposition of the Entire Bible (1746–1763)",
+    hasBook: book => !!MHC_BOOKS[book],
+    getUrl: (book, chapter) => {
+      const b = MHC_BOOKS[book]
+      return b ? `${GILL_BASE}/${b.code}/${chapter}.json` : null
+    },
+    parse: json => {
+      let data
+      try { data = typeof json === 'string' ? JSON.parse(json) : json } catch { return [] }
+      const verses = data?.chapter?.verses ?? []
+      return verses
+        .filter(v => v.type === 'verse' && Array.isArray(v.content) && v.content.length)
+        .map(v => ({
+          heading:    `Verse ${v.number}`,
+          paragraphs: v.content.map(t => String(t)),
+        }))
+    },
+  },
 }
 
 // ── Fetch with Cache API (offline-first) ─────────────────────────────────────
@@ -136,9 +157,9 @@ export async function getCommentary(commentaryId, book, chapter) {
   if (!c || !c.hasBook(book)) return null
   const url = c.getUrl(book, chapter)
   if (!url) return null
-  const html = await _fetchCached(url)
-  if (!html) return null
-  return { sections: c.parse(html) }
+  const raw = await _fetchCached(url)
+  if (!raw) return null
+  return { sections: c.parse(raw) }
 }
 
 /** True if the chapter is already stored in cache (available offline). */
