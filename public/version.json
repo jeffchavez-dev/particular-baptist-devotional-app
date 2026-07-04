@@ -1,5 +1,5 @@
 {
-  "version": "1.4",
+  "version": "1.5",
   "date": "2026-07-05",
-  "changelog": "Fixed Gill and Calvin commentaries not loading. Calvin now routes through a server-side proxy (BibleHub blocks direct browser requests). Gill fetch is now compatible with older Safari."
+  "changelog": "Fixed Gill and Calvin commentaries not showing. Gill was reading the wrong JSON key (chapter.verses → chapter.content). Calvin's parser was using the wrong DOM selectors — BibleHub uses div.comm blocks, not bracketed anchor tags."
 }
