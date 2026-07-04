@@ -242,33 +242,68 @@ export const COMMENTARIES = {
       const doc = new DOMParser().parseFromString(html, 'text/html')
       const sections = []
 
-      // BibleHub Calvin structure:
-      //   <div class="comm">
-      //     <div align="center"><b>Romans 1:1-7</b></div>
-      //     <p>1. English verse quote...</p>
-      //     <p>1. Latin verse quote...</p>  ← repeat for each verse
-      //     <p>1. Paul, etc. [11] -- Actual commentary text...</p>  ← starts here
-      //   </div>
-      // Commentary paragraphs contain " -- " or "[" footnote markers;
-      // verse-quote paragraphs do not.
+      // BibleHub Calvin structure per .comm div:
+      //   <b>Genesis 3:1-24</b> (or <b><a>Genesis 3:1-24</a></b>)
+      //   <p>1. English verse quote</p>   ← verse quote pairs (same number, consecutive)
+      //   <p>1. Latin verse quote</p>
+      //   <p>2. English...</p>
+      //   <p>2. Latin...</p>
+      //   ...
+      //   <p>1. [verse text] Calvin's exposition...</p>  ← actual commentary (solo numbered)
+      //   <p>continuation paragraph</p>
+      //   <p>4. [verse text] Calvin's exposition...</p>  ← next verse's commentary
+      //
+      // Strategy: verse-quote pairs always have the same verse number in adjacent paragraphs.
+      // Commentary paragraphs with that same number are SOLO (no adjacent duplicate).
+      // After filtering quotes, group commentary by leading verse number → one section per verse.
+
+      function leadingVerseNum(p) {
+        const m = p.textContent.trim().match(/^(\d+)\./)
+        return m ? m[1] : null
+      }
+
       for (const comm of doc.querySelectorAll('.comm')) {
         const boldEl = comm.querySelector('b')
         if (!boldEl) continue
-        const heading = boldEl.textContent.trim()
-        if (!heading) continue
+        const fullHeading = boldEl.textContent.trim()
+        if (!fullHeading) continue
 
-        const paragraphs = []
-        let inCommentary = false
-        for (const p of comm.querySelectorAll('p')) {
+        // Extract "Book Chapter:" prefix for per-verse headings (e.g. "Genesis 3:")
+        const bookChMatch = fullHeading.match(/^(.+?\s+\d+):/)
+        const bookCh = bookChMatch ? bookChMatch[1] : null  // "Genesis 3"
+
+        const allParas = [...comm.querySelectorAll('p')]
+
+        // Filter out verse-quote pairs: a paragraph is a quote if an adjacent paragraph
+        // shares its verse number (English + Latin always appear consecutively).
+        const commentaryParas = allParas.filter((p, i) => {
           const text = p.textContent.trim()
-          if (!text || text.length < 10) continue
-          if (!inCommentary && (text.includes(' -- ') || text.includes('['))) {
-            inCommentary = true
-          }
-          if (inCommentary) paragraphs.push(p.innerHTML)
-        }
+          if (text.length < 10) return false
+          const vnum = leadingVerseNum(p)
+          if (!vnum) return true  // non-numbered paragraphs are always commentary
+          const prevNum = i > 0 ? leadingVerseNum(allParas[i - 1]) : null
+          const nextNum = i < allParas.length - 1 ? leadingVerseNum(allParas[i + 1]) : null
+          return prevNum !== vnum && nextNum !== vnum
+        })
 
-        if (paragraphs.length > 0) sections.push({ heading, paragraphs })
+        if (commentaryParas.length === 0) continue
+
+        // Group consecutive paragraphs by their leading verse number.
+        // Paragraphs without a leading verse number continue the previous group.
+        let currentGroup = null
+        for (const p of commentaryParas) {
+          const vnum = leadingVerseNum(p)
+          if (vnum) {
+            if (currentGroup) sections.push(currentGroup)
+            const heading = bookCh ? `${bookCh}:${vnum}` : fullHeading
+            currentGroup = { heading, paragraphs: [p.innerHTML] }
+          } else if (currentGroup) {
+            currentGroup.paragraphs.push(p.innerHTML)
+          } else {
+            currentGroup = { heading: fullHeading, paragraphs: [p.innerHTML] }
+          }
+        }
+        if (currentGroup) sections.push(currentGroup)
       }
       return sections
     },

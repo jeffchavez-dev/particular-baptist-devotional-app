@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.2.1",
   "date": "2026-07-05",
-  "changelog": "Commentary scripture references now show a verse preview modal (same as cross-reference chips) before navigating — tap the reference to preview the verse, then tap 'Go to' to jump there."
+  "changelog": "Calvin commentary now shows per-verse chips instead of one clumped section per chapter. The parser detects implicit verse divisions by identifying verse-quote pairs (English + Latin always adjacent with same number) and groups the remaining commentary by verse number."
 }
