@@ -217,7 +217,7 @@ export const COMMENTARIES = {
     parse: json => {
       let data
       try { data = typeof json === 'string' ? JSON.parse(json) : json } catch { return [] }
-      const verses = data?.chapter?.verses ?? []
+      const verses = data?.chapter?.content ?? []
       return verses
         .filter(v => v.type === 'verse' && Array.isArray(v.content) && v.content.length)
         .map(v => ({
