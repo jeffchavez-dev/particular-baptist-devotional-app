@@ -95,6 +95,64 @@ function parseBibleHubHref(href) {
   return { book, chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) }
 }
 
+// ── Commentary plain-text reference linkifier ────────────────────────────────
+// Maps common abbreviations used by MHC, Calvin, and Gill to app book names.
+const _ABBR_BOOK = {
+  'Gen': 'Genesis', 'Exod': 'Exodus', 'Ex': 'Exodus',
+  'Lev': 'Leviticus', 'Num': 'Numbers', 'Deut': 'Deuteronomy',
+  'Josh': 'Joshua', 'Judg': 'Judges', 'Ruth': 'Ruth',
+  'Sam': 'Samuel', 'Kgs': 'Kings', 'Kings': 'Kings',
+  'Chr': 'Chronicles', 'Chron': 'Chronicles',
+  'Ezra': 'Ezra', 'Neh': 'Nehemiah', 'Est': 'Esther', 'Esth': 'Esther',
+  'Job': 'Job',
+  'Ps': 'Psalms', 'Psalm': 'Psalms', 'Psalms': 'Psalms',
+  'Prov': 'Proverbs', 'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes',
+  'Song': 'Song of Solomon',
+  'Isa': 'Isaiah', 'Jer': 'Jeremiah', 'Lam': 'Lamentations',
+  'Ezek': 'Ezekiel', 'Dan': 'Daniel',
+  'Hos': 'Hosea', 'Joel': 'Joel', 'Amos': 'Amos', 'Obad': 'Obadiah',
+  'Jon': 'Jonah', 'Jonah': 'Jonah', 'Mic': 'Micah', 'Nah': 'Nahum',
+  'Hab': 'Habakkuk', 'Zeph': 'Zephaniah', 'Hag': 'Haggai',
+  'Zech': 'Zechariah', 'Mal': 'Malachi',
+  'Matt': 'Matthew', 'Mat': 'Matthew', 'Mark': 'Mark',
+  'Luke': 'Luke', 'John': 'John', 'Jn': 'John', 'Acts': 'Acts',
+  'Rom': 'Romans', 'Cor': 'Corinthians',
+  'Gal': 'Galatians', 'Eph': 'Ephesians', 'Phil': 'Philippians',
+  'Col': 'Colossians', 'Thess': 'Thessalonians',
+  'Tim': 'Timothy', 'Tit': 'Titus',
+  'Philem': 'Philemon', 'Phile': 'Philemon', 'Phlm': 'Philemon',
+  'Heb': 'Hebrews', 'Jas': 'James', 'Pet': 'Peter',
+  'Jude': 'Jude', 'Rev': 'Revelation',
+}
+const _ABBR_RE = (() => {
+  const keys = Object.keys(_ABBR_BOOK).sort((a, b) => b.length - a.length)
+  const pat = keys.join('|')
+  // Matches: "1 Cor. 1:30", "Rev. 12:9", "Gen. 3:1-5", "Acts 2:24", "1 John 3:16"
+  return new RegExp(`\\b([123]\\s+)?(${pat})\\.?\\s*(\\d+):(\\d+)(?:-\\d+)?\\b`, 'g')
+})()
+
+function _resolveComRef(numStr, abbr, ch, v) {
+  const base = _ABBR_BOOK[abbr]
+  if (!base) return null
+  const n = (numStr || '').trim()
+  const book = n ? `${n} ${base}` : base
+  return { book, chapter: parseInt(ch, 10), verse: parseInt(v, 10) }
+}
+
+// Wrap plain-text scripture references in commentary HTML with in-app nav links.
+// Skips text already inside <a> tags to avoid double-linking.
+function linkifyCommentaryRefs(html) {
+  const parts = html.split(/(<a\b[^>]*>[\s\S]*?<\/a>)/i)
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part // inside existing <a>, skip
+    return part.replace(_ABBR_RE, (match, numStr, abbr, ch, v) => {
+      const ref = _resolveComRef(numStr, abbr, ch, v)
+      if (!ref) return match
+      return `<a data-inapp-ref="${ref.book}|${ref.chapter}|${ref.verse}" style="color:var(--teal);cursor:pointer;text-decoration:underline;">${match}</a>`
+    })
+  }).join('')
+}
+
 async function loadBibleData(version = 'kjv') {
   return await loadBibleVersion(version)
 }
@@ -3508,6 +3566,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       <div style={r.comChipBody} onClick={e => {
                                         const a = e.target.closest('a')
                                         if (!a) return
+                                        // In-app plain-text ref (data-inapp-ref="Book|ch|v")
+                                        const inapp = a.getAttribute('data-inapp-ref')
+                                        if (inapp) {
+                                          e.preventDefault()
+                                          const [book, ch, v] = inapp.split('|')
+                                          navigate(book, parseInt(ch, 10))
+                                          if (v) pendingVerseRef.current = { book, chapter: parseInt(ch, 10), verse: parseInt(v, 10) }
+                                          return
+                                        }
+                                        // BibleHub external link → navigate in-app
                                         const parsed = parseBibleHubHref(a.getAttribute('href'))
                                         if (!parsed) return
                                         e.preventDefault()
@@ -3515,7 +3583,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         if (parsed.verse) pendingVerseRef.current = parsed
                                       }}>
                                         {sec.paragraphs.map((html, pi) => (
-                                          <p key={pi} style={{ ...r.comPara, fontSize: prefs?.sizePx ? prefs.sizePx - 1 : 14 }} dangerouslySetInnerHTML={{ __html: html }} />
+                                          <p key={pi} style={{ ...r.comPara, fontSize: prefs?.sizePx ? prefs.sizePx - 1 : 14 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
                                         ))}
                                       </div>
                                     )}
