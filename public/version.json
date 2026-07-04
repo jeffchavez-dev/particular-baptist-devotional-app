@@ -1,5 +1,5 @@
 {
-  "version": "1.5",
+  "version": "1.6",
   "date": "2026-07-05",
-  "changelog": "Fixed Gill and Calvin commentaries not showing. Gill was reading the wrong JSON key (chapter.verses → chapter.content). Calvin's parser was using the wrong DOM selectors — BibleHub uses div.comm blocks, not bracketed anchor tags."
+  "changelog": "Fixed Gill commentary missing verses (e.g. John 1:1, 1:3). Switched Gill's source from HelloAO (incomplete data) to BibleHub via proxy — now covers all 66 books with no missing verses."
 }

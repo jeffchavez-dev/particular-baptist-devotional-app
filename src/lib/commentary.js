@@ -5,9 +5,8 @@
 
 const CACHE_NAME    = 'pb-commentary-v1'
 const MHC_BASE      = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
-const GILL_BASE     = 'https://bible.helloao.org/api/c/john-gill'
 // BibleHub blocks CORS — route through our own Vercel serverless proxy
-const CALVIN_PROXY  = '/api/commentary'
+const BIBLEHUB_PROXY = '/api/commentary'
 
 // Books Calvin wrote on and their BibleHub URL slugs
 const CALVIN_BOOKS = {
@@ -55,6 +54,76 @@ const CALVIN_BOOKS = {
   '2 Peter':         '2_peter',
   '1 John':          '1_john',
   'Jude':            'jude',
+}
+
+// Gill covers all 66 books — same BibleHub slug pattern as Calvin
+const GILL_BOOKS = {
+  'Genesis':          'genesis',
+  'Exodus':           'exodus',
+  'Leviticus':        'leviticus',
+  'Numbers':          'numbers',
+  'Deuteronomy':      'deuteronomy',
+  'Joshua':           'joshua',
+  'Judges':           'judges',
+  'Ruth':             'ruth',
+  '1 Samuel':         '1_samuel',
+  '2 Samuel':         '2_samuel',
+  '1 Kings':          '1_kings',
+  '2 Kings':          '2_kings',
+  '1 Chronicles':     '1_chronicles',
+  '2 Chronicles':     '2_chronicles',
+  'Ezra':             'ezra',
+  'Nehemiah':         'nehemiah',
+  'Esther':           'esther',
+  'Job':              'job',
+  'Psalms':           'psalms',
+  'Proverbs':         'proverbs',
+  'Ecclesiastes':     'ecclesiastes',
+  'Song of Solomon':  'songs',
+  'Isaiah':           'isaiah',
+  'Jeremiah':         'jeremiah',
+  'Lamentations':     'lamentations',
+  'Ezekiel':          'ezekiel',
+  'Daniel':           'daniel',
+  'Hosea':            'hosea',
+  'Joel':             'joel',
+  'Amos':             'amos',
+  'Obadiah':          'obadiah',
+  'Jonah':            'jonah',
+  'Micah':            'micah',
+  'Nahum':            'nahum',
+  'Habakkuk':         'habakkuk',
+  'Zephaniah':        'zephaniah',
+  'Haggai':           'haggai',
+  'Zechariah':        'zechariah',
+  'Malachi':          'malachi',
+  'Matthew':          'matthew',
+  'Mark':             'mark',
+  'Luke':             'luke',
+  'John':             'john',
+  'Acts':             'acts',
+  'Romans':           'romans',
+  '1 Corinthians':    '1_corinthians',
+  '2 Corinthians':    '2_corinthians',
+  'Galatians':        'galatians',
+  'Ephesians':        'ephesians',
+  'Philippians':      'philippians',
+  'Colossians':       'colossians',
+  '1 Thessalonians':  '1_thessalonians',
+  '2 Thessalonians':  '2_thessalonians',
+  '1 Timothy':        '1_timothy',
+  '2 Timothy':        '2_timothy',
+  'Titus':            'titus',
+  'Philemon':         'philemon',
+  'Hebrews':          'hebrews',
+  'James':            'james',
+  '1 Peter':          '1_peter',
+  '2 Peter':          '2_peter',
+  '1 John':           '1_john',
+  '2 John':           '2_john',
+  '3 John':           '3_john',
+  'Jude':             'jude',
+  'Revelation':       'revelation',
 }
 
 // ── Book → MHC path mapping ──────────────────────────────────────────────────
@@ -167,7 +236,7 @@ export const COMMENTARIES = {
     hasBook: book => !!CALVIN_BOOKS[book],
     getUrl: (book, chapter) => {
       const slug = CALVIN_BOOKS[book]
-      return slug ? `${CALVIN_PROXY}?src=calvin&book=${encodeURIComponent(book)}&chapter=${chapter}` : null
+      return slug ? `${BIBLEHUB_PROXY}?src=calvin&book=${encodeURIComponent(book)}&chapter=${chapter}` : null
     },
     parse: html => {
       const doc = new DOMParser().parseFromString(html, 'text/html')
@@ -209,21 +278,49 @@ export const COMMENTARIES = {
     name:        "Gill's Exposition",
     shortName:   'Gill',
     description: "Exposition of the Entire Bible (1746–1763)",
-    hasBook: book => !!MHC_BOOKS[book],
+    hasBook: book => !!GILL_BOOKS[book],
     getUrl: (book, chapter) => {
-      const b = MHC_BOOKS[book]
-      return b ? `${GILL_BASE}/${b.code}/${chapter}.json` : null
+      const slug = GILL_BOOKS[book]
+      return slug ? `${BIBLEHUB_PROXY}?src=gill&book=${encodeURIComponent(book)}&chapter=${chapter}` : null
     },
-    parse: json => {
-      let data
-      try { data = typeof json === 'string' ? JSON.parse(json) : json } catch { return [] }
-      const verses = data?.chapter?.content ?? []
-      return verses
-        .filter(v => v.type === 'verse' && Array.isArray(v.content) && v.content.length)
-        .map(v => ({
-          heading:    `Verse ${v.number}`,
-          paragraphs: v.content.map(t => String(t)),
-        }))
+    parse: html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const sections = []
+
+      // BibleHub Gill structure (per-verse, flat siblings):
+      //   <div class="versenum"><a href="/john/1-1.htm">John 1:1</a></div>
+      //   <div class="verse">KJV text</div>
+      //   Commentary text (raw text nodes + <a> cross-refs + <p> quotes)
+      //   <div class="versenum"><a href="/john/1-2.htm">John 1:2</a></div>
+      //   ...
+      const versenums = [...doc.querySelectorAll('div.versenum')]
+      versenums.forEach((vn, i) => {
+        const anchor = vn.querySelector('a')
+        if (!anchor) return
+        const heading = anchor.textContent.trim()
+
+        const nextVn = versenums[i + 1] ?? null
+        const htmlParts = []
+        let node = vn.nextSibling
+
+        while (node && node !== nextVn) {
+          const isEl = node.nodeType === 1
+          if (isEl && node.classList.contains('versenum')) break
+          // Skip the KJV verse div
+          if (!isEl || !node.classList.contains('verse')) {
+            const text = (node.textContent || '').trim()
+            if (text.length > 5) {
+              htmlParts.push(isEl ? node.outerHTML : text)
+            }
+          }
+          node = node.nextSibling
+        }
+
+        if (htmlParts.length > 0) {
+          sections.push({ heading, paragraphs: [htmlParts.join(' ')] })
+        }
+      })
+      return sections
     },
   },
 }
