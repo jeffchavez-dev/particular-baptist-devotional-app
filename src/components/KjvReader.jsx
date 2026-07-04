@@ -26,7 +26,7 @@ import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarke
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
 import ShareCardModal from './ShareCardModal'
-import CommentaryPanel from './CommentaryPanel'
+import { getCommentary, COMMENTARIES } from '../lib/commentary'
 import BookCelebration from './BookCelebration'
 import ConfessionModal from './ConfessionModal'
 import StrongsModal from './StrongsModal'
@@ -56,6 +56,17 @@ const _versionDataCache = {}
 
 function bookSlug(name) {
   return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '')
+}
+
+// Parse the first verse number out of a commentary section heading.
+// Handles "Romans 1:1–7", "[Genesis 1:1]", "Verse 3", "Chapter 2:1", etc.
+function extractStartVerse(heading) {
+  if (!heading) return null
+  const colonMatch = heading.match(/:(\d+)/)
+  if (colonMatch) return parseInt(colonMatch[1], 10)
+  const verseMatch = heading.match(/[Vv]erse\s+(\d+)/)
+  if (verseMatch) return parseInt(verseMatch[1], 10)
+  return null
 }
 
 async function loadBibleData(version = 'kjv') {
@@ -798,7 +809,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
   const [colorBarOpen,      setColorBarOpen]      = useState(false)
-  const [commentaryChapter, setCommentaryChapter] = useState(null) // { book, chapter } | null
+
+  /* Inline commentary (study mode) */
+  const [inlineComId,  setInlineComId]  = useState('mhc')
+  const [inlineComData, setInlineComData] = useState({}) // { [segKey]: { sections, loading } }
+  const [inlineComExp, setInlineComExp] = useState({})   // { [secKey]: bool }
+  const inlineComFetchedRef = useRef(new Set())
 
   /* Search — full-Bible mode (inline in toolbar, always visible) */
   const [searchQuery,       setSearchQuery]       = useState('')
@@ -1438,6 +1454,34 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       window.removeEventListener('pb-partial-highlight-changed', onPartialHighlightChanged)
     }
   }, [])
+
+  /* Inline commentary — reset cache when user switches commentary */
+  useEffect(() => {
+    inlineComFetchedRef.current = new Set()
+    setInlineComData({})
+    setInlineComExp({})
+  }, [inlineComId])
+
+  /* Inline commentary — fetch for all visible segments when study mode is on */
+  useEffect(() => {
+    if (!studyMode || !segments.length) return
+    const com = COMMENTARIES[inlineComId]
+    if (!com) return
+    segments.forEach(seg => {
+      const segKey = `${seg.book}|${seg.chapter}`
+      const fetchKey = `${inlineComId}|${segKey}`
+      if (inlineComFetchedRef.current.has(fetchKey)) return
+      inlineComFetchedRef.current.add(fetchKey)
+      setInlineComData(prev => ({ ...prev, [segKey]: { sections: [], loading: true } }))
+      getCommentary(inlineComId, seg.book, seg.chapter).then(result => {
+        const raw = result?.sections ?? []
+        const sections = raw.map(s => ({ ...s, startVerse: extractStartVerse(s.heading) }))
+        setInlineComData(prev => ({ ...prev, [segKey]: { sections, loading: false } }))
+      }).catch(() => {
+        setInlineComData(prev => ({ ...prev, [segKey]: { sections: [], loading: false } }))
+      })
+    })
+  }, [studyMode, inlineComId, segments])
 
   /* Persist position per version */
   useEffect(() => {
@@ -3347,6 +3391,23 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     }
                     {renderScriptureChapterDesc(seg.book, seg.chapter)}
 
+                    {/* ── Commentary selector (study mode) ── */}
+                    {studyMode && _TEXT_VERSIONS.has(version) && seg.book === book && seg.chapter === chapter && (
+                      <div style={r.comSelectorRow}>
+                        <span style={r.comSelectorLabel}>Commentary</span>
+                        {Object.values(COMMENTARIES).map(c => (
+                          <button
+                            key={c.id}
+                            style={{ ...r.comSelectorBtn, ...(inlineComId === c.id ? r.comSelectorBtnActive : {}) }}
+                            onClick={() => setInlineComId(c.id)}
+                            disabled={!c.hasBook(seg.book)}
+                          >
+                            {c.shortName}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div style={r.verseList}>
                       {seg.verses.map(({ verse, text }) => {
                         const verseKey      = `kjv|${seg.book}|${seg.chapter}|${verse}`
@@ -3376,6 +3437,59 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         return (
                           <React.Fragment key={verse}>
                             {renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
+
+                            {/* ── Inline commentary chips (study mode) ── */}
+                            {studyMode && _TEXT_VERSIONS.has(version) && (() => {
+                              const segKey  = `${seg.book}|${seg.chapter}`
+                              const comData = inlineComData[segKey]
+                              const sections = comData?.sections ?? []
+                              const isLoading = comData?.loading
+
+                              // Intro sections (no verse mapping) go above verse 1
+                              const introSects = verse === 1
+                                ? sections.filter(s => s.startVerse == null)
+                                : []
+                              // Sections whose range starts at this verse
+                              const verseSects = sections.filter(s => s.startVerse === verse)
+                              const allSects = [...introSects, ...verseSects]
+
+                              if (isLoading && verse === 1) {
+                                return (
+                                  <div style={r.comLoadingRow}>
+                                    <div style={r.comSpinner} />
+                                    <span style={r.comLoadingText}>Loading {COMMENTARIES[inlineComId]?.shortName}…</span>
+                                  </div>
+                                )
+                              }
+                              if (!allSects.length) return null
+
+                              return allSects.map((sec, si) => {
+                                const secKey = `${segKey}|${si}|${sec.heading}`
+                                const isExp  = !!inlineComExp[secKey]
+                                return (
+                                  <div key={secKey} style={r.comChip}>
+                                    <button
+                                      style={r.comChipHead}
+                                      onClick={() => setInlineComExp(prev => ({ ...prev, [secKey]: !isExp }))}
+                                    >
+                                      <span style={r.comChipSource}>{COMMENTARIES[inlineComId]?.shortName}</span>
+                                      <span style={r.comChipHeading}>{sec.heading}</span>
+                                      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0, marginLeft:'auto', transition:'transform 0.18s', transform: isExp ? 'rotate(180deg)' : 'none' }}>
+                                        <path d="M2.5 4.5L6 8l3.5-3.5" stroke="var(--ink-faint)" strokeWidth="1.4" strokeLinecap="round"/>
+                                      </svg>
+                                    </button>
+                                    {isExp && (
+                                      <div style={r.comChipBody}>
+                                        {sec.paragraphs.map((html, pi) => (
+                                          <p key={pi} style={{ ...r.comPara, fontSize: prefs?.sizePx ? prefs.sizePx - 1 : 14 }} dangerouslySetInnerHTML={{ __html: html }} />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })
+                            })()}
+
                           <div
                             id={verseId(seg.book, seg.chapter, verse)}
                             data-anchor-book={seg.book}
@@ -4037,29 +4151,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       const isDone = !!bibleProgress[chKey]
                       return (
                         <div style={r.chapterReadRow}>
-                          {/* Commentary toggle */}
-                          {_TEXT_VERSIONS.has(version) && (() => {
-                            const isOpen = commentaryChapter?.book === seg.book && commentaryChapter?.chapter === seg.chapter
-                            return (
-                              <button
-                                onClick={() => setCommentaryChapter(isOpen ? null : { book: seg.book, chapter: seg.chapter })}
-                                style={{
-                                  ...r.chapterReadBtn,
-                                  background: isOpen ? 'var(--gold-faint)' : 'transparent',
-                                  borderColor: isOpen ? 'var(--gold)' : 'var(--border-strong)',
-                                  color: isOpen ? 'var(--gold)' : 'var(--ink-faint)',
-                                }}
-                                title="Matthew Henry Commentary"
-                              >
-                                <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                                  <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
-                                  <path d="M4 4.5h6M4 7h6M4 9.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                                </svg>
-                                <span>Commentary</span>
-                              </button>
-                            )
-                          })()}
-
                           <button
                             onClick={() => {
                               const newDone = !isDone
@@ -4105,16 +4196,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                       )
                     })()}
 
-                    {/* ── Commentary panel ── */}
-                    {commentaryChapter?.book === seg.book && commentaryChapter?.chapter === seg.chapter && (
-                      <div style={{ padding: '0 4px 16px' }}>
-                        <CommentaryPanel
-                          book={seg.book}
-                          chapter={seg.chapter}
-                          prefs={prefs}
-                        />
-                      </div>
-                    )}
                   </div>
                 ))}
 
@@ -4746,6 +4827,72 @@ const r = {
     fontSize:12, fontWeight:600,
     fontFamily:"'DM Sans','Helvetica Neue',sans-serif",
     cursor:'pointer', transition:'all 0.15s',
+  },
+
+  /* ── Inline commentary chips ── */
+  comSelectorRow: {
+    display:'flex', alignItems:'center', gap:6,
+    padding:'6px 0 10px', flexWrap:'wrap',
+  },
+  comSelectorLabel: {
+    fontSize:11, fontWeight:600, color:'var(--ink-faint)',
+    fontFamily:"'DM Sans',sans-serif", textTransform:'uppercase',
+    letterSpacing:'0.05em', marginRight:2,
+  },
+  comSelectorBtn: {
+    fontSize:11, fontWeight:600, padding:'3px 10px', borderRadius:99,
+    border:'1px solid var(--border-strong)', background:'transparent',
+    color:'var(--ink-muted)', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", transition:'all 0.12s',
+  },
+  comSelectorBtnActive: {
+    background:'var(--gold-faint)', borderColor:'var(--gold)',
+    color:'var(--gold-dark,#92400e)',
+  },
+  comLoadingRow: {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'6px 2px', opacity:0.6,
+  },
+  comSpinner: {
+    width:12, height:12, borderRadius:'50%',
+    border:'1.5px solid var(--border-strong)',
+    borderTopColor:'var(--gold)',
+    animation:'spin 0.7s linear infinite', flexShrink:0,
+  },
+  comLoadingText: {
+    fontSize:12, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif",
+  },
+  comChip: {
+    borderRadius:6, overflow:'hidden',
+    border:'1px solid var(--border)',
+    borderLeft:'3px solid var(--gold)',
+    marginBottom:4, marginTop:2,
+    background:'var(--parchment)',
+  },
+  comChipHead: {
+    width:'100%', display:'flex', alignItems:'center', gap:6,
+    padding:'6px 10px', background:'none', border:'none',
+    cursor:'pointer', textAlign:'left',
+  },
+  comChipSource: {
+    fontSize:10, fontWeight:700, color:'var(--gold-dark,#92400e)',
+    background:'var(--gold-faint)', borderRadius:99,
+    padding:'1px 6px', flexShrink:0,
+    fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.03em',
+  },
+  comChipHeading: {
+    fontSize:12, fontWeight:600, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", flex:1,
+    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+  },
+  comChipBody: {
+    padding:'8px 12px 10px',
+    borderTop:'1px solid var(--border)',
+    background:'var(--surface)',
+  },
+  comPara: {
+    margin:'0 0 8px', color:'var(--ink)', lineHeight:1.75,
+    fontFamily:"'Georgia',serif",
   },
 
   /* ── Verse outer wrapper ── */
