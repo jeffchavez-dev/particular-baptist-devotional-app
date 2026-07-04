@@ -3,9 +3,58 @@
  * Add new commentaries by extending COMMENTARIES below.
  */
 
-const CACHE_NAME  = 'pb-commentary-v1'
-const MHC_BASE    = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
-const GILL_BASE   = 'https://bible.helloao.org/api/c/john-gill'
+const CACHE_NAME    = 'pb-commentary-v1'
+const MHC_BASE      = 'https://raw.githubusercontent.com/Razzula/public-domain-bible-resources/main/dist/MHC'
+const GILL_BASE     = 'https://bible.helloao.org/api/c/john-gill'
+const CALVIN_BASE   = 'https://biblehub.com/commentaries/calvin'
+
+// Books Calvin wrote on and their BibleHub URL slugs
+const CALVIN_BOOKS = {
+  'Genesis':         'genesis',
+  'Joshua':          'joshua',
+  'Psalms':          'psalms',
+  'Isaiah':          'isaiah',
+  'Jeremiah':        'jeremiah',
+  'Lamentations':    'lamentations',
+  'Ezekiel':         'ezekiel',
+  'Daniel':          'daniel',
+  'Hosea':           'hosea',
+  'Joel':            'joel',
+  'Amos':            'amos',
+  'Obadiah':         'obadiah',
+  'Jonah':           'jonah',
+  'Micah':           'micah',
+  'Nahum':           'nahum',
+  'Habakkuk':        'habakkuk',
+  'Zephaniah':       'zephaniah',
+  'Haggai':          'haggai',
+  'Zechariah':       'zechariah',
+  'Malachi':         'malachi',
+  'Matthew':         'matthew',
+  'Mark':            'mark',
+  'Luke':            'luke',
+  'John':            'john',
+  'Acts':            'acts',
+  'Romans':          'romans',
+  '1 Corinthians':   '1_corinthians',
+  '2 Corinthians':   '2_corinthians',
+  'Galatians':       'galatians',
+  'Ephesians':       'ephesians',
+  'Philippians':     'philippians',
+  'Colossians':      'colossians',
+  '1 Thessalonians': '1_thessalonians',
+  '2 Thessalonians': '2_thessalonians',
+  '1 Timothy':       '1_timothy',
+  '2 Timothy':       '2_timothy',
+  'Titus':           'titus',
+  'Philemon':        'philemon',
+  'Hebrews':         'hebrews',
+  'James':           'james',
+  '1 Peter':         '1_peter',
+  '2 Peter':         '2_peter',
+  '1 John':          '1_john',
+  'Jude':            'jude',
+}
 
 // ── Book → MHC path mapping ──────────────────────────────────────────────────
 const MHC_BOOKS = {
@@ -103,6 +152,39 @@ export const COMMENTARIES = {
           for (const p of el.querySelectorAll('p')) {
             current.paragraphs.push(p.innerHTML)
           }
+        }
+      }
+      if (current) sections.push(current)
+      return sections
+    },
+  },
+  calvin: {
+    id:          'calvin',
+    name:        "Calvin's Commentaries",
+    shortName:   'Calvin',
+    description: 'Commentaries on the Bible (1540s–1560s)',
+    hasBook: book => !!CALVIN_BOOKS[book],
+    getUrl: (book, chapter) => {
+      const slug = CALVIN_BOOKS[book]
+      return slug ? `${CALVIN_BASE}/${slug}/${chapter}.htm` : null
+    },
+    parse: html => {
+      const doc = new DOMParser().parseFromString(html, 'text/html')
+      const sections = []
+      let current = null
+
+      // BibleHub Calvin: verse refs are <a> with text like "[Genesis 1:1]",
+      // commentary follows in sibling/nearby <p> tags — process in DOM order.
+      for (const el of doc.querySelectorAll('a, p')) {
+        if (el.tagName === 'A') {
+          const txt = el.textContent.trim()
+          if (/^\[.+\d+:\d+/.test(txt)) {
+            if (current) sections.push(current)
+            current = { heading: txt.replace(/^\[|\]$/g, ''), paragraphs: [] }
+          }
+        } else if (el.tagName === 'P' && current) {
+          const text = el.textContent.trim()
+          if (text.length > 20) current.paragraphs.push(el.innerHTML)
         }
       }
       if (current) sections.push(current)
