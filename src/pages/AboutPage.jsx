@@ -288,10 +288,25 @@ export default function AboutPage() {
   const [updateCheckMsg,    setUpdateCheckMsg]     = useState(null)   // 'up-to-date' | null
   const [swUpdateReady,     setSwUpdateReady]      = useState(false)  // new SW waiting
 
-  // Check for update: fetch version.json from the network and compare
+  // Check for update: force the SW to re-check, then compare version.json
   const checkForUpdate = useCallback(async () => {
     setCheckingUpdate(true)
     setUpdateCheckMsg(null)
+
+    // 1. Check if a new SW is already waiting (downloaded but not yet active)
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration().catch(() => null)
+      if (reg?.waiting) {
+        setSwUpdateReady(true)
+        setCheckingUpdate(false)
+        return
+      }
+      // 2. Tell the active SW to check the server for a new version now
+      if (reg) {
+        try { await reg.update() } catch {}
+      }
+    }
+
     const data = await fetchRemoteVersion()
     setCheckingUpdate(false)
     if (!data) {
@@ -307,11 +322,21 @@ export default function AboutPage() {
     }
   }, [])
 
-  // Apply update: mark new version installed and reload (new SW is already active)
-  const applyUpdate = useCallback(() => {
+  // Apply update: wake any waiting SW, then reload so the new version is served
+  const applyUpdate = useCallback(async () => {
     if (remoteVersion) {
       setInstalledVersion(remoteVersion.version)
       setInstalledVersionState(remoteVersion.version)
+    }
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration().catch(() => null)
+      if (reg?.waiting) {
+        // Signal the waiting SW to skip its waiting phase and take control
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+        await new Promise(resolve =>
+          navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true })
+        )
+      }
     }
     window.location.reload()
   }, [remoteVersion])

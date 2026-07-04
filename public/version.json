@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
-  "date": "2026-06-01",
-  "changelog": "Fixed Today's Reading not showing active plan, and fixed deleted Bible reading plans reappearing after sync."
+  "version": "1.3",
+  "date": "2026-07-05",
+  "changelog": "Inline commentary (MHC, Gill, Calvin) now appears above verses in study mode. Check for Updates now correctly activates a waiting service worker before reloading."
 }
