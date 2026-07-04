@@ -1,5 +1,5 @@
 {
-  "version": "1.9",
+  "version": "1.1.9",
   "date": "2026-07-05",
-  "changelog": "All commentary scripture references are now tappable links within the app — including plain-text abbreviations like 'Rev. 12:9' and '1 Cor. 1:30' (MHC style), and linked references in Calvin and Gill."
+  "changelog": "All commentary scripture references are now tappable in-app links. Gill commentary now sourced from BibleHub (no missing verses). Confession chip labels shortened. Commentary links navigate within the app."
 }

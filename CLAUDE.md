@@ -84,11 +84,11 @@ Fixed bottom navigation. Auto-hides on scroll down, reappears on scroll up.
 ## Update System (`public/version.json`)
 
 ```json
-{ "version": "1.5", "date": "2026-07-05", "changelog": "..." }
+{ "version": "1.1.9", "date": "2026-07-05", "changelog": "..." }
 ```
 
 - Excluded from SW precache via `globIgnores: ['**/version.json']` in `vite.config.js`
-- **Every commit that changes app behavior must bump `"version"` in `public/version.json`** — increment the minor number (1.4 → 1.5), update `"date"` to today, and write a plain-English `"changelog"` describing what changed. Do this in the same commit as the code change.
+- **Every commit that changes app behavior must bump `"version"` in `public/version.json`** — use semantic versioning `major.minor.patch` (e.g. 1.1.9 → 1.1.10 for a patch, 1.1.9 → 1.2.0 for a minor feature). Update `"date"` to today and write a plain-English `"changelog"` describing what changed. Do this in the same commit as the code change.
 - On next app open the user sees an "Update" button in Settings → App Version with the changelog.
 - `checkForUpdate()` in `AboutPage.jsx` calls `reg.update()` to force the SW to re-fetch, then compares versions.
 - `applyUpdate()` posts `SKIP_WAITING` to any waiting SW, waits for `controllerchange`, then reloads.
