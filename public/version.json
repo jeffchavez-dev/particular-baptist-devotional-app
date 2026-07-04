@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "date": "2026-07-05",
-  "changelog": "Fixed Gill commentary missing verses (e.g. John 1:1, 1:3). Switched Gill's source from HelloAO (incomplete data) to BibleHub via proxy — now covers all 66 books with no missing verses."
+  "changelog": "Shortened confession chip labels — 1LBCF shows article number only (e.g. '2' instead of 'Article 2 — The Trinity'), 2LBCF shows chapter.paragraph (e.g. '4.1' instead of 'Ch. 4 §1')."
 }

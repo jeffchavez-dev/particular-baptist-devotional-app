@@ -31,7 +31,7 @@ function buildIndex() {
     const [ch, par] = key.split('.')
     const entry = {
       src: '2LBCF', key,
-      label: `Ch. ${ch} §${par}`,
+      label: `${ch}.${par}`,
       detail: item.text?.slice(0, 60) + '…',
       text: item.text,
       refs: item.refs,
@@ -46,7 +46,7 @@ function buildIndex() {
     if (!item.refs) continue
     const entry = {
       src: '1LBCF', key: `lbcf1.${num}`,
-      label: `Article ${num}${item.title ? ` — ${item.title}` : ''}`,
+      label: `${num}`,
       detail: item.text?.slice(0, 60) + '…',
       text: item.text,
       refs: item.refs,
