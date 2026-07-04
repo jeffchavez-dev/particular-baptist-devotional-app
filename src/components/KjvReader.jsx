@@ -3566,21 +3566,18 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       <div style={r.comChipBody} onClick={e => {
                                         const a = e.target.closest('a')
                                         if (!a) return
+                                        e.preventDefault()
                                         // In-app plain-text ref (data-inapp-ref="Book|ch|v")
                                         const inapp = a.getAttribute('data-inapp-ref')
                                         if (inapp) {
-                                          e.preventDefault()
                                           const [book, ch, v] = inapp.split('|')
-                                          navigate(book, parseInt(ch, 10))
-                                          if (v) pendingVerseRef.current = { book, chapter: parseInt(ch, 10), verse: parseInt(v, 10) }
+                                          setAuthorRefModal({ ref: { tgt_book: book, tgt_chapter: parseInt(ch, 10), tgt_verse: v ? parseInt(v, 10) : null } })
                                           return
                                         }
-                                        // BibleHub external link → navigate in-app
+                                        // BibleHub external link → show modal
                                         const parsed = parseBibleHubHref(a.getAttribute('href'))
                                         if (!parsed) return
-                                        e.preventDefault()
-                                        navigate(parsed.book, parsed.chapter)
-                                        if (parsed.verse) pendingVerseRef.current = parsed
+                                        setAuthorRefModal({ ref: { tgt_book: parsed.book, tgt_chapter: parsed.chapter, tgt_verse: parsed.verse || null } })
                                       }}>
                                         {sec.paragraphs.map((html, pi) => (
                                           <p key={pi} style={{ ...r.comPara, fontSize: prefs?.sizePx ? prefs.sizePx - 1 : 14 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />

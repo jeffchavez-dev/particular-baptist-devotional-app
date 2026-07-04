@@ -1,5 +1,5 @@
 {
-  "version": "1.1.9",
+  "version": "1.2.0",
   "date": "2026-07-05",
-  "changelog": "All commentary scripture references are now tappable in-app links. Gill commentary now sourced from BibleHub (no missing verses). Confession chip labels shortened. Commentary links navigate within the app."
+  "changelog": "Commentary scripture references now show a verse preview modal (same as cross-reference chips) before navigating — tap the reference to preview the verse, then tap 'Go to' to jump there."
 }
