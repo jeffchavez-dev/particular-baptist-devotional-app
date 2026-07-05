@@ -2149,17 +2149,44 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* ── Partial (two-tap) highlight helpers ── */
   function getWordOffsetInEl(textEl, e) {
-    const sel = window.getSelection()
-    if (!sel) return null
-    // Place cursor at click point then expand to word
-    if (sel.rangeCount > 0) {
-      sel.modify('move', 'backward', 'word')
-      sel.modify('extend', 'forward', 'word')
+    if (!textEl) return null
+    const clientX = e.clientX ?? (e.touches?.[0]?.clientX)
+    const clientY = e.clientY ?? (e.touches?.[0]?.clientY)
+
+    // Get a range at the tap point — caretRangeFromPoint works on Chrome/Android/Safari
+    let range = null
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(clientX, clientY)
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(clientX, clientY)
+      if (pos) {
+        range = document.createRange()
+        range.setStart(pos.offsetNode, pos.offset)
+        range.collapse(true)
+      }
     }
-    const word = sel.toString().trim()
+    if (!range || !textEl.contains(range.startContainer)) return null
+
+    // Expand the collapsed range to the word boundary
+    range.expand?.('word')  // non-standard but works in Safari/Chrome
+    if (range.collapsed || !range.toString().trim()) {
+      // Fallback: manually expand using textContent
+      const node = range.startContainer
+      if (node.nodeType !== Node.TEXT_NODE) return null
+      const txt = node.textContent
+      let s = range.startOffset
+      let f = s
+      const isWordChar = c => /\S/.test(c)
+      while (s > 0 && isWordChar(txt[s - 1])) s--
+      while (f < txt.length && isWordChar(txt[f])) f++
+      if (f === s) return null
+      range.setStart(node, s)
+      range.setEnd(node, f)
+    }
+
+    const word = range.toString().trim()
     if (!word) return null
-    const range = sel.getRangeAt(0)
-    if (!textEl || !textEl.contains(range.startContainer)) return null
+
     const preRange = document.createRange()
     preRange.selectNodeContents(textEl)
     preRange.setEnd(range.startContainer, range.startOffset)
@@ -3656,6 +3683,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
                                       ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
+                                      WebkitUserSelect: 'none',
+                                      userSelect: 'none',
                                     }}
                                     onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
                                   >{(() => {

@@ -1,5 +1,5 @@
 {
-  "version": "1.2.1",
+  "version": "1.2.2",
   "date": "2026-07-05",
-  "changelog": "Calvin commentary now shows per-verse chips instead of one clumped section per chapter. The parser detects implicit verse divisions by identifying verse-quote pairs (English + Latin always adjacent with same number) and groups the remaining commentary by verse number."
+  "changelog": "Fixed partial highlight word-tap not working on Android. Replaced sel.modify() (not supported on Android Chrome) with caretRangeFromPoint, and suppressed native text selection to prevent Android from intercepting taps."
 }
