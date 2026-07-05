@@ -3683,8 +3683,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),
                                       ...(wordSelStart?.verseKey === verseKey ? { cursor: 'crosshair' } : { cursor: 'text' }),
-                                      WebkitUserSelect: 'none',
-                                      userSelect: 'none',
                                     }}
                                     onClick={e => handleVerseTextClick(verseKey, e.currentTarget, e)}
                                   >{(() => {

@@ -1,5 +1,5 @@
 {
-  "version": "1.2.2",
+  "version": "1.2.3",
   "date": "2026-07-05",
-  "changelog": "Fixed partial highlight word-tap not working on Android. Replaced sel.modify() (not supported on Android Chrome) with caretRangeFromPoint, and suppressed native text selection to prevent Android from intercepting taps."
+  "changelog": "Fix partial highlight broken on iPhone X after previous patch. Removed userSelect:none which caused Safari's caretRangeFromPoint to return null for non-selectable elements. The caretRangeFromPoint approach works on all platforms without suppressing selection."
 }
