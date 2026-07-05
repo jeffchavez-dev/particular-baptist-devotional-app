@@ -1,5 +1,5 @@
 {
-  "version": "1.2.4",
+  "version": "1.2.5",
   "date": "2026-07-05",
-  "changelog": "Fix partial highlight word-tap on desktop Mac. caretRangeFromPoint returns an element node on Chrome desktop — now resolves to the actual text node child before expanding to word boundaries."
+  "changelog": "Fixed floating toolbar overflowing on narrow screens. Buttons now wrap to a second line instead of spilling outside the container."
 }
