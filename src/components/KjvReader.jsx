@@ -2153,43 +2153,54 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const clientX = e.clientX ?? (e.touches?.[0]?.clientX)
     const clientY = e.clientY ?? (e.touches?.[0]?.clientY)
 
-    // Get a range at the tap point — caretRangeFromPoint works on Chrome/Android/Safari
-    let range = null
+    // Get a collapsed range at the tap/click point
+    let node = null
+    let offset = 0
     if (document.caretRangeFromPoint) {
-      range = document.caretRangeFromPoint(clientX, clientY)
+      const r = document.caretRangeFromPoint(clientX, clientY)
+      if (!r || !textEl.contains(r.startContainer)) return null
+      node   = r.startContainer
+      offset = r.startOffset
+      // caretRangeFromPoint can return an element node — resolve to the text node inside it
+      if (node.nodeType !== Node.TEXT_NODE) {
+        const child = node.childNodes[offset] ?? node.childNodes[node.childNodes.length - 1]
+        if (!child) return null
+        node   = child.nodeType === Node.TEXT_NODE ? child : (child.firstChild ?? child)
+        offset = node.nodeType === Node.TEXT_NODE ? (node.textContent?.length ?? 0) : 0
+        if (node.nodeType !== Node.TEXT_NODE) return null
+      }
     } else if (document.caretPositionFromPoint) {
       const pos = document.caretPositionFromPoint(clientX, clientY)
-      if (pos) {
-        range = document.createRange()
-        range.setStart(pos.offsetNode, pos.offset)
-        range.collapse(true)
-      }
-    }
-    if (!range || !textEl.contains(range.startContainer)) return null
-
-    // Expand the collapsed range to the word boundary
-    range.expand?.('word')  // non-standard but works in Safari/Chrome
-    if (range.collapsed || !range.toString().trim()) {
-      // Fallback: manually expand using textContent
-      const node = range.startContainer
+      if (!pos || !textEl.contains(pos.offsetNode)) return null
+      node   = pos.offsetNode
+      offset = pos.offset
       if (node.nodeType !== Node.TEXT_NODE) return null
-      const txt = node.textContent
-      let s = range.startOffset
-      let f = s
-      const isWordChar = c => /\S/.test(c)
-      while (s > 0 && isWordChar(txt[s - 1])) s--
-      while (f < txt.length && isWordChar(txt[f])) f++
-      if (f === s) return null
-      range.setStart(node, s)
-      range.setEnd(node, f)
+    } else {
+      return null
     }
+
+    // Expand to word boundaries within the text node
+    const txt = node.textContent ?? ''
+    const isWordChar = c => /\S/.test(c)
+    let s = offset
+    let f = offset
+    // If we landed on whitespace, try one character back
+    if (f >= txt.length || !isWordChar(txt[f])) { s = Math.max(0, s - 1); f = s }
+    if (!isWordChar(txt[s])) return null  // still on whitespace — no word here
+    while (s > 0 && isWordChar(txt[s - 1])) s--
+    while (f < txt.length && isWordChar(txt[f])) f++
+    if (f === s) return null
+
+    const range = document.createRange()
+    range.setStart(node, s)
+    range.setEnd(node, f)
 
     const word = range.toString().trim()
     if (!word) return null
 
     const preRange = document.createRange()
     preRange.selectNodeContents(textEl)
-    preRange.setEnd(range.startContainer, range.startOffset)
+    preRange.setEnd(node, s)
     const start = preRange.toString().length
     const end   = Math.min(start + word.length, textEl.textContent.length)
     window.getSelection()?.removeAllRanges()
