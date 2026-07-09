@@ -1,5 +1,5 @@
 {
-  "version": "1.2.6",
+  "version": "1.2.7",
   "date": "2026-07-09",
-  "changelog": "Desktop reader now uses 80% of the available width after the sidebar instead of being capped at 720px."
+  "changelog": "Commentary text is now a fixed 14px regardless of the reader's font size setting, so it stays secondary to the Bible text."
 }
