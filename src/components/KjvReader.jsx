@@ -2946,7 +2946,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the 220px sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : 220 }} ref={readerRef}>
 
-        <div style={r.content}>
+        <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)' }}>
 
           {/* ══════════════════════════════════════════════
               MORPHOLOGICAL MODE (GREEK NT / HEBREW OT)

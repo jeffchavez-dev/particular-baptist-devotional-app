@@ -1,5 +1,5 @@
 {
-  "version": "1.2.5",
-  "date": "2026-07-05",
-  "changelog": "Fixed floating toolbar overflowing on narrow screens. Buttons now wrap to a second line instead of spilling outside the container."
+  "version": "1.2.6",
+  "date": "2026-07-09",
+  "changelog": "Desktop reader now uses 80% of the available width after the sidebar instead of being capped at 720px."
 }
