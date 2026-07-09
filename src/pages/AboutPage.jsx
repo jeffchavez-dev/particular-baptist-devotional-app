@@ -975,13 +975,15 @@ export default function AboutPage() {
         >
           {/* App intro */}
           <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.8, marginBottom:4}}>
-            A <strong>Particular Baptist study companion</strong> — daily devotional readings through the foundational
-            confessions and catechisms, paired with a full Scripture study suite in KJV, Greek NT, and Hebrew OT.
+            A <strong>Particular Baptist study companion</strong> — walk through the <strong>2nd London Baptist Confession, Keach's Catechism,
+            and 1st London Baptist Confession</strong> in a 365-day plan, with every article anchored to its Scripture proof texts
+            and set alongside the Reformed confessions of the church.
           </p>
           <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.8, marginBottom:20}}>
-            Walk through Reformed doctrine with historical voices, inline commentaries, and personal annotations.
-            Then open the same passage in the original languages, tap any word for morphology and lexicon data,
-            and trace every Strong's number across the whole Bible — all in one app, fully offline-capable.
+            Study each passage with inline commentaries from <strong>Matthew Henry, John Calvin, and John Gill</strong> — three
+            pillars of the Reformed tradition — plus the full KJV, Geneva Bible (1599), Greek NT, and Hebrew OT.
+            Tap any word for morphology and lexicon data, trace every Strong's number across the whole Bible,
+            and annotate with personal highlights and notes — all in one app, fully offline-capable.
           </p>
 
           {/* ── Devotional features ── */}

@@ -1,5 +1,5 @@
 {
-  "version": "1.2.8",
+  "version": "1.2.9",
   "date": "2026-07-09",
-  "changelog": "Updated About page: removed Pastoral Quotes feature, added Geneva Bible (1599) to translations, added Matthew Henry, John Gill, and John Calvin commentary entries."
+  "changelog": "Updated About page intro to highlight the Reformed confessions (2LBCF, Keach's Catechism, 1LBCF) and the three inline commentaries (Matthew Henry, John Calvin, John Gill)."
 }
