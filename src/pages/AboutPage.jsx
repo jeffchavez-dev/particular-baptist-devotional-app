@@ -96,7 +96,6 @@ const CONFESSIONS = [
 const DEVOTIONAL_FEATURES = [
   { title: '365-Day Reading Plan', body: 'Walk through the 2LBCF, Keach\'s Catechism, and 1LBCF in one year — one chapter per day, with Scripture readings assigned for each day.' },
   { title: 'Scripture Proof Texts', body: 'Every article is grounded in Scripture. Tap any proof-text reference to open it in an inline modal — then jump directly to the full reader.' },
-  { title: 'Pastoral Quotes', body: 'Keach, Coxe, Knollys, Owen, Renihan — historical voices illuminate each reading with theological depth alongside the primary confession text.' },
   { title: 'Progress & Streaks', body: 'Mark days complete, build streaks, earn achievements, and sync your progress across devices when signed in.' },
   { title: 'Personal Notes & Highlights', body: 'Write reflections for any devotional day or confession paragraph. Highlight in five colors. Everything syncs to your account.' },
   { title: 'Quiz', body: '"How Particular Baptist are you?" — 37 questions covering Scripture, soteriology, covenant theology, and church history.' },
@@ -104,6 +103,7 @@ const DEVOTIONAL_FEATURES = [
 
 const SCRIPTURE_FEATURES = [
   { title: 'King James Version', body: 'Full KJV Bible with continuous infinite-scroll reading. Tap any word to search it across the whole Bible instantly.' },
+  { title: 'Geneva Bible (1599)', body: 'Read the 1599 Geneva Bible — the translation of the Reformers and the Puritans, predating the KJV. Includes the original marginal notes that shaped Reformed theology for generations.' },
   { title: 'New American Standard Bible 1995 (NASB)', body: 'Full NASB 1995 Bible with continuous reading, search, parallel mode, verse highlighting, notes, and chapter progress tracking — the same full feature set as KJV. The NASB is widely regarded for its literal accuracy and faithfulness to the original languages.' },
   { title: 'Greek New Testament (GNT)', body: 'Read the Translators Amalgamated GNT (TAGNT) word-by-word. Tap any word to see its Robinson morphology, Strong\'s number, gloss, and transliteration.' },
   { title: 'Hebrew Old Testament (HOT)', body: 'Read the TAHOT with full Masoretic pointing and cantillation. Each word displays ETCBC morphology — stem, aspect, person, gender, and number.' },
@@ -114,6 +114,9 @@ const SCRIPTURE_FEATURES = [
   { title: 'Smart Book Sidebar', body: 'The book navigation sidebar always opens to the category and chapter grid for the book you\'re currently reading, with the active chapter highlighted and scrolled into view — making it quick to switch chapters within the same book.' },
   { title: 'Verse Highlighting & Notes', body: 'Highlight individual verses in five colors and attach personal notes. Annotations are stored locally and sync to your account.' },
   { title: 'Offline Ready (PWA)', body: 'Install as a Progressive Web App. All Bible data — KJV, GNT, HOT, and lexicons — caches on first load and reads fully offline thereafter.' },
+  { title: 'Matthew Henry\'s Commentary (MHC)', body: 'The classic verse-by-verse commentary from Matthew Henry (1662–1714), shown inline above each verse in study mode. Covers the entire Bible with pastoral warmth and Reformed precision.' },
+  { title: 'John Gill\'s Exposition', body: 'John Gill\'s exhaustive Exposition of the Bible (1746–1763), a Particular Baptist landmark. Shown per-verse inline in study mode, covering every verse of both Testaments with meticulous exegesis.' },
+  { title: 'John Calvin\'s Commentaries', body: 'Calvin\'s Commentaries displayed per-verse in study mode, drawn from his complete works. Each verse\'s commentary appears as its own chip — the implicit verse divisions in Calvin\'s text are detected and split automatically.' },
 ]
 
 const DATA_SOURCES = [
@@ -976,7 +979,7 @@ export default function AboutPage() {
             confessions and catechisms, paired with a full Scripture study suite in KJV, Greek NT, and Hebrew OT.
           </p>
           <p style={{fontSize:13, color:'var(--ink-muted)', lineHeight:1.8, marginBottom:20}}>
-            Walk through Reformed doctrine with historical voices, pastoral quotes, and personal annotations.
+            Walk through Reformed doctrine with historical voices, inline commentaries, and personal annotations.
             Then open the same passage in the original languages, tap any word for morphology and lexicon data,
             and trace every Strong's number across the whole Bible — all in one app, fully offline-capable.
           </p>

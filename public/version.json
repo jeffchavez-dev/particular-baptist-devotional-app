@@ -1,5 +1,5 @@
 {
-  "version": "1.2.7",
+  "version": "1.2.8",
   "date": "2026-07-09",
-  "changelog": "Commentary text is now a fixed 14px regardless of the reader's font size setting, so it stays secondary to the Bible text."
+  "changelog": "Updated About page: removed Pastoral Quotes feature, added Geneva Bible (1599) to translations, added Matthew Henry, John Gill, and John Calvin commentary entries."
 }
