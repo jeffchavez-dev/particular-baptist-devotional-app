@@ -1,5 +1,5 @@
 {
-  "version": "1.3.8",
+  "version": "1.3.9",
   "date": "2026-07-10",
-  "changelog": "Commentary text now respects the Reading Font Size setting — scales with prefs.sizePx instead of being fixed at 14px."
+  "changelog": "Commentary font size reduced to prefs.sizePx - 10 so it stays compact relative to Bible text."
 }
