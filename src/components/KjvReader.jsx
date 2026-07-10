@@ -827,6 +827,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [error,         setError]         = useState(null)
   const [sideOpen,      setSideOpen]      = useState(false)
 
+  // Allow onboarding overlay to close the sidebar on any device
+  useEffect(() => {
+    function onCloseSidebar() { setSideOpen(false) }
+    window.addEventListener('pb-close-scripture-sidebar', onCloseSidebar)
+    return () => window.removeEventListener('pb-close-scripture-sidebar', onCloseSidebar)
+  }, [])
+
   /* Refs so imperative handle methods always see the latest values without recreating the handle */
   const versionDataRef = useRef(null)
   const dataReadyRef   = useRef(false)
@@ -2837,7 +2844,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         {isMobile && (
           <div style={r.mobileNavHeader}>
             <span style={{ fontSize:13, fontWeight:700 }}>Select Book</span>
-            <button onClick={() => setSideOpen(false)} style={r.closeBtn}>
+            <button onClick={() => setSideOpen(false)} style={r.closeBtn} data-onboarding="scripture-sidebar-close">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
               </svg>
@@ -2847,7 +2854,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
         {/* ── Parallel section ── */}
         {_TEXT_VERSIONS.has(version) && (
-          <div style={sb.parallelSection}>
+          <div style={sb.parallelSection} data-onboarding="parallel-section">
             <div style={sb.versionSectionTitle}>Parallel</div>
             <div style={sb.parallelPills}>
               {[
@@ -3618,7 +3625,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         setAuthorRefModal({ ref: { tgt_book: parsed.book, tgt_chapter: parsed.chapter, tgt_verse: parsed.verse || null } })
                                       }}>
                                         {sec.paragraphs.map((html, pi) => (
-                                          <p key={pi} style={{ ...r.comPara, fontSize: 14 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
+                                          <p key={pi} style={{ ...r.comPara, fontSize: prefs.sizePx - 1 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
                                         ))}
                                       </div>
                                     )}
@@ -3707,7 +3714,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 )}
 
                                 {studyMode && verseRefs.length > 0 && (
-                                  <span style={r.inlineCrossRefs}>
+                                  <span style={r.inlineCrossRefs} {...(verse === 1 ? { 'data-onboarding': 'confession-chips' } : {})}>
                                     {verseRefs.map(ref => {
                                       const chip = SRC_CHIP[ref.src] || {}
                                       return (

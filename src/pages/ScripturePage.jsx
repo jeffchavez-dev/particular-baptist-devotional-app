@@ -86,6 +86,21 @@ export default function ScripturePage() {
   const [authorEditMode, setAuthorEditMode] = useState(false)
   // Study mode: show/hide all notes and cross-reference chips (off by default for clean reading)
   const [studyMode, setStudyMode] = useState(false)
+  // Allow onboarding overlay to enable study mode via custom event
+  useEffect(() => {
+    function onEnableStudy() { setStudyMode(true) }
+    window.addEventListener('pb-enable-study-mode', onEnableStudy)
+    return () => window.removeEventListener('pb-enable-study-mode', onEnableStudy)
+  }, [])
+  // Allow onboarding overlay to reset to KJV so commentary selector is always visible
+  useEffect(() => {
+    function onResetToKjv() {
+      setReadVersion('kjv')
+      try { localStorage.setItem('reader-version', 'kjv') } catch {}
+    }
+    window.addEventListener('pb-reset-version-kjv', onResetToKjv)
+    return () => window.removeEventListener('pb-reset-version-kjv', onResetToKjv)
+  }, [])
   // Ref for search input (avoid autoFocus keyboard-on-load on mobile)
   const searchInputRef = useRef(null)
   useEffect(() => {
@@ -261,6 +276,7 @@ export default function ScripturePage() {
             style={s.readBookPill}
             onClick={() => kjvRef.current?.openSidebar()}
             title="Select book & chapter"
+            data-onboarding="scripture-book-pill"
           >
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
               <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>

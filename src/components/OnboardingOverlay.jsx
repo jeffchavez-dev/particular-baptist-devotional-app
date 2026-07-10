@@ -55,6 +55,11 @@ const STEPS = [
     title:    "Study Mode",
     body:     "Tap the open-book icon to enter Study Mode. This reveals confession cross-reference chips, Bible cross-references, and inline commentary above each verse.",
     position: 'below',
+    // Reset to KJV and enable study mode — both required for commentary selector to appear
+    beforeEnter: () => {
+      window.dispatchEvent(new CustomEvent('pb-reset-version-kjv'))
+      window.dispatchEvent(new CustomEvent('pb-enable-study-mode'))
+    },
   },
   {
     route:    '/scripture',
@@ -62,7 +67,32 @@ const STEPS = [
     title:    "Reformed Commentaries",
     body:     "Choose from Matthew Henry, John Calvin, or John Gill. Commentary appears per-verse as collapsible chips — tap any chip to expand the commentary for that verse.",
     position: 'below',
-    requiresStudyMode: true,
+    beforeEnter: () => {
+      // Close sidebar first, then ensure KJV + study mode for commentary selector to render
+      window.dispatchEvent(new CustomEvent('pb-close-scripture-sidebar'))
+      window.dispatchEvent(new CustomEvent('pb-reset-version-kjv'))
+      window.dispatchEvent(new CustomEvent('pb-enable-study-mode'))
+    },
+    delay: 700,
+  },
+  {
+    route:    '/scripture',
+    selector: '[data-onboarding="confession-chips"]',
+    title:    "Confession & Catechism Links",
+    body:     "In Study Mode, colored chips appear inline — linking each verse to its 2LBCF article, Catechism question, or Orthodox Catechism entry. Tap any chip to read the full article.",
+    position: 'below',
+  },
+  {
+    route:    '/scripture',
+    selector: '[data-onboarding="parallel-section"]',
+    title:    "Parallel Bible",
+    body:     "Open the book picker and tap any version chip under Parallel — ABAB, NASB, BSB, Geneva, GNT, Hebrew OT, LXX — to read two translations side by side.",
+    position: 'right',
+    beforeEnter: () => {
+      const pill = document.querySelector('[data-onboarding="scripture-book-pill"]')
+      pill?.click()
+    },
+    delay: 450,
   },
   {
     route:    '/scripture',
@@ -70,6 +100,9 @@ const STEPS = [
     title:    "Highlight & Take Notes",
     body:     "Tap a verse number to select it. A toolbar appears — choose a highlight color or add a personal note. Tap two words to highlight a phrase instead of the whole verse.",
     position: 'right',
+    beforeEnter: () => {
+      window.dispatchEvent(new CustomEvent('pb-close-scripture-sidebar'))
+    },
   },
   {
     route:    '/library',
@@ -84,6 +117,7 @@ const STEPS = [
     title:    "Theology Quiz",
     body:     '"How Particular Baptist are you?" — 37 questions covering Scripture, soteriology, covenant theology, and church history. A fun way to test your Reformed knowledge.',
     position: 'below',
+    delay: 900,
   },
   {
     route:    '/about',
@@ -91,6 +125,7 @@ const STEPS = [
     title:    "Bible Tracker",
     body:     "See which books and chapters of the Bible you've read. Mark chapters complete manually or let it track automatically as you read.",
     position: 'below',
+    delay: 400,
   },
   {
     route:    '/about',
@@ -98,6 +133,7 @@ const STEPS = [
     title:    "Confession Tracker",
     body:     "Track your progress through each confession and catechism — see which articles you've completed and how far along you are.",
     position: 'below',
+    delay: 400,
   },
   {
     route:    '/about',
@@ -107,8 +143,6 @@ const STEPS = [
   },
 ]
 
-const TOOLTIP_W = 300
-const TOOLTIP_H_EST = 170  // generous estimate; real height measured at render
 const TOOLTIP_PADDING = 16
 const SPOTLIGHT_PAD = 8
 
@@ -116,6 +150,7 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
   const navigate   = useNavigate()
   const [rect, setRect]     = useState(null)
   const [ready, setReady]   = useState(false)
+  const tooltipRef = useRef(null)
   const prevRoute  = useRef(null)
   const current    = STEPS[step]
   const total      = STEPS.length
@@ -137,11 +172,8 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
     prevRoute.current = current.route
 
     if (current.beforeEnter) current.beforeEnter()
-    if (doNavigate) {
-      navigate(current.route)
-    }
+    if (doNavigate) navigate(current.route)
 
-    // Wait for navigation + render, then measure
     const delay = current.delay ?? (doNavigate ? 500 : 120)
     const t = setTimeout(() => {
       const r = current.selector ? resolveTarget() : null
@@ -157,27 +189,40 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
   const vw = window.visualViewport?.width  ?? window.innerWidth
   const vh = window.visualViewport?.height ?? window.innerHeight
 
+  // Responsive tooltip width: on small screens use almost full width
+  const isMobileView = vw < 600
+  const TOOLTIP_W    = isMobileView ? Math.min(320, vw - TOOLTIP_PADDING * 2) : 320
+  // Taller estimate on mobile because text wraps more
+  const TOOLTIP_H_EST = isMobileView ? 200 : 170
+
   // Spotlight box
   const sTop    = rect ? Math.max(0, rect.top    - SPOTLIGHT_PAD) : 0
   const sLeft   = rect ? Math.max(0, rect.left   - SPOTLIGHT_PAD) : 0
   const sWidth  = rect ? rect.width  + SPOTLIGHT_PAD * 2 : 0
   const sHeight = rect ? rect.height + SPOTLIGHT_PAD * 2 : 0
 
-  // Tooltip position — prefer the hint, but flip if it would go off-screen
+  // Tooltip position — prefer the step hint, auto-flip if it doesn't fit
   let tooltipTop, tooltipLeft
   if (!rect) {
+    // No target — center the tooltip
     tooltipTop  = vh / 2 - TOOLTIP_H_EST / 2
     tooltipLeft = vw / 2 - TOOLTIP_W / 2
   } else {
     const spaceBelow = vh - (sTop + sHeight)
     const spaceAbove = sTop
     const spaceRight = vw - (sLeft + sWidth)
+    const spaceLeft  = sLeft
 
     let pos = current.position || 'below'
-    // Auto-flip: if preferred position doesn't fit, use the side with more room
     if (pos === 'below' && spaceBelow < TOOLTIP_H_EST + 24 && spaceAbove > spaceBelow) pos = 'above'
     if (pos === 'above' && spaceAbove < TOOLTIP_H_EST + 24 && spaceBelow > spaceAbove) pos = 'below'
-    if (pos === 'right' && spaceRight < TOOLTIP_W + 24) pos = spaceAbove > spaceBelow ? 'above' : 'below'
+    // On mobile, never use 'right' — stack above/below instead
+    if (pos === 'right') {
+      if (isMobileView || spaceRight < TOOLTIP_W + 24) pos = spaceAbove > spaceBelow ? 'above' : 'below'
+    }
+    if (pos === 'left') {
+      if (isMobileView || spaceLeft < TOOLTIP_W + 24) pos = spaceAbove > spaceBelow ? 'above' : 'below'
+    }
 
     if (pos === 'above') {
       tooltipTop  = sTop - TOOLTIP_H_EST - 12
@@ -185,14 +230,17 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
     } else if (pos === 'right') {
       tooltipTop  = sTop + sHeight / 2 - TOOLTIP_H_EST / 2
       tooltipLeft = sLeft + sWidth + 12
+    } else if (pos === 'left') {
+      tooltipTop  = sTop + sHeight / 2 - TOOLTIP_H_EST / 2
+      tooltipLeft = sLeft - TOOLTIP_W - 12
     } else {
       tooltipTop  = sTop + sHeight + 12
       tooltipLeft = sLeft + sWidth / 2 - TOOLTIP_W / 2
     }
 
-    // Clamp horizontally and vertically within viewport
+    // Clamp within viewport
     tooltipLeft = Math.max(TOOLTIP_PADDING, Math.min(tooltipLeft, vw - TOOLTIP_W - TOOLTIP_PADDING))
-    tooltipTop  = Math.max(TOOLTIP_PADDING, Math.min(tooltipTop, vh - TOOLTIP_H_EST - TOOLTIP_PADDING))
+    tooltipTop  = Math.max(TOOLTIP_PADDING, Math.min(tooltipTop,  vh - TOOLTIP_H_EST - TOOLTIP_PADDING))
   }
 
   const isLast = step === total - 1
@@ -226,38 +274,23 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
 
   return (
     <div style={s.root}>
-      {/* Dark overlay with spotlight cutout via clip-path */}
       {rect ? (
         <svg style={s.svgOverlay} viewBox={`0 0 ${vw} ${vh}`} preserveAspectRatio="none">
           <defs>
             <mask id="spotlight-mask">
               <rect width={vw} height={vh} fill="white" />
-              <rect
-                x={sLeft} y={sTop}
-                width={sWidth} height={sHeight}
-                rx={6} fill="black"
-              />
+              <rect x={sLeft} y={sTop} width={sWidth} height={sHeight} rx={6} fill="black" />
             </mask>
           </defs>
-          <rect
-            width={vw} height={vh}
-            fill="rgba(0,0,0,0.62)"
-            mask="url(#spotlight-mask)"
-          />
-          {/* Spotlight border ring */}
-          <rect
-            x={sLeft} y={sTop}
-            width={sWidth} height={sHeight}
-            rx={6} fill="none"
-            stroke="rgba(255,255,255,0.25)" strokeWidth={1.5}
-          />
+          <rect width={vw} height={vh} fill="rgba(0,0,0,0.62)" mask="url(#spotlight-mask)" />
+          <rect x={sLeft} y={sTop} width={sWidth} height={sHeight} rx={6} fill="none"
+            stroke="rgba(255,255,255,0.25)" strokeWidth={1.5} />
         </svg>
       ) : (
         <div style={s.dimAll} />
       )}
 
-      {/* Tooltip card */}
-      <div style={{ ...s.tooltip, top: tooltipTop, left: tooltipLeft }}>
+      <div ref={tooltipRef} style={{ ...s.tooltip, top: tooltipTop, left: tooltipLeft, width: TOOLTIP_W }}>
         <div style={s.stepPills}>
           {STEPS.map((_, i) => (
             <div key={i} style={{ ...s.pill, ...(i === step ? s.pillActive : i < step ? s.pillDone : {}) }} />
@@ -293,7 +326,6 @@ const s = {
   },
   tooltip: {
     position: 'absolute',
-    width: TOOLTIP_W,
     background: 'var(--surface)',
     borderRadius: 14,
     padding: '16px 18px 14px',
