@@ -11,12 +11,10 @@ import {
   getConfPlanConfig, saveConfPlanConfig, clearConfPlanConfig,
   getConfPlanProgress, saveConfPlanProgress, resetConfPlanProgress,
   getCurrentConfItem, isConfPlanComplete, advanceConfPlan, retreatConfPlan,
-  getConfPlanStats, isTodayConfRestDay, computeConfItems,
+  getConfPlanStats, isTodayConfRestDay, computeConfItems, getConfCompletions,
 } from '../lib/confessionPlan'
-import { getLocalProgress, buildSchedule, getOrthodoxForDay, ORTHODOX_Q_COUNT } from '../lib/supabase'
 import { localDateStr } from '../lib/dateUtils'
 
-const SCHEDULE = buildSchedule()
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
 function fmtDate(iso) {
@@ -34,40 +32,64 @@ const CONF_META = {
   'Orthodox': { label:'Orthodox', fullName:'An Orthodox Catechism',          color:'var(--sky)',        bg:'var(--sky-light)',  border:'rgba(14,116,144,0.25)' },
 }
 
-function useConfessionStats(supabaseProgress) {
+const PLAN_TO_SRC = { '2lbcf': '2LBCF', 'catechism': 'Catechism', '1lbcf': '1LBCF', 'orthodox': 'Orthodox' }
+
+// Pre-compute total item counts per document (fixed document sizes)
+const DOC_TOTALS = {
+  '2LBCF':    computeConfItems('2lbcf').length,
+  'Catechism': computeConfItems('catechism').length,
+  '1LBCF':    computeConfItems('1lbcf').length,
+  'Orthodox': computeConfItems('orthodox').length,
+}
+
+function useConfessionStats() {
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    function onChanged() { setTick(t => t + 1) }
+    window.addEventListener('pb-conf-plan-changed', onChanged)
+    return () => window.removeEventListener('pb-conf-plan-changed', onChanged)
+  }, [])
+
   return useMemo(() => {
-    const completedDays = new Set()
-    if (supabaseProgress) {
-      supabaseProgress.forEach(r => { if (r.completed) completedDays.add(r.day_number) })
-    } else {
-      const local = getLocalProgress()
-      Object.entries(local).forEach(([day, d]) => { if (d.completed) completedDays.add(parseInt(day)) })
-    }
-
-    const stats = {}
-    for (const src of ['2LBCF', 'Catechism', '1LBCF']) {
-      const days = SCHEDULE.filter(e => e.src === src)
-      const done = days.filter(e => completedDays.has(e.day)).length
-      stats[src] = { total: days.length, done, pct: days.length ? Math.round(done / days.length * 100) : 0 }
-    }
-
-    // Orthodox Catechism — always shown; tracked via modular day mapping
-    const covered = new Set()
-    completedDays.forEach(day => covered.add(getOrthodoxForDay(day)))
-    stats['Orthodox'] = {
-      total: ORTHODOX_Q_COUNT,
-      done:  covered.size,
-      pct:   Math.round(covered.size / ORTHODOX_Q_COUNT * 100),
-    }
-
     const activeKeys = ['2LBCF', 'Catechism', '1LBCF', 'Orthodox']
+    const stats = {}
+    for (const src of activeKeys) {
+      stats[src] = { total: DOC_TOTALS[src], done: 0, pct: 0 }
+    }
+
+    const config = getConfPlanConfig()
+    if (config) {
+      const progress = getConfPlanProgress()
+      const currentIndex = progress.currentIndex || 0
+      const items = computeConfItems(config.planId)
+
+      // Count completed items (0..currentIndex-1) per document
+      for (let i = 0; i < Math.min(currentIndex, items.length); i++) {
+        const src = PLAN_TO_SRC[items[i].planId]
+        if (src && stats[src]) stats[src].done++
+      }
+
+      // If the plan has been completed at least once in cyclic mode, cap done at total
+      const completions = getConfCompletions()
+      if (completions.length > 0) {
+        for (const src of activeKeys) {
+          if (stats[src].done < stats[src].total) stats[src].done = stats[src].total
+        }
+      }
+    }
+
+    for (const src of activeKeys) {
+      const s = stats[src]
+      s.pct = s.total ? Math.round(s.done / s.total * 100) : 0
+    }
 
     const complete = activeKeys.filter(k => {
       const s = stats[k]; return s && s.total > 0 && s.done === s.total
     }).length
 
     return { stats, activeKeys, complete }
-  }, [supabaseProgress])
+  }, [tick])
 }
 
 function ConfCard({ src, stats }) {
@@ -467,7 +489,7 @@ export default function ConfessionTrackerSection({ supabaseProgress = null }) {
   const [draftRest,    setDraftRest]    = useState(() => getConfPlanConfig()?.restDays || [])
 
   /* ── Confession tracker stats ── */
-  const { stats: confStats, activeKeys, complete: confComplete } = useConfessionStats(supabaseProgress)
+  const { stats: confStats, activeKeys, complete: confComplete } = useConfessionStats()
 
   /* ── Sync when config changes externally (other tabs, Dashboard retreat, etc.) ── */
   useEffect(() => {
