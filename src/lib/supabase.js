@@ -357,15 +357,25 @@ const USER_DATA_MAP = [
   { local: 'pb-conf-completions',      remote: 'conf_completions' },
 ]
 
+function _getUserDataMeta() {
+  try { return JSON.parse(localStorage.getItem('pb-user-data-meta') || '{}') } catch { return {} }
+}
+
 export async function syncUserDataUp(userId) {
   if (!userId) return { success: false, count: 0 }
   try {
+    const meta = _getUserDataMeta()
     const rows = USER_DATA_MAP.map(({ local, remote }) => {
       const raw = localStorage.getItem(local)
       const val = raw ? JSON.parse(raw) : null
-      // Skip empty objects/arrays
       if (!val || (Array.isArray(val) ? val.length === 0 : Object.keys(val).length === 0)) return null
-      return { user_id: userId, data_key: remote, data_value: val, updated_at: new Date().toISOString() }
+      // Use stored modification time so we don't stamp stale data as "now"
+      return {
+        user_id:    userId,
+        data_key:   remote,
+        data_value: val,
+        updated_at: meta[remote] || new Date().toISOString(),
+      }
     }).filter(Boolean)
 
     if (rows.length) {
@@ -373,7 +383,6 @@ export async function syncUserDataUp(userId) {
     }
     return { success: true, count: rows.length }
   } catch (e) {
-    // Table may not exist yet — degrade gracefully
     console.warn('[syncUserDataUp]', e?.message)
     return { success: true, count: 0 }
   }
@@ -384,26 +393,39 @@ export async function syncUserDataDown(userId) {
   try {
     const { data, error } = await supabase
       .from('pb_user_data')
-      .select('data_key,data_value')
+      .select('data_key,data_value,updated_at')
       .eq('user_id', userId)
 
     if (error || !data?.length) return { success: true, count: 0 }
 
+    const meta = _getUserDataMeta()
     let confPlanChanged = false
-    data.forEach(({ data_key, data_value }) => {
+    let writeCount = 0
+
+    data.forEach(({ data_key, data_value, updated_at: remoteTs }) => {
       const mapping = USER_DATA_MAP.find(k => k.remote === data_key)
-      if (mapping && data_value != null) {
-        try { localStorage.setItem(mapping.local, JSON.stringify(data_value)) } catch {}
-        if (['conf_plan_config', 'conf_plan_progress', 'conf_completions'].includes(data_key)) {
-          confPlanChanged = true
-        }
+      if (!mapping || data_value == null) return
+
+      // Only overwrite local if remote is newer (or local has no timestamp)
+      const localTs = meta[data_key]
+      if (localTs && remoteTs && new Date(remoteTs) <= new Date(localTs)) return
+
+      try { localStorage.setItem(mapping.local, JSON.stringify(data_value)) } catch {}
+      // Record that local now matches remote's timestamp
+      if (remoteTs) meta[data_key] = remoteTs
+      writeCount++
+
+      if (['conf_plan_config', 'conf_plan_progress', 'conf_completions'].includes(data_key)) {
+        confPlanChanged = true
       }
     })
-    // Fire events so Dashboard + ConfessionTrackerSection re-read from localStorage
+
+    try { localStorage.setItem('pb-user-data-meta', JSON.stringify(meta)) } catch {}
+
     if (confPlanChanged) {
       window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
     }
-    return { success: true, count: data.length }
+    return { success: true, count: writeCount }
   } catch (e) {
     console.warn('[syncUserDataDown]', e?.message)
     return { success: true, count: 0 }
@@ -411,22 +433,32 @@ export async function syncUserDataDown(userId) {
 }
 
 /**
- * Full sync: devotional progress, Bible progress, and local-only user data.
- * Books and annotations are synced separately via their own lib functions.
+ * Full sync: devotional progress, Bible progress, user data, and Bible reading plans.
+ * Runs UP passes first, then DOWN, so stale local data never races with newer remote data.
  */
 export async function syncAll(userId) {
   if (!userId) return { success: false, message: 'Not logged in' }
   try {
-    const [devUp, devDown, bibleUp, bibleDown, udUp, udDown] = await Promise.all([
+    // Dynamic import avoids circular dependency (multiPlan imports supabase)
+    const { syncMultiPlansUp, syncMultiPlansDown } = await import('./multiPlan')
+
+    // UP first so we don't overwrite newer remote data with stale local reads
+    const [devUp, bibleUp, udUp, plansUp] = await Promise.all([
       syncProgressUp(userId),
-      syncProgressDown(userId),
       syncBibleUp(userId),
-      syncBibleDown(userId),
       syncUserDataUp(userId),
-      syncUserDataDown(userId),
+      syncMultiPlansUp(userId),
     ])
 
-    const allSuccess = [devUp, devDown, bibleUp, bibleDown, udUp, udDown].every(r => r.success)
+    // DOWN after UP completes
+    const [devDown, bibleDown, udDown, plansDown] = await Promise.all([
+      syncProgressDown(userId),
+      syncBibleDown(userId),
+      syncUserDataDown(userId),
+      syncMultiPlansDown(userId),
+    ])
+
+    const allSuccess = [devUp, devDown, bibleUp, bibleDown, udUp, udDown, plansUp, plansDown].every(r => r.success !== false)
     return {
       success: allSuccess,
       message: allSuccess ? 'Sync complete' : 'Sync completed with some errors',
@@ -434,6 +466,7 @@ export async function syncAll(userId) {
         devotional: (devUp.count || 0) + (devDown.count || 0),
         bible:      (bibleUp.count || 0) + (bibleDown.count || 0),
         userData:   (udUp.count || 0) + (udDown.count || 0),
+        plans:      (plansUp.count || 0) + (plansDown.count || 0),
       },
     }
   } catch (e) {

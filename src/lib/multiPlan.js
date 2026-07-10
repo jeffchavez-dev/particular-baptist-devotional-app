@@ -303,6 +303,9 @@ export async function syncMultiPlansDown(userId) {
     const activePlan = merged.find(p => p.id === activeId)
     if (activePlan) _mirrorToLegacy(activePlan)
 
+    // Notify Dashboard and BibleTrackerSection to re-read plan state
+    window.dispatchEvent(new CustomEvent('pb-plans-changed'))
+
     return { success: true, count: data.length }
   } catch (e) {
     console.warn('[multiPlan] syncDown:', e?.message)

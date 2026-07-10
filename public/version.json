@@ -1,5 +1,5 @@
 {
-  "version": "1.3.13",
+  "version": "1.3.14",
   "date": "2026-07-11",
-  "changelog": "Confession Tracker tab now shows real per-document progress (2LBCF, Catechism, 1LBCF, Orthodox) based on your confession reading plan position, instead of staying at 0."
+  "changelog": "Sync now updates Dashboard Today's Reading and confession progress immediately — Bible reading plan position syncs during manual sync, and newer data from another device no longer gets overwritten by stale local data."
 }

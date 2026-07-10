@@ -24,11 +24,21 @@ const CONF_CONFIG_KEY   = 'pb-conf-plan-config'
 const CONF_PROGRESS_KEY = 'pb-conf-plan-progress'
 export const CONF_COMPLETE_KEY = 'pb-conf-completions'
 
+// Shared timestamp map so sync can tell which device's data is newer
+function _stampUserData(remoteKey) {
+  try {
+    const meta = JSON.parse(localStorage.getItem('pb-user-data-meta') || '{}')
+    meta[remoteKey] = new Date().toISOString()
+    localStorage.setItem('pb-user-data-meta', JSON.stringify(meta))
+  } catch {}
+}
+
 export function getConfPlanConfig() {
   try { return JSON.parse(localStorage.getItem(CONF_CONFIG_KEY) || 'null') } catch { return null }
 }
 export function saveConfPlanConfig(config) {
   try { localStorage.setItem(CONF_CONFIG_KEY, JSON.stringify(config)) } catch {}
+  _stampUserData('conf_plan_config')
   window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
 }
 export function clearConfPlanConfig() {
@@ -43,6 +53,7 @@ export function getConfPlanProgress() {
 }
 export function saveConfPlanProgress(progress) {
   try { localStorage.setItem(CONF_PROGRESS_KEY, JSON.stringify(progress)) } catch {}
+  _stampUserData('conf_plan_progress')
   window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
 }
 export function resetConfPlanProgress() {
@@ -64,6 +75,7 @@ function addConfCompletion(config) {
     completedDate: new Date().toISOString().slice(0, 10),
   })
   try { localStorage.setItem(CONF_COMPLETE_KEY, JSON.stringify(all)) } catch {}
+  _stampUserData('conf_completions')
   return all
 }
 
