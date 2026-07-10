@@ -29,6 +29,14 @@ const STEPS = [
     title:    "Choose a Confession",
     body:     "Select a document from the sidebar to start reading. Each article is cross-referenced with Scripture proof texts shown inline as chips.",
     position: 'below',
+    // On mobile the sidebar is in a drawer — tap the hamburger to open it first
+    beforeEnter: () => {
+      if (window.innerWidth < 768) {
+        const btn = document.querySelector('[data-onboarding="confession-hamburger"]')
+        btn?.click()
+      }
+    },
+    delay: 400,
   },
   {
     route:    '/scripture',
@@ -134,7 +142,7 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
     }
 
     // Wait for navigation + render, then measure
-    const delay = doNavigate ? 500 : 120
+    const delay = current.delay ?? (doNavigate ? 500 : 120)
     const t = setTimeout(() => {
       const r = current.selector ? resolveTarget() : null
       setRect(r)
@@ -145,8 +153,9 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
 
   if (!current || !ready) return null
 
-  const vw = window.innerWidth
-  const vh = window.innerHeight
+  // visualViewport is more accurate on mobile Safari (excludes browser chrome)
+  const vw = window.visualViewport?.width  ?? window.innerWidth
+  const vh = window.visualViewport?.height ?? window.innerHeight
 
   // Spotlight box
   const sTop    = rect ? Math.max(0, rect.top    - SPOTLIGHT_PAD) : 0

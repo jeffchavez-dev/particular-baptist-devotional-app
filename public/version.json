@@ -1,5 +1,5 @@
 {
-  "version": "1.3.3",
+  "version": "1.3.4",
   "date": "2026-07-10",
-  "changelog": "Onboarding tour now ends with a Thomas Watson quote on meditation before closing. 'Reading without meditation is unfruitful; meditation without reading is dangerous.'"
+  "changelog": "Onboarding tour mobile fixes: confession sidebar now opens automatically on mobile before the confession step, added visualViewport for accurate overlay sizing on iOS Safari, and added per-step delay control."
 }

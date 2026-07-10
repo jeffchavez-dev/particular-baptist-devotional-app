@@ -1346,6 +1346,7 @@ export default function ConfessionsPage() {
               style={{gap:5, fontSize:12, padding:'5px 10px', flexShrink:0}}
               aria-label="Open navigation"
               title="Navigation"
+              data-onboarding="confession-hamburger"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="2.5" width="14" height="1.5" rx=".75" fill="currentColor"/>
