@@ -91,6 +91,12 @@ const STEPS = [
     body:     "Track your progress through each confession and catechism — see which articles you've completed and how far along you are.",
     position: 'below',
   },
+  {
+    route:    '/about',
+    selector: null,
+    title:    "You're ready.",
+    quote:    true,
+  },
 ]
 
 const TOOLTIP_W = 300
@@ -130,7 +136,7 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
     // Wait for navigation + render, then measure
     const delay = doNavigate ? 500 : 120
     const t = setTimeout(() => {
-      const r = resolveTarget()
+      const r = current.selector ? resolveTarget() : null
       setRect(r)
       setReady(true)
     }, delay)
@@ -181,6 +187,33 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
   }
 
   const isLast = step === total - 1
+
+  // Quote step — full-screen dim, centered card, no spotlight
+  if (current.quote) {
+    return (
+      <div style={s.root}>
+        <div style={s.dimAll} />
+        <div style={s.quoteCard}>
+          <div style={s.stepPills}>
+            {STEPS.map((_, i) => (
+              <div key={i} style={{ ...s.pill, ...(i === step ? s.pillActive : i < step ? s.pillDone : {}) }} />
+            ))}
+          </div>
+          <div style={s.quoteLabel}>Directions for Meditation</div>
+          <blockquote style={s.quoteText}>
+            "Read before you meditate. 'Give attendance to reading' (1 Tim. 4:13). Then it follows, 'meditate upon these things' (v. 15). Reading doth furnish with matter; it is the oil that feeds the lamp of meditation. Be sure your meditations are founded upon Scripture. Reading without meditation is unfruitful; meditation without reading is dangerous."
+          </blockquote>
+          <div style={s.quoteAttrib}>— Thomas Watson, <em>The Christian on the Mount</em>, 69</div>
+          <div style={{ ...s.actions, marginTop: 20 }}>
+            <div />
+            <button style={s.nextBtn} onClick={() => onNext(total)}>
+              Begin →
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={s.root}>
@@ -291,5 +324,37 @@ const s = {
     border: 'none', borderRadius: 8, cursor: 'pointer',
     fontSize: 13, fontWeight: 600, padding: '7px 16px',
     fontFamily: "'DM Sans', sans-serif",
+  },
+  quoteCard: {
+    position: 'absolute',
+    top: '50%', left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: 'min(480px, calc(100vw - 48px))',
+    background: 'var(--surface)',
+    borderRadius: 18,
+    padding: '28px 32px 24px',
+    boxShadow: '0 12px 48px rgba(0,0,0,0.36)',
+    border: '1px solid var(--border)',
+    fontFamily: "'DM Sans', sans-serif",
+    pointerEvents: 'all',
+    zIndex: 9001,
+  },
+  quoteLabel: {
+    fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+    color: 'var(--teal)', textTransform: 'uppercase',
+    marginBottom: 14, marginTop: 10,
+  },
+  quoteText: {
+    margin: '0 0 14px',
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    fontSize: 17, lineHeight: 1.75,
+    color: 'var(--ink)',
+    fontStyle: 'italic',
+    borderLeft: '3px solid var(--gold)',
+    paddingLeft: 16,
+  },
+  quoteAttrib: {
+    fontSize: 12, color: 'var(--ink-muted)',
+    textAlign: 'right',
   },
 }
