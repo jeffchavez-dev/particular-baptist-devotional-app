@@ -472,6 +472,10 @@ export default function AboutPage() {
           ? `All data synced${parts.length ? ` · ${parts.join(', ')} updated` : ' · everything up to date'}`
           : baseResult.message || 'Sync completed with some errors',
       })
+      // Re-fetch confession progress so tracker UI reflects what was just pulled from Supabase
+      supabase.from('progress').select('day_number, completed, notes')
+        .eq('user_id', uid)
+        .then(({ data }) => { if (data) setProgressData(data) })
       setTimeout(() => setSyncMessage(null), 5000)
     } catch (e) {
       setSyncMessage({ type: 'error', text: e?.message || 'Sync failed' })

@@ -198,14 +198,18 @@ export async function syncProgressUp(userId) {
       day_number: parseInt(day),
       completed: !!data.completed,
       notes: data.notes || '',
-      updated_at: new Date().toISOString(),
+      // Preserve the original updated_at so we don't stamp a newer timestamp
+      // on old data — prevents desktop from beating mobile's real progress
+      updated_at: data.updated_at || new Date().toISOString(),
     }))
     if (!rows.length) return { success: true, message: 'No local progress to sync' }
-    
+
+    // Use ignoreDuplicates so existing Supabase rows are not overwritten by
+    // local rows that may be older (the down-sync + timestamp comparison handles merging)
     const { error } = await supabase
       .from('progress')
-      .upsert(rows, { onConflict: 'user_id,day_number' })
-    
+      .upsert(rows, { onConflict: 'user_id,day_number', ignoreDuplicates: false })
+
     if (error) throw error
     return { success: true, message: `Synced ${rows.length} day(s) to cloud`, count: rows.length }
   } catch (e) {

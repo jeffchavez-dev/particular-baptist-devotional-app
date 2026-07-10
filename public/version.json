@@ -1,5 +1,5 @@
 {
-  "version": "1.3.10",
+  "version": "1.3.11",
   "date": "2026-07-10",
-  "changelog": "Settings page now syncs Bible chapter progress and confession progress from Supabase on every open, so mobile and desktop trackers stay in sync."
+  "changelog": "Sync fixes: preserve original updated_at on push so desktop can't overwrite newer mobile data; re-fetch confession progress after Sync Now so tracker updates immediately without a page reload."
 }
