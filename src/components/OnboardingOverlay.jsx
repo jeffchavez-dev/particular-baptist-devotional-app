@@ -90,6 +90,7 @@ const STEPS = [
 ]
 
 const TOOLTIP_W = 300
+const TOOLTIP_H_EST = 170  // generous estimate; real height measured at render
 const TOOLTIP_PADDING = 16
 const SPOTLIGHT_PAD = 8
 
@@ -142,26 +143,36 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
   const sWidth  = rect ? rect.width  + SPOTLIGHT_PAD * 2 : 0
   const sHeight = rect ? rect.height + SPOTLIGHT_PAD * 2 : 0
 
-  // Tooltip position
+  // Tooltip position — prefer the hint, but flip if it would go off-screen
   let tooltipTop, tooltipLeft
   if (!rect) {
-    tooltipTop  = vh / 2 - 80
+    tooltipTop  = vh / 2 - TOOLTIP_H_EST / 2
     tooltipLeft = vw / 2 - TOOLTIP_W / 2
   } else {
-    const pos = current.position || 'below'
+    const spaceBelow = vh - (sTop + sHeight)
+    const spaceAbove = sTop
+    const spaceRight = vw - (sLeft + sWidth)
+
+    let pos = current.position || 'below'
+    // Auto-flip: if preferred position doesn't fit, use the side with more room
+    if (pos === 'below' && spaceBelow < TOOLTIP_H_EST + 24 && spaceAbove > spaceBelow) pos = 'above'
+    if (pos === 'above' && spaceAbove < TOOLTIP_H_EST + 24 && spaceBelow > spaceAbove) pos = 'below'
+    if (pos === 'right' && spaceRight < TOOLTIP_W + 24) pos = spaceAbove > spaceBelow ? 'above' : 'below'
+
     if (pos === 'above') {
-      tooltipTop  = sTop - 12 - 140  // estimated tooltip height
+      tooltipTop  = sTop - TOOLTIP_H_EST - 12
       tooltipLeft = sLeft + sWidth / 2 - TOOLTIP_W / 2
     } else if (pos === 'right') {
-      tooltipTop  = sTop + sHeight / 2 - 70
+      tooltipTop  = sTop + sHeight / 2 - TOOLTIP_H_EST / 2
       tooltipLeft = sLeft + sWidth + 12
     } else {
       tooltipTop  = sTop + sHeight + 12
       tooltipLeft = sLeft + sWidth / 2 - TOOLTIP_W / 2
     }
-    // Clamp within viewport
+
+    // Clamp horizontally and vertically within viewport
     tooltipLeft = Math.max(TOOLTIP_PADDING, Math.min(tooltipLeft, vw - TOOLTIP_W - TOOLTIP_PADDING))
-    tooltipTop  = Math.max(TOOLTIP_PADDING, tooltipTop)
+    tooltipTop  = Math.max(TOOLTIP_PADDING, Math.min(tooltipTop, vh - TOOLTIP_H_EST - TOOLTIP_PADDING))
   }
 
   const isLast = step === total - 1
