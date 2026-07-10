@@ -36,6 +36,10 @@ const STEPS = [
     title:    "Scripture Tab",
     body:     "The full Bible reader — KJV, Geneva Bible (1599), Greek NT, Hebrew OT, and LXX. Read continuously across chapters with infinite scroll.",
     position: 'above',
+    // Ensure KJV is pre-selected so the version picker doesn't block the reader
+    beforeEnter: () => {
+      try { if (!localStorage.getItem('pb-default-version')) localStorage.setItem('pb-default-version', 'kjv') } catch {}
+    },
   },
   {
     route:    '/scripture',
@@ -118,6 +122,7 @@ export default function OnboardingOverlay({ step, onNext, onSkip }) {
     const doNavigate = current.route !== prevRoute.current
     prevRoute.current = current.route
 
+    if (current.beforeEnter) current.beforeEnter()
     if (doNavigate) {
       navigate(current.route)
     }

@@ -1,5 +1,5 @@
 {
-  "version": "1.3.1",
+  "version": "1.3.2",
   "date": "2026-07-10",
-  "changelog": "Fixed onboarding tooltip going off-screen on desktop. Tooltip now auto-flips above/below the spotlight based on available space and is clamped within the viewport so the Next button is always visible."
+  "changelog": "Fixed onboarding tour getting stuck on the version picker screen when navigating to Scripture. KJV is now pre-selected before entering Scripture steps so the reader loads directly."
 }
