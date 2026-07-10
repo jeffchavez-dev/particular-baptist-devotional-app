@@ -351,6 +351,10 @@ const USER_DATA_MAP = [
   { local: 'pb-bookmarks',             remote: 'bookmarks' },
   { local: 'pb-scripture-bookmarks',   remote: 'scripture_bookmarks' },
   { local: 'pb-scripture-completions', remote: 'scripture_completions' },
+  // Confession reading plan — position + config + completions
+  { local: 'pb-conf-plan-config',      remote: 'conf_plan_config' },
+  { local: 'pb-conf-plan-progress',    remote: 'conf_plan_progress' },
+  { local: 'pb-conf-completions',      remote: 'conf_completions' },
 ]
 
 export async function syncUserDataUp(userId) {
@@ -385,12 +389,20 @@ export async function syncUserDataDown(userId) {
 
     if (error || !data?.length) return { success: true, count: 0 }
 
+    let confPlanChanged = false
     data.forEach(({ data_key, data_value }) => {
       const mapping = USER_DATA_MAP.find(k => k.remote === data_key)
       if (mapping && data_value != null) {
         try { localStorage.setItem(mapping.local, JSON.stringify(data_value)) } catch {}
+        if (['conf_plan_config', 'conf_plan_progress', 'conf_completions'].includes(data_key)) {
+          confPlanChanged = true
+        }
       }
     })
+    // Fire events so Dashboard + ConfessionTrackerSection re-read from localStorage
+    if (confPlanChanged) {
+      window.dispatchEvent(new CustomEvent('pb-conf-plan-changed'))
+    }
     return { success: true, count: data.length }
   } catch (e) {
     console.warn('[syncUserDataDown]', e?.message)

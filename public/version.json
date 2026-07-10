@@ -1,5 +1,5 @@
 {
-  "version": "1.3.11",
+  "version": "1.3.12",
   "date": "2026-07-10",
-  "changelog": "Sync fixes: preserve original updated_at on push so desktop can't overwrite newer mobile data; re-fetch confession progress after Sync Now so tracker updates immediately without a page reload."
+  "changelog": "Sync now covers confession reading plan position, config, and completions (pb-conf-plan-*) — these were never synced before, causing Dashboard and Confession Tracker to stay stale on desktop after mobile progress."
 }
