@@ -4,6 +4,7 @@ import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
+import { useOnboardingCtx } from '../App'
 import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
 import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
@@ -220,6 +221,7 @@ export default function AboutPage() {
   const { session } = useAuth()
   const { dark, toggleDark } = useTheme()
   const { prefs, updatePrefs } = usePrefs()
+  const { startTour } = useOnboardingCtx()
 
   const [defaultVersion, setDefaultVersion] = useState(() => getDefaultReaderVersion())
 
@@ -857,6 +859,21 @@ export default function AboutPage() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* App Tour */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>App Tour</span>
+                <span style={s.settingHint}>Replay the guided walkthrough of the main features</span>
+              </div>
+              <button
+                onClick={startTour}
+                className="btn btn-outline"
+                style={{ fontSize:13, flexShrink:0 }}
+              >
+                Take Tour
+              </button>
             </div>
 
             {/* Reset */}

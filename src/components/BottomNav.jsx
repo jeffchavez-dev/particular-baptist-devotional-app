@@ -159,6 +159,7 @@ export default function BottomNav() {
               title={tab.label}
               aria-label={tab.label}
               aria-current={isActive ? 'page' : undefined}
+              data-onboarding={`nav-${tab.path.replace('/', '') || 'home'}`}
             >
               <span style={n.icon}>{tab.icon(isActive)}</span>
               {isActive && <span style={n.indicator} />}

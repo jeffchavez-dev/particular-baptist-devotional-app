@@ -374,6 +374,7 @@ export default function ScripturePage() {
             onClick={() => setStudyMode(m => !m)}
             aria-label={studyMode ? 'Hide notes & references' : 'Show notes & references'}
             title={studyMode ? 'Hide notes & references' : 'Show notes & references'}
+            data-onboarding="study-mode-btn"
           >
             {/* Open book icon */}
             <svg width="17" height="17" viewBox="0 0 17 17" fill="none">

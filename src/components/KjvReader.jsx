@@ -3515,7 +3515,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                     {/* ── Commentary selector (study mode) ── */}
                     {studyMode && _TEXT_VERSIONS.has(version) && seg.book === book && seg.chapter === chapter && (
-                      <div style={r.comSelectorRow}>
+                      <div style={r.comSelectorRow} data-onboarding="commentary-selector">
                         <span style={r.comSelectorLabel}>Commentary</span>
                         {Object.values(COMMENTARIES).map(c => (
                           <button
@@ -3646,6 +3646,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
+                                {...(verse === 1 ? { 'data-onboarding': 'verse-number' } : {})}
                               >
                                 {verse}
                               </span>

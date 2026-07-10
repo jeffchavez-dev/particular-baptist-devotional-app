@@ -1,5 +1,5 @@
 {
-  "version": "1.2.9",
+  "version": "1.3.0",
   "date": "2026-07-09",
-  "changelog": "Updated About page intro to highlight the Reformed confessions (2LBCF, Keach's Catechism, 1LBCF) and the three inline commentaries (Matthew Henry, John Calvin, John Gill)."
+  "changelog": "New feature: interactive onboarding tour. First-time users get a 12-step guided walkthrough covering the home page, confessions, Bible reader, study mode, commentaries, highlights, library, quiz, and settings trackers. Replay anytime from Settings → App Tour."
 }

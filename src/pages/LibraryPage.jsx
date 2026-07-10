@@ -4152,7 +4152,7 @@ export default function LibraryPage() {
             </>
           )}
         </div>
-        <div style={{ ...s.tabBar, ...(isEditingNote ? { display: 'none' } : {}) }}>
+        <div style={{ ...s.tabBar, ...(isEditingNote ? { display: 'none' } : {}) }} data-onboarding="library-tabs">
           {TABS.map(tab => (
             <button
               key={tab.id}

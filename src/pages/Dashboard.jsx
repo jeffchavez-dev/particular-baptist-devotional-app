@@ -309,7 +309,7 @@ export default function Dashboard() {
         {/* ════════════════════════════════════════
             TODAY'S READING header
             ════════════════════════════════════════ */}
-        <div style={s.todayHeader}>
+        <div style={s.todayHeader} data-onboarding="home-header">
           <span style={s.todayHeaderLabel}>Today&apos;s Reading</span>
           <span style={s.todayHeaderDate}>{new Date().toLocaleDateString(undefined, { weekday:'short', month:'long', day:'numeric' })}</span>
         </div>
@@ -388,7 +388,7 @@ export default function Dashboard() {
         {/* ════════════════════════════════════════
             CONFESSION / CATECHISM section
             ════════════════════════════════════════ */}
-        <div style={s.section}>
+        <div style={s.section} data-onboarding="home-confession-card">
           <div style={s.sectionHeader}>
             <span style={s.sectionIcon}>📜</span>
             <span style={s.sectionTitle}>Confession &amp; Catechism</span>

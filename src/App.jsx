@@ -17,6 +17,11 @@ import LibraryPage from './pages/LibraryPage'
 import SharedNotePage from './pages/SharedNotePage'
 import BottomNav from './components/BottomNav'
 import SplashScreen from './components/SplashScreen'
+import OnboardingOverlay from './components/OnboardingOverlay'
+import { useOnboarding } from './hooks/useOnboarding'
+
+export const OnboardingContext = createContext({ startTour: () => {} })
+export const useOnboardingCtx  = () => useContext(OnboardingContext)
 
 export const AuthContext  = createContext(null)
 export const useAuth      = () => useContext(AuthContext)
@@ -31,6 +36,7 @@ export default function App() {
   const [session, setSession] = useState(undefined)
   const prevUser = useRef(null)
   const [showSplash, setShowSplash] = useState(true)
+  const { active: tourActive, step: tourStep, start: startTour, next: tourNext, skip: tourSkip } = useOnboarding()
 
   /* ── Migrate old single-plan → multi-plan on first load ── */
   /* ── Then ensure the legacy keys match the active plan     ── */
@@ -157,6 +163,7 @@ export default function App() {
     <ThemeContext.Provider value={{ dark, toggleDark }}>
       <PrefsContext.Provider value={{ prefs, updatePrefs }}>
         <AuthContext.Provider value={{ session }}>
+        <OnboardingContext.Provider value={{ startTour }}>
           {/* Public shared-note route — no splash, no nav, no offline banner */}
           <Routes>
             <Route path="/share/note/:token" element={<SharedNotePage />} />
@@ -192,6 +199,10 @@ export default function App() {
               </>
             } />
           </Routes>
+          {tourActive && !showSplash && (
+            <OnboardingOverlay step={tourStep} onNext={tourNext} onSkip={tourSkip} />
+          )}
+        </OnboardingContext.Provider>
         </AuthContext.Provider>
       </PrefsContext.Provider>
     </ThemeContext.Provider>

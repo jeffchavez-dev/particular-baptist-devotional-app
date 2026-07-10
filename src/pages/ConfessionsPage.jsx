@@ -1230,7 +1230,7 @@ export default function ConfessionsPage() {
   /* ── Sidebar content ── */
   const SidebarContent = (
     <div style={s.sidebarContent}>
-      <div style={s.confSelector}>
+      <div style={s.confSelector} data-onboarding="confession-list">
         <div style={s.confSelectorLabel}>Browse</div>
         {Object.entries(SOURCES).map(([key, info]) => (
           <button
