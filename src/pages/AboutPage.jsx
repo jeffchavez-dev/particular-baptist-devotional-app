@@ -6,7 +6,7 @@ import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { useOnboardingCtx } from '../App'
 import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
-import { supabase, getLocalProgress, syncAll } from '../lib/supabase'
+import { supabase, getLocalProgress, syncAll, syncBibleProgressDown } from '../lib/supabase'
 import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
 import { syncMultiPlansUp, syncMultiPlansDown } from '../lib/multiPlan'
 import ExportModal from '../components/ExportModal'
@@ -380,9 +380,13 @@ export default function AboutPage() {
 
   useEffect(() => {
     if (!session) return
+    const uid = session.user.id
+    // Pull latest confession progress from Supabase every time Settings opens
     supabase.from('progress').select('day_number, completed, notes')
-      .eq('user_id', session.user.id)
+      .eq('user_id', uid)
       .then(({ data }) => setProgressData(data || []))
+    // Pull latest Bible chapter progress so tracker matches other devices
+    syncBibleProgressDown(uid)
   }, [session])
 
   const handleReset = useCallback(async () => {
