@@ -1,5 +1,5 @@
 {
-  "version": "1.4.3",
+  "version": "1.4.4",
   "date": "2026-07-11",
-  "changelog": "Cebuano Bible (CEBug) now fully integrated — available in the version switcher, parallel mode, and documented in the About section. All Bible features (highlights, notes, search, chapter tracking) work with it."
+  "changelog": "Fixed Cebuano (CEBug) not appearing in version picker — also added it to the default version allowlist so it saves correctly when selected."
 }
