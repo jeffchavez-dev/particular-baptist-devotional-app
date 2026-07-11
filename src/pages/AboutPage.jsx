@@ -104,6 +104,7 @@ const DEVOTIONAL_FEATURES = [
 
 const SCRIPTURE_FEATURES = [
   { title: 'King James Version', body: 'Full KJV Bible with continuous infinite-scroll reading. Tap any word to search it across the whole Bible instantly.' },
+  { title: 'Cebuano Ang Biblia (CEBug)', body: 'Full Cebuano Bible — the Bugna/Pinadayag translation (1917, public domain), also called the Cebuano King James Version for its closeness to the KJV text. All 66 books with full verse highlighting, notes, search, parallel mode, and chapter progress tracking.' },
   { title: 'Geneva Bible (1599)', body: 'Read the 1599 Geneva Bible — the translation of the Reformers and the Puritans, predating the KJV. Includes the original marginal notes that shaped Reformed theology for generations.' },
   { title: 'New American Standard Bible 1995 (NASB)', body: 'Full NASB 1995 Bible with continuous reading, search, parallel mode, verse highlighting, notes, and chapter progress tracking — the same full feature set as KJV. The NASB is widely regarded for its literal accuracy and faithfulness to the original languages.' },
   { title: 'Greek New Testament (GNT)', body: 'Read the Translators Amalgamated GNT (TAGNT) word-by-word. Tap any word to see its Robinson morphology, Strong\'s number, gloss, and transliteration.' },
@@ -143,6 +144,12 @@ const DATA_SOURCES = [
     name: 'King James Version (KJV)',
     href: 'https://github.com/christos-c/bible-corpus',
     desc: 'Public domain KJV text used for the Scripture reader and all proof-text references throughout the devotional.',
+    badge: 'Public Domain',
+  },
+  {
+    name: 'Cebuano Ang Biblia — Bugna/Pinadayag (1917)',
+    href: 'https://github.com/scrollmapper/bible_databases',
+    desc: 'Public domain Cebuano Bible (Bugna/Pinadayag, 1917) via scrollmapper/bible_databases. All 66 books in verse-level JSON format.',
     badge: 'Public Domain',
   },
   {

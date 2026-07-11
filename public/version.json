@@ -1,5 +1,5 @@
 {
-  "version": "1.4.2",
+  "version": "1.4.3",
   "date": "2026-07-11",
-  "changelog": "Cebuano Bible added — Ang Biblia (Cebuano Pinadayag/Bugna, 1917, public domain). Select 'CEBug' in the version switcher in the Scripture reader."
+  "changelog": "Cebuano Bible (CEBug) now fully integrated — available in the version switcher, parallel mode, and documented in the About section. All Bible features (highlights, notes, search, chapter tracking) work with it."
 }

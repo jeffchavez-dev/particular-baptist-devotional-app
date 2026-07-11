@@ -1059,7 +1059,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
   // Which text-version parallel is selected (if any) — supports all English text translations
-  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'nasb', 'bsb', 'gnv', 'rv'])
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'ceb', 'nasb', 'bsb', 'gnv', 'rv'])
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
@@ -2862,12 +2862,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             <div style={sb.parallelPills}>
               {[
                 ...[
-                  { id: 'kjv',  label: 'KJV',  title: 'King James Version' },
-                  { id: 'abab', label: 'ABAB', title: 'Ang Bagong Ang Biblia' },
-                  { id: 'nasb', label: 'NASB', title: 'New American Standard Bible 1995' },
-                  { id: 'bsb',  label: 'BSB',  title: 'Berean Standard Bible' },
-                  { id: 'gnv',  label: 'GNV',  title: 'Geneva Bible (1599)' },
-                  { id: 'rv',   label: 'RV',   title: 'Revised Version (1895)' },
+                  { id: 'kjv',  label: 'KJV',   title: 'King James Version' },
+                  { id: 'abab', label: 'ABAB',  title: 'Ang Bagong Ang Biblia' },
+                  { id: 'ceb',  label: 'CEBug', title: 'Cebuano Ang Biblia (Bugna/Pinadayag)' },
+                  { id: 'nasb', label: 'NASB',  title: 'New American Standard Bible 1995' },
+                  { id: 'bsb',  label: 'BSB',   title: 'Berean Standard Bible' },
+                  { id: 'gnv',  label: 'GNV',   title: 'Geneva Bible (1599)' },
+                  { id: 'rv',   label: 'RV',    title: 'Revised Version (1895)' },
                 ].filter(v => v.id !== version),
                 { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
                 { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
