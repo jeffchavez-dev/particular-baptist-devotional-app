@@ -6,6 +6,7 @@ import { getTodayDayNum } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion } from '../lib/readerPrefs'
+import { getStudySession, setStudySession } from '../lib/studySession'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS, BOOK_ABBR } from '../lib/bibleBooks'
 import { addSearchHistory, getSearchHistory, clearSearchHistory, isScriptureBookmarked, toggleScriptureBookmark } from '../lib/annotations'
@@ -85,7 +86,8 @@ export default function ScripturePage() {
   const isAuthorUser = isAuthor(session)
   const [authorEditMode, setAuthorEditMode] = useState(false)
   // Study mode: show/hide all notes and cross-reference chips (off by default for clean reading)
-  const [studyMode, setStudyMode] = useState(false)
+  const [studyMode, setStudyMode] = useState(() => getStudySession().studyMode)
+  useEffect(() => { setStudySession({ studyMode }) }, [studyMode])
   // Allow onboarding overlay to enable study mode via custom event
   useEffect(() => {
     function onEnableStudy() { setStudyMode(true) }

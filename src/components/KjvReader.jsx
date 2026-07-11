@@ -50,6 +50,7 @@ import {
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
+import { getStudySession, setStudySession } from '../lib/studySession'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -902,10 +903,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [colorBarOpen,      setColorBarOpen]      = useState(false)
 
   /* Inline commentary (study mode) */
-  const [inlineComId,  setInlineComId]  = useState('mhc')
+  const [inlineComId,  setInlineComId]  = useState(() => getStudySession().inlineComId || 'mhc')
   const [inlineComData, setInlineComData] = useState({}) // { [segKey]: { sections, loading } }
-  const [inlineComExp, setInlineComExp] = useState({})   // { [secKey]: bool }
+  const [inlineComExp, setInlineComExp] = useState(() => getStudySession().inlineComExp || {})   // { [secKey]: bool }
   const inlineComFetchedRef = useRef(new Set())
+  useEffect(() => { setStudySession({ inlineComId }) }, [inlineComId])
+  useEffect(() => { setStudySession({ inlineComExp }) }, [inlineComExp])
 
   /* Search — full-Bible mode (inline in toolbar, always visible) */
   const [searchQuery,       setSearchQuery]       = useState('')

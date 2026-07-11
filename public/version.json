@@ -1,5 +1,5 @@
 {
-  "version": "1.3.14",
+  "version": "1.4.1",
   "date": "2026-07-11",
-  "changelog": "Sync now updates Dashboard Today's Reading and confession progress immediately — Bible reading plan position syncs during manual sync, and newer data from another device no longer gets overwritten by stale local data."
+  "changelog": "Study mode now stays on when you switch tabs — come back to Scripture and your commentary and expanded sections are exactly as you left them."
 }
