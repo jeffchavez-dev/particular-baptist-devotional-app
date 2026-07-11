@@ -31,6 +31,15 @@ export const BIBLE_VERSIONS = [
     dataFile: '/abab.json',
   },
   {
+    id: 'ceb',
+    label: 'Ang Biblia — Cebuano Pinadayag',
+    abbreviation: 'CEBug',
+    language: 'Cebuano',
+    year: '1917',
+    description: 'Cebuano Bugna/Pinadayag — public domain. Similar in structure to the KJV.',
+    dataFile: '/ceb.json',
+  },
+  {
     id: 'greek',
     label: 'Greek New Testament',
     abbreviation: 'GNT',
