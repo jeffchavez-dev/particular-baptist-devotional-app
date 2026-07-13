@@ -1,5 +1,5 @@
 {
-  "version": "1.4.4",
+  "version": "1.4.5",
   "date": "2026-07-11",
-  "changelog": "Fixed Cebuano (CEBug) not appearing in version picker — also added it to the default version allowlist so it saves correctly when selected."
+  "changelog": "Fixed proof text chips in the Confession sidebar — tapping 2LBCF, Catechism, 1LBCF, or Orthodox chips now navigates directly to the correct article or Q&A within the Confessions page instead of going to the old devotional day page."
 }

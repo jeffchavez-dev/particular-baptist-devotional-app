@@ -155,7 +155,30 @@ function ptSrcBadge(src) {
 }
 
 /* Sidebar proof-text panel */
-function ProofTextPanel({ onDayNav, onOrthodoxNav }) {
+function labelToResult(c) {
+  if (c.src === '2LBCF') {
+    // label: "2LBCF 4.2" → source:'2lbcf', id:'p-4.2'
+    const key = c.label.replace('2LBCF ', '')
+    return { source: '2lbcf', id: `p-${key}` }
+  }
+  if (c.src === 'Catechism') {
+    // label: "Catechism Q.25" → source:'catechism', id:'qa-25'
+    const num = c.label.replace('Catechism Q.', '')
+    return { source: 'catechism', id: `qa-${num}` }
+  }
+  if (c.src === '1LBCF') {
+    // label: "1LBCF Art. 4" → source:'1lbcf', id:'art-4'
+    const num = c.label.replace('1LBCF Art. ', '')
+    return { source: '1lbcf', id: `art-${num}` }
+  }
+  if (c.src === 'Orthodox') {
+    // refKey is the question number
+    return { source: 'orthodox', id: `qa-${c.refKey}` }
+  }
+  return null
+}
+
+function ProofTextPanel({ onConfNav }) {
   const [ptSearch,   setPtSearch]   = useState('')
   const [expanded,   setExpanded]   = useState(null)
   const [filterSrc,  setFilterSrc]  = useState('')
@@ -252,19 +275,10 @@ function ProofTextPanel({ onDayNav, onOrthodoxNav }) {
                             <button
                               key={i}
                               style={{...pt.citeBtn, background: badge.bg, color: badge.color}}
-                              onClick={() => isOrthodox
-                                ? onOrthodoxNav?.(c.refKey)
-                                : onDayNav(c.day)
-                              }
-                              title={isOrthodox
-                                ? `${c.label} — Open Orthodox Catechism`
-                                : `${c.label} · Day ${c.day}`
-                              }
+                              onClick={() => { const r = labelToResult(c); if (r) onConfNav(r) }}
+                              title={`${c.label} — Open in Confessions`}
                             >
                               {shortLabel}
-                              {!isOrthodox && (
-                                <span style={{fontWeight:400,opacity:0.65,marginLeft:3}}>·{c.day}</span>
-                              )}
                             </button>
                           )
                         })}
@@ -1307,17 +1321,7 @@ export default function ConfessionsPage() {
         <>
           <div style={s.sidebarDivider} />
           <ProofTextPanel
-            onDayNav={d => { routerNavigate(`/day/${d}`); setNavOpen(false) }}
-            onOrthodoxNav={qNum => {
-              setSidebarConf('orthodox')
-              setTab('orthodox')
-              setNavOpen(false)
-              // Scroll to the specific question after the tab renders
-              setTimeout(() => {
-                const el = document.getElementById(`qa-${qNum}`)
-                if (el) el.scrollIntoView({ behavior:'smooth', block:'center' })
-              }, 250)
-            }}
+            onConfNav={result => { navigateToResult(result); setNavOpen(false) }}
           />
         </>
       )}
