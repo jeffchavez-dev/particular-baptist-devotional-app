@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "date": "2026-07-13",
-  "changelog": "Fixed confession share cards: Proof Texts toggle now appears correctly (refs were never passed to the share action). Fixed share card text align resetting to Left each time a new card opens instead of carrying over the previous card's setting."
+  "changelog": "Fixed confession share card showing scripture proofs twice — refs are now rendered only in the dedicated Proof Texts section, not also embedded in the body text."
 }

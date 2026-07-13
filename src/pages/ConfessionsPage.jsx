@@ -523,13 +523,16 @@ function ItemActions({
     setEditingNote(false)
   }
 
+  // copyText includes refs appended for clipboard; strip them for the canvas card
+  const bodyText = copyText.split('\n\nScripture proofs: ')[0]
+
   function handleShare() {
     onShare({
       type: 'reading',
       title: shareTitle,
       subtitle: label,
       source: shareSource,
-      text: copyText,
+      text: bodyText,
       label: '',
       refs: refs ? cleanRefs(refs) : '',
     })
@@ -541,8 +544,9 @@ function ItemActions({
       title: shareTitle,
       subtitle: label,
       source: shareSource,
-      text: `${copyText.slice(0, 300)}${copyText.length > 300 ? '…' : ''}\n\n— My note:\n${note}`,
+      text: `${bodyText.slice(0, 300)}${bodyText.length > 300 ? '…' : ''}\n\n— My note:\n${note}`,
       label: '',
+      refs: refs ? cleanRefs(refs) : '',
     })
   }
 
