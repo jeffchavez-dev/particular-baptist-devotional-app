@@ -1,5 +1,5 @@
 {
-  "version": "1.4.8",
+  "version": "1.4.9",
   "date": "2026-07-13",
-  "changelog": "Fixed 'Read' link on confession card — now switches to the correct document tab (2LBCF, Catechism, 1LBCF, Orthodox) and scrolls to the exact paragraph or question."
+  "changelog": "New users and guests now start with the Three Confessions year plan (2LBCF · Baptist Catechism · 1LBCF) by default instead of a blank card. The plan can be changed anytime in Settings → Confession Tracker."
 }

@@ -33,8 +33,12 @@ function _stampUserData(remoteKey) {
   } catch {}
 }
 
+const DEFAULT_CONF_CONFIG = { planId: 'three', mode: 'year', restDays: [], startedDate: null }
+
 export function getConfPlanConfig() {
-  try { return JSON.parse(localStorage.getItem(CONF_CONFIG_KEY) || 'null') } catch { return null }
+  try {
+    return JSON.parse(localStorage.getItem(CONF_CONFIG_KEY) || 'null') || DEFAULT_CONF_CONFIG
+  } catch { return DEFAULT_CONF_CONFIG }
 }
 export function saveConfPlanConfig(config) {
   try { localStorage.setItem(CONF_CONFIG_KEY, JSON.stringify(config)) } catch {}
