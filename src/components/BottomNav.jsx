@@ -102,7 +102,7 @@ export default function BottomNav() {
   useEffect(() => { setVisible(true) }, [pathname])
 
   function getActive() {
-    if (pathname === '/' || pathname.startsWith('/day/')) return '/'
+    if (pathname === '/') return '/'
     if (pathname.startsWith('/confessions')) return '/confessions'
     if (pathname.startsWith('/scripture'))  return '/scripture'
     if (pathname.startsWith('/library'))    return '/library'

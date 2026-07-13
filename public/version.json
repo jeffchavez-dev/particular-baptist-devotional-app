@@ -1,5 +1,5 @@
 {
-  "version": "1.4.5",
-  "date": "2026-07-11",
-  "changelog": "Fixed proof text chips in the Confession sidebar — tapping 2LBCF, Catechism, 1LBCF, or Orthodox chips now navigates directly to the correct article or Q&A within the Confessions page instead of going to the old devotional day page."
+  "version": "1.4.6",
+  "date": "2026-07-13",
+  "changelog": "Renamed 'Devotional Notes' to 'Reflection Notes' in Library. Reflection notes now link back to the Dashboard reflection section. Removed old /day/ route."
 }

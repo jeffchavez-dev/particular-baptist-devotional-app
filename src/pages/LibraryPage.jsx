@@ -2561,7 +2561,7 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
       {savedDayEntries.length === 0
         ? <EmptyMsg text="No saved days yet. Tap the bookmark icon on any devotional reading day." />
         : sortedDays.map(entry => (
-          <div key={entry.day} style={s.card} onClick={() => navigate(`/day/${entry.day}`)}>
+          <div key={entry.day} style={s.card}>
             <div style={s.cardHead}>
               <span style={s.dayBadge}>Day {entry.day}</span>
               <span style={s.dateBadge}>{entry.date}</span>
@@ -3141,7 +3141,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
     [confNotes, q]
   )
   const filteredDev = useMemo(() => {
-    // Devotional notes are plain text — they carry no labels,
+    // Reflection notes are plain text — they carry no labels,
     // so hide them when a label filter is active (they can't match).
     if (filterLabel) return []
     if (!q) return enrichedDevNotes
@@ -3424,7 +3424,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
 
       <div style={s.divider} />
 
-      {/* ── Devotional Notes ── */}
+      {/* ── Reflection Notes ── */}
       {(!isSearching || filteredDev.length > 0) && (
         <>
           <SectionHeader
@@ -3433,7 +3433,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 <path d="M2 2.5h10M2 5h6M2 7.5h8M2 10h5" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             }
-            title="Devotional Notes"
+            title="Reflection Notes"
             count={enrichedDevNotes.length}
             filtered={isSearching ? filteredDev.length : null}
             open={isSearching || openSections.dev}
@@ -3443,13 +3443,13 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
             <>
               {!session ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
-                  <p style={s.emptyText}>Sign in to sync and view your devotional notes.</p>
+                  <p style={s.emptyText}>Sign in to sync and view your reflection notes.</p>
                   <button onClick={() => navigate('/auth')} className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }}>
                     Sign in →
                   </button>
                 </div>
               ) : filteredDev.length === 0 && !isSearching ? (
-                <EmptyMsg text="No devotional notes yet. Open any reading day to add your reflections." />
+                <EmptyMsg text="No reflection notes yet. Open the Dashboard and add your reflections." />
               ) : (
                 <div style={gridStyle}>
                   {filteredDev.map(n => {
@@ -3463,7 +3463,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                         preview={notePreviewText(n.notes)}
                         date={n.entry.date}
                         onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
-                        onOpen={() => navigate(`/day/${n.day_number}`)}
+                        onOpen={() => navigate('/')}
                         onDelete={() => requestDelete(n.day_number, 'dev')}
                         query={isSearching ? searchQuery.trim() : ''}
                       />
@@ -3559,7 +3559,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
         const vn = viewingNote
         const shareableKey = vn.key && vn.type !== 'dev' ? vn.key : null
         const currentToken = shareableKey ? getLibShareToken(shareableKey) : null
-        const sourceLabel  = vn.type === 'lib' ? 'Personal Note' : vn.type === 'kjv' ? 'Scripture Note' : vn.type === 'conf' ? 'Confession Note' : vn.type === 'dev' ? 'Devotional Note' : 'Note'
+        const sourceLabel  = vn.type === 'lib' ? 'Personal Note' : vn.type === 'kjv' ? 'Scripture Note' : vn.type === 'conf' ? 'Confession Note' : vn.type === 'dev' ? 'Reflection Note' : 'Note'
 
         async function handleShareLibLink() {
           if (!shareableKey || !session?.user?.id) return
@@ -3604,7 +3604,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                 const { book, chapter, verse } = vn.extra
                 navigate('/scripture', { state: { book, chapter, verse } })
               } else if (vn.type === 'dev') {
-                navigate(`/day/${vn.extra.dayNumber}`)
+                navigate('/')
               } else if (vn.type === 'conf') {
                 const { source, itemKey } = vn.extra
                 navigate(`/confessions?t=${source}`, { state: { itemKey, source } })

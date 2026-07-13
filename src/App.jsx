@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgressDown } from './lib/supabase'
+import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgressDown, syncUserDataUp, syncUserDataDown } from './lib/supabase'
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { syncBooksUp, syncBooksDown } from './lib/bookLibrary'
 import { tryAdvancePlanForChapter } from './lib/biblePlan'
@@ -8,7 +8,6 @@ import { migrateOldPlan, ensureActivePlanMirrored, syncMultiPlansUp, syncMultiPl
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
-import ReadingPage from './pages/ReadingPage'
 import QuizPage from './pages/QuizPage'
 import ScripturePage from './pages/ScripturePage'
 import ConfessionsPage from './pages/ConfessionsPage'
@@ -80,6 +79,7 @@ export default function App() {
         syncBibleProgressDown(prevUser.current.id)
         syncBooksDown(prevUser.current.id)
         syncMultiPlansDown(prevUser.current.id)
+        syncUserDataDown(prevUser.current.id)
       }
     }
     document.addEventListener('visibilitychange', onVisible)
@@ -139,6 +139,10 @@ export default function App() {
         syncMultiPlansUp(s.user.id)
           .then(() => syncMultiPlansDown(s.user.id))
           .catch(e => console.warn('[auth-sync-plans] error:', e?.message))
+        /* Sync confession plan config/progress (part of generic pb_user_data) */
+        syncUserDataUp(s.user.id)
+          .then(() => syncUserDataDown(s.user.id))
+          .catch(e => console.warn('[auth-sync-userdata] error:', e?.message))
       }
       prevUser.current = s?.user ?? null
       setSession(s)
@@ -186,7 +190,6 @@ export default function App() {
                   <Routes>
                     <Route path="/auth"        element={session ? <Navigate to="/" /> : <AuthPage />} />
                     <Route path="/"            element={<Dashboard />} />
-                    <Route path="/day/:dayNum" element={<ReadingPage />} />
                     <Route path="/quiz"        element={<QuizPage />} />
                     <Route path="/scripture"   element={<ScripturePage />} />
                     <Route path="/confessions" element={<ConfessionsPage />} />
