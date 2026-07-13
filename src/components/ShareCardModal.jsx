@@ -53,7 +53,9 @@ const SRC_COLORS = {
   'RV':       { bg:'#2a3a1a', text:'#c5d4a8' },
 }
 
-const HEBREW_RE = /[֐-׿יִ-ﭏ]/
+// Hebrew block U+0590–U+05FF + Hebrew presentation forms U+FB1D–U+FB4E
+// Previous range [יִ-ﭏ] = U+05D9–U+FB4F accidentally covered Greek polytonic (U+1F00–U+1FFF)
+const HEBREW_RE = /[\u0590-\u05FF\uFB1D-\uFB4F]/
 function hasHebrew(str) { return HEBREW_RE.test(str || '') }
 const HEBREW_FONT = "'Noto Serif Hebrew','Frank Ruhl Libre','Arial Hebrew','David','SBL Hebrew',serif"
 

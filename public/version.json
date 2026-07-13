@@ -1,5 +1,5 @@
 {
-  "version": "1.5.2",
+  "version": "1.5.3",
   "date": "2026-07-13",
-  "changelog": "Fixed confession share card showing scripture proofs twice — refs are now rendered only in the dedicated Proof Texts section, not also embedded in the body text."
+  "changelog": "Fixed GNT and LXX share cards forced to right-align — the Hebrew detection regex now covers only the Hebrew Unicode block (U+0590–05FF) and Hebrew Presentation Forms (FB1D–FB4F), no longer accidentally matching Greek polytonic characters."
 }
