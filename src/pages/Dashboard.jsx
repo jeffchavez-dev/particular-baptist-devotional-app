@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getBibleProgress, setBibleChapter, BIBLE_KEY, getTodayDayNum, setLocalProgress, supabase } from '../lib/supabase'
+import { getBibleProgress, setBibleChapter, BIBLE_KEY, getTodayDayNum, getLocalProgress, setLocalProgress, supabase } from '../lib/supabase'
 import { getPlanConfig, getPlanProgress, getCurrentPlanChapters, computePlanChapters, isTodayRestDay } from '../lib/biblePlan'
 import {
   getConfPlanConfig, getConfPlanProgress,
@@ -113,13 +113,17 @@ export default function Dashboard() {
   const reflectTimer = useRef(null)
   function onReflectionChange(text) {
     setReflection(text)
+    setReflectionSaved(false)
     clearTimeout(reflectTimer.current)
     reflectTimer.current = setTimeout(() => saveReflection(text), 600)
   }
 
   /* ── UI state ── */
   const [confTextExpanded, setConfTextExpanded] = useState(false)
-  const [reflectionSaved, setReflectionSaved] = useState(false)
+  const [reflectionSaved, setReflectionSaved] = useState(() => {
+    const saved = getLocalProgress()[getTodayDayNum()]?.notes?.trim()
+    return !!saved && saved === loadReflection().trim()
+  })
   const [kjvModal, setKjvModal] = useState(null)   // { book, chapter, verse, refDisplay }
 
   /* ── Navigate to a specific scripture chapter ── */
@@ -150,7 +154,6 @@ export default function Dashboard() {
       }, { onConflict: 'user_id,day_number' }).catch(() => {})
     }
     setReflectionSaved(true)
-    setTimeout(() => setReflectionSaved(false), 3000)
   }
 
   /* ── Open a Settings CollapseSection ── */
