@@ -1,5 +1,5 @@
 {
-  "version": "1.5.5",
-  "date": "2026-07-13",
-  "changelog": "Fixed GNT, HOT, and LXX not appearing in the parallel panel — the reader uses 'gnt'/'hot' internally but BIBLE_VERSIONS uses 'greek'/'hebrew', causing a mismatch after the visible-versions filter was applied."
+  "version": "1.5.6",
+  "date": "2026-07-14",
+  "changelog": "Fixed commentary text size — was using sizePx - 10 (6px at default, invisible at minimum). Now scales proportionally at 87.5% of the scripture font size, minimum 13px."
 }
