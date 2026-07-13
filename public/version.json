@@ -1,5 +1,5 @@
 {
-  "version": "1.5.4",
+  "version": "1.5.5",
   "date": "2026-07-13",
-  "changelog": "Added Ilocano Bible (Ti Biblia, Door43 CC BY-SA 4.0). New 'Bible Translations' setting — choose which versions appear in the Scripture picker and parallel panel. Default visible: KJV, HOT, GNT, ABAB. All others (CEBug, ILO, LXX, NASB, BSB, GNV, RV) opt-in via Settings."
+  "changelog": "Fixed GNT, HOT, and LXX not appearing in the parallel panel — the reader uses 'gnt'/'hot' internally but BIBLE_VERSIONS uses 'greek'/'hebrew', causing a mismatch after the visible-versions filter was applied."
 }

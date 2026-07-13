@@ -2864,13 +2864,19 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             <div style={sb.parallelPills}>
               {(() => {
                 const visible = getVisibleVersions()
-                return BIBLE_VERSIONS
-                  .filter(v => visible.includes(v.id) && v.id !== version)
-                  .map(v => ({
-                    id:    v.id,
-                    label: v.abbreviation,
-                    title: v.label,
-                  }))
+                // Text versions: IDs match between BIBLE_VERSIONS and the parallel engine
+                const textEntries = BIBLE_VERSIONS
+                  .filter(v => !v.type && visible.includes(v.id) && v.id !== version)
+                  .map(v => ({ id: v.id, label: v.abbreviation, title: v.label }))
+                // Original-language versions use different IDs inside the parallel engine
+                // ('gnt'/'hot'/'lxx') vs BIBLE_VERSIONS ('greek'/'hebrew'/'lxx')
+                const origEntries = [
+                  { id: 'gnt', bvId: 'greek',  label: 'GNT', title: 'Greek New Testament (NT books)' },
+                  { id: 'hot', bvId: 'hebrew', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
+                  { id: 'lxx', bvId: 'lxx',    label: 'LXX', title: 'Greek Septuagint (OT books)' },
+                ].filter(v => visible.includes(v.bvId))
+                 .map(({ id, label, title }) => ({ id, label, title }))
+                return [...textEntries, ...origEntries]
               })().map(({ id, label, title }) => {
                 const active = parallelVersions.has(id)
                 return (
