@@ -1,5 +1,5 @@
 {
-  "version": "1.4.7",
+  "version": "1.4.8",
   "date": "2026-07-13",
-  "changelog": "Fixed reflection notes not appearing in Library (notes with no legacy schedule entry were silently filtered out). Added 'Read →' link on the Dashboard confession/catechism card that opens the Confessions page at the assigned section."
+  "changelog": "Fixed 'Read' link on confession card — now switches to the correct document tab (2LBCF, Catechism, 1LBCF, Orthodox) and scrolls to the exact paragraph or question."
 }

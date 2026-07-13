@@ -1005,10 +1005,16 @@ export default function ConfessionsPage() {
     }
   }, [])
 
-  /* Deep-link scroll: fires once after the tab content renders */
+  /* Deep-link scroll: fires once after the correct tab content renders */
   useEffect(() => {
     if (!deepLinkRef.current) return
     const { itemKey, source } = deepLinkRef.current
+    // If the active tab doesn't match the target, switch tabs first.
+    // Don't consume deepLinkRef yet — re-fire after tab changes.
+    if (tab !== source) {
+      setSearchParams({ t: source })
+      return
+    }
     deepLinkRef.current = null
     let domId
     if (source === '2lbcf')          domId = `p-${itemKey}`
@@ -1020,13 +1026,12 @@ export default function ConfessionsPage() {
       const el = document.getElementById(domId)
       if (el) {
         window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
-        /* Highlight the chapter in the sidebar nav */
         if (source === '2lbcf') setActiveChapter(`ch-${itemKey.split('.')[0]}`)
         else if (source === '1lbcf') setActiveChapter(`art-${itemKey}`)
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [tab]) // re-fire if tab changes (URL param arrives after mount)
+  }, [tab]) // re-fires when tab changes, allowing the switch-then-scroll pattern
 
   useEffect(() => {
     const handler = () => {
