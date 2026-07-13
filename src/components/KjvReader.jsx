@@ -3633,7 +3633,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         setAuthorRefModal({ ref: { tgt_book: parsed.book, tgt_chapter: parsed.chapter, tgt_verse: parsed.verse || null } })
                                       }}>
                                         {sec.paragraphs.map((html, pi) => (
-                                          <p key={pi} style={{ ...r.comPara, fontSize: Math.max(13, prefs.sizePx * 0.875) }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
+                                          <p key={pi} style={{ ...r.comPara, fontSize: prefs.sizePx - 5 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
                                         ))}
                                       </div>
                                     )}
