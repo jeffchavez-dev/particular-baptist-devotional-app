@@ -423,9 +423,12 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
-                {confDoneToday && (
-                  <span style={{ fontSize:11, color:'var(--teal)', fontWeight:600, flexShrink:0 }}>✓ Done</span>
-                )}
+                <button
+                  onClick={() => navigate('/confessions', { state: { source: confDisplayItem?.planId, itemKey: confDisplayItem?.key } })}
+                  style={s.readLink}
+                >
+                  Read →
+                </button>
               </div>
 
               {/* Full text */}

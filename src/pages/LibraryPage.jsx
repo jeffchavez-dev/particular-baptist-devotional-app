@@ -3420,7 +3420,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
                         badge={badge}
                         badgeStyle={badgeStyle}
                         preview={notePreviewText(n.notes)}
-                        date={n.entry.date}
+                        date={n.entry?.date ?? ''}
                         onCardClick={() => setViewingNote({ note: n.notes, key: null, badge, badgeStyle, type: 'dev', extra: { dayNumber: n.day_number } })}
                         onOpen={() => navigate('/')}
                         onDelete={() => requestDelete(n.day_number, 'dev')}
@@ -3993,8 +3993,7 @@ export default function LibraryPage() {
 
   const enrichedDevNotes = useMemo(() =>
     devNotes
-      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) }))
-      .filter(n => n.entry)
+      .map(n => ({ ...n, entry: SCHEDULE.find(r => r.day === n.day_number) || null }))
       .sort((a, b) => a.day_number - b.day_number),
     [devNotes]
   )
