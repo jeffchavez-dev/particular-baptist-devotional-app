@@ -51,6 +51,7 @@ const SRC_COLORS = {
   'BSB':      { bg:'#1a3a30', text:'#a8e8d4' },
   'GNV':      { bg:'#3a2a1a', text:'#d4c5a8' },
   'RV':       { bg:'#2a3a1a', text:'#c5d4a8' },
+  'ILO':      { bg:'#3a1a10', text:'#f0c8a0' },
 }
 
 // Hebrew block U+0590–U+05FF + Hebrew presentation forms U+FB1D–U+FB4E

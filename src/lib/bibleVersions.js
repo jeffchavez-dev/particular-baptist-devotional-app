@@ -110,6 +110,15 @@ export const BIBLE_VERSIONS = [
     description: 'The first major scholarly revision of the KJV, using earlier manuscripts',
     dataFile: '/rv.json',
   },
+  {
+    id: 'ilocano',
+    label: 'Ti Biblia — Ilocano ULB',
+    abbreviation: 'ILO',
+    language: 'Ilocano',
+    year: '2019',
+    description: 'Unlocked Literal Bible in the Ilocano language (Door43 World Missions Community, CC BY-SA 4.0)',
+    dataFile: '/ilocano.json',
+  },
 ]
 
 // ── Version Data Cache ────────────────────────────────────────────────────

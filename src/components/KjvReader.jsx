@@ -48,6 +48,7 @@ import {
   prefetchAllAuthorContent, invalidateBulkCache,
 } from '../lib/authorContent'
 import { saveElementScroll, restoreElementScroll } from '../lib/pageState'
+import { getVisibleVersions } from '../lib/readerPrefs'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 import { getStudySession, setStudySession } from '../lib/studySession'
@@ -2861,20 +2862,16 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           <div style={sb.parallelSection} data-onboarding="parallel-section">
             <div style={sb.versionSectionTitle}>Parallel</div>
             <div style={sb.parallelPills}>
-              {[
-                ...[
-                  { id: 'kjv',  label: 'KJV',   title: 'King James Version' },
-                  { id: 'abab', label: 'ABAB',  title: 'Ang Bagong Ang Biblia' },
-                  { id: 'ceb',  label: 'CEBug', title: 'Cebuano Ang Biblia (Bugna/Pinadayag)' },
-                  { id: 'nasb', label: 'NASB',  title: 'New American Standard Bible 1995' },
-                  { id: 'bsb',  label: 'BSB',   title: 'Berean Standard Bible' },
-                  { id: 'gnv',  label: 'GNV',   title: 'Geneva Bible (1599)' },
-                  { id: 'rv',   label: 'RV',    title: 'Revised Version (1895)' },
-                ].filter(v => v.id !== version),
-                { id: 'gnt', label: 'GNT', title: 'Greek New Testament (NT books)' },
-                { id: 'hot', label: 'HOT', title: 'Hebrew Old Testament (OT books)' },
-                { id: 'lxx', label: 'LXX', title: 'Greek Septuagint (OT books)' },
-              ].map(({ id, label, title }) => {
+              {(() => {
+                const visible = getVisibleVersions()
+                return BIBLE_VERSIONS
+                  .filter(v => visible.includes(v.id) && v.id !== version)
+                  .map(v => ({
+                    id:    v.id,
+                    label: v.abbreviation,
+                    title: v.label,
+                  }))
+              })().map(({ id, label, title }) => {
                 const active = parallelVersions.has(id)
                 return (
                   <button

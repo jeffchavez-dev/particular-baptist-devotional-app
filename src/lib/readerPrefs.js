@@ -1,14 +1,17 @@
 /**
  * readerPrefs.js
  *
- * Persistent user preference for the default Bible reader version
- * (KJV or ABAB). Stored in localStorage so it survives sessions.
+ * Persistent user preferences for the Bible reader.
  *
- * Key: 'pb-default-version'
- * Values: 'kjv' | 'abab'
+ * Keys:
+ *   'pb-default-version'   — which version opens by default
+ *   'pb-visible-versions'  — array of version IDs shown in the picker
  */
 
 const KEY = 'pb-default-version'
+const VISIBLE_KEY = 'pb-visible-versions'
+
+export const DEFAULT_VISIBLE_VERSIONS = ['kjv', 'hebrew', 'greek', 'abab']
 
 /**
  * Available default reader options shown in Settings.
@@ -19,6 +22,8 @@ const KEY = 'pb-default-version'
 export const DEFAULT_VERSION_OPTIONS = [
   { id: 'kjv',      label: 'KJV',      full: 'King James Version' },
   { id: 'abab',     label: 'ABAB',     full: 'Ang Bagong Ang Biblia' },
+  { id: 'ceb',      label: 'CEBug',    full: 'Cebuano Ang Biblia (Bugna/Pinadayag)' },
+  { id: 'ilocano',  label: 'ILO',      full: 'Ti Biblia — Ilocano ULB' },
   { id: 'nasb',     label: 'NASB',     full: 'New American Standard Bible 1995' },
   { id: 'bsb',      label: 'BSB',      full: 'Berean Standard Bible' },
   { id: 'gnv',      label: 'GNV',      full: 'Geneva Bible (1599)' },
@@ -72,4 +77,27 @@ export function getDefaultReaderVersion() {
 export function setDefaultReaderVersion(version) {
   if (!VALID_IDS.includes(version)) return
   try { localStorage.setItem(KEY, version) } catch {}
+}
+
+/**
+ * Return the set of version IDs the user wants visible in the picker.
+ * Falls back to DEFAULT_VISIBLE_VERSIONS for new/guest users.
+ */
+export function getVisibleVersions() {
+  try {
+    const raw = localStorage.getItem(VISIBLE_KEY)
+    if (!raw) return DEFAULT_VISIBLE_VERSIONS
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_VISIBLE_VERSIONS
+  } catch {
+    return DEFAULT_VISIBLE_VERSIONS
+  }
+}
+
+/**
+ * Persist the user's chosen visible version set.
+ * @param {string[]} ids
+ */
+export function setVisibleVersions(ids) {
+  try { localStorage.setItem(VISIBLE_KEY, JSON.stringify(ids)) } catch {}
 }

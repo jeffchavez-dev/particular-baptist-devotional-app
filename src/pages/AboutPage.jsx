@@ -1,4 +1,5 @@
 import React, { Component, useState, useCallback, useEffect, useRef } from 'react'
+import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { useNavigate } from 'react-router-dom'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
@@ -20,6 +21,7 @@ import {
 } from '../lib/annotations'
 import {
   getDefaultReaderVersion, setDefaultReaderVersion, DEFAULT_VERSION_OPTIONS,
+  getVisibleVersions, setVisibleVersions as persistVisibleVersions, DEFAULT_VISIBLE_VERSIONS,
 } from '../lib/readerPrefs'
 import {
   clearPlanConfig, resetPlanProgress,
@@ -231,6 +233,24 @@ export default function AboutPage() {
   const { startTour } = useOnboardingCtx()
 
   const [defaultVersion, setDefaultVersion] = useState(() => getDefaultReaderVersion())
+  const [visibleVersions, setVisibleVersionsState] = useState(() => getVisibleVersions())
+
+  function toggleVersionVisibility(id) {
+    setVisibleVersionsState(prev => {
+      const next = prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+      // Always keep at least one version visible
+      if (next.length === 0) return prev
+      persistVisibleVersions(next)
+      window.dispatchEvent(new CustomEvent('pb-visible-versions-changed'))
+      // If current default is no longer visible, reset to KJV
+      const textVersions = ['kjv','abab','ceb','ilocano','nasb','bsb','gnv','rv']
+      if (textVersions.includes(defaultVersion) && !next.includes(defaultVersion)) {
+        setDefaultVersion('kjv')
+        setDefaultReaderVersion('kjv')
+      }
+      return next
+    })
+  }
 
   /* ── Wake Lock ("Keep screen on") ── */
   const WAKE_LOCK_KEY = 'pb-keep-awake'
@@ -756,12 +776,54 @@ export default function AboutPage() {
                   outline:'none',
                 }}
               >
-                {DEFAULT_VERSION_OPTIONS.map(opt => (
+                {DEFAULT_VERSION_OPTIONS.filter(opt =>
+                  opt.id === 'original' || visibleVersions.includes(opt.id)
+                ).map(opt => (
                   <option key={opt.id} value={opt.id}>
                     {opt.label} — {opt.full}
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Bible Translations — chip toggles */}
+            <div style={{ ...s.settingRow, alignItems:'flex-start', flexDirection:'column', gap:10 }}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Bible Translations</span>
+                <span style={s.settingHint}>Choose which translations appear in the Scripture version picker and parallel panel</span>
+              </div>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
+                {BIBLE_VERSIONS.map(v => {
+                  const on = visibleVersions.includes(v.id)
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => toggleVersionVisibility(v.id)}
+                      title={v.label}
+                      style={{
+                        padding:'5px 13px', borderRadius:99, fontSize:12, fontWeight:700,
+                        fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                        border: on ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
+                        background: on ? 'var(--teal-light)' : 'transparent',
+                        color: on ? 'var(--teal)' : 'var(--ink-muted)',
+                        transition:'all 0.15s',
+                      }}
+                    >
+                      {v.abbreviation}
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={() => {
+                  persistVisibleVersions(DEFAULT_VISIBLE_VERSIONS)
+                  setVisibleVersionsState(DEFAULT_VISIBLE_VERSIONS)
+                  window.dispatchEvent(new CustomEvent('pb-visible-versions-changed'))
+                }}
+                style={{ fontSize:11, color:'var(--ink-faint)', background:'none', border:'none', cursor:'pointer', padding:0, alignSelf:'flex-start' }}
+              >
+                Reset to defaults
+              </button>
             </div>
 
             {/* Backup */}

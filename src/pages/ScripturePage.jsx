@@ -5,7 +5,7 @@ import KjvReader from '../components/KjvReader'
 import { getTodayDayNum } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
 import { saveScroll, restoreScroll } from '../lib/pageState'
-import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion } from '../lib/readerPrefs'
+import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion, getVisibleVersions } from '../lib/readerPrefs'
 import { getStudySession, setStudySession } from '../lib/studySession'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS, BOOK_ABBR } from '../lib/bibleBooks'
@@ -39,6 +39,7 @@ export default function ScripturePage() {
   const [navHistoryIdx, setNavHistoryIdx] = useState(0)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [showVersionDropdown, setShowVersionDropdown] = useState(false)
+  const [visibleVersions, setVisibleVersions] = useState(() => getVisibleVersions())
   // Show version picker on first launch (no saved preference)
   const [showVersionPicker, setShowVersionPicker] = useState(() => {
     try { return !localStorage.getItem('pb-default-version') } catch { return false }
@@ -103,6 +104,13 @@ export default function ScripturePage() {
     window.addEventListener('pb-reset-version-kjv', onResetToKjv)
     return () => window.removeEventListener('pb-reset-version-kjv', onResetToKjv)
   }, [])
+  // Re-read visible versions when the user changes them in Settings
+  useEffect(() => {
+    function onVisibleChanged() { setVisibleVersions(getVisibleVersions()) }
+    window.addEventListener('pb-visible-versions-changed', onVisibleChanged)
+    return () => window.removeEventListener('pb-visible-versions-changed', onVisibleChanged)
+  }, [])
+
   // Ref for search input (avoid autoFocus keyboard-on-load on mobile)
   const searchInputRef = useRef(null)
   useEffect(() => {
@@ -305,7 +313,7 @@ export default function ScripturePage() {
             </button>
             {showVersionDropdown && (
               <div style={s.versionDropdown}>
-                {BIBLE_VERSIONS.map(v => (
+                {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id)).map(v => (
                   <button
                     key={v.id}
                     style={{
@@ -766,12 +774,12 @@ export default function ScripturePage() {
               <p style={vp.heroSub}>Pick a translation to start reading. You can change this anytime in Settings.</p>
             </div>
             <div style={vp.grid}>
-              {BIBLE_VERSIONS.filter(v => !v.hidden).map(v => (
+              {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id)).map(v => (
                 <button
                   key={v.id}
                   style={vp.card}
                   onClick={() => {
-                    setDefaultReaderVersion(['kjv','abab','ceb','nasb','bsb','gnv','rv'].includes(v.id) ? v.id : 'kjv')
+                    setDefaultReaderVersion(['kjv','abab','ceb','ilocano','nasb','bsb','gnv','rv'].includes(v.id) ? v.id : 'kjv')
                     setReadVersion(v.id)
                     try { localStorage.setItem('reader-version', v.id) } catch {}
                     setShowVersionPicker(false)
