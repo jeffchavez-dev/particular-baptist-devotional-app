@@ -584,15 +584,18 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
     }
   }, [card, isBook])
 
-  // Reset metaShown when card type changes
+  // Reset layout + metaShown whenever a new card opens
   useEffect(() => {
     if (!card) return
+    setTextAlign('left')
+    setTextPosition('top')
+    setCardScale(CARD_SCALE_DEFAULT)
     if (isBook) {
       setMetaShown({ bookTitle: true, author: true, category: !!(card.bookLabels?.length) })
     } else {
       setMetaShown({ title: true, version: true, label: true, refs: true })
     }
-  }, [card?.type]) // eslint-disable-line
+  }, [card]) // eslint-disable-line
 
   useEffect(() => {
     if (!isOpen || !card) return

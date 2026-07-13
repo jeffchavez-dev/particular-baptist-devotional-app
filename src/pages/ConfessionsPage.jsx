@@ -1696,6 +1696,7 @@ export default function ConfessionsPage() {
                                 copyText={p.text + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
                                 shareTitle={`2LBCF ${p.key}`}
                                 shareSource="2LBCF"
+                                refs={p.refs || ''}
                                 highlights={hlData}
                                 itemNotes={noteData}
                                 onHighlight={handleHighlight}
@@ -1751,6 +1752,7 @@ export default function ConfessionsPage() {
                           copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`Catechism Q.${num}`}
                           shareSource="Catechism"
+                          refs={item.refs || ''}
                           highlights={hlData}
                           itemNotes={noteData}
                           onHighlight={handleHighlight}
@@ -1814,6 +1816,7 @@ export default function ConfessionsPage() {
                           copyText={`${item.title}\n\n${item.text}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`1LBCF Art. ${num}`}
                           shareSource="1LBCF"
+                          refs={item.refs || ''}
                           highlights={hlData}
                           itemNotes={noteData}
                           onHighlight={handleHighlight}
@@ -1866,6 +1869,7 @@ export default function ConfessionsPage() {
                           copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`Orthodox Catechism Q.${num}`}
                           shareSource="Orthodox"
+                          refs={item.refs || ''}
                           highlights={hlData}
                           itemNotes={noteData}
                           onHighlight={handleHighlight}
