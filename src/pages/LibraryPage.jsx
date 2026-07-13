@@ -11,7 +11,7 @@ import {
   setHighlight, setItemNote,
   loadPartialHighlights, removePartialHighlight,
 } from '../lib/annotations'
-import { supabase, getLocalProgress, setLocalProgress, getBookmarks, toggleBookmark, buildSchedule } from '../lib/supabase'
+import { supabase, getLocalProgress, setLocalProgress, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { loadBibleVersion, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { getDefaultReaderVersion, resolveVersion } from '../lib/readerPrefs'
@@ -2485,7 +2485,7 @@ const BM_SORT_OPTS = [
 /* ══════════════════════════════════════════════════════════════
    Bookmarks Tab
 ══════════════════════════════════════════════════════════════ */
-function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay, onRemoveScBookmark }) {
+function BookmarksTab({ scBookmarks, navigate, onRemoveScBookmark }) {
   const [sortBy, setSortBy] = useState('date-desc')
   const [sortOpen, setSortOpen] = useState(false)
   const sortRef = useRef(null)
@@ -2496,13 +2496,6 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [])
-
-  const sortedDays = useMemo(() => {
-    const list = [...savedDayEntries]
-    if (sortBy === 'date-asc')  return list.reverse()
-    if (sortBy === 'alpha')     return list.sort((a, b) => a.day - b.day)
-    return list // date-desc = default order
-  }, [savedDayEntries, sortBy])
 
   const sortedScBm = useMemo(() => {
     const list = [...scBookmarks]
@@ -2547,40 +2540,6 @@ function BookmarksTab({ savedDayEntries, scBookmarks, navigate, onRemoveSavedDay
           )}
         </div>
       </div>
-
-      <SectionHeader
-        icon={
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M3 2A1.5 1.5 0 014.5.5h5A1.5 1.5 0 0111 2v11l-4-2.5L3 13V2z"
-              stroke="var(--teal)" strokeWidth="1.3" strokeLinejoin="round" fill="var(--teal)" fillOpacity="0.12"/>
-          </svg>
-        }
-        title="Saved Days"
-        count={savedDayEntries.length}
-      />
-      {savedDayEntries.length === 0
-        ? <EmptyMsg text="No saved days yet. Tap the bookmark icon on any devotional reading day." />
-        : sortedDays.map(entry => (
-          <div key={entry.day} style={s.card}>
-            <div style={s.cardHead}>
-              <span style={s.dayBadge}>Day {entry.day}</span>
-              <span style={s.dateBadge}>{entry.date}</span>
-              <span style={{
-                ...s.srcBadge,
-                background: entry.src === '2LBCF' ? 'var(--purple-soft)' : entry.src === 'Catechism' ? 'var(--teal-light)' : 'var(--amber-soft)',
-                color:      entry.src === '2LBCF' ? 'var(--purple-ink)' : entry.src === 'Catechism' ? 'var(--teal)'       : 'var(--amber-ink)',
-              }}>{entry.src}</span>
-              <RemoveBtn onClick={() => onRemoveSavedDay(entry.day)} label="Remove saved day" />
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ opacity: .35, flexShrink: 0 }}>
-                <path d="M3 2l3.5 3.5L3 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <p style={s.cardReading}>{entry.reading}</p>
-          </div>
-        ))
-      }
-
-      <div style={s.divider} />
 
       <SectionHeader
         icon={
@@ -3888,7 +3847,6 @@ export default function LibraryPage() {
   const [isNoteOverlayOpen, setIsNoteOverlayOpen] = useState(false)
 
   const [devNotes,       setDevNotes]       = useState([])
-  const [savedDays,      setSavedDays]      = useState(() => getBookmarks())
   const [scBookmarks,    setScBookmarks]    = useState(() => getAllScriptureBookmarks())
   const [kjvHighlights,      setKjvHighlights]      = useState(() => getAllKjvHighlights())
   const [kjvNotes,           setKjvNotes]           = useState(() => getAllKjvNotes())
@@ -4041,16 +3999,8 @@ export default function LibraryPage() {
     [devNotes]
   )
 
-  const savedDayEntries = useMemo(() =>
-    Object.keys(savedDays)
-      .map(d => SCHEDULE.find(r => r.day === parseInt(d)))
-      .filter(Boolean)
-      .sort((a, b) => a.day - b.day),
-    [savedDays]
-  )
-
   const notesCount      = libNotes.length + kjvNotes.length + enrichedDevNotes.length + confNotes.length
-  const bookmarksCount  = savedDayEntries.length + scBookmarks.length
+  const bookmarksCount  = scBookmarks.length
   const highlightsCount = kjvHighlights.length   + confHighlights.length
 
   const TABS = [
@@ -4061,7 +4011,6 @@ export default function LibraryPage() {
     ...(session ? [{ id: 'quotes', label: 'Quotes', count: bookLibraryCount }] : []),
   ]
 
-  const handleRemoveSavedDay      = useCallback(day  => { toggleBookmark(day); setSavedDays(prev => { const n = {...prev}; delete n[day]; return n }) }, [])
   const handleRemoveScBookmark    = useCallback((book, chapter) => { toggleScriptureBookmark(book, chapter); setScBookmarks(getAllScriptureBookmarks()) }, [])
   const handleRemoveKjvHighlight  = useCallback(key  => setHighlight(key, null, session?.user?.id), [session?.user?.id])
   const handleRemoveConfHighlight = useCallback(key  => setHighlight(key, null, session?.user?.id), [session?.user?.id])
@@ -4188,10 +4137,8 @@ export default function LibraryPage() {
         )}
         {activeTab === 'bookmarks' && (
           <BookmarksTab
-            savedDayEntries={savedDayEntries}
             scBookmarks={scBookmarks}
             navigate={navigate}
-            onRemoveSavedDay={handleRemoveSavedDay}
             onRemoveScBookmark={handleRemoveScBookmark}
           />
         )}
