@@ -531,6 +531,7 @@ function ItemActions({
       source: shareSource,
       text: copyText,
       label: '',
+      refs: refs ? cleanRefs(refs) : '',
     })
   }
 

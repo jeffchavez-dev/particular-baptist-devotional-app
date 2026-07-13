@@ -39,11 +39,18 @@ const SRC_COLORS = {
   '2LBCF':    { bg:'#3d2b6b', text:'#c4a8ff' },
   'Catechism':{ bg:'#1a3a38', text:'#7ecfc8' },
   '1LBCF':    { bg:'#4a2e0a', text:'#d4a84c' },
+  'Orthodox': { bg:'#2a1a3a', text:'#d4b8ff' },
   'Review':   { bg:'#2a2a2a', text:'#aaaaaa' },
   'KJV':      { bg:'#1e3a5f', text:'#a8c5e8' },
   'GNT':      { bg:'#1a2e5f', text:'#a8b8e8' },
   'HOT':      { bg:'#5f2b1a', text:'#e8c4a8' },
+  'LXX':      { bg:'#2b3a1a', text:'#b8d4a8' },
   'ABAB':     { bg:'#1a3a2a', text:'#a8e8c5' },
+  'CEBug':    { bg:'#3a1a2a', text:'#e8a8c5' },
+  'NASB':     { bg:'#1a2a3a', text:'#a8c5d4' },
+  'BSB':      { bg:'#1a3a30', text:'#a8e8d4' },
+  'GNV':      { bg:'#3a2a1a', text:'#d4c5a8' },
+  'RV':       { bg:'#2a3a1a', text:'#c5d4a8' },
 }
 
 const HEBREW_RE = /[֐-׿יִ-ﭏ]/
@@ -704,11 +711,15 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
             </div>
             <div style={{ ...m.section, flex:1 }}>
               <label style={m.label} htmlFor="sc-align">Text Align</label>
-              <select id="sc-align" value={textAlign} onChange={e => setTextAlign(e.target.value)} style={selectStyle}>
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
-              </select>
+              {card?.script === 'hebrew' ? (
+                <div style={{ ...selectStyle, opacity:0.5, pointerEvents:'none', display:'flex', alignItems:'center' }}>Right (Hebrew)</div>
+              ) : (
+                <select id="sc-align" value={textAlign} onChange={e => setTextAlign(e.target.value)} style={selectStyle}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              )}
             </div>
           </div>
 

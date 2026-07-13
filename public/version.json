@@ -1,5 +1,5 @@
 {
-  "version": "1.4.9",
+  "version": "1.5.0",
   "date": "2026-07-13",
-  "changelog": "New users and guests now start with the Three Confessions year plan (2LBCF · Baptist Catechism · 1LBCF) by default instead of a blank card. The plan can be changed anytime in Settings → Confession Tracker."
+  "changelog": "Share card fixes: Bible cards now show the correct version label and badge (not always KJV) for ABAB, CEBug, NASB, BSB, GNV, RV, GNT, and HOT. Confession share cards now include a 'Proof Texts' toggle in Show Fields to hide the scripture proofs. Added distinct badge colors for all versions. Hebrew text align is now shown as locked (RTL) instead of a non-functional dropdown."
 }

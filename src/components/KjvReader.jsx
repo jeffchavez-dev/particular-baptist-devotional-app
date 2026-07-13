@@ -2449,11 +2449,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* ── Share helpers ── */
   function handleShareSelection() {
+    const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
     setShareCard({
       type: 'reading',
       title: `${visBookRef.current} ${visChapterRef.current}`,
-      subtitle: 'King James Version',
-      source: 'KJV',
+      subtitle: versMeta?.label || 'King James Version',
+      source: versMeta?.abbreviation || 'KJV',
       text: selection,
       label: '',
     })
@@ -2462,18 +2463,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function handleShareChapter() {
     const vb = visBookRef.current
     const vc = visChapterRef.current
-    // Find the segment for the currently visible chapter (may differ from segments[0] when
-    // the user has scrolled into a chapter loaded via infinite scroll)
     const seg = segments.find(s => s.book === vb && s.chapter === vc)
              || morphSegments.find(s => s.book === vb && s.chapter === vc)
              || segments[0]
     if (!seg) return
+    const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
     const chText = seg.verses.map(v => `${v.verse} ${v.text ?? v.words?.map(w => w.w).join(' ') ?? ''}`).join('\n')
     setShareCard({
       type: 'reading',
       title: `${seg.book} ${seg.chapter}`,
-      subtitle: 'King James Version',
-      source: 'KJV',
+      subtitle: versMeta?.label || 'King James Version',
+      source: versMeta?.abbreviation || 'KJV',
       text: chText.slice(0, 1200),
       label: '',
     })
@@ -2481,11 +2481,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   function handleShareNote(verseKey, note, verseText) {
     const [, b, ch, v] = verseKey.split('|')
+    const versMeta = BIBLE_VERSIONS.find(v2 => v2.id === version)
     setShareCard({
       type: 'reading',
       title: `${b} ${ch}:${v}`,
-      subtitle: 'King James Version',
-      source: 'KJV',
+      subtitle: versMeta?.label || 'King James Version',
+      source: versMeta?.abbreviation || 'KJV',
       text: `"${verseText}"\n\n— My reflection:\n${note}`,
       label: '',
     })
