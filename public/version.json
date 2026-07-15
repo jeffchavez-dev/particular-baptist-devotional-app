@@ -1,5 +1,5 @@
 {
-  "version": "1.5.6",
-  "date": "2026-07-14",
-  "changelog": "Fixed commentary text size — now renders at sizePx - 5 (11px at default 16px) instead of the previous sizePx - 10 which was illegibly small."
+  "version": "1.5.7",
+  "date": "2026-07-15",
+  "changelog": "Fixed Ilocano (ILO) parallel — now renders correctly alongside other versions in the parallel panel."
 }

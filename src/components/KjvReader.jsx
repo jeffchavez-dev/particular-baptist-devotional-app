@@ -1060,7 +1060,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
   // Which text-version parallel is selected (if any) — supports all English text translations
-  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'ceb', 'nasb', 'bsb', 'gnv', 'rv'])
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'ceb', 'ilocano', 'nasb', 'bsb', 'gnv', 'rv'])
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
