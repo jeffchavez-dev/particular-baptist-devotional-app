@@ -70,6 +70,7 @@ export const BIBLE_VERSIONS = [
     language: 'Greek',
     year: 'Rahlfs 1935',
     description: 'The Greek translation of the Hebrew scriptures used in early Christianity',
+    type: 'lxx',        // special: word-level Greek rendering, excluded from text-parallel list
     dataFile: '/lxx.json',
     scope: 'OT',        // OT books; LXX includes additional deuterocanonical books
     source: 'CCAT (Thesaurus Linguae Graecae / CATSS) CC BY 4.0',

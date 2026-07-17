@@ -1,5 +1,5 @@
 {
-  "version": "1.5.7",
+  "version": "1.5.8",
   "date": "2026-07-15",
-  "changelog": "Fixed Ilocano (ILO) parallel — now renders correctly alongside other versions in the parallel panel."
+  "changelog": "Fixed duplicate LXX pill in the parallel panel — LXX now appears only once in the original-languages row."
 }
