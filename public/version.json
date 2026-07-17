@@ -1,5 +1,5 @@
 {
-  "version": "1.5.9",
+  "version": "1.5.10",
   "date": "2026-07-15",
-  "changelog": "Share card now always shows a Download PNG button — previously hidden on desktop when the native share sheet was available."
+  "changelog": "Confession reader no longer shows inline proof text citations in the body — they already appear as tappable chips below each section."
 }

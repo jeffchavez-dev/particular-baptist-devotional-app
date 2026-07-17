@@ -79,6 +79,11 @@ function buildChapters() {
 
 const LBCF2_CHAPTERS = buildChapters()
 
+function stripInlineRefs(text) {
+  if (!text) return text
+  return text.replace(/\s*\([^)]+\)\s*$/, '').trim()
+}
+
 function cleanRefs(refs) {
   if (!refs) return ''
   return refs.replace(/\b[a-z](?=[A-Z1-9])/g, '').replace(/\s+/g, ' ').trim()
@@ -1686,7 +1691,7 @@ export default function ConfessionsPage() {
                         >
                           <div style={s.paraNum}>§{p.para}</div>
                           <div style={s.paraBody}>
-                            <p style={{...s.paraText, ...textStyle}}>{highlight(p.text, q)}</p>
+                            <p style={{...s.paraText, ...textStyle}}>{highlight(stripInlineRefs(p.text), q)}</p>
                             <div onClick={e => e.stopPropagation()}>
                               {p.refs && (
                                 <div style={s.refs}>
@@ -1741,8 +1746,8 @@ export default function ConfessionsPage() {
                   >
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
-                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
-                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(item.a, q)}</p>
+                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(stripInlineRefs(item.q), q)}</p>
+                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(stripInlineRefs(item.a), q)}</p>
                       <div onClick={e => e.stopPropagation()}>
                         {item.refs && (
                           <div style={s.refs}>
@@ -1779,7 +1784,7 @@ export default function ConfessionsPage() {
               {Object.entries(LBCF1).map(([num, item]) => {
                 const artId = `art-${num}`
                 if (q && !textMatches(item.title + ' ' + item.text, item.refs, SEARCH_IDX.lbcf1[num] || '', q)) return null
-                const lines = item.text.split('\n').filter(l => l.trim())
+                const lines = item.text.split('\n').filter(l => l.trim()).map(stripInlineRefs)
                 const itemKey = `conf|1lbcf|${num}`
                 const hlColor = hlData[itemKey] || null
                 const hlStyle = hlColor ? getHlStyle(hlColor) : null
@@ -1858,8 +1863,8 @@ export default function ConfessionsPage() {
                   >
                     <div style={s.qaNum}>Q.{num}</div>
                     <div style={s.qaBody}>
-                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(item.q, q)}</p>
-                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(item.a, q)}</p>
+                      <p style={{...s.qaQuestion, ...textStyle}}>{highlight(stripInlineRefs(item.q), q)}</p>
+                      <p style={{...s.qaAnswer, ...textStyle}}><strong style={{fontWeight:600}}>A.</strong> {highlight(stripInlineRefs(item.a), q)}</p>
                       <div onClick={e => e.stopPropagation()}>
                         {item.refs && (
                           <div style={s.refs}>
