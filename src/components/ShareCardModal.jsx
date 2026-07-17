@@ -871,8 +871,8 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
               <path d="M6.5 5.5v4M6.5 4h.01" stroke="var(--teal)" strokeWidth="1.4" strokeLinecap="round"/>
             </svg>
             {canShare
-              ? <span><strong>On mobile:</strong> tap <em>Share / Save Image</em> — the share sheet opens so you can save to Photos or post to Instagram.</span>
-              : <span><strong>On desktop:</strong> the PNG downloads to your computer. Upload from Downloads to share on social media.</span>
+              ? <span>Tap <em>Download PNG</em> to save the file, or <em>Share / Save Image</em> to open the share sheet and post to Instagram, save to Photos, etc.</span>
+              : <span>Click <em>Download PNG</em> to save the image to your computer.</span>
             }
           </div>
         </div>
@@ -880,19 +880,19 @@ export default function ShareCardModal({ isOpen, onClose, card }) {
         {/* Footer */}
         <div style={m.footer}>
           <button onClick={onClose} className="btn btn-ghost" style={{fontSize:13}}>Cancel</button>
-          {!canShare && (
-            <button onClick={() => fallbackDownload()} className="btn btn-outline" style={{fontSize:13, gap:6}}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7M4 7l3 3 3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Download PNG
+          <button onClick={() => fallbackDownload()} className="btn btn-outline" style={{fontSize:13, gap:6}}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v7M4 7l3 3 3-3M2 11.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Download PNG
+          </button>
+          {canShare && (
+            <button onClick={shareNative} className="btn btn-primary" disabled={sharing} style={{fontSize:13, gap:6}}>
+              {sharing
+                ? <span className="spinner" style={{width:14,height:14}} />
+                : <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v5M4.5 4.5L7 2l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 7v4.5h8V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              }
+              Share / Save Image
             </button>
           )}
-          <button onClick={shareNative} className="btn btn-primary" disabled={sharing} style={{fontSize:13, gap:6}}>
-            {sharing
-              ? <span className="spinner" style={{width:14,height:14}} />
-              : <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v5M4.5 4.5L7 2l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 7v4.5h8V7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            }
-            {canShare ? 'Share / Save Image' : 'Save PNG'}
-          </button>
         </div>
       </div>
     </div>

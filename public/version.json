@@ -1,5 +1,5 @@
 {
-  "version": "1.5.8",
+  "version": "1.5.9",
   "date": "2026-07-15",
-  "changelog": "Fixed duplicate LXX pill in the parallel panel — LXX now appears only once in the original-languages row."
+  "changelog": "Share card now always shows a Download PNG button — previously hidden on desktop when the native share sheet was available."
 }
