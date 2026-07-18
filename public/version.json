@@ -1,5 +1,5 @@
 {
-  "version": "1.5.16",
+  "version": "1.5.17",
   "date": "2026-07-18",
-  "changelog": "2LBCF Chapters 21–32 text corrected — typos fixed, stray footnote markers removed, broken hyphens repaired."
+  "changelog": "Catechism text cleaned — broken hyphens repaired, embedded footnotes removed, inline refs now stripped from answer display."
 }

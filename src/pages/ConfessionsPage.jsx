@@ -81,7 +81,10 @@ const LBCF2_CHAPTERS = buildChapters()
 
 function stripInlineRefs(text) {
   if (!text) return text
-  return text.replace(/\s*\([^)]+\)\s*$/, '').trim()
+  return text
+    .replace(/\s*\([^)]*\b(?:[A-Z][a-z]{0,4}\s+\d|[A-Z]{3}\s+\d)\d*[^)]*\)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 function cleanRefs(refs) {
