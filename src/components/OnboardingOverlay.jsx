@@ -137,6 +137,14 @@ const STEPS = [
   },
   {
     route:    '/about',
+    selector: '[data-onboarding="bible-translations"]',
+    title:    "Choose Your Translations",
+    body:     "Tap any chip to show or hide that translation in the Scripture version picker and parallel panel. Default visible: KJV, HOT, GNT, ABAB. Add Filipino translations (ABAB, CEBug, ILO) or others here.",
+    position: 'below',
+    delay:    400,
+  },
+  {
+    route:    '/about',
     selector: null,
     title:    "You're ready.",
     quote:    true,

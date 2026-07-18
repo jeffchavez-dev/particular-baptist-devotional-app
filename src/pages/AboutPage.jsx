@@ -787,7 +787,7 @@ export default function AboutPage() {
             </div>
 
             {/* Bible Translations — chip toggles */}
-            <div style={{ ...s.settingRow, alignItems:'flex-start', flexDirection:'column', gap:10 }}>
+            <div data-onboarding="bible-translations" style={{ ...s.settingRow, alignItems:'flex-start', flexDirection:'column', gap:10 }}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Bible Translations</span>
                 <span style={s.settingHint}>Choose which translations appear in the Scripture version picker and parallel panel</span>

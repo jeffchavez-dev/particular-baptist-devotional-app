@@ -1,5 +1,5 @@
 {
-  "version": "1.5.11",
+  "version": "1.5.12",
   "date": "2026-07-15",
-  "changelog": "Dashboard confession card no longer shows inline proof text citations in the body text."
+  "changelog": "Onboarding tour now includes a step highlighting the Bible Translations setting in Settings."
 }
