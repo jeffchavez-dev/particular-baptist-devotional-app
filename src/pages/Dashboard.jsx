@@ -31,23 +31,28 @@ function saveReflection(text) {
   try { localStorage.setItem(getTodayKey(), text) } catch {}
 }
 
+function stripInlineRefs(text) {
+  if (!text) return text
+  return text.replace(/\s*\([^)]+\)\s*$/, '').trim()
+}
+
 /* ── Full text resolver for a confession item ── */
 function getConfItemText(item) {
   if (!item) return null
   if (item.planId === '2lbcf') {
-    return LBCF2[item.key]?.text || null
+    return stripInlineRefs(LBCF2[item.key]?.text) || null
   }
   if (item.planId === 'catechism') {
     const entry = CATECHISM[item.key]
-    return entry ? `Q. ${entry.q}\n\nA. ${entry.a}` : null
+    return entry ? `Q. ${stripInlineRefs(entry.q)}\n\nA. ${stripInlineRefs(entry.a)}` : null
   }
   if (item.planId === '1lbcf') {
     const entry = LBCF1[parseInt(item.key)]
-    return entry?.text || null
+    return stripInlineRefs(entry?.text) || null
   }
   if (item.planId === 'orthodox') {
     const entry = ORTHODOX_CATECHISM[item.key]
-    return entry ? `Q. ${entry.q}\n\nA. ${entry.a}` : null
+    return entry ? `Q. ${stripInlineRefs(entry.q)}\n\nA. ${stripInlineRefs(entry.a)}` : null
   }
   return null
 }
@@ -65,7 +70,7 @@ function getConfItemRefs(item) {
 /* ── Default items shown to guests / no-plan users ── */
 const GUEST_SCRIPTURE = 'Genesis 1'
 const GUEST_CONF_ITEM = { planId:'2lbcf', key:'1.1', label:'Ch. 1 §1' }
-const GUEST_CONF_TEXT = LBCF2['1.1']?.text || ''
+const GUEST_CONF_TEXT = stripInlineRefs(LBCF2['1.1']?.text) || ''
 
 /* ── Small icon ── */
 function CheckIcon() {
