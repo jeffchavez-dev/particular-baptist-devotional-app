@@ -1,5 +1,5 @@
 {
-  "version": "1.5.17",
+  "version": "1.5.18",
   "date": "2026-07-18",
-  "changelog": "Catechism text cleaned — broken hyphens repaired, embedded footnotes removed, inline refs now stripped from answer display."
+  "changelog": "1LBCF cleaned — stray footnote markers removed, paragraph section numbers stripped, editorial junk removed from Art. 52."
 }
