@@ -273,8 +273,10 @@ function parseAtQueryWithChapterTag(query, chapterTag) {
   if (chapterTag) {
     const q = query.trim()
     // @3 — bare verse number → use the tagged chapter
+    // Skip 1, 2, 3 as verse shorthands — they conflict with numbered book prefixes
+    // (1 Samuel, 2 Kings, 3 John, etc.). Verse shorthands work from 4+ upward.
     const mVerse = q.match(/^(\d+)$/)
-    if (mVerse) {
+    if (mVerse && parseInt(mVerse[1]) >= 4) {
       return {
         book:    chapterTag.book,
         chapter: chapterTag.chapter,
@@ -1170,7 +1172,9 @@ function AtMentionPopup({ pos, query, onSelect, onClose, chapterTag }) {
         </div>
         <div style={am.bookList}>
           {filteredBooks.slice(0, 12).map(b => (
-            <button key={b.name} style={am.bookBtn} onClick={() => { setBook(b.name); setStep('ref') }}>
+            <button key={b.name} style={am.bookBtn}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { setBook(b.name); setStep('ref') }}>
               {b.name}
             </button>
           ))}
@@ -1463,10 +1467,18 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
 
   function checkAtMention() {
     const sel = window.getSelection()
-    if (!sel || !sel.rangeCount) { setAtPopup(null); return }
+    if (!sel || !sel.rangeCount) {
+      // If popup is already visible, don't close on lost selection — the user may have
+      // tapped inside the popup (blurring the editor). Let the click-outside handler decide.
+      if (!atPopup) setAtPopup(null)
+      return
+    }
     const range = sel.getRangeAt(0)
     const node  = range.startContainer
-    if (node.nodeType !== Node.TEXT_NODE) { setAtPopup(null); return }
+    if (node.nodeType !== Node.TEXT_NODE) {
+      if (!atPopup) setAtPopup(null)
+      return
+    }
     const text = node.textContent || ''
     const idx  = text.lastIndexOf('@', range.startOffset - 1)
     if (idx === -1) { setAtPopup(null); return }
