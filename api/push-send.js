@@ -11,8 +11,10 @@
  *   CRON_SECRET  (optional — if set, request must include Authorization: Bearer <secret>)
  */
 
-import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const webpush = require('web-push')
 
 // ── Minimal plan helpers (no data file imports) ──────────────────────────────
 

@@ -20,7 +20,9 @@
  */
 
 import crypto from 'crypto'
-import webpush from 'web-push'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const webpush = require('web-push')
 import { createClient } from '@supabase/supabase-js'
 
 export const config = { api: { bodyParser: false } }
