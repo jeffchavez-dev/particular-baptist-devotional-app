@@ -1,52 +1,81 @@
 /**
  * GET /api/push-send  (triggered by Vercel Cron daily at 08:00 UTC)
  *
- * Sends every subscriber a personalized Web Push reminder naming today's
- * actual Bible reading-plan chapter(s) and Confession-plan item — the same
- * content Dashboard.jsx shows for that user.
- *
- * (Fixed single daily time, not per-user, since Vercel Cron on the Hobby
- * plan only supports a once-a-day schedule.)
+ * Sends every subscriber a daily reading reminder. Avoids importing from
+ * src/lib/ (those files chain-import large data files that break serverless
+ * bundling). Plan logic is inlined minimally here.
  *
  * Env vars required:
  *   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_MAILTO
- *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY)
- *   CRON_SECRET  (set in Vercel dashboard, sent as Authorization: Bearer <secret>)
+ *   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+ *   CRON_SECRET  (optional — if set, request must include Authorization: Bearer <secret>)
  */
 
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
-import { isTodayRestDay, getCurrentPlanChapters } from '../src/lib/planEngine.js'
-import { isTodayConfRestDay, getCurrentConfItem } from '../src/lib/confessionPlan.js'
 
-function bibleLine(planRow) {
-  if (!planRow) return 'No Bible plan set up'
-  const config   = planRow.config || {}
-  const progress = { currentIndex: planRow.current_index ?? 0, lastAdvancedDate: planRow.last_advanced_date ?? null }
-  if (isTodayRestDay(config)) return 'Rest day'
-  const chapters = getCurrentPlanChapters(config, progress)
-  return chapters?.length ? chapters.join(' & ') : 'Plan complete! 🎉'
+// ── Minimal plan helpers (no data file imports) ──────────────────────────────
+
+const BIBLE_BOOKS = [
+  'Genesis','Exodus','Leviticus','Numbers','Deuteronomy','Joshua','Judges','Ruth',
+  '1 Samuel','2 Samuel','1 Kings','2 Kings','1 Chronicles','2 Chronicles','Ezra',
+  'Nehemiah','Esther','Job','Psalms','Proverbs','Ecclesiastes','Song of Solomon',
+  'Isaiah','Jeremiah','Lamentations','Ezekiel','Daniel','Hosea','Joel','Amos',
+  'Obadiah','Jonah','Micah','Nahum','Habakkuk','Zephaniah','Haggai','Zechariah',
+  'Malachi','Matthew','Mark','Luke','John','Acts','Romans','1 Corinthians',
+  '2 Corinthians','Galatians','Ephesians','Philippians','Colossians',
+  '1 Thessalonians','2 Thessalonians','1 Timothy','2 Timothy','Titus','Philemon',
+  'Hebrews','James','1 Peter','2 Peter','1 John','2 John','3 John','Jude','Revelation',
+]
+
+const CHAPTER_COUNTS = [
+  50,40,27,36,34,24,21,4,31,24,22,25,29,36,10,13,10,42,150,31,12,8,
+  66,52,5,48,12,14,3,9,1,4,7,3,3,3,2,14,4,28,16,24,21,28,16,16,13,
+  6,6,4,4,5,3,6,4,3,1,13,5,5,3,5,1,1,1,22,
+]
+
+function isTodayRestDay(config) {
+  if (!config?.restDays?.length) return false
+  return config.restDays.includes(new Date().getDay())
 }
 
-function confLine(confConfig, confProgress) {
-  if (!confConfig) return 'No confession plan set up'
-  if (isTodayConfRestDay(confConfig)) return 'Rest day'
-  const item = getCurrentConfItem(confConfig, confProgress)
-  return item?.label || 'Plan complete! 🎉'
+function getChapterLabel(config, currentIndex) {
+  if (!config) return null
+  // Build flat chapter list from plan books
+  const books = config.books || BIBLE_BOOKS
+  const chapters = []
+  for (const book of books) {
+    const idx = BIBLE_BOOKS.indexOf(book)
+    if (idx === -1) continue
+    const count = CHAPTER_COUNTS[idx] || 1
+    for (let c = 1; c <= count; c++) chapters.push(`${book} ${c}`)
+  }
+  if (!chapters.length || currentIndex >= chapters.length) return null
+  const cpd = config.chaptersPerDay || 1
+  const result = []
+  for (let i = 0; i < cpd; i++) {
+    if (currentIndex + i < chapters.length) result.push(chapters[currentIndex + i])
+  }
+  return result.length ? result.join(' & ') : null
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  // Verify cron secret (Vercel passes it automatically when configured)
   const auth = req.headers['authorization'] || ''
   if (process.env.CRON_SECRET && auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  webpush.setVapidDetails(
-    `mailto:${process.env.VAPID_MAILTO || 'jeffchavez0828@gmail.com'}`,
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  )
+  const vapidPublic  = process.env.VAPID_PUBLIC_KEY
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY
+  const vapidMailto  = process.env.VAPID_MAILTO || 'jeffchavez0828@gmail.com'
+
+  if (!vapidPublic || !vapidPrivate) {
+    return res.status(500).json({ error: 'Missing VAPID env vars' })
+  }
+
+  webpush.setVapidDetails(`mailto:${vapidMailto}`, vapidPublic, vapidPrivate)
 
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -69,26 +98,34 @@ export default async function handler(req, res) {
 
   const results = await Promise.allSettled(
     subs.map(async sub => {
-      const [{ data: planRows }, { data: userDataRows }] = await Promise.all([
-        supabase.from('pb_bible_plans')
-          .select('config, current_index, last_advanced_date')
-          .eq('user_id', sub.user_id).eq('is_active', true).limit(1),
-        supabase.from('pb_user_data')
-          .select('data_key, data_value')
-          .eq('user_id', sub.user_id)
-          .in('data_key', ['conf_plan_config', 'conf_plan_progress']),
-      ])
+      // Fetch user's active Bible plan
+      const { data: planRows } = await supabase
+        .from('pb_bible_plans')
+        .select('config, current_index')
+        .eq('user_id', sub.user_id)
+        .eq('is_active', true)
+        .limit(1)
 
-      const planRow      = planRows?.[0] ?? null
-      const confConfig    = userDataRows?.find(r => r.data_key === 'conf_plan_config')?.data_value ?? null
-      const confProgress  = userDataRows?.find(r => r.data_key === 'conf_plan_progress')?.data_value ?? null
+      const plan         = planRows?.[0] ?? null
+      const isRestDay    = plan ? isTodayRestDay(plan.config) : false
+      const chapterLabel = plan && !isRestDay
+        ? getChapterLabel(plan.config, plan.current_index ?? 0)
+        : null
 
-      const bible = bibleLine(planRow)
-      const conf  = confLine(confConfig, confProgress)
+      let body
+      if (!plan) {
+        body = "Time for your daily devotional reading. Open the app to continue."
+      } else if (isRestDay) {
+        body = "It's a rest day — but the app is ready when you are. 📖"
+      } else if (chapterLabel) {
+        body = `Today's reading: ${chapterLabel} 📖`
+      } else {
+        body = "Your Bible reading plan is complete! 🎉 Check the app to start a new plan."
+      }
 
       const payload = JSON.stringify({
-        title: "Today's Reading",
-        body:  `📖 Bible: ${bible}   📜 Confession: ${conf}`,
+        title: 'Particular Baptist Devotional',
+        body,
         icon:  '/pwa-192.png',
         badge: '/pwa-192.png',
         tag:   'daily-reading',
@@ -100,7 +137,6 @@ export default async function handler(req, res) {
         await webpush.sendNotification(pushSub, payload)
         return { ok: true }
       } catch (err) {
-        // 410 Gone = expired subscription; clean it up
         if (err.statusCode === 410) {
           await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
         }
@@ -111,7 +147,6 @@ export default async function handler(req, res) {
 
   const sent   = results.filter(r => r.status === 'fulfilled').length
   const failed = results.filter(r => r.status === 'rejected').length
-
   console.log(`Push send: sent=${sent} failed=${failed}`)
   return res.status(200).json({ sent, failed })
 }
