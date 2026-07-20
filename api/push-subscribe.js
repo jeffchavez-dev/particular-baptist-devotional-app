@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const { subscription, userId, action = 'subscribe' } = req.body || {}
+    const { subscription, userId, slot = 'morning', action = 'subscribe' } = req.body || {}
 
     if (!subscription || !subscription.endpoint) {
       return res.status(400).json({ error: 'Missing subscription object' })
@@ -62,6 +62,7 @@ export default async function handler(req, res) {
       p256dh:     subscription.keys?.p256dh || null,
       auth:       subscription.keys?.auth    || null,
       user_id:    userId,
+      slot:       ['morning','midday','evening'].includes(slot) ? slot : 'morning',
       created_at: new Date().toISOString(),
     }
 

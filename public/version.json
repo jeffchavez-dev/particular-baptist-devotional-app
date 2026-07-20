@@ -1,5 +1,5 @@
 {
-  "version": "1.5.25",
+  "version": "1.5.26",
   "date": "2026-07-20",
-  "changelog": "Push notifications now work — subscribe button fixed and VAPID keys updated."
+  "changelog": "Choose when to receive your daily reading reminder — Morning (6 AM), Midday (12 PM), or Evening (7 PM)."
 }

@@ -84,10 +84,13 @@ export default async function handler(req, res) {
     process.env.VITE_SUPABASE_ANON_KEY
   )
 
+  const slot = req.query.slot || 'morning'
+
   const { data: subs, error } = await supabase
     .from('push_subscriptions')
     .select('endpoint, p256dh, auth, user_id')
     .not('user_id', 'is', null)
+    .eq('slot', slot)
 
   if (error) {
     console.error('Supabase fetch error:', error)

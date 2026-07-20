@@ -4,6 +4,8 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/push-send", "schedule": "0 8 * * *" }
+    { "path": "/api/push-send?slot=morning", "schedule": "0 22 * * *" },
+    { "path": "/api/push-send?slot=midday",  "schedule": "0 4 * * *"  },
+    { "path": "/api/push-send?slot=evening", "schedule": "0 11 * * *" }
   ]
 }
