@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/share/note/:token", "destination": "/api/share/note/:token" },
+    { "source": "/share/note/:token", "destination": "/api/shared-note?token=:token" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
