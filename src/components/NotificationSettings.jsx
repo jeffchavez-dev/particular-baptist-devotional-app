@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-const VAPID_PUBLIC_KEY = 'BBCVNo8lVrGRVkDgO0rBh-toh_8CtTL8W5z4hAjMBO4RUNi5qF-9TXj3V6IvUMmMa4NmXme0ivMMmGw4AY9IAsg'
+const VAPID_PUBLIC_KEY = 'BC9Dn5Pvou9_LphX4_-9SgKZAwEsPe47wQ2W9tpt-NgQiJQFYS9cCD69CL82Oe3MBBZfYTt-IL0CjZ7yjGg60oY'
 
 /** Convert VAPID public key (base64url) → Uint8Array */
 function urlBase64ToUint8Array(base64String) {
@@ -11,6 +12,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export default function NotificationSettings({ userId }) {
+  const navigate = useNavigate()
   const [supported,  setSupported]  = useState(false)
   const [permission, setPermission] = useState('default')
   const [subscribed, setSubscribed] = useState(false)
@@ -55,8 +57,8 @@ export default function NotificationSettings({ userId }) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
           subscription: sub.toJSON(),
-          userId:       userId || null,
-          action:       'subscribe',
+          userId,
+          action: 'subscribe',
         }),
       })
 
@@ -66,7 +68,7 @@ export default function NotificationSettings({ userId }) {
       }
 
       setSubscribed(true)
-      setMsg('Notifications enabled — you\'ll receive a daily reminder each morning.')
+      setMsg('Notifications enabled — you\'ll get a reminder naming today\'s actual reading each morning.')
     } catch (err) {
       console.error(err)
       setError(err.message || 'Could not enable notifications. Try again.')
@@ -128,6 +130,27 @@ export default function NotificationSettings({ userId }) {
     )
   }
 
+  /* ── Sign-in required ──
+     A personalized reminder needs to read your Bible/Confession plan progress
+     server-side, which only exists in Supabase for signed-in accounts. */
+  if (!userId) {
+    return (
+      <div style={n.row}>
+        <div style={n.label}>
+          <span style={n.name}>Daily Reminders</span>
+          <span style={n.hint}>
+            Sign in to get a daily push notification naming today's actual Bible chapter and confession reading.
+          </span>
+        </div>
+        <div style={n.controls}>
+          <button onClick={() => navigate('/auth')} className="btn btn-outline" style={{fontSize:13, flexShrink:0}}>
+            Sign in
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const busy = status === 'working'
 
   return (
@@ -136,8 +159,8 @@ export default function NotificationSettings({ userId }) {
         <span style={n.name}>Daily Reminders</span>
         <span style={n.hint}>
           {subscribed
-            ? 'You\'ll receive a daily push notification on this device each morning.'
-            : 'Get a daily push notification on this device reminding you to read.'}
+            ? 'You\'ll get a push notification naming today\'s Bible chapter and confession reading, once a day each morning.'
+            : 'Get a daily push notification naming today\'s actual Bible chapter and confession reading.'}
         </span>
       </div>
 
