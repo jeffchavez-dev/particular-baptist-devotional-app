@@ -2430,7 +2430,7 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate
     try {
       const raw = encodeRichNote(titleVal.trim(), bodyHtml, labels, verseTag, createdAt, chapterTag)
       setItemNote(noteKey, raw, session?.user?.id)
-      onSave()
+      onSave(raw)
     } finally {
       setSaving(false)
     }
@@ -3113,7 +3113,13 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
   const totalResults = filteredLib.length + filteredKjv.length + filteredConf.length + filteredDev.length
   const isSearching  = q.length > 0
 
-  function handleSaved() {
+  function handleSaved(raw) {
+    // Sync to Supabase if this note has an active share link
+    if (raw && editingNote?.key && session?.user?.id && getLibShareToken(editingNote.key)) {
+      const sourceLabel = editingNote.type === 'lib' ? 'Personal Note' : editingNote.type === 'kjv' ? 'Scripture Note' : editingNote.type === 'conf' ? 'Confession Note' : 'Note'
+      syncLibSharedNote({ noteKey: editingNote.key, text: raw, title: editingNote.badge || editingNote.title || '', source: sourceLabel, userId: session.user.id })
+        .catch(e => console.warn('[syncLibSharedNote]', e))
+    }
     setShowCreateForm(false) // clears SESSION_CREATE_KEY via wrapper
     setEditingNote(null)     // clears SESSION_EDIT_KEY via wrapper
   }

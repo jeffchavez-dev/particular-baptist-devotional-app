@@ -1,5 +1,5 @@
 {
-  "version": "1.5.20",
-  "date": "2026-07-19",
-  "changelog": "Shared note links now preserve rich formatting — headings, bullets, and scripture quote cards render correctly instead of showing plain text."
+  "version": "1.5.21",
+  "date": "2026-07-20",
+  "changelog": "Shared note links now stay in sync — editing a note after sharing automatically updates the shared link with the latest content."
 }
