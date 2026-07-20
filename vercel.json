@@ -1,5 +1,8 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/share/note/:token", "destination": "/api/share/note/:token" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "crons": [
     { "path": "/api/push-send", "schedule": "0 8 * * *" }
   ]
