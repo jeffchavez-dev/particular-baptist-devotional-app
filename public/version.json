@@ -1,5 +1,5 @@
 {
-  "version": "1.5.22",
+  "version": "1.5.23",
   "date": "2026-07-20",
-  "changelog": "Shared note links now show a title preview when shared on iMessage, WhatsApp, and other apps."
+  "changelog": "Share card and copy text no longer include the parenthetical proof references embedded in confession text."
 }

@@ -1705,7 +1705,7 @@ export default function ConfessionsPage() {
                               <ItemActions
                                 itemKey={itemKey}
                                 label="2LBCF"
-                                copyText={p.text + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
+                                copyText={stripInlineRefs(p.text) + (p.refs ? '\n\nScripture proofs: ' + cleanRefs(p.refs) : '')}
                                 shareTitle={`2LBCF ${p.key}`}
                                 shareSource="2LBCF"
                                 refs={p.refs || ''}
@@ -1761,7 +1761,7 @@ export default function ConfessionsPage() {
                         <ItemActions
                           itemKey={itemKey}
                           label="Catechism"
-                          copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          copyText={`Q. ${stripInlineRefs(item.q)}\n\nA. ${stripInlineRefs(item.a)}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`Catechism Q.${num}`}
                           shareSource="Catechism"
                           refs={item.refs || ''}
@@ -1825,7 +1825,7 @@ export default function ConfessionsPage() {
                         <ItemActions
                           itemKey={itemKey}
                           label="1LBCF"
-                          copyText={`${item.title}\n\n${item.text}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          copyText={`${item.title}\n\n${stripInlineRefs(item.text)}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`1LBCF Art. ${num}`}
                           shareSource="1LBCF"
                           refs={item.refs || ''}
@@ -1878,7 +1878,7 @@ export default function ConfessionsPage() {
                         <ItemActions
                           itemKey={itemKey}
                           label="Orthodox Catechism"
-                          copyText={`Q. ${item.q}\n\nA. ${item.a}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
+                          copyText={`Q. ${stripInlineRefs(item.q)}\n\nA. ${stripInlineRefs(item.a)}` + (item.refs ? '\n\nScripture proofs: ' + cleanRefs(item.refs) : '')}
                           shareTitle={`Orthodox Catechism Q.${num}`}
                           shareSource="Orthodox"
                           refs={item.refs || ''}
