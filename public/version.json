@@ -1,5 +1,5 @@
 {
-  "version": "1.5.19",
-  "date": "2026-07-18",
-  "changelog": "1LBCF further corrected against london1644.info — residual section numbers removed, Christf/believed fixed, Art.41+44 title/text splits repaired, Art.18 missing article 'a' restored."
+  "version": "1.5.20",
+  "date": "2026-07-19",
+  "changelog": "Shared note links now preserve rich formatting — headings, bullets, and scripture quote cards render correctly instead of showing plain text."
 }

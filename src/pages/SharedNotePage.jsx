@@ -11,17 +11,17 @@ function formatDate(iso) {
 
 /* ── Scoped styles for rich content rendering ── */
 const RICH_STYLES = `
-  .pb-rich-note h1 { font-size:1.5em; font-weight:700; margin:0.6em 0 0.3em; font-family:'Cormorant Garamond',serif; }
-  .pb-rich-note h2 { font-size:1.25em; font-weight:700; margin:0.5em 0 0.25em; font-family:'Cormorant Garamond',serif; }
-  .pb-rich-note p  { margin:0 0 0.75em; }
-  .pb-rich-note ul, .pb-rich-note ol { padding-left:1.4em; margin:0 0 0.75em; }
-  .pb-rich-note li { margin-bottom:0.3em; }
-  .pb-rich-note blockquote {
-    border-left:3px solid #1d6b5a; margin:1em 0; padding:0.6em 1em;
-    background:rgba(29,107,90,0.06); border-radius:0 6px 6px 0;
+  .pb-rich-note h1 { font-size:1.35em; font-weight:700; margin:0.4em 0 0.2em; font-family:'Cormorant Garamond',serif; }
+  .pb-rich-note h2 { font-size:1.1em; font-weight:700; margin:0.4em 0 0.15em; font-family:'Cormorant Garamond',serif; }
+  .pb-rich-note p  { margin:0.2em 0; }
+  .pb-rich-note ul, .pb-rich-note ol { padding-left:1.4em; margin:0.3em 0; }
+  .pb-rich-note li { margin:0.15em 0; padding-left:0.2em; }
+  .pb-rich-note blockquote, .pb-rich-note .sc-quote {
+    border-left:3px solid #1d6b5a; margin:8px 0; padding:8px 12px;
+    background:rgba(29,107,90,0.06); border-radius:0 8px 8px 0;
     font-style:italic; color:#2c2417;
   }
-  .pb-rich-note blockquote em { font-style:normal; }
+  .pb-rich-note blockquote em, .pb-rich-note .sc-quote em { font-style:normal; }
   .pb-rich-note strong { font-weight:700; }
   .pb-rich-note em { font-style:italic; }
   .pb-rich-note a { color:#1d6b5a; }
@@ -69,7 +69,19 @@ export default function SharedNotePage() {
   const updatedAt = data.updated_at || note.updatedAt || note.createdAt
   const noteText  = note.text || ''
   const isRich    = noteText.startsWith('<!RICH>')
-  const richHtml  = isRich ? noteText.slice(7) : null
+
+  // Rich notes are stored as <!RICH>{"title":"…","body":"<html>…",…}
+  let richTitle = null
+  let richHtml  = null
+  if (isRich) {
+    try {
+      const parsed = JSON.parse(noteText.slice(7))
+      richTitle = parsed.title || null
+      richHtml  = parsed.body  || ''
+    } catch {
+      richHtml = noteText.slice(7) // fallback for legacy plain-HTML format
+    }
+  }
 
   return (
     <div style={s.page}>
@@ -116,11 +128,14 @@ export default function SharedNotePage() {
 
         {/* Rich note content */}
         {isRich ? (
-          <div
-            className="pb-rich-note"
-            style={s.richContent}
-            dangerouslySetInnerHTML={{ __html: richHtml }}
-          />
+          <>
+            {richTitle && <div style={s.richTitle}>{richTitle}</div>}
+            <div
+              className="pb-rich-note"
+              style={s.richContent}
+              dangerouslySetInnerHTML={{ __html: richHtml }}
+            />
+          </>
         ) : (
           /* Plain text note */
           <div style={{ ...s.noteText, fontStyle: isQuote ? 'italic' : 'normal' }}>
@@ -202,6 +217,12 @@ const s = {
     color: 'var(--ink, #2c2417)',
     whiteSpace: 'pre-wrap', wordBreak: 'break-word',
     padding: '8px 0',
+  },
+  richTitle: {
+    fontSize: 20, fontWeight: 700,
+    fontFamily: "'Cormorant Garamond', serif",
+    color: 'var(--ink, #2c2417)',
+    marginBottom: 12,
   },
   richContent: {
     fontSize: 16, lineHeight: 1.8,

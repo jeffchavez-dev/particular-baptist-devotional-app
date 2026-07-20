@@ -3524,8 +3524,7 @@ function NotesTab({ enrichedDevNotes, kjvNotes, confNotes, libNotes, navigate, s
           if (!shareableKey || !session?.user?.id) return
           setShareLinkLoading(true)
           try {
-            const text  = noteToPlainText(vn.note)
-            const token = await shareLibNote({ noteKey: shareableKey, text, title: vn.badge || vn.title || '', source: sourceLabel, userId: session.user.id })
+            const token = await shareLibNote({ noteKey: shareableKey, text: vn.note, title: vn.badge || vn.title || '', source: sourceLabel, userId: session.user.id })
             setShareLibLink(token)
           } catch (e) { console.error('[shareLibLink]', e) }
           finally { setShareLinkLoading(false) }
