@@ -1734,7 +1734,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
   /* Editor border style: connect to toolbar when shown, full border when hidden (overlay mode) */
   const editorStyle = showToolbar
     ? re.editor
-    : { ...re.editor, border: 'none', borderBottom: '1px solid var(--border)', borderRadius: 0, minHeight: '40vh', background: 'transparent' }
+    : { ...re.editor, border: 'none', borderBottom: 'none', borderRadius: 0, minHeight: 120, background: 'transparent' }
 
   return (
     <div style={re.wrap} data-note-editor-wrap="1">
