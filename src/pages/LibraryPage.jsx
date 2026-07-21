@@ -2008,19 +2008,6 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
             </svg>
             <span style={eo.quickNavLabel}>Scripture</span>
           </button>
-          <button
-            onClick={() => navigate('/confessions')}
-            style={eo.quickNavBtn}
-            title="Go to Confessions (note auto-saved)"
-            aria-label="Open Confessions"
-          >
-            {/* Scroll / columns */}
-            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
-              <rect x="2.5" y="2.5" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-              <path d="M6 2.5v12M2.5 6.5h3.5M2.5 9.5h3.5M2.5 12.5h3.5M7.5 6.5h7M7.5 9.5h7M7.5 12.5h5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
-            </svg>
-            <span style={eo.quickNavLabel}>Confession</span>
-          </button>
         </div>
 
         {/* Save */}
