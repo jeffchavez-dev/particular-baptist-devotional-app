@@ -1,5 +1,9 @@
 # Todo
 
+## Security
+
+- [ ] **Add a pre-commit hook to catch accidental secret commits** — scan staged files for patterns like bearer tokens, private keys, and hardcoded secrets before allowing a commit. Use `git-secrets` or a simple shell hook in `.git/hooks/pre-commit`. Should block commits containing things like VAPID private keys, CRON secrets, API keys, and `service_role` values in plain text.
+
 ## Confession Page
 
 - [ ] **Fix proof text chip navigation in the Confession page sidebar** — the Proof Texts tab shows cross-reference chips (e.g. "Art. 4 ·15", "4.2 ·48", "Q.25") that currently navigate to an old `/day/:num` URL instead of jumping to the correct article or Q&A within the Confession reader. Should navigate in-page: "Art. 4" → 2LBCF Chapter 4, "Q.25" → Catechism Q&A 25, "4.2" → 2LBCF Chapter 4 Section 2. Files in scope: `src/pages/ConfessionsPage.jsx` and any sub-components it uses.
