@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const VAPID_PUBLIC_KEY = 'BC9Dn5Pvou9_LphX4_-9SgKZAwEsPe47wQ2W9tpt-NgQiJQFYS9cCD69CL82Oe3MBBZfYTt-IL0CjZ7yjGg60oY'
+const VAPID_PUBLIC_KEY = 'BB5f0jKlB_dNGFiUEJ4t8q0Jt3gEWI-3x6dwZRITz5Ixr3l7rhUSxbBIzVAdghbLXr-1cgRV2pYcQD8tIck0zSI'
 
 const SLOTS = [
   { id: 'morning', label: 'Morning',  hint: '6:00 AM' },
