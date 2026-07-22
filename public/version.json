@@ -1,5 +1,5 @@
 {
-  "version": "1.5.29",
+  "version": "1.5.30",
   "date": "2026-07-21",
   "changelog": "Fixed @ scripture tagging for numbered books (1 Corinthians, 2 Timothy, etc.) — popup no longer closes when tapping a book on mobile."
 }

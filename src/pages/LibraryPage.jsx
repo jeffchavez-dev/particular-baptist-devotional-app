@@ -1729,12 +1729,13 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
     execCmd,
     execUndo,
     execRedo,
+    focus: () => editorRef.current?.focus(),
   }))
 
   /* Editor border style: connect to toolbar when shown, full border when hidden (overlay mode) */
   const editorStyle = showToolbar
     ? re.editor
-    : { ...re.editor, border: 'none', borderBottom: 'none', borderRadius: 0, minHeight: 120, background: 'transparent' }
+    : { ...re.editor, border: 'none', borderBottom: 'none', borderRadius: 0, minHeight: 0, background: 'transparent' }
 
   return (
     <div style={re.wrap} data-note-editor-wrap="1">
@@ -2078,7 +2079,14 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
       </div>
 
       {/* ── Scrollable content ── */}
-      <div ref={scrollAreaRef} style={eo.scrollArea}>
+      <div ref={scrollAreaRef} style={eo.scrollArea}
+        onClick={e => {
+          // Tap anywhere in the empty scroll area to focus the editor
+          if (e.target === scrollAreaRef.current && editorRef.current) {
+            editorRef.current.focus()
+          }
+        }}
+      >
         <div style={eo.contentPad}>
           {children}
         </div>
