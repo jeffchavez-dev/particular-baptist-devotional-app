@@ -80,11 +80,13 @@ A progressive web app for daily devotional reading, Bible study, confession read
 ### My Library
 - **Highlights** — all verse and phrase highlights with color filter
 - **Reflection Notes** — personal daily notes saved from the Home screen, shown with date and searchable
+  - **Rich text editor** — bold, italic, underline, lists, and heading formatting in the note editor
+  - **@ scripture tagging** — type `@` in a note to tag a Bible verse inline; numbered books (1 Corinthians, 2 Timothy, etc.) work correctly
+  - **Shareable links** — every note can be shared via a public URL (no auth required); shared note pages include OpenGraph meta tags so link previews render correctly in iMessage, Slack, Twitter, etc.
 - **Bookmarks** — confession and catechism bookmarks with scripture cross-references
 - **Highlighted Phrases** — partial phrase highlights saved from the Bible reader
-- Shareable note links (public URL, no auth required)
 
-**Done when:** every item type saved elsewhere in the app appears in its matching Library tab, Reflection Notes saved today appear in the Notes tab after a reload, and a shared note link opens correctly in a signed-out browser.
+**Done when:** every item type saved elsewhere in the app appears in its matching Library tab, Reflection Notes saved today appear in the Notes tab after a reload, a shared note link opens correctly in a signed-out browser, and pasting a shared note URL into iMessage shows a preview card with the note title.
 
 ### Sync (Supabase)
 - Cloud sync covers: devotional day progress, Bible chapter progress, Bible reading plan position, confession plan position/config/completions, bookmarks, scripture bookmarks, and scripture completions
