@@ -52,12 +52,12 @@ vercel.com → project → **Settings → Environment Variables** → add each, 
 
 | Name | Value |
 |---|---|
-| `VAPID_PUBLIC_KEY` | `REDACTED` |
-| `VAPID_PRIVATE_KEY` | `REDACTED` |
-| `VAPID_MAILTO` | `mailto:jeffchavez0828@gmail.com` |
+| `VAPID_PUBLIC_KEY` | *(regenerate — previous key was exposed in git history)* |
+| `VAPID_PRIVATE_KEY` | *(regenerate — previous key was exposed in git history)* |
+| `VAPID_MAILTO` | `mailto:jeff.chavez0828@gmail.com` |
 | `SUPABASE_URL` | same value as existing `VITE_SUPABASE_URL` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` secret key |
-| `CRON_SECRET` | `REDACTED` |
+| `CRON_SECRET` | *(regenerate — previous secret was exposed in git history)* |
 
 (Leave `VERCEL_WEBHOOK_SECRET` for Part 3.)
 
@@ -75,7 +75,7 @@ This is a **Webhook**, not a "Deploy Hook" (deploy hooks trigger deploys; webhoo
 2. Sign in to the app → Settings → **Enable notifications**.
 3. Test the daily reminder immediately (don't wait for 8am UTC):
    ```
-   curl -H "Authorization: Bearer REDACTED" https://<domain>/api/push-send
+   curl -H "Authorization: Bearer <your-cron-secret>" https://<domain>/api/push-send
    ```
    Expect a push naming the actual Bible chapter + confession section, and `{"sent":1,"failed":0}` back.
 4. Test the update-push: deploy any small change, then check **Team Settings → Webhooks → your webhook → Deliveries** for a `200`. A `401` means the signature check failed — the field names in `api/push-notify-update.js` (`body.type`, `body.payload.target`, `body.payload.deployment.url`) were written from Vercel's documented payload shape but never verified against a real delivery; report back what the delivery log shows and adjust from there.
