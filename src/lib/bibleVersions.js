@@ -112,6 +112,16 @@ export const BIBLE_VERSIONS = [
     dataFile: '/rv.json',
   },
   {
+    id: 'esv',
+    label: 'English Standard Version',
+    abbreviation: 'ESV',
+    language: 'English',
+    year: '2001',
+    description: 'English Standard Version — a modern literal translation by Crossway',
+    type: 'api',       // fetched on demand via /api/esv, not bundled locally
+    adminOnly: true,   // hidden from regular users until public launch
+  },
+  {
     id: 'ilocano',
     label: 'Ti Biblia — Ilocano ULB',
     abbreviation: 'ILO',

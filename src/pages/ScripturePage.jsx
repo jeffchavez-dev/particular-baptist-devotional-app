@@ -313,7 +313,7 @@ export default function ScripturePage() {
             </button>
             {showVersionDropdown && (
               <div style={s.versionDropdown}>
-                {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id)).map(v => (
+                {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id) && (!v.adminOnly || session?.user?.email === 'jeff.chavez0828@gmail.com')).map(v => (
                   <button
                     key={v.id}
                     style={{
@@ -774,12 +774,12 @@ export default function ScripturePage() {
               <p style={vp.heroSub}>Pick a translation to start reading. You can change this anytime in Settings.</p>
             </div>
             <div style={vp.grid}>
-              {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id)).map(v => (
+              {BIBLE_VERSIONS.filter(v => visibleVersions.includes(v.id) && (!v.adminOnly || session?.user?.email === 'jeff.chavez0828@gmail.com')).map(v => (
                 <button
                   key={v.id}
                   style={vp.card}
                   onClick={() => {
-                    setDefaultReaderVersion(['kjv','abab','ceb','ilocano','nasb','bsb','gnv','rv'].includes(v.id) ? v.id : 'kjv')
+                    setDefaultReaderVersion(['kjv','abab','ceb','ilocano','nasb','bsb','gnv','rv','esv'].includes(v.id) ? v.id : 'kjv')
                     setReadVersion(v.id)
                     try { localStorage.setItem('reader-version', v.id) } catch {}
                     setShowVersionPicker(false)

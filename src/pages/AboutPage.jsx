@@ -793,7 +793,7 @@ export default function AboutPage() {
                 <span style={s.settingHint}>Choose which translations appear in the Scripture version picker and parallel panel</span>
               </div>
               <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-                {BIBLE_VERSIONS.map(v => {
+                {BIBLE_VERSIONS.filter(v => !v.adminOnly || session?.user?.email === 'jeff.chavez0828@gmail.com').map(v => {
                   const on = visibleVersions.includes(v.id)
                   return (
                     <button
@@ -814,6 +814,20 @@ export default function AboutPage() {
                   )
                 })}
               </div>
+
+              {/* ESV coming soon notice */}
+              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:2 }}>
+                <span style={{
+                  padding:'5px 13px', borderRadius:99, fontSize:12, fontWeight:700,
+                  fontFamily:"'DM Sans',sans-serif",
+                  border:'1.5px dashed var(--border)',
+                  color:'var(--ink-faint)',
+                  cursor:'default',
+                }}>ESV</span>
+                <span style={{ fontSize:11, color:'var(--ink-faint)', fontStyle:'italic' }}>
+                  Coming soon — ESV® (English Standard Version®) via Crossway API
+                </span>
+              </div>
               <button
                 onClick={() => {
                   persistVisibleVersions(DEFAULT_VISIBLE_VERSIONS)
@@ -824,6 +838,9 @@ export default function AboutPage() {
               >
                 Reset to defaults
               </button>
+              <p style={{ fontSize:11, color:'var(--ink-faint)', margin:'4px 0 0', fontStyle:'italic', lineHeight:1.5 }}>
+                Scripture quotations marked ESV are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.
+              </p>
             </div>
 
             {/* Backup */}

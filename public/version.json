@@ -1,5 +1,5 @@
 {
-  "version": "1.5.30",
-  "date": "2026-07-21",
-  "changelog": "Fixed @ scripture tagging for numbered books (1 Corinthians, 2 Timothy, etc.) — popup no longer closes when tapping a book on mobile."
+  "version": "1.5.31",
+  "date": "2026-07-22",
+  "changelog": "ESV translation added (admin preview) — fetched via ESV API with local caching; attribution shown inline per Crossway license; visible to admin only until public launch."
 }

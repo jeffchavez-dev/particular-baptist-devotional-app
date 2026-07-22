@@ -22,6 +22,7 @@ import { BIBLE_BOOKS } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import { getBibleXrefs, getBibleBackRefs } from '../lib/bibleXrefs'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
+import { getEsvChapter } from '../lib/esvCache'
 import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
 import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
 import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
@@ -1060,7 +1061,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   // Derived: any original-language parallel selected
   const parallelMode = parallelVersions.has('gnt') || parallelVersions.has('hot') || parallelVersions.has('lxx')
   // Which text-version parallel is selected (if any) — supports all English text translations
-  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'ceb', 'ilocano', 'nasb', 'bsb', 'gnv', 'rv'])
+  const _TEXT_VERSIONS = new Set(['kjv', 'abab', 'ceb', 'ilocano', 'nasb', 'bsb', 'gnv', 'rv', 'esv'])
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
@@ -1718,6 +1719,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         .catch(e => {
           if (!cancelled) { setMorphError(e.message); setMorphLoading(false) }
         })
+    } else if (version === 'esv') {
+      // ── ESV — API-fetched per chapter, no bulk JSON to load ──
+      setVersionData(null)
+      setMorphReady(false)
+      setMorphLoading(false)
+      setMorphSegments([])
+      setSelectedWord(null)
+      setError(null)
+      loadedForVersionRef.current = 'esv'
+      setDataReady(true)
+      setLoading(false)
     } else {
       // ── Text version (KJV, ABAB, …) ──
       setVersionData(null)
@@ -1751,9 +1763,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   /* Chapter navigation — load single segment, restore or reset scroll */
   useEffect(() => {
     if (!dataReady) return
-    // Guard: skip if versionData belongs to a different version (stale state in the
-    // same render cycle as the version effect — prevents premature snap consumption).
     if (loadedForVersionRef.current !== version) return
+
+    if (version === 'esv') {
+      setLoading(true)
+      setError(null)
+      getEsvChapter(book, chapter)
+        .then(verses => {
+          if (verses?.length) {
+            lastNavMsRef.current = Date.now()
+            pendingVisibleTargetRef.current = { book, chapter }
+            setSegments([{ book, chapter, verses }])
+            setError(null)
+          } else {
+            setError('Chapter not found in ESV')
+          }
+          setLoading(false)
+        })
+        .catch(e => { setError(e.message); setLoading(false) })
+      return
+    }
+
     const v = getChapterVerses(versionData, book, chapter, version)
     if (v) {
       lastNavMsRef.current = Date.now()
@@ -2502,6 +2532,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     addSearchHistory('kjv', trimmed)
     setSearchHistory(getSearchHistory('kjv'))
     setShowHistDrop(false)
+    // ESV search not supported — API can't search the full Bible
+    if (version === 'esv') {
+      setBibleResults([])
+      setBibleResultsTotal(0)
+      setBibleResultsCapped(false)
+      onSearchResults?.([], 0, false, trimmed)
+      return
+    }
     // Run full-Bible search
     if (dataReady) {
       setSearching(true)
@@ -4297,6 +4335,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         )
                       })}
                     </div>
+
+                    {/* ── ESV attribution (required by Crossway license) ── */}
+                    {version === 'esv' && (
+                      <p style={{ fontSize: 11, color: 'var(--ink-faint)', textAlign: 'center', margin: '12px 0 4px', fontStyle: 'italic', lineHeight: 1.4 }}>
+                        Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), copyright © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.
+                      </p>
+                    )}
 
                     {/* ── Chapter-end read button (all text translations) ── */}
                     {_TEXT_VERSIONS.has(version) && (() => {
