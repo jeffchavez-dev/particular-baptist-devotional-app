@@ -65,13 +65,14 @@ const STEPS = [
     route:    '/scripture',
     selector: '[data-onboarding="commentary-selector"]',
     title:    "Reformed Commentaries",
-    body:     "Choose from Matthew Henry, John Calvin, or John Gill. Commentary appears per-verse as collapsible chips — tap any chip to expand the commentary for that verse.",
-    position: 'below',
+    body:     "Switch between Matthew Henry, John Calvin, and John Gill right here in the sidebar — no need to scroll back up. Commentary appears per-verse as collapsible chips as you read.",
+    position: 'right',
     beforeEnter: () => {
-      // Close sidebar first, then ensure KJV + study mode for commentary selector to render
-      window.dispatchEvent(new CustomEvent('pb-close-scripture-sidebar'))
+      // Open sidebar, ensure KJV + study mode so commentary selector renders
       window.dispatchEvent(new CustomEvent('pb-reset-version-kjv'))
       window.dispatchEvent(new CustomEvent('pb-enable-study-mode'))
+      const pill = document.querySelector('[data-onboarding="scripture-book-pill"]')
+      pill?.click()
     },
     delay: 700,
   },

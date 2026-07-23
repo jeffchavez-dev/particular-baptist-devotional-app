@@ -1,5 +1,5 @@
 {
-  "version": "1.5.31",
-  "date": "2026-07-22",
-  "changelog": "ESV translation added (admin preview) — fetched via ESV API with local caching; attribution shown inline per Crossway license; visible to admin only until public launch."
+  "version": "1.5.32",
+  "date": "2026-07-23",
+  "changelog": "Commentary selector now in the sidebar — switch between Matthew Henry, John Gill, and Calvin without scrolling back up. Tour updated to reflect the new location."
 }

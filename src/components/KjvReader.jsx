@@ -2935,6 +2935,26 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
 
+        {/* ── Commentary selector (sidebar) — only in study mode ── */}
+        {studyMode && _TEXT_VERSIONS.has(version) && (
+          <div style={{ padding:'0 12px 4px', borderBottom:'1px solid var(--border)' }} data-onboarding="commentary-selector">
+            <div style={{ fontSize:11, fontWeight:600, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif", textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Commentary</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+              {Object.values(COMMENTARIES).map(c => (
+                <button
+                  key={c.id}
+                  style={{ ...r.comSelectorBtn, ...(inlineComId === c.id ? r.comSelectorBtnActive : {}) }}
+                  onClick={() => setInlineComId(c.id)}
+                  disabled={!c.hasBook(book)}
+                  title={c.hasBook(book) ? c.label : `${c.label} — not available for ${book}`}
+                >
+                  {c.shortName}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <BookSidebar
           selectedBook={book}
           selectedChapter={chapter}
