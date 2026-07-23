@@ -4,7 +4,7 @@ import { supabase, migrateLocalToSupabase, syncBibleProgressUp, syncBibleProgres
 import { syncAnnotationsUp, syncAnnotationsDown } from './lib/annotations'
 import { syncBooksUp, syncBooksDown } from './lib/bookLibrary'
 import { tryAdvancePlanForChapter } from './lib/biblePlan'
-import { migrateOldPlan, ensureActivePlanMirrored, syncMultiPlansUp, syncMultiPlansDown } from './lib/multiPlan'
+import { migrateOldPlan, ensureActivePlanMirrored, syncActivePlanFromLegacy, syncMultiPlansUp, syncMultiPlansDown } from './lib/multiPlan'
 import { loadPrefs, savePrefs, DEFAULT_PREFS } from './components/FontPrefsPanel'
 import AuthPage from './pages/AuthPage'
 import Dashboard from './pages/Dashboard'
@@ -54,8 +54,17 @@ export default function App() {
       const { chapter, done } = e.detail || {}
       if (chapter != null) tryAdvancePlanForChapter(chapter, !!done)
     }
+    // After tryAdvancePlanForChapter writes legacy progress, mirror it back
+    // into the multi-plan array so Supabase sync doesn't overwrite the advance.
+    function onPlanChanged() {
+      syncActivePlanFromLegacy()
+    }
     window.addEventListener('pb-bible-chapter-changed', onBibleChapterChanged)
-    return () => window.removeEventListener('pb-bible-chapter-changed', onBibleChapterChanged)
+    window.addEventListener('pb-plan-changed', onPlanChanged)
+    return () => {
+      window.removeEventListener('pb-bible-chapter-changed', onBibleChapterChanged)
+      window.removeEventListener('pb-plan-changed', onPlanChanged)
+    }
   }, [])
 
   /* ── Online/offline detection ── */

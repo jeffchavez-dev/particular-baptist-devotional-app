@@ -1,5 +1,5 @@
 {
-  "version": "1.5.32",
-  "date": "2026-07-23",
-  "changelog": "Commentary selector now in the sidebar — switch between Matthew Henry, John Gill, and Calvin without scrolling back up. Tour updated to reflect the new location."
+  "version": "1.5.33",
+  "date": "2026-07-24",
+  "changelog": "Fixed reading plan not advancing to the next chapter — marking a chapter as read now correctly updates the plan index and refreshes the Dashboard immediately."
 }

@@ -286,4 +286,7 @@ export function tryAdvancePlanForChapter(chapter, done) {
     const newIndex = Math.max(0, progress.currentIndex - cpd)
     savePlanProgress({ currentIndex: newIndex, lastAdvancedDate: null })
   }
+
+  // Notify listeners (Dashboard re-reads progress, App.jsx syncs multi-plan array).
+  window.dispatchEvent(new CustomEvent('pb-plan-changed'))
 }
