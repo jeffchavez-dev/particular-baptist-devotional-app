@@ -1,5 +1,5 @@
 {
-  "version": "1.5.33",
-  "date": "2026-07-24",
-  "changelog": "Fixed reading plan not advancing to the next chapter — marking a chapter as read now correctly updates the plan index and refreshes the Dashboard immediately."
+  "version": "1.5.34",
+  "date": "2026-07-25",
+  "changelog": "Removed duplicate commentary selector above chapter — use the sidebar instead."
 }

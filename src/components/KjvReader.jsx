@@ -3586,22 +3586,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     }
                     {renderScriptureChapterDesc(seg.book, seg.chapter)}
 
-                    {/* ── Commentary selector (study mode) ── */}
-                    {studyMode && _TEXT_VERSIONS.has(version) && seg.book === book && seg.chapter === chapter && (
-                      <div style={r.comSelectorRow} data-onboarding="commentary-selector">
-                        <span style={r.comSelectorLabel}>Commentary</span>
-                        {Object.values(COMMENTARIES).map(c => (
-                          <button
-                            key={c.id}
-                            style={{ ...r.comSelectorBtn, ...(inlineComId === c.id ? r.comSelectorBtnActive : {}) }}
-                            onClick={() => setInlineComId(c.id)}
-                            disabled={!c.hasBook(seg.book)}
-                          >
-                            {c.shortName}
-                          </button>
-                        ))}
-                      </div>
-                    )}
 
                     <div style={r.verseList}>
                       {seg.verses.map(({ verse, text }) => {
