@@ -4867,7 +4867,7 @@ const vm = {
     fontFamily: 'serif', flexShrink: 0,
   },
   closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, display: 'flex', flexShrink: 0 },
-  body: { flex: 1, overflowY: 'auto' },
+  body: { flex: 1, overflowY: 'auto', minHeight: 0 },
   loading: { fontSize: 13, color: 'var(--ink-faint)', textAlign: 'center', padding: '1rem 0' },
   verseText: {
     fontSize: 15, color: 'var(--ink)', lineHeight: 1.8,
