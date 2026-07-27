@@ -435,6 +435,7 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, onDeleteTag, onEditTag, 
   const [verses,  setVerses]  = useState([])
   const [loading, setLoading] = useState(true)
   const [version, setVersion] = useState(() => getDefaultReaderVersion())
+  const taggedVerseRef = useRef(null)
 
   /* Reset navChapter whenever a new tag is opened */
   useEffect(() => {
@@ -448,30 +449,33 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, onDeleteTag, onEditTag, 
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  /* Always fetch the full chapter so users can scroll context around the tag */
   useEffect(() => {
     if (!sc) return
     const ver = getDefaultReaderVersion()
     setVersion(ver)
     setLoading(true)
-    const { book, verse, verseTo } = sc
-    if (navChapter !== sc.chapter) {
-      /* Browsing an adjacent chapter — show the full chapter */
-      fetchVerseRange(book, navChapter, 1, 999, ver).then(vs => { setVerses(vs); setLoading(false) })
-    } else if (verseTo && verseTo !== verse) {
-      fetchVerseRange(book, navChapter, verse, verseTo, ver).then(vs => { setVerses(vs); setLoading(false) })
-    } else {
-      fetchVerseText(book, navChapter, verse, ver).then(t => {
-        setVerses(t ? [{ v: verse, t }] : [])
-        setLoading(false)
-      })
-    }
+    fetchVerseRange(sc.book, navChapter, 1, 999, ver).then(vs => {
+      setVerses(vs)
+      setLoading(false)
+    })
   }, [sc?.book, sc?.chapter, sc?.verse, sc?.verseTo, navChapter]) // eslint-disable-line
+
+  /* Scroll tagged verse into view when content loads on the original chapter */
+  useEffect(() => {
+    if (!loading && taggedVerseRef.current) {
+      taggedVerseRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [loading])
 
   if (!sc) return null
 
-  const bookInfo   = BIBLE_BOOKS.find(b => b.name === sc.book)
-  const maxChapter = bookInfo?.chapters ?? 150
-  const isOriginal = navChapter === sc.chapter
+  const bookInfo    = BIBLE_BOOKS.find(b => b.name === sc.book)
+  const maxChapter  = bookInfo?.chapters ?? 150
+  const isOriginal  = navChapter === sc.chapter
+  const tagFrom     = sc.verse ?? 0
+  const tagTo       = sc.verseTo ?? sc.verse ?? 0
+  const isTagged    = (vNum) => isOriginal && vNum >= tagFrom && vNum <= tagTo
 
   const refLabel = isOriginal
     ? (sc.verseTo && sc.verseTo !== sc.verse)
@@ -512,16 +516,30 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, onDeleteTag, onEditTag, 
             <p style={vm.loading}>Loading…</p>
           ) : verses.length === 0 ? (
             <p style={vm.loading}>Verse not found.</p>
-          ) : verses.length === 1 ? (
-            <p style={vm.verseText}>"{verses[0].t}"</p>
           ) : (
             <div>
-              {verses.map(vr => (
-                <p key={vr.v} style={{ ...vm.verseText, marginBottom: 6, fontStyle: 'normal' }}>
-                  <sup style={{ fontSize: '0.72em', fontWeight: 700, color: 'var(--teal)', marginRight: 3 }}>{vr.v}</sup>
-                  {vr.t}
-                </p>
-              ))}
+              {verses.map(vr => {
+                const tagged = isTagged(vr.v)
+                return (
+                  <p
+                    key={vr.v}
+                    ref={tagged && vr.v === tagFrom ? taggedVerseRef : null}
+                    style={{
+                      ...vm.verseText, marginBottom: 4, fontStyle: 'normal',
+                      ...(tagged ? {
+                        background: 'var(--teal-light)',
+                        borderLeft: '3px solid var(--teal)',
+                        padding: '3px 6px',
+                        borderRadius: 4,
+                        marginLeft: -6,
+                      } : {}),
+                    }}
+                  >
+                    <sup style={{ fontSize: '0.72em', fontWeight: 700, color: 'var(--teal)', marginRight: 3 }}>{vr.v}</sup>
+                    {vr.t}
+                  </p>
+                )
+              })}
             </div>
           )}
         </div>
