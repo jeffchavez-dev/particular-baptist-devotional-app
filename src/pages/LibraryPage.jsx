@@ -374,6 +374,17 @@ function getConfPreviewText(confType, chapter, para, maxLen = 120) {
   return raw.length > maxLen ? raw.slice(0, maxLen) + '…' : raw
 }
 
+/** All paragraphs for a 2LBCF chapter */
+function get2lbcfChapterParas(chapter) {
+  const paras = []
+  for (let i = 1; i <= 30; i++) {
+    const entry = LBCF2[`${chapter}.${i}`]
+    if (!entry) break
+    paras.push({ para: i, ...entry })
+  }
+  return paras
+}
+
 /** Full text for quote-mode insertion */
 function getConfFullText(confType, chapter, para) {
   const entry = getConfEntry(confType, chapter, para)
@@ -708,16 +719,29 @@ function ScTagActionPopup({ sc, onClose, onDelete, onEdit }) {
 ══════════════════════════════════════════════════════════════ */
 function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
   const [mode,        setMode]        = useState('view')
+  const [navChapter,  setNavChapter]  = useState(conf.chapter ?? 1)
   const [editType,    setEditType]    = useState(conf.confType)
   const [editChapter, setEditChapter] = useState(conf.chapter ?? 1)
   const [editPara,    setEditPara]    = useState(String(conf.para))
+  const taggedParaRef = useRef(null)
 
-  const ct      = CONF_TYPES[conf.confType] ?? CONF_TYPES['2lbcf']
-  const editCt  = CONF_TYPES[editType]      ?? CONF_TYPES['2lbcf']
-  const label   = confRefLabel(conf.confType, conf.chapter, conf.para)
-  const preview = getConfPreviewText(conf.confType, conf.chapter, conf.para)
-  const entry   = getConfEntry(conf.confType, conf.chapter, conf.para)
+  const ct          = CONF_TYPES[conf.confType] ?? CONF_TYPES['2lbcf']
+  const editCt      = CONF_TYPES[editType]      ?? CONF_TYPES['2lbcf']
+  const label       = confRefLabel(conf.confType, conf.chapter, conf.para)
   const isCatechism = conf.confType === 'orthodox' || conf.confType === 'keach'
+  const is2lbcf     = conf.confType === '2lbcf'
+
+  // For 2LBCF: load all paragraphs for the nav chapter; otherwise just the single entry
+  const chapterParas = is2lbcf ? get2lbcfChapterParas(navChapter) : null
+  const singleEntry  = !is2lbcf ? getConfEntry(conf.confType, conf.chapter, conf.para) : null
+  const maxChapter   = 32 // 2LBCF has 32 chapters
+
+  // Scroll tagged paragraph into view when chapter loads
+  useEffect(() => {
+    if (taggedParaRef.current) {
+      taggedParaRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }, [navChapter])
 
   function handleUpdate() {
     const pNum  = Math.max(1, parseInt(editPara)    || 1)
@@ -734,24 +758,63 @@ function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
       <div style={vm.sheet} onClick={e => e.stopPropagation()}>
         {mode === 'view' ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ ...vm.ref, color: ct.color, flex: 1 }}>{label}</span>
+            <div style={vm.header}>
+              {is2lbcf && (
+                <button
+                  style={{ ...vm.navArrow, opacity: navChapter <= 1 ? 0.25 : 1 }}
+                  disabled={navChapter <= 1}
+                  onClick={() => setNavChapter(c => Math.max(1, c - 1))}
+                >‹</button>
+              )}
+              <span style={{ ...vm.ref, color: ct.color, flex: 1, textAlign: is2lbcf ? 'center' : 'left' }}>
+                {is2lbcf
+                  ? `${ct.label} ${navChapter}`
+                  : label}
+              </span>
+              {is2lbcf && (
+                <button
+                  style={{ ...vm.navArrow, opacity: navChapter >= maxChapter ? 0.25 : 1 }}
+                  disabled={navChapter >= maxChapter}
+                  onClick={() => setNavChapter(c => Math.min(maxChapter, c + 1))}
+                >›</button>
+              )}
               <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                 </svg>
               </button>
             </div>
-            <div style={{ ...vm.body }}>
-              {!entry ? (
-                <p style={vm.loading}>Entry not found.</p>
+            <div style={vm.body}>
+              {is2lbcf ? (
+                chapterParas?.length ? chapterParas.map(p => {
+                  const isTagged = navChapter === conf.chapter && p.para === conf.para
+                  return (
+                    <div
+                      key={p.para}
+                      ref={isTagged ? taggedParaRef : null}
+                      style={{
+                        marginBottom: 12,
+                        ...(isTagged ? {
+                          background: ct.bg,
+                          borderLeft: `3px solid ${ct.border}`,
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          marginLeft: -8,
+                        } : {}),
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72em', fontWeight: 700, color: ct.color, marginRight: 5 }}>{navChapter}.{p.para}</span>
+                      <span style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{p.text}</span>
+                    </div>
+                  )
+                }) : <p style={vm.loading}>Chapter not found.</p>
               ) : isCatechism ? (
                 <>
-                  <p style={{ fontSize: '0.88em', fontWeight: 700, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>Q. {entry.q}</p>
-                  <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.7, fontSize: '0.88em' }}>A. {entry.a}</p>
+                  <p style={{ fontSize: '0.88em', fontWeight: 700, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>Q. {singleEntry?.q}</p>
+                  <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.7, fontSize: '0.88em' }}>A. {singleEntry?.a}</p>
                 </>
               ) : (
-                <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{entry.text}</p>
+                <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{singleEntry?.text}</p>
               )}
             </div>
             <div style={{ ...vm.actions, justifyContent: 'space-between' }}>
@@ -1319,7 +1382,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
     onBodyChange(editorRef.current.innerHTML)
   }
 
-  function editScTag(el, newSc, isQuote) {
+  async function editScTag(el, newSc, isQuote) {
     if (!el || !editorRef.current?.contains(el)) return
     if (!isQuote) {
       const newLabel = newSc.verseTo
@@ -1333,8 +1396,15 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
       el.textContent = newLabel
       onBodyChange(editorRef.current.innerHTML)
     } else {
-      el.parentNode?.removeChild(el)
-      handleAtSelect({ ...newSc, quoteMode: true })
+      // Select the existing blockquote so handleAtSelect replaces it in place
+      const range = document.createRange()
+      range.selectNode(el)
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(range)
+      atRangeRef.current = range
+      editorRef.current.focus()
+      await handleAtSelect({ ...newSc, quoteMode: true })
     }
   }
 
@@ -1345,7 +1415,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
     onBodyChange(editorRef.current.innerHTML)
   }
 
-  function editConfTag(el, newConf, isQuote) {
+  async function editConfTag(el, newConf, isQuote) {
     if (!el || !editorRef.current?.contains(el)) return
     if (!isQuote) {
       const newLabel = confRefLabel(newConf.confType, newConf.chapter, newConf.para)
@@ -1355,14 +1425,20 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
       else delete el.dataset.confChapter
       el.dataset.confPara    = String(newConf.para)
       el.textContent         = newLabel
-      // Update colours in place
       el.style.background    = ct.bg
       el.style.color         = ct.color
       el.style.borderColor   = ct.border
       onBodyChange(editorRef.current.innerHTML)
     } else {
-      el.parentNode?.removeChild(el)
-      handleAtSelect({ ...newConf, quoteMode: true })
+      // Select the existing blockquote so handleAtSelect replaces it in place
+      const range = document.createRange()
+      range.selectNode(el)
+      const sel = window.getSelection()
+      sel.removeAllRanges()
+      sel.addRange(range)
+      atRangeRef.current = range
+      editorRef.current.focus()
+      await handleAtSelect({ ...newConf, quoteMode: true })
     }
   }
 

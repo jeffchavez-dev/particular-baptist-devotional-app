@@ -1,5 +1,5 @@
 {
-  "version": "1.5.37",
+  "version": "1.5.38",
   "date": "2026-07-27",
-  "changelog": "Edit note: scripture and confession tag popups are now bottom sheets (consistent with read mode). Editing tags now saves correctly."
+  "changelog": "Fix: editing a scripture or confession blockquote tag no longer removes it. 2LBCF tag modal now shows full scrollable chapter with ‹ › chapter navigation."
 }
