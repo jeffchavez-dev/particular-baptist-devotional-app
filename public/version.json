@@ -1,5 +1,5 @@
 {
-  "version": "1.5.41",
+  "version": "1.5.42",
   "date": "2026-07-28",
-  "changelog": "Bible Tracker: added 'Mark done' and 'Undo' buttons to the active plan card in Settings, matching the confession tracker UX."
+  "changelog": "New reading plans: Chronological (1,189 chapters in historical order), Psalms (150 chapters), and Gospels (Matthew–John, 89 chapters)."
 }
