@@ -2034,19 +2034,6 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
             <path d="M8.5 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
           </svg>
         </button>
-
-        {/* Save — checkmark icon */}
-        <button
-          onClick={onSave}
-          disabled={saving}
-          style={{ ...eo.iconBtn, color: autoSaved ? 'var(--teal)' : 'var(--ink-muted)', opacity: saving ? 0.5 : 1 }}
-          title={saving ? 'Saving…' : autoSaved ? 'Saved' : 'Save'}
-          aria-label="Save note"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M3.5 9.5l4 4 7-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
       </div>
 
       {/* ── Scrollable content ── */}
@@ -2271,9 +2258,14 @@ function CreateNoteForm({ onSave, onCancel, session, navigate }) {
     }
   }
 
-  function handleCancel() {
-    localStorage.removeItem(CREATE_DRAFT_KEY)
-    onCancel()
+  async function handleBack() {
+    const hasContent = titleVal.trim() || bodyHtml.replace(/<[^>]*>/g, '').trim()
+    if (hasContent) {
+      await handleSave()
+    } else {
+      localStorage.removeItem(CREATE_DRAFT_KEY)
+      onCancel()
+    }
   }
 
   const chapterTagObj = tagEnabled ? { book: tagBook, chapter: tagChapter } : null
@@ -2281,7 +2273,7 @@ function CreateNoteForm({ onSave, onCancel, session, navigate }) {
   return (
     <NoteEditOverlay
       isCreate
-      onBack={handleCancel}
+      onBack={handleBack}
       onSave={handleSave}
       saving={saving}
       autoSaved={false}
