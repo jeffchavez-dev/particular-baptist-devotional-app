@@ -1,5 +1,5 @@
 {
-  "version": "1.5.38",
+  "version": "1.5.39",
   "date": "2026-07-27",
-  "changelog": "Fix: editing a scripture or confession blockquote tag no longer removes it. 2LBCF tag modal now shows full scrollable chapter with ‹ › chapter navigation."
+  "changelog": "Confession tag modals now show full scrollable content: 2LBCF shows the chapter with ‹ › nav; 1LBCF, Keach, and Orthodox show all entries scrollable with the tagged one highlighted."
 }

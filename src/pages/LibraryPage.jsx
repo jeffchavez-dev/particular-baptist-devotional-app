@@ -385,6 +385,12 @@ function get2lbcfChapterParas(chapter) {
   return paras
 }
 
+/** All entries for flat-list confession types (1LBCF, Keach, Orthodox) */
+function getAllConfEntries(confType) {
+  const src = confType === '1lbcf' ? LBCF1 : confType === 'keach' ? CATECHISM : ORTHODOX_CATECHISM
+  return Object.entries(src).map(([k, v]) => ({ para: parseInt(k), ...v }))
+}
+
 /** Full text for quote-mode insertion */
 function getConfFullText(confType, chapter, para) {
   const entry = getConfEntry(confType, chapter, para)
@@ -731,12 +737,12 @@ function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
   const isCatechism = conf.confType === 'orthodox' || conf.confType === 'keach'
   const is2lbcf     = conf.confType === '2lbcf'
 
-  // For 2LBCF: load all paragraphs for the nav chapter; otherwise just the single entry
-  const chapterParas = is2lbcf ? get2lbcfChapterParas(navChapter) : null
-  const singleEntry  = !is2lbcf ? getConfEntry(conf.confType, conf.chapter, conf.para) : null
-  const maxChapter   = 32 // 2LBCF has 32 chapters
+  // For 2LBCF: load all paragraphs for the nav chapter; otherwise all entries for flat list
+  const chapterParas  = is2lbcf ? get2lbcfChapterParas(navChapter) : null
+  const flatEntries   = !is2lbcf ? getAllConfEntries(conf.confType) : null
+  const maxChapter    = 32 // 2LBCF has 32 chapters
 
-  // Scroll tagged paragraph into view when chapter loads
+  // Scroll tagged entry into view on open / chapter change
   useEffect(() => {
     if (taggedParaRef.current) {
       taggedParaRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -794,13 +800,7 @@ function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
                       ref={isTagged ? taggedParaRef : null}
                       style={{
                         marginBottom: 12,
-                        ...(isTagged ? {
-                          background: ct.bg,
-                          borderLeft: `3px solid ${ct.border}`,
-                          padding: '4px 8px',
-                          borderRadius: 4,
-                          marginLeft: -8,
-                        } : {}),
+                        ...(isTagged ? { background: ct.bg, borderLeft: `3px solid ${ct.border}`, padding: '4px 8px', borderRadius: 4, marginLeft: -8 } : {}),
                       }}
                     >
                       <span style={{ fontSize: '0.72em', fontWeight: 700, color: ct.color, marginRight: 5 }}>{navChapter}.{p.para}</span>
@@ -808,14 +808,31 @@ function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
                     </div>
                   )
                 }) : <p style={vm.loading}>Chapter not found.</p>
-              ) : isCatechism ? (
-                <>
-                  <p style={{ fontSize: '0.88em', fontWeight: 700, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>Q. {singleEntry?.q}</p>
-                  <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.7, fontSize: '0.88em' }}>A. {singleEntry?.a}</p>
-                </>
-              ) : (
-                <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{singleEntry?.text}</p>
-              )}
+              ) : flatEntries?.map(p => {
+                const isTagged = p.para === conf.para
+                return (
+                  <div
+                    key={p.para}
+                    ref={isTagged ? taggedParaRef : null}
+                    style={{
+                      marginBottom: 14,
+                      ...(isTagged ? { background: ct.bg, borderLeft: `3px solid ${ct.border}`, padding: '4px 8px', borderRadius: 4, marginLeft: -8 } : {}),
+                    }}
+                  >
+                    <span style={{ fontSize: '0.72em', fontWeight: 700, color: ct.color, marginRight: 5 }}>
+                      {isCatechism ? `Q.${p.para}` : `Art. ${p.para}`}
+                    </span>
+                    {isCatechism ? (
+                      <>
+                        <span style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.6, fontSize: '0.88em', display: 'block', fontWeight: 600, marginBottom: 2 }}>{p.q}</span>
+                        <span style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.6, fontSize: '0.85em', color: 'var(--ink-muted)', display: 'block' }}>{p.a}</span>
+                      </>
+                    ) : (
+                      <span style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{p.text}</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
             <div style={{ ...vm.actions, justifyContent: 'space-between' }}>
               <button onClick={onDelete} style={vm.deleteBtn}>Delete tag</button>
