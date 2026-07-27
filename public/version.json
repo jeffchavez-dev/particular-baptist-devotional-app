@@ -1,5 +1,5 @@
 {
-  "version": "1.5.35",
+  "version": "1.5.36",
   "date": "2026-07-27",
-  "changelog": "Scripture preview modal: tap ‹ › arrows to browse adjacent chapters. Edit mode now uses the same modal for consistency."
+  "changelog": "Note editor: Labels and Key Chapter fields now appear directly under the title, not at the bottom."
 }

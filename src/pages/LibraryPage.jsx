@@ -1246,7 +1246,7 @@ const TOOLBAR_ACTIONS = [
    Rich Note Editor Component
 ══════════════════════════════════════════════════════════════ */
 const RichNoteEditor = React.forwardRef(function RichNoteEditor(
-  { initialTitle = '', initialBody = '', onTitleChange, onBodyChange, chapterTag, showToolbar = true, onActiveFormatsChange },
+  { initialTitle = '', initialBody = '', onTitleChange, onBodyChange, chapterTag, showToolbar = true, onActiveFormatsChange, headerSlot },
   editorImperativeRef
 ) {
   const editorRef  = useRef(null)
@@ -1734,6 +1734,9 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
         onChange={e => onTitleChange(e.target.value)}
         style={re.titleInput}
       />
+
+      {/* Meta slot: labels + key chapter — injected between title and body */}
+      {headerSlot}
 
       {/* Editable area */}
       <div
@@ -2293,68 +2296,71 @@ function CreateNoteForm({ onSave, onCancel, session, navigate }) {
         showToolbar={false}
         onActiveFormatsChange={setActiveFormats}
         chapterTag={chapterTagObj}
+        headerSlot={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 8, borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+            {/* Labels */}
+            <LabelDropdown selected={labels} onChange={setLabels} />
+
+            {/* Key Chapter toggle */}
+            <button
+              style={{ ...s.tagToggleBtn, ...(tagEnabled ? s.tagToggleBtnActive : {}) }}
+              onClick={() => setTagEnabled(t => !t)}
+              type="button"
+            >
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <rect x="1" y="1" width="11" height="11" rx="1.5"
+                  stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.3"/>
+                <path d="M4 4.5h5M4 7h3" stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              {tagEnabled ? 'Key Chapter tagged' : 'Key Chapter'}
+              {tagEnabled && (
+                <span style={s.tagPreview}>{tagBook} {tagChapter}</span>
+              )}
+            </button>
+
+            {tagEnabled && (
+              <div style={s.pickerRow}>
+                <div style={s.pickerGroup}>
+                  <label style={s.pickerLabel}>Book</label>
+                  <select
+                    value={tagBook}
+                    onChange={e => { setTagBook(e.target.value); setTagChapter(1) }}
+                    style={s.pickerSelect}
+                  >
+                    <optgroup label="Old Testament">
+                      {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => (
+                        <option key={b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="New Testament">
+                      {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => (
+                        <option key={b.name} value={b.name}>{b.name}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                <div style={s.pickerGroup}>
+                  <label style={s.pickerLabel}>Ch.</label>
+                  <select
+                    value={tagChapter}
+                    onChange={e => setTagChapter(Number(e.target.value))}
+                    style={s.pickerSelectSmall}
+                  >
+                    {Array.from({ length: maxChapters }, (_, i) => i + 1).map(ch => (
+                      <option key={ch} value={ch}>{ch}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            {tagEnabled && (
+              <p style={s.tagHint}>
+                Tagged to <strong>{tagBook} {tagChapter}</strong>. In the editor, type <code style={{ fontSize: 10, background: 'var(--parchment-dark)', padding: '1px 4px', borderRadius: 3 }}>@1:1</code> to quickly tag verse 1 of this chapter.
+              </p>
+            )}
+          </div>
+        }
       />
-
-      {/* Labels */}
-      <LabelDropdown selected={labels} onChange={setLabels} />
-
-      {/* Chapter tag toggle */}
-      <button
-        style={{ ...s.tagToggleBtn, ...(tagEnabled ? s.tagToggleBtnActive : {}) }}
-        onClick={() => setTagEnabled(t => !t)}
-        type="button"
-      >
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <rect x="1" y="1" width="11" height="11" rx="1.5"
-            stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.3"/>
-          <path d="M4 4.5h5M4 7h3" stroke={tagEnabled ? 'var(--teal)' : 'currentColor'} strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
-        {tagEnabled ? 'Chapter tagged' : 'Tag a chapter'}
-        {tagEnabled && (
-          <span style={s.tagPreview}>{tagBook} {tagChapter}</span>
-        )}
-      </button>
-
-      {tagEnabled && (
-        <div style={s.pickerRow}>
-          <div style={s.pickerGroup}>
-            <label style={s.pickerLabel}>Book</label>
-            <select
-              value={tagBook}
-              onChange={e => { setTagBook(e.target.value); setTagChapter(1) }}
-              style={s.pickerSelect}
-            >
-              <optgroup label="Old Testament">
-                {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => (
-                  <option key={b.name} value={b.name}>{b.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="New Testament">
-                {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => (
-                  <option key={b.name} value={b.name}>{b.name}</option>
-                ))}
-              </optgroup>
-            </select>
-          </div>
-          <div style={s.pickerGroup}>
-            <label style={s.pickerLabel}>Ch.</label>
-            <select
-              value={tagChapter}
-              onChange={e => setTagChapter(Number(e.target.value))}
-              style={s.pickerSelectSmall}
-            >
-              {Array.from({ length: maxChapters }, (_, i) => i + 1).map(ch => (
-                <option key={ch} value={ch}>{ch}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
-      {tagEnabled && (
-        <p style={s.tagHint}>
-          Tagged to <strong>{tagBook} {tagChapter}</strong>. In the editor, type <code style={{ fontSize: 10, background: 'var(--parchment-dark)', padding: '1px 4px', borderRadius: 3 }}>@1:1</code> to quickly tag verse 1 of this chapter.
-        </p>
-      )}
     </NoteEditOverlay>
   )
 }
@@ -2429,18 +2435,22 @@ function EditNoteForm({ noteKey, initialRaw, onSave, onCancel, session, navigate
         showToolbar={false}
         onActiveFormatsChange={setActiveFormats}
         chapterTag={chapterTag}
+        headerSlot={
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 8, borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+            {/* Labels */}
+            <LabelDropdown selected={labels} onChange={setLabels} />
+
+            {/* Key Chapter badge (read-only in edit mode) */}
+            {chapterTag && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Key Chapter:</span>
+                <span style={{ ...s.tagPreview }}>{chapterTag.book} {chapterTag.chapter}</span>
+                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>· Use @{chapterTag.chapter}:1 to reference a verse</span>
+              </div>
+            )}
+          </div>
+        }
       />
-
-      {/* Show chapter tag badge if the note has one */}
-      {chapterTag && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Chapter tag:</span>
-          <span style={{ ...s.tagPreview }}>{chapterTag.book} {chapterTag.chapter}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>· Use @{chapterTag.chapter}:1 to reference a verse</span>
-        </div>
-      )}
-
-      <LabelDropdown selected={labels} onChange={setLabels} />
     </NoteEditOverlay>
   )
 }
