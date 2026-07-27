@@ -621,119 +621,83 @@ function ConfessionModal({ conf, onClose, onNavigate, zOverride }) {
 /* ══════════════════════════════════════════════════════════════
    ScTag Action Popup  (shown in EDIT MODE when clicking a tag)
 ══════════════════════════════════════════════════════════════ */
-function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
+function ScTagActionPopup({ sc, onClose, onDelete, onEdit }) {
   const [editBook,    setEditBook]    = useState(sc.book)
   const [editChapter, setEditChapter] = useState(sc.chapter)
   const [editVerse,   setEditVerse]   = useState(String(sc.verse))
   const [editVerseTo, setEditVerseTo] = useState(sc.verseTo ? String(sc.verseTo) : '')
-  const ref = useRef(null)
 
   const editSelectedBook = BIBLE_BOOKS.find(b => b.name === editBook) ?? BIBLE_BOOKS[0]
   const maxEditChapters  = editSelectedBook.chapters
 
-  /* Close on outside click/tap */
-  useEffect(() => {
-    function onDown(e) {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('touchstart', onDown, { passive: true })
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('touchstart', onDown)
-    }
-  }, [onClose])
-
-  const POPUP_H    = 240
-  const spaceAbove = anchorRect.top - 6
-  const spaceBelow = window.innerHeight - anchorRect.bottom - 6
-  const showAbove  = spaceAbove >= Math.min(POPUP_H, 200)
-  const availH     = showAbove ? spaceAbove : spaceBelow
-  const clampedH   = Math.min(POPUP_H, Math.max(180, availH))
-  const top  = showAbove ? anchorRect.top - clampedH - 6 : anchorRect.bottom + 6
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 272))
-
   function handleUpdate() {
     const vNum  = Math.max(1, parseInt(editVerse)  || 1)
-    const vtNum = editVerseTo === ''
-      ? null
-      : Math.max(vNum, parseInt(editVerseTo) || vNum)
+    const vtNum = editVerseTo === '' ? null : Math.max(vNum, parseInt(editVerseTo) || vNum)
     onEdit({ book: editBook, chapter: editChapter, verse: vNum, verseTo: vtNum })
     onClose()
   }
 
-  const baseStyle = {
-    position: 'fixed', zIndex: 9500, left, top,
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
-    padding: '12px', width: 272, height: clampedH,
-    display: 'flex', flexDirection: 'column',
-    fontFamily: "'DM Sans', sans-serif",
-  }
-  const labelStyle  = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
-  const inputStyle  = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif" }
-  const selectStyle = { ...inputStyle, cursor: 'pointer' }
+  const labelStyle = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
+  const inputStyle = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: '100%' }
 
   return (
-    <div ref={ref} onMouseDown={e => { e.preventDefault(); e.stopPropagation() }} style={baseStyle}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>Edit reference</span>
-        <button onMouseDown={e => { e.preventDefault(); onClose() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 12, padding: 0, marginLeft: 'auto', fontFamily: "'DM Sans', sans-serif" }}>
-          Cancel
-        </button>
-      </div>
+    <div style={vm.backdrop} onClick={onClose}>
+      <div style={vm.sheet} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>Edit reference</span>
+          <button onClick={onClose} style={vm.closeBtn} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
 
-      {/* Book */}
-      <div style={{ marginBottom: 8 }}>
-        <p style={labelStyle}>Book</p>
-        <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
-          <optgroup label="Old Testament">
-            {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-          </optgroup>
-          <optgroup label="New Testament">
-            {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-          </optgroup>
-        </select>
-      </div>
-
-      {/* Chapter + Verse + VerseTo row */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-        <div style={{ flex: 1 }}>
-          <p style={labelStyle}>Ch.</p>
-          <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
-            {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+        {/* Book */}
+        <div style={{ marginBottom: 10 }}>
+          <p style={labelStyle}>Book</p>
+          <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+            <optgroup label="Old Testament">
+              {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+            </optgroup>
+            <optgroup label="New Testament">
+              {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+            </optgroup>
           </select>
         </div>
-        <div style={{ flex: 1 }}>
-          <p style={labelStyle}>Vs.</p>
-          <input type="number" min={1} max={200} value={editVerse}
-            onChange={e => setEditVerse(e.target.value)}
-            onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
-            style={{ ...inputStyle, width: '100%' }} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <p style={labelStyle}>To (opt)</p>
-          <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
-            onChange={e => setEditVerseTo(e.target.value)}
-            style={{ ...inputStyle, width: '100%' }} />
-        </div>
-      </div>
 
-      {/* Confirm / Cancel */}
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button
-          onMouseDown={e => { e.preventDefault(); onClose() }}
-          style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
-        >
-          Cancel
-        </button>
-        <button
-          onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }}
-          style={{ flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
-        >
-          Update tag
-        </button>
+        {/* Chapter + Verse + VerseTo row */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <div style={{ flex: 1 }}>
+            <p style={labelStyle}>Ch.</p>
+            <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+              {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={labelStyle}>Vs.</p>
+            <input type="number" min={1} max={200} value={editVerse}
+              onChange={e => setEditVerse(e.target.value)}
+              onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
+              style={inputStyle} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <p style={labelStyle}>To (opt)</p>
+            <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
+              onChange={e => setEditVerseTo(e.target.value)}
+              style={inputStyle} />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onDelete} style={{ ...vm.deleteBtn }}>
+            Delete tag
+          </button>
+          <button onClick={handleUpdate} style={{ ...vm.openBtn, flex: 1 }}>
+            Update reference
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -742,112 +706,107 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
 /* ══════════════════════════════════════════════════════════════
    Conf Tag Action Popup  (shown in EDIT MODE when clicking a conf tag)
 ══════════════════════════════════════════════════════════════ */
-function ConfTagActionPopup({ conf, anchorRect, onClose, onDelete, onEdit }) {
+function ConfTagActionPopup({ conf, onClose, onDelete, onEdit }) {
   const [mode,        setMode]        = useState('view')
   const [editType,    setEditType]    = useState(conf.confType)
   const [editChapter, setEditChapter] = useState(conf.chapter ?? 1)
   const [editPara,    setEditPara]    = useState(String(conf.para))
-  const ref = useRef(null)
 
   const ct      = CONF_TYPES[conf.confType] ?? CONF_TYPES['2lbcf']
   const editCt  = CONF_TYPES[editType]      ?? CONF_TYPES['2lbcf']
   const label   = confRefLabel(conf.confType, conf.chapter, conf.para)
   const preview = getConfPreviewText(conf.confType, conf.chapter, conf.para)
-
-  useEffect(() => {
-    function onDown(e) { if (ref.current && !ref.current.contains(e.target)) onClose() }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('touchstart', onDown, { passive: true })
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('touchstart', onDown)
-    }
-  }, [onClose])
-
-  const POPUP_H   = mode === 'edit' ? 270 : 185
-  const spaceAbove = anchorRect.top - 6
-  const showAbove  = spaceAbove >= POPUP_H
-  const top  = showAbove ? anchorRect.top - POPUP_H - 6 : anchorRect.bottom + 6
-  const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - 260))
+  const entry   = getConfEntry(conf.confType, conf.chapter, conf.para)
+  const isCatechism = conf.confType === 'orthodox' || conf.confType === 'keach'
 
   function handleUpdate() {
-    const pNum = Math.max(1, parseInt(editPara) || 1)
+    const pNum  = Math.max(1, parseInt(editPara)    || 1)
     const chNum = editType === '2lbcf' ? Math.max(1, parseInt(editChapter) || 1) : null
     onEdit({ confType: editType, chapter: chNum, para: pNum })
     onClose()
   }
 
-  const baseStyle  = { position: 'fixed', zIndex: 9500, left, top, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, boxShadow: '0 4px 24px rgba(0,0,0,0.18)', padding: '12px', width: 256, fontFamily: "'DM Sans', sans-serif" }
   const labelStyle = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
-  const inputStyle = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif" }
+  const inputStyle = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: '100%' }
 
   return (
-    <div ref={ref} data-sctag-popup="1" onMouseDown={e => { e.preventDefault(); e.stopPropagation() }} style={baseStyle}>
-      {mode === 'view' ? (
-        <>
-          <p style={{ fontSize: 13, fontWeight: 700, color: ct.color, margin: '0 0 5px', fontFamily: "'Cormorant Garamond', serif" }}>
-            {label}
-          </p>
-          {preview ? (
-            <p style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic', lineHeight: 1.55, margin: '0 0 10px', maxHeight: 64, overflow: 'hidden' }}>
-              "{preview}"
-            </p>
-          ) : (
-            <p style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 10px' }}>Entry not found.</p>
-          )}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setMode('edit') }}
-              style={{ flex: 1, background: 'var(--parchment-dark)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
-            >Edit ref</button>
-            <button
-              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
-              style={{ flex: 1, background: 'var(--red-light)', border: '1px solid var(--red)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--red)', fontFamily: "'DM Sans', sans-serif" }}
-            >Remove</button>
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
-            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 12, fontWeight: 700, padding: 0, fontFamily: "'DM Sans', sans-serif" }}>← Back</button>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginLeft: 'auto' }}>Edit reference</span>
-          </div>
-
-          {/* Confession type */}
-          <div style={{ marginBottom: 8 }}>
-            <p style={labelStyle}>Confession / Catechism</p>
-            <select value={editType} onChange={e => { setEditType(e.target.value); setEditChapter(1); setEditPara('1') }} style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-              {Object.entries(CONF_TYPES).map(([id, info]) => (
-                <option key={id} value={id}>{info.label} — {info.fullName}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Chapter (2LBCF only) + Para/Question */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            {editType === '2lbcf' && (
-              <div style={{ flex: 1 }}>
-                <p style={labelStyle}>Ch.</p>
-                <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditPara('1') }} style={{ ...inputStyle, width: '100%', cursor: 'pointer' }}>
-                  {Array.from({ length: 32 }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            )}
-            <div style={{ flex: 1 }}>
-              <p style={labelStyle}>{editCt.hasParagraphs ? 'Para.' : 'Q.'}</p>
-              <input type="number" min={1} max={editCt.maxItems ?? 999} value={editPara}
-                onChange={e => setEditPara(e.target.value)}
-                onBlur={() => setEditPara(v => String(Math.max(1, parseInt(v) || 1)))}
-                style={{ ...inputStyle, width: '100%' }} />
+    <div style={vm.backdrop} onClick={onClose}>
+      <div style={vm.sheet} onClick={e => e.stopPropagation()}>
+        {mode === 'view' ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ ...vm.ref, color: ct.color, flex: 1 }}>{label}</span>
+              <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+              </button>
             </div>
-          </div>
+            <div style={{ ...vm.body }}>
+              {!entry ? (
+                <p style={vm.loading}>Entry not found.</p>
+              ) : isCatechism ? (
+                <>
+                  <p style={{ fontSize: '0.88em', fontWeight: 700, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.5 }}>Q. {entry.q}</p>
+                  <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.7, fontSize: '0.88em' }}>A. {entry.a}</p>
+                </>
+              ) : (
+                <p style={{ ...vm.verseText, fontStyle: 'normal', lineHeight: 1.72, fontSize: '0.88em' }}>{entry.text}</p>
+              )}
+            </div>
+            <div style={{ ...vm.actions, justifyContent: 'space-between' }}>
+              <button onClick={onDelete} style={vm.deleteBtn}>Delete tag</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setMode('edit')} style={{ ...vm.openBtn, background: 'var(--parchment-dark)', color: 'var(--ink-muted)', border: '1px solid var(--border)' }}>Edit ref →</button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+              <button onClick={() => setMode('view')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 13, fontWeight: 700, padding: 0, fontFamily: "'DM Sans', sans-serif", marginRight: 8 }}>←</button>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>Edit reference</span>
+              <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
 
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-            <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }} style={{ flex: 1, background: editCt.bg, border: `1px solid ${editCt.border}`, borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: editCt.color, fontFamily: "'DM Sans', sans-serif" }}>Update tag</button>
-          </div>
-        </>
-      )}
+            <div style={{ marginBottom: 10 }}>
+              <p style={labelStyle}>Confession / Catechism</p>
+              <select value={editType} onChange={e => { setEditType(e.target.value); setEditChapter(1); setEditPara('1') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+                {Object.entries(CONF_TYPES).map(([id, info]) => (
+                  <option key={id} value={id}>{info.label} — {info.fullName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {editType === '2lbcf' && (
+                <div style={{ flex: 1 }}>
+                  <p style={labelStyle}>Ch.</p>
+                  <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditPara('1') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    {Array.from({ length: 32 }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <p style={labelStyle}>{editCt.hasParagraphs ? 'Para.' : 'Q.'}</p>
+                <input type="number" min={1} max={editCt.maxItems ?? 999} value={editPara}
+                  onChange={e => setEditPara(e.target.value)}
+                  onBlur={() => setEditPara(v => String(Math.max(1, parseInt(v) || 1)))}
+                  style={inputStyle} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setMode('view')} style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              <button onClick={handleUpdate} style={{ flex: 2, background: editCt.bg, border: `1px solid ${editCt.border}`, borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: editCt.color, fontFamily: "'DM Sans', sans-serif" }}>Update reference</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -1805,21 +1764,6 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
         />
       )}
 
-      {/* Full-screen backdrop — blocks ALL pointer/touch events behind the popup.
-          Sits at zIndex 9000 (below popup's 9500, above everything else).
-          Tapping the backdrop (outside the popup) closes it. */}
-      {(scEditPopup || confTagPopup) && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9000,
-            background: 'transparent', WebkitTapHighlightColor: 'transparent',
-          }}
-          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
-          onTouchStart={e => e.stopPropagation()}
-          onClick={() => { setScEditPopup(null); setConfTagPopup(null) }}
-        />
-      )}
-
       {/* sc-tag view: bottom sheet modal (same as read mode) */}
       {scTagPopup && (
         <ScriptureVerseModal
@@ -1836,10 +1780,9 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
       {scEditPopup && (
         <ScTagActionPopup
           sc={scEditPopup}
-          anchorRect={scEditPopup.anchorRect}
           onClose={() => setScEditPopup(null)}
           onDelete={() => { deleteScTag(scEditPopup.el); setScEditPopup(null) }}
-          onEdit={newSc => editScTag(scEditPopup.el, newSc, scEditPopup.isQuote)}
+          onEdit={newSc => { editScTag(scEditPopup.el, newSc, scEditPopup.isQuote); setScEditPopup(null) }}
         />
       )}
 
@@ -1847,10 +1790,9 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
       {confTagPopup && (
         <ConfTagActionPopup
           conf={confTagPopup}
-          anchorRect={confTagPopup.anchorRect}
           onClose={() => setConfTagPopup(null)}
-          onDelete={() => deleteConfTag(confTagPopup.el)}
-          onEdit={newConf => editConfTag(confTagPopup.el, newConf, confTagPopup.isQuote)}
+          onDelete={() => { deleteConfTag(confTagPopup.el); setConfTagPopup(null) }}
+          onEdit={newConf => { editConfTag(confTagPopup.el, newConf, confTagPopup.isQuote); setConfTagPopup(null) }}
         />
       )}
     </div>
@@ -4861,5 +4803,10 @@ const vm = {
     background: 'var(--teal)', border: 'none', borderRadius: 8,
     padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
     color: '#fff', fontFamily: "'DM Sans', sans-serif",
+  },
+  deleteBtn: {
+    background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+    padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+    color: '#c0392b', fontFamily: "'DM Sans', sans-serif",
   },
 }

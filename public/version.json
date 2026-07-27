@@ -1,5 +1,5 @@
 {
-  "version": "1.5.36",
+  "version": "1.5.37",
   "date": "2026-07-27",
-  "changelog": "Note editor: Labels and Key Chapter fields now appear directly under the title, not at the bottom."
+  "changelog": "Edit note: scripture and confession tag popups are now bottom sheets (consistent with read mode). Editing tags now saves correctly."
 }
