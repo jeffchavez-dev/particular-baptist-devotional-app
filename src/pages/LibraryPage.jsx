@@ -1962,100 +1962,73 @@ function NoteEditOverlay({ isCreate, scrollKey, onBack, onSave, saving, autoSave
   return (
     <div ref={overlayRef} style={overlayStyle}>
 
-      {/* ── Top bar ── */}
-      <div style={eo.topBar}>
-        {/* Back to Library */}
+      {/* ── Single combined toolbar row ── */}
+      <div style={eo.singleBar}>
+        {/* Back — chevron only */}
         <button onClick={onBack} style={eo.backBtn} aria-label="Back to Library">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Library
+        </button>
+        <span style={re.toolDivider} />
+
+        {/* Formatting buttons */}
+        {TOOLBAR_ACTIONS.map(action => (
+          <button
+            key={action.id}
+            title={action.title}
+            onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
+            style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
+            type="button"
+          >
+            {action.label}
+          </button>
+        ))}
+        <span style={re.toolDivider} />
+
+        {/* Undo / Redo */}
+        <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <span style={re.toolDivider} />
+
+        {/* @ hint — fills remaining space */}
+        <span style={{ ...re.atHint, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{atHint}</span>
+
+        {/* Scripture nav — icon only */}
+        <button
+          onClick={() => navigate('/scripture')}
+          style={eo.iconBtn}
+          title="Go to Scripture (note auto-saved)"
+          aria-label="Open Scripture reader"
+        >
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+            <path d="M2 3.5C2 3.5 4 3 8.5 3s6.5.5 6.5.5V13.5S13 13 8.5 13 2 13.5 2 13.5V3.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+            <path d="M8.5 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+          </svg>
         </button>
 
-        <span style={eo.topTitle}>{isCreate ? 'New Note' : 'Edit Note'}</span>
-
-        {/* Quick-nav shortcuts — navigate without closing the note */}
-        <div style={eo.quickNav}>
-          <button
-            onClick={() => navigate('/scripture')}
-            style={eo.quickNavBtn}
-            title="Go to Scripture (note auto-saved)"
-            aria-label="Open Scripture reader"
-          >
-            {/* Open book */}
-            <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
-              <path d="M2 3.5C2 3.5 4 3 8.5 3s6.5.5 6.5.5V13.5S13 13 8.5 13 2 13.5 2 13.5V3.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-              <path d="M8.5 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            <span style={eo.quickNavLabel}>Scripture</span>
-          </button>
-        </div>
-
-        {/* Save */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {autoSaved && <span style={eo.autoSavedChip}>✓ Saved</span>}
-          <button onClick={onSave} disabled={saving} style={{ ...eo.saveTopBtn, opacity: saving ? 0.6 : 1 }}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Formatting toolbar — sits just below top bar, above content ── */}
-      <div style={eo.toolbarWrap}>
-        {!toolbarHidden && (
-          <div style={eo.toolbarRow}>
-            {TOOLBAR_ACTIONS.map(action => (
-              <button
-                key={action.id}
-                title={action.title}
-                onMouseDown={e => { e.preventDefault(); execCmd(action.cmd, action.val) }}
-                style={{ ...re.toolBtn, ...(activeFormats[action.id] ? re.toolBtnActive : {}) }}
-                type="button"
-              >
-                {action.label}
-              </button>
-            ))}
-            <span style={re.toolDivider} />
-            <button title="Undo" aria-label="Undo" onMouseDown={e => { e.preventDefault(); execUndo() }} style={re.toolBtn} type="button">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 4.5h6a3.5 3.5 0 010 7H4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M4.5 2L2 4.5l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button title="Redo" aria-label="Redo" onMouseDown={e => { e.preventDefault(); execRedo() }} style={re.toolBtn} type="button">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M12 4.5H6a3.5 3.5 0 000 7h3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M9.5 2L12 4.5 9.5 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <span style={re.toolDivider} />
-            <span style={{ ...re.atHint, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{atHint}</span>
-            {/* Hide button inline at end of toolbar row */}
-            <button
-              onMouseDown={e => { e.preventDefault(); setToolbarHidden(true) }}
-              style={{ ...eo.toolbarToggleBtn, marginLeft: 4 }}
-              title="Hide formatting toolbar"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1.5 3.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-        )}
-        {toolbarHidden && (
-          <div style={eo.toolbarFooter}>
-            <button
-              onMouseDown={e => { e.preventDefault(); setToolbarHidden(false) }}
-              style={eo.toolbarToggleBtn}
-              title="Show formatting toolbar"
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M1.5 6.5l3.5-3.5 3.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Format
-            </button>
-          </div>
-        )}
+        {/* Save — checkmark icon */}
+        <button
+          onClick={onSave}
+          disabled={saving}
+          style={{ ...eo.iconBtn, color: autoSaved ? 'var(--teal)' : 'var(--ink-muted)', opacity: saving ? 0.5 : 1 }}
+          title={saving ? 'Saving…' : autoSaved ? 'Saved' : 'Save'}
+          aria-label="Save note"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M3.5 9.5l4 4 7-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
       </div>
 
       {/* ── Scrollable content ── */}
@@ -4548,23 +4521,12 @@ const re = {
 
 /* ── Note Edit Overlay styles ── */
 const eo = {
-  overlay:          { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", overscrollBehavior: 'none' },
-  topBar:           { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', paddingTop: 'max(10px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0 },
-  backBtn:          { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans', sans-serif", padding: '4px', flexShrink: 0 },
-  topTitle:         { fontSize: 13, fontWeight: 600, color: 'var(--ink)' },
-  autoSavedChip:    { fontSize: 10, fontWeight: 700, color: 'var(--teal)', background: 'var(--teal-light)', borderRadius: 4, padding: '2px 6px', flexShrink: 0 },
-  saveTopBtn:       { background: 'var(--teal)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, padding: '6px 16px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 },
-  scrollArea:       { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
-  contentPad:       { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
-  toolbarWrap:      { flexShrink: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)' },
-  toolbarRow:       { display: 'flex', alignItems: 'center', gap: 2, padding: '5px 8px', flexWrap: 'wrap', overflowX: 'auto' },
-  toolbarFooter:    { display: 'flex', alignItems: 'center', padding: '3px 10px' },
-  toolbarToggleBtn: { display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", padding: '3px 0' },
-
-  /* Quick-nav row in top bar */
-  quickNav:      { display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 },
-  quickNavBtn:   { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: '3px 7px', borderRadius: 8, fontFamily: "'DM Sans', sans-serif", lineHeight: 1 },
-  quickNavLabel: { fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--ink-faint)' },
+  overlay:    { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 3000, background: 'var(--parchment)', display: 'flex', flexDirection: 'column', fontFamily: "'DM Sans', sans-serif", overscrollBehavior: 'none' },
+  singleBar:  { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px', paddingTop: 'max(6px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' },
+  backBtn:    { display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', padding: '4px 6px', flexShrink: 0 },
+  iconBtn:    { display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', padding: '4px 6px', borderRadius: 6, flexShrink: 0 },
+  scrollArea: { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
+  contentPad: { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
 }
 
 /* ── @ mention popup styles ── */
