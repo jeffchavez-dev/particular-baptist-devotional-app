@@ -1,5 +1,5 @@
 {
-  "version": "1.5.42",
+  "version": "1.5.43",
   "date": "2026-07-28",
-  "changelog": "New reading plans: Chronological (1,189 chapters in historical order), Psalms (150 chapters), and Gospels (Matthew–John, 89 chapters)."
+  "changelog": "Reading plans: add Loop option — when enabled, the plan restarts from the beginning automatically instead of completing. Works with any plan (e.g. loop Zechariah indefinitely). Shows cycle count in the plan card."
 }

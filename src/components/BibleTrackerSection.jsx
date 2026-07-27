@@ -71,6 +71,7 @@ const DEFAULT_DRAFT = {
   startBook: 'Genesis', startChapter: 1,
   endBook:   'Revelation', endChapter: 22,
   duration: 1,
+  loop: false,
 }
 
 function planToConfig(plan) {
@@ -176,6 +177,14 @@ function PlanCard({
             <div style={{ fontSize:11, color:'var(--ink-faint)', textAlign:'right' }}>
               Est. finish: {fmtDate(stats.projectedEnd)}
             </div>
+          )}
+          {plan.loop && stats.cycleCount > 0 && (
+            <div style={{ fontSize:11, color:'var(--teal)', fontWeight:600 }}>
+              🔁 Cycle {stats.cycleCount + 1} · completed {stats.cycleCount}×
+            </div>
+          )}
+          {plan.loop && stats.cycleCount === 0 && (
+            <div style={{ fontSize:11, color:'var(--ink-faint)' }}>🔁 Loops when complete</div>
           )}
         </div>
       )}
@@ -413,8 +422,26 @@ function PlanEditorView({ draft, setDraft, duration, setDuration, isNew, onSave,
           </div>
         </div>
 
+        {/* Loop */}
+        <div style={p.section}>
+          <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }}>
+            <input
+              type="checkbox"
+              checked={!!draft.loop}
+              onChange={e => patch({ loop: e.target.checked })}
+              style={{ accentColor:'var(--teal)', width:15, height:15, flexShrink:0 }}
+            />
+            <div>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)' }}>Loop (repeat when complete)</div>
+              <div style={{ fontSize:11, color:'var(--ink-faint)', marginTop:1 }}>
+                When you finish the last chapter, the plan restarts from the beginning automatically.
+              </div>
+            </div>
+          </label>
+        </div>
+
         {/* Duration estimate */}
-        {draftChapters.length > 0 && (() => {
+        {!draft.loop && draftChapters.length > 0 && (() => {
           const cpd        = draft.chaptersPerDay || 1
           const rest       = (draft.restDays || []).length
           const rpw        = 7 - rest

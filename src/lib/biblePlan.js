@@ -148,6 +148,7 @@ export function getCurrentPlanChapters(config, progress) {
  */
 export function isPlanComplete(config, progress) {
   if (!config) return false
+  if (config.loop) return false   // loop plans never complete
   const chapters = computePlanChapters(config)
   return (progress?.currentIndex ?? 0) >= chapters.length
 }
@@ -178,9 +179,10 @@ export function advancePlan(config, progress, userId = null) {
     if (ch) setBibleChapter(ch, true, userId, true)
   }
 
-  const newIndex    = idx + cpd
+  let newIndex    = idx + cpd
+  const completed = !config.loop && newIndex >= chapters.length
+  if (config.loop && newIndex >= chapters.length) newIndex = newIndex % chapters.length
   const newProgress = { currentIndex: newIndex, lastAdvancedDate: today }
-  const completed   = newIndex >= chapters.length
 
   if (completed) addPlanCompletion(config)
 
@@ -215,7 +217,10 @@ export function getPlanStats(config, progress) {
   if (!config) return null
   const chapters    = computePlanChapters(config)
   const total       = chapters.length
-  const done        = Math.min(progress?.currentIndex ?? 0, total)
+  const rawIndex    = progress?.currentIndex ?? 0
+  // For loop plans: show progress within the current cycle
+  const done        = config.loop ? (rawIndex % total) : Math.min(rawIndex, total)
+  const cycleCount  = config.loop ? Math.floor(rawIndex / total) : null
   const remaining   = total - done
   const pct         = total > 0 ? Math.round((done / total) * 100) : 0
   const cpd         = config.chaptersPerDay || 1
@@ -226,13 +231,13 @@ export function getPlanStats(config, progress) {
   const daysLeft    = Math.ceil(weeksLeft * 7)
 
   let projectedEnd = null
-  if (isFinite(daysLeft)) {
+  if (!config.loop && isFinite(daysLeft)) {
     const d = new Date()
     d.setDate(d.getDate() + daysLeft)
     projectedEnd = d.toISOString().slice(0, 10)
   }
 
-  return { total, done, remaining, pct, daysLeft, projectedEnd }
+  return { total, done, remaining, pct, daysLeft: config.loop ? null : daysLeft, projectedEnd, cycleCount }
 }
 
 /**
@@ -275,8 +280,9 @@ export function tryAdvancePlanForChapter(chapter, done) {
 
     const cpd      = config.chaptersPerDay || 1
     const chapters = computePlanChapters(config)
-    const newIndex = progress.currentIndex + cpd
-    const complete = newIndex >= chapters.length
+    let newIndex   = progress.currentIndex + cpd
+    const complete = !config.loop && newIndex >= chapters.length
+    if (config.loop && newIndex >= chapters.length) newIndex = newIndex % chapters.length
     if (complete) addPlanCompletion(config)
     savePlanProgress({ currentIndex: newIndex, lastAdvancedDate: today })
   } else {
