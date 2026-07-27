@@ -1,5 +1,5 @@
 {
-  "version": "1.5.40",
-  "date": "2026-07-27",
-  "changelog": "Edit reference: verse fields now have − / + stepper buttons that work on mobile (iOS hides native number spinners)."
+  "version": "1.5.41",
+  "date": "2026-07-28",
+  "changelog": "Bible Tracker: added 'Mark done' and 'Undo' buttons to the active plan card in Settings, matching the confession tracker UX."
 }
