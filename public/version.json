@@ -1,5 +1,5 @@
 {
-  "version": "1.5.39",
+  "version": "1.5.40",
   "date": "2026-07-27",
-  "changelog": "Confession tag modals now show full scrollable content: 2LBCF shows the chapter with ‹ › nav; 1LBCF, Keach, and Orthodox show all entries scrollable with the tagged one highlighted."
+  "changelog": "Edit reference: verse fields now have − / + stepper buttons that work on mobile (iOS hides native number spinners)."
 }

@@ -654,8 +654,21 @@ function ScTagActionPopup({ sc, onClose, onDelete, onEdit }) {
     onClose()
   }
 
-  const labelStyle = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
-  const inputStyle = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", width: '100%' }
+  const labelStyle  = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 4px' }
+  const inputStyle  = { border: 'none', background: 'transparent', outline: 'none', fontFamily: "'DM Sans', sans-serif", fontSize: 16, color: 'var(--ink)', textAlign: 'center', width: 0, flex: 1, minWidth: 0 }
+  const stepperWrap = { display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--parchment)', overflow: 'hidden' }
+  const stepBtn     = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', fontSize: 20, lineHeight: 1, padding: '6px 10px', fontFamily: 'sans-serif', flexShrink: 0, userSelect: 'none', WebkitUserSelect: 'none' }
+
+  function stepVerse(delta) {
+    setEditVerse(v => String(Math.max(1, Math.min(200, (parseInt(v) || 1) + delta))))
+  }
+  function stepVerseTo(delta) {
+    setEditVerseTo(v => {
+      const cur = v === '' ? (parseInt(editVerse) || 1) : (parseInt(v) || 1)
+      const next = Math.max(1, Math.min(200, cur + delta))
+      return String(next)
+    })
+  }
 
   return (
     <div style={vm.backdrop} onClick={onClose}>
@@ -671,9 +684,9 @@ function ScTagActionPopup({ sc, onClose, onDelete, onEdit }) {
         </div>
 
         {/* Book */}
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 14 }}>
           <p style={labelStyle}>Book</p>
-          <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+          <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', fontSize: 15, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer' }}>
             <optgroup label="Old Testament">
               {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
             </optgroup>
@@ -684,25 +697,37 @@ function ScTagActionPopup({ sc, onClose, onDelete, onEdit }) {
         </div>
 
         {/* Chapter + Verse + VerseTo row */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
           <div style={{ flex: 1 }}>
             <p style={labelStyle}>Ch.</p>
-            <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...inputStyle, cursor: 'pointer' }}>
+            <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 6px', fontSize: 15, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', textAlign: 'center' }}>
               {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
             <p style={labelStyle}>Vs.</p>
-            <input type="number" min={1} max={200} value={editVerse}
-              onChange={e => setEditVerse(e.target.value)}
-              onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
-              style={inputStyle} />
+            <div style={stepperWrap}>
+              <button style={stepBtn} onClick={() => stepVerse(-1)} aria-label="Decrease verse">−</button>
+              <input
+                type="number" min={1} max={200} value={editVerse}
+                onChange={e => setEditVerse(e.target.value)}
+                onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
+                style={inputStyle}
+              />
+              <button style={stepBtn} onClick={() => stepVerse(1)} aria-label="Increase verse">+</button>
+            </div>
           </div>
           <div style={{ flex: 1 }}>
             <p style={labelStyle}>To (opt)</p>
-            <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
-              onChange={e => setEditVerseTo(e.target.value)}
-              style={inputStyle} />
+            <div style={stepperWrap}>
+              <button style={stepBtn} onClick={() => stepVerseTo(-1)} aria-label="Decrease end verse">−</button>
+              <input
+                type="number" min={1} max={200} value={editVerseTo} placeholder="–"
+                onChange={e => setEditVerseTo(e.target.value)}
+                style={inputStyle}
+              />
+              <button style={stepBtn} onClick={() => stepVerseTo(1)} aria-label="Increase end verse">+</button>
+            </div>
           </div>
         </div>
 
