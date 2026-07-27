@@ -430,12 +430,18 @@ function saveStoredLabels(labels) {
 /* ══════════════════════════════════════════════════════════════
    Scripture Verse Modal  (shown when clicking a tagged @ref)
 ══════════════════════════════════════════════════════════════ */
-function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
+function ScriptureVerseModal({ sc, onClose, onNavigate, onDeleteTag, onEditTag, zOverride }) {
+  const [navChapter, setNavChapter] = useState(sc?.chapter ?? 1)
   const [verses,  setVerses]  = useState([])
   const [loading, setLoading] = useState(true)
   const [version, setVersion] = useState(() => getDefaultReaderVersion())
 
-  /* Keep version in sync when the user changes it in Settings (same-tab storage event) */
+  /* Reset navChapter whenever a new tag is opened */
+  useEffect(() => {
+    if (sc) setNavChapter(sc.chapter)
+  }, [sc?.book, sc?.chapter, sc?.verse, sc?.verseTo]) // eslint-disable-line
+
+  /* Keep version in sync when the user changes it in Settings */
   useEffect(() => {
     function onStorage() { setVersion(getDefaultReaderVersion()) }
     window.addEventListener('storage', onStorage)
@@ -444,26 +450,34 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
 
   useEffect(() => {
     if (!sc) return
-    /* Re-read version on each open so a settings change before opening is reflected */
     const ver = getDefaultReaderVersion()
     setVersion(ver)
     setLoading(true)
-    const { book, chapter, verse, verseTo } = sc
-    if (verseTo && verseTo !== verse) {
-      fetchVerseRange(book, chapter, verse, verseTo, ver).then(vs => { setVerses(vs); setLoading(false) })
+    const { book, verse, verseTo } = sc
+    if (navChapter !== sc.chapter) {
+      /* Browsing an adjacent chapter — show the full chapter */
+      fetchVerseRange(book, navChapter, 1, 999, ver).then(vs => { setVerses(vs); setLoading(false) })
+    } else if (verseTo && verseTo !== verse) {
+      fetchVerseRange(book, navChapter, verse, verseTo, ver).then(vs => { setVerses(vs); setLoading(false) })
     } else {
-      fetchVerseText(book, chapter, verse, ver).then(t => {
+      fetchVerseText(book, navChapter, verse, ver).then(t => {
         setVerses(t ? [{ v: verse, t }] : [])
         setLoading(false)
       })
     }
-  }, [sc?.book, sc?.chapter, sc?.verse, sc?.verseTo]) // eslint-disable-line
+  }, [sc?.book, sc?.chapter, sc?.verse, sc?.verseTo, navChapter]) // eslint-disable-line
 
   if (!sc) return null
 
-  const refLabel = (sc.verseTo && sc.verseTo !== sc.verse)
-    ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
-    : `${sc.book} ${sc.chapter}:${sc.verse}`
+  const bookInfo   = BIBLE_BOOKS.find(b => b.name === sc.book)
+  const maxChapter = bookInfo?.chapters ?? 150
+  const isOriginal = navChapter === sc.chapter
+
+  const refLabel = isOriginal
+    ? (sc.verseTo && sc.verseTo !== sc.verse)
+      ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
+      : `${sc.book} ${sc.chapter}:${sc.verse}`
+    : `${sc.book} ${navChapter}`
 
   const verLabel = versionLabel(version, sc.book ?? '')
 
@@ -471,7 +485,22 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
     <div style={zOverride ? { ...vm.backdrop, zIndex: zOverride } : vm.backdrop} onClick={onClose}>
       <div style={vm.sheet} onClick={e => e.stopPropagation()}>
         <div style={vm.header}>
-          <span style={vm.ref}>{refLabel} <span style={{ fontWeight: 400, fontSize: '0.82em', color: 'var(--ink-faint)', marginLeft: 4 }}>· {verLabel}</span></span>
+          <button
+            style={{ ...vm.navArrow, opacity: navChapter <= 1 ? 0.25 : 1 }}
+            disabled={navChapter <= 1}
+            onClick={() => setNavChapter(c => Math.max(1, c - 1))}
+            aria-label="Previous chapter"
+          >‹</button>
+          <span style={{ ...vm.ref, flex: 1, textAlign: 'center' }}>
+            {refLabel}
+            <span style={{ fontWeight: 400, fontSize: '0.82em', color: 'var(--ink-faint)', marginLeft: 4 }}>· {verLabel}</span>
+          </span>
+          <button
+            style={{ ...vm.navArrow, opacity: navChapter >= maxChapter ? 0.25 : 1 }}
+            disabled={navChapter >= maxChapter}
+            onClick={() => setNavChapter(c => Math.min(maxChapter, c + 1))}
+            aria-label="Next chapter"
+          >›</button>
           <button style={vm.closeBtn} onClick={onClose} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -497,7 +526,19 @@ function ScriptureVerseModal({ sc, onClose, onNavigate, zOverride }) {
           )}
         </div>
         <div style={vm.actions}>
-          <button style={vm.openBtn} onClick={() => { onNavigate(sc.book, sc.chapter, sc.verse); onClose() }}>
+          {onDeleteTag && (
+            <button style={{ ...vm.openBtn, background: 'none', border: '1px solid #e53e3e', color: '#e53e3e' }}
+              onClick={() => { onDeleteTag(); onClose() }}>
+              Remove
+            </button>
+          )}
+          {onEditTag && (
+            <button style={{ ...vm.openBtn, background: 'var(--parchment-dark)', border: '1px solid var(--border)', color: 'var(--ink-muted)' }}
+              onClick={() => { onClose(); onEditTag() }}>
+              Edit ref
+            </button>
+          )}
+          <button style={vm.openBtn} onClick={() => { onNavigate(sc.book, navChapter, isOriginal ? sc.verse : 1); onClose() }}>
             Open in Scripture →
           </button>
         </div>
@@ -563,35 +604,14 @@ function ConfessionModal({ conf, onClose, onNavigate, zOverride }) {
    ScTag Action Popup  (shown in EDIT MODE when clicking a tag)
 ══════════════════════════════════════════════════════════════ */
 function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
-  const [verseLines,  setVerseLines]  = useState([])   // [{ v, t }]
-  const [loading,     setLoading]     = useState(true)
-  const [mode,        setMode]        = useState('view')  // 'view' | 'edit'
-
-  /* Edit form state — seeded from current tag values */
   const [editBook,    setEditBook]    = useState(sc.book)
   const [editChapter, setEditChapter] = useState(sc.chapter)
   const [editVerse,   setEditVerse]   = useState(String(sc.verse))
   const [editVerseTo, setEditVerseTo] = useState(sc.verseTo ? String(sc.verseTo) : '')
-
   const ref = useRef(null)
 
   const editSelectedBook = BIBLE_BOOKS.find(b => b.name === editBook) ?? BIBLE_BOOKS[0]
   const maxEditChapters  = editSelectedBook.chapters
-
-  /* Fetch full verse(s) — range-aware */
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const ver = getDefaultReaderVersion()
-    if (sc.verseTo && sc.verseTo !== sc.verse) {
-      fetchVerseRange(sc.book, sc.chapter, sc.verse, sc.verseTo, ver)
-        .then(vs => { if (!cancelled) { setVerseLines(vs); setLoading(false) } })
-    } else {
-      fetchVerseText(sc.book, sc.chapter, sc.verse, ver)
-        .then(t => { if (!cancelled) { setVerseLines(t ? [{ v: sc.verse, t }] : []); setLoading(false) } })
-    }
-    return () => { cancelled = true }
-  }, [sc.book, sc.chapter, sc.verse, sc.verseTo]) // eslint-disable-line
 
   /* Close on outside click/tap */
   useEffect(() => {
@@ -606,12 +626,7 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
     }
   }, [onClose])
 
-  const label = sc.verseTo
-    ? `${sc.book} ${sc.chapter}:${sc.verse}–${sc.verseTo}`
-    : `${sc.book} ${sc.chapter}:${sc.verse}`
-
-  /* Prefer showing ABOVE the tag (same rationale as @ popup) */
-  const POPUP_H  = mode === 'edit' ? 260 : 300
+  const POPUP_H    = 240
   const spaceAbove = anchorRect.top - 6
   const spaceBelow = window.innerHeight - anchorRect.bottom - 6
   const showAbove  = spaceAbove >= Math.min(POPUP_H, 200)
@@ -637,120 +652,71 @@ function ScTagActionPopup({ sc, anchorRect, onClose, onDelete, onEdit }) {
     display: 'flex', flexDirection: 'column',
     fontFamily: "'DM Sans', sans-serif",
   }
-
   const labelStyle  = { fontSize: 9, fontWeight: 700, color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }
   const inputStyle  = { border: '1px solid var(--border)', borderRadius: 6, padding: '5px 6px', fontSize: 16, color: 'var(--ink)', background: 'var(--parchment)', outline: 'none', fontFamily: "'DM Sans', sans-serif" }
   const selectStyle = { ...inputStyle, cursor: 'pointer' }
 
   return (
     <div ref={ref} onMouseDown={e => { e.preventDefault(); e.stopPropagation() }} style={baseStyle}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>Edit reference</span>
+        <button onMouseDown={e => { e.preventDefault(); onClose() }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', fontSize: 12, padding: 0, marginLeft: 'auto', fontFamily: "'DM Sans', sans-serif" }}>
+          Cancel
+        </button>
+      </div>
 
-      {mode === 'view' ? (
-        <>
-          {/* Reference label */}
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--teal)', margin: '0 0 6px', fontFamily: "'Cormorant Garamond', serif", flexShrink: 0 }}>
-            {label}
-          </p>
+      {/* Book */}
+      <div style={{ marginBottom: 8 }}>
+        <p style={labelStyle}>Book</p>
+        <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
+          <optgroup label="Old Testament">
+            {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+          </optgroup>
+          <optgroup label="New Testament">
+            {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
+          </optgroup>
+        </select>
+      </div>
 
-          {/* Full verse text — scrollable so long verses don't get cut off */}
-          <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', marginBottom: 8 }}>
-            {loading ? (
-              <p style={{ fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic', margin: 0 }}>Loading…</p>
-            ) : verseLines.length > 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--ink)', fontStyle: 'italic', lineHeight: 1.65, margin: 0, fontFamily: "'Cormorant Garamond', serif" }}>
-                {verseLines.map((vl, i) => (
-                  <span key={vl.v}>
-                    {verseLines.length > 1 && (
-                      <sup style={{ fontSize: '0.72em', marginRight: 2, color: 'var(--ink-faint)', fontStyle: 'normal' }}>{vl.v}</sup>
-                    )}
-                    {vl.t}{i < verseLines.length - 1 ? ' ' : ''}
-                  </span>
-                ))}
-              </p>
-            ) : (
-              <p style={{ fontSize: 12, color: 'var(--ink-faint)', margin: 0 }}>Verse not found.</p>
-            )}
-          </div>
+      {/* Chapter + Verse + VerseTo row */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+        <div style={{ flex: 1 }}>
+          <p style={labelStyle}>Ch.</p>
+          <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
+            {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={labelStyle}>Vs.</p>
+          <input type="number" min={1} max={200} value={editVerse}
+            onChange={e => setEditVerse(e.target.value)}
+            onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
+            style={{ ...inputStyle, width: '100%' }} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <p style={labelStyle}>To (opt)</p>
+          <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
+            onChange={e => setEditVerseTo(e.target.value)}
+            style={{ ...inputStyle, width: '100%' }} />
+        </div>
+      </div>
 
-          {/* Actions — pinned to bottom */}
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button
-              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setMode('edit') }}
-              style={{ flex: 1, background: 'var(--parchment-dark)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Edit ref
-            </button>
-            <button
-              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose() }}
-              style={{ flex: 1, background: 'var(--red-light)', border: '1px solid var(--red)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: 'var(--red)', fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Remove
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Edit mode header */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10, gap: 6 }}>
-            <button onMouseDown={e => { e.preventDefault(); setMode('view') }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', fontSize: 12, fontWeight: 700, padding: 0, fontFamily: "'DM Sans', sans-serif" }}>
-              ← Back
-            </button>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', marginLeft: 'auto' }}>Edit reference</span>
-          </div>
-
-          {/* Book */}
-          <div style={{ marginBottom: 8 }}>
-            <p style={labelStyle}>Book</p>
-            <select value={editBook} onChange={e => { setEditBook(e.target.value); setEditChapter(1); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
-              <optgroup label="Old Testament">
-                {BIBLE_BOOKS.filter(b => b.testament === 'OT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </optgroup>
-              <optgroup label="New Testament">
-                {BIBLE_BOOKS.filter(b => b.testament === 'NT').map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
-              </optgroup>
-            </select>
-          </div>
-
-          {/* Chapter + Verse + VerseTo row */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            <div style={{ flex: 1 }}>
-              <p style={labelStyle}>Ch.</p>
-              <select value={editChapter} onChange={e => { setEditChapter(Number(e.target.value)); setEditVerse('1'); setEditVerseTo('') }} style={{ ...selectStyle, width: '100%' }}>
-                {Array.from({ length: maxEditChapters }, (_, i) => i + 1).map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={labelStyle}>Vs.</p>
-              <input type="number" min={1} max={200} value={editVerse}
-                onChange={e => setEditVerse(e.target.value)}
-                onBlur={() => setEditVerse(v => String(Math.max(1, parseInt(v) || 1)))}
-                style={{ ...inputStyle, width: '100%' }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={labelStyle}>To (opt)</p>
-              <input type="number" min={1} max={200} value={editVerseTo} placeholder="–"
-                onChange={e => setEditVerseTo(e.target.value)}
-                style={{ ...inputStyle, width: '100%' }} />
-            </div>
-          </div>
-
-          {/* Confirm / Cancel */}
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              onMouseDown={e => { e.preventDefault(); setMode('view') }}
-              style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Cancel
-            </button>
-            <button
-              onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }}
-              style={{ flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Update tag
-            </button>
-          </div>
-        </>
-      )}
+      {/* Confirm / Cancel */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onMouseDown={e => { e.preventDefault(); onClose() }}
+          style={{ flex: 1, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif" }}
+        >
+          Cancel
+        </button>
+        <button
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation(); handleUpdate() }}
+          style={{ flex: 1, background: 'var(--teal)', border: 'none', borderRadius: 6, padding: '6px 0', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
+        >
+          Update tag
+        </button>
+      </div>
     </div>
   )
 }
@@ -1310,8 +1276,11 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
   const [atQuery,   setAtQuery]   = useState('')
   const atRangeRef = useRef(null)  // saved Range at the @ sign
 
+  const navigate = useNavigate()
+
   /* sc-tag click popup (edit mode) */
-  const [scTagPopup,   setScTagPopup]   = useState(null) // scripture tag popup
+  const [scTagPopup,   setScTagPopup]   = useState(null) // scripture tag → ScriptureVerseModal
+  const [scEditPopup,  setScEditPopup]  = useState(null) // scripture tag edit form → ScTagActionPopup
   const [confTagPopup, setConfTagPopup] = useState(null) // confession tag popup
 
   function handleEditorClick(e) {
@@ -1682,7 +1651,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Escape') { setAtPopup(null); setScTagPopup(null); setConfTagPopup(null); return }
+    if (e.key === 'Escape') { setAtPopup(null); setScTagPopup(null); setScEditPopup(null); setConfTagPopup(null); return }
 
     /* ── Backspace / Delete: intercept if it would hit a tag element ── */
     if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -1818,7 +1787,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
       {/* Full-screen backdrop — blocks ALL pointer/touch events behind the popup.
           Sits at zIndex 9000 (below popup's 9500, above everything else).
           Tapping the backdrop (outside the popup) closes it. */}
-      {(scTagPopup || confTagPopup) && (
+      {(scEditPopup || confTagPopup) && (
         <div
           style={{
             position: 'fixed', inset: 0, zIndex: 9000,
@@ -1826,19 +1795,30 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
           }}
           onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
           onTouchStart={e => e.stopPropagation()}
-          onClick={() => { setScTagPopup(null); setConfTagPopup(null) }}
+          onClick={() => { setScEditPopup(null); setConfTagPopup(null) }}
         />
       )}
 
-      {/* sc-tag action popup (edit mode) */}
+      {/* sc-tag view: bottom sheet modal (same as read mode) */}
       {scTagPopup && (
-        <ScTagActionPopup
+        <ScriptureVerseModal
           sc={scTagPopup}
-          anchorRect={scTagPopup.anchorRect}
-          isQuote={scTagPopup.isQuote}
           onClose={() => setScTagPopup(null)}
-          onDelete={() => deleteScTag(scTagPopup.el)}
-          onEdit={newSc => editScTag(scTagPopup.el, newSc, scTagPopup.isQuote)}
+          onNavigate={(book, ch, vs) => navigate('/scripture', { state: { book, chapter: ch, verse: vs } })}
+          onDeleteTag={() => { deleteScTag(scTagPopup.el); setScTagPopup(null) }}
+          onEditTag={() => setScEditPopup(scTagPopup)}
+          zOverride={9600}
+        />
+      )}
+
+      {/* sc-tag edit form popup */}
+      {scEditPopup && (
+        <ScTagActionPopup
+          sc={scEditPopup}
+          anchorRect={scEditPopup.anchorRect}
+          onClose={() => setScEditPopup(null)}
+          onDelete={() => { deleteScTag(scEditPopup.el); setScEditPopup(null) }}
+          onEdit={newSc => editScTag(scEditPopup.el, newSc, scEditPopup.isQuote)}
         />
       )}
 
@@ -4877,11 +4857,16 @@ const vm = {
     maxHeight: '70vh', display: 'flex', flexDirection: 'column',
   },
   header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    display: 'flex', alignItems: 'center', gap: 4,
     marginBottom: 12,
   },
   ref: { fontSize: 14, fontWeight: 700, color: 'var(--teal)', fontFamily: "'Cormorant Garamond', serif" },
-  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, display: 'flex' },
+  navArrow: {
+    background: 'none', border: 'none', cursor: 'pointer',
+    color: 'var(--teal)', fontSize: 22, lineHeight: 1, padding: '0 4px',
+    fontFamily: 'serif', flexShrink: 0,
+  },
+  closeBtn: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-faint)', padding: 4, display: 'flex', flexShrink: 0 },
   body: { flex: 1, overflowY: 'auto' },
   loading: { fontSize: 13, color: 'var(--ink-faint)', textAlign: 'center', padding: '1rem 0' },
   verseText: {
@@ -4889,7 +4874,7 @@ const vm = {
     margin: 0, fontFamily: "'Georgia', serif",
     fontStyle: 'italic',
   },
-  actions: { marginTop: 16, display: 'flex', justifyContent: 'flex-end' },
+  actions: { marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
   openBtn: {
     background: 'var(--teal)', border: 'none', borderRadius: 8,
     padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
