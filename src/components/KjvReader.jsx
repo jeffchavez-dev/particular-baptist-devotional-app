@@ -53,6 +53,7 @@ import { getVisibleVersions } from '../lib/readerPrefs'
 import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 import { getStudySession, setStudySession } from '../lib/studySession'
+import { getInlineHeadings, NT_BOOKS_WITH_OUTLINES, BIBLE_OUTLINES } from '../data/bibleOutlines'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -731,25 +732,49 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                       </span>
                     </button>
                     {isExpanded && chCount > 1 && (
-                      <div style={sb.chapterGrid}>
-                        {Array.from({ length: chCount }, (_, i) => i + 1).map(ch => {
-                          const isActive = isReading && selectedChapter === ch
-                          return (
-                            <button
-                              key={ch}
-                              ref={isActive ? activeChRef : null}
-                              style={{
-                                ...sb.chapterBtn,
-                                ...(isActive
-                                  ? { background: cat.color, color:'white', fontWeight:700, borderColor: cat.color }
-                                  : {}),
-                              }}
-                              onClick={() => handleChapterClick(b, ch)}
-                            >
-                              {ch}
-                            </button>
-                          )
-                        })}
+                      <div>
+                        {NT_BOOKS_WITH_OUTLINES.has(b) && (
+                          <button
+                            style={{
+                              ...sb.chapterBtn,
+                              width: '100%',
+                              textAlign: 'left',
+                              borderRadius: 4,
+                              marginBottom: 4,
+                              padding: '5px 10px',
+                              fontFamily: "'DM Sans', sans-serif",
+                              fontSize: 11,
+                              fontWeight: 600,
+                              letterSpacing: '0.02em',
+                              color: isReading && selectedChapter === 0 ? 'white' : cat.color,
+                              background: isReading && selectedChapter === 0 ? cat.color : `${cat.color}18`,
+                              border: `1px solid ${cat.color}44`,
+                            }}
+                            onClick={() => handleChapterClick(b, 0)}
+                          >
+                            ☰ Outline
+                          </button>
+                        )}
+                        <div style={sb.chapterGrid}>
+                          {Array.from({ length: chCount }, (_, i) => i + 1).map(ch => {
+                            const isActive = isReading && selectedChapter === ch
+                            return (
+                              <button
+                                key={ch}
+                                ref={isActive ? activeChRef : null}
+                                style={{
+                                  ...sb.chapterBtn,
+                                  ...(isActive
+                                    ? { background: cat.color, color:'white', fontWeight:700, borderColor: cat.color }
+                                    : {}),
+                                }}
+                                onClick={() => handleChapterClick(b, ch)}
+                              >
+                                {ch}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1764,6 +1789,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => {
     if (!dataReady) return
     if (loadedForVersionRef.current !== version) return
+    if (chapter === 0) return // outline view — no chapter content to load
 
     if (version === 'esv') {
       setLoading(true)
@@ -2784,6 +2810,44 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
    * Marks the start of a new passage section (e.g. "The Greeting", "Warning against False Teachers").
    * Stored in author_chapter_descs with chapter_key = 'Book:ch:v'.
    */
+  function renderBsbSectionHeadings(segBook, segChapter, verse) {
+    const headings = getInlineHeadings(segBook, segChapter, verse)
+    if (!headings.length) return null
+    return (
+      <>
+        {headings.map((h, i) => {
+          if (h.level === 1) return (
+            <div key={i} style={{ marginTop: 28, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 3, height: 18, background: 'var(--teal)', borderRadius: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", letterSpacing: '0.01em' }}>
+                {h.title}
+              </span>
+            </div>
+          )
+          if (h.level === 2) return (
+            <div key={i} style={{ marginTop: 20, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 0 }}>
+              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+              <span style={{ padding: '0 10px', fontSize: 11.5, fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-muted)', fontFamily: "'Lora', Georgia, serif", whiteSpace: 'nowrap' }}>
+                {h.title}
+              </span>
+              <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            </div>
+          )
+          if (h.level === 3) return (
+            <div key={i} style={{ marginTop: 14, marginBottom: 2, paddingLeft: 12, fontSize: 11.5, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
+              {h.title}
+            </div>
+          )
+          return (
+            <div key={i} style={{ marginTop: 8, marginBottom: 1, paddingLeft: 24, fontSize: 10.5, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
+              {h.title}
+            </div>
+          )
+        })}
+      </>
+    )
+  }
+
   function renderScriptureSectionHeading(segBook, segChapter, verse) {
     const vKey      = `${segBook}:${segChapter}:${verse}`
     const existing  = scriptureVerseDescs[vKey]
@@ -2975,8 +3039,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         const allowed = version === 'greek' ? NT_BOOKS
           : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
           : null
-        const prevCh = getPrevChapter(book, chapter)
-        const nextCh = getNextChapter(book, chapter)
+        const prevCh = chapter === 0 ? null : getPrevChapter(book, chapter)
+        const nextCh = chapter === 0 ? null : getNextChapter(book, chapter)
         const hasPrev = !!prevCh && (!allowed || allowed.has(prevCh.book))
         const hasNext = !!nextCh && (!allowed || allowed.has(nextCh.book))
         // On desktop the sidebar is 220px wide; leave room for it on the left
@@ -3022,9 +3086,76 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)' }}>
 
           {/* ══════════════════════════════════════════════
+              BOOK OUTLINE VIEW (chapter === 0)
+              ══════════════════════════════════════════════ */}
+          {chapter === 0 && (() => {
+            const entries = BIBLE_OUTLINES[book]
+            if (!entries) return (
+              <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: 14, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif" }}>
+                  No outline available for {book} yet.
+                </div>
+                <button
+                  style={{ marginTop: 16, fontSize: 13, color: 'var(--teal)', background: 'none', border: '1px solid var(--teal)', borderRadius: 6, padding: '6px 16px', cursor: 'pointer' }}
+                  onClick={() => navigate(book, 1)}
+                >
+                  Read Chapter 1
+                </button>
+              </div>
+            )
+
+            const indents = [0, 0, 20, 36, 48]
+            const levelStyles = {
+              1: { fontSize: 15, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", marginTop: 20, marginBottom: 2 },
+              2: { fontSize: 13.5, fontWeight: 500, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontStyle: 'italic', marginTop: 10, marginBottom: 1 },
+              3: { fontSize: 12.5, fontWeight: 400, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", marginTop: 6, marginBottom: 1 },
+              4: { fontSize: 11.5, fontWeight: 400, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 4, marginBottom: 0 },
+            }
+            return (
+              <div style={{ padding: isMobile ? '24px 16px 80px' : '32px 0 80px' }}>
+                <h2 style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--ink)', marginBottom: 4, marginTop: 0 }}>
+                  {book}
+                </h2>
+                <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Book Outline · Berean Study Bible
+                </div>
+                {entries.map((entry, i) => (
+                  <button
+                    key={i}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: `${entry.level === 1 ? '6px' : '3px'} 0 ${entry.level === 1 ? '6px' : '3px'} ${indents[entry.level]}px`,
+                      ...levelStyles[entry.level],
+                    }}
+                    onClick={() => navigate(book, entry.startCh)}
+                  >
+                    <span>{entry.title}</span>
+                    <span style={{
+                      marginLeft: 8,
+                      fontSize: Math.max(10, (levelStyles[entry.level].fontSize || 12) - 2),
+                      color: 'var(--teal)',
+                      fontStyle: 'normal',
+                      fontWeight: 400,
+                      fontFamily: "'DM Sans', sans-serif",
+                      opacity: 0.9,
+                    }}>
+                      {entry.startCh}:{entry.startV}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ══════════════════════════════════════════════
               MORPHOLOGICAL MODE (GREEK NT / HEBREW OT)
               ══════════════════════════════════════════════ */}
-          {(version === 'greek' || version === 'hebrew') && (() => {
+          {chapter !== 0 && (version === 'greek' || version === 'hebrew') && (() => {
             const isHeb        = version === 'hebrew'
             const langLabel    = isHeb ? 'Hebrew' : 'Greek'
             const scriptLabel  = isHeb ? 'HOT' : 'GNT'
@@ -3127,7 +3258,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                             return (
                               <React.Fragment key={verse}>
-                                {renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
+                                {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
+                                {canEdit && renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
                               <div
                                 id={verseId(seg.book, seg.chapter, verse)}
                                 data-anchor-book={seg.book}
@@ -3536,7 +3668,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           {/* ══════════════════════════════════════════════
               TEXT VERSION MODE (KJV, ABAB, …)
               ══════════════════════════════════════════════ */}
-          {version !== 'greek' && version !== 'hebrew' && (
+          {chapter !== 0 && version !== 'greek' && version !== 'hebrew' && (
             <>
               {loading && (
                 <div style={r.loadingState}>
@@ -3615,7 +3747,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                         return (
                           <React.Fragment key={verse}>
-                            {renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
+                            {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
+                            {canEdit && renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
 
                             {/* ── Inline commentary chips (study mode) ── */}
                             {studyMode && _TEXT_VERSIONS.has(version) && (() => {

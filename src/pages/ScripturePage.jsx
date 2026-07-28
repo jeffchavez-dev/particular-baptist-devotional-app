@@ -293,7 +293,7 @@ export default function ScripturePage() {
               <path d="M3 3.5h5M3 5.5h5M3 7.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
             <span style={s.readBookName}>{BOOK_ABBR[readBook] ?? readBook}</span>
-            <span style={s.readBookCh}>Ch. {readChapter}</span>
+            <span style={s.readBookCh}>{readChapter === 0 ? 'Outline' : `Ch. ${readChapter}`}</span>
           </button>
 
           {/* Version dropdown */}

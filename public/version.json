@@ -1,5 +1,5 @@
 {
-  "version": "1.5.43",
-  "date": "2026-07-28",
-  "changelog": "Reading plans: add Loop option — when enabled, the plan restarts from the beginning automatically instead of completing. Works with any plan (e.g. loop Zechariah indefinitely). Shows cycle count in the plan card."
+  "version": "1.5.44",
+  "date": "2026-07-29",
+  "changelog": "BSB Book Outlines (NT): Each NT book now has a structured outline from the Berean Study Bible (public domain). Tap a book in the sidebar then 'Outline' to see the full hierarchical outline. Inline section headings appear above verses in the reader across all 4 heading levels. Clicking any outline entry navigates to that passage."
 }
