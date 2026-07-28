@@ -121,6 +121,7 @@ const SCRIPTURE_FEATURES = [
   { title: 'Matthew Henry\'s Commentary (MHC)', body: 'The classic verse-by-verse commentary from Matthew Henry (1662–1714), shown inline above each verse in study mode. Covers the entire Bible with pastoral warmth and Reformed precision.' },
   { title: 'John Gill\'s Exposition', body: 'John Gill\'s exhaustive Exposition of the Bible (1746–1763), a Particular Baptist landmark. Shown per-verse inline in study mode, covering every verse of both Testaments with meticulous exegesis.' },
   { title: 'John Calvin\'s Commentaries', body: 'Calvin\'s Commentaries displayed per-verse in study mode, drawn from his complete works. Each verse\'s commentary appears as its own chip — the implicit verse divisions in Calvin\'s text are detected and split automatically.' },
+  { title: 'BSB Book Outlines', body: 'All 66 books of the Bible include a structured hierarchical outline from the Berean Study Bible (public domain since April 30, 2023). Tap any book in the sidebar then "Outline" to browse the full outline. Outline section headings also appear inline above the relevant verses as you read, across up to four levels of nesting.' },
 ]
 
 const DATA_SOURCES = [
@@ -152,6 +153,12 @@ const DATA_SOURCES = [
     name: 'Cebuano Ang Biblia — Bugna/Pinadayag (1917)',
     href: 'https://github.com/scrollmapper/bible_databases',
     desc: 'Public domain Cebuano Bible (Bugna/Pinadayag, 1917) via scrollmapper/bible_databases. All 66 books in verse-level JSON format.',
+    badge: 'Public Domain',
+  },
+  {
+    name: 'Berean Study Bible (BSB)',
+    href: 'https://berean.bible/',
+    desc: 'BSB book outlines (all 66 books) used for the in-app structured outline view and inline section headings. The Berean Study Bible entered the public domain on April 30, 2023.',
     badge: 'Public Domain',
   },
   {
