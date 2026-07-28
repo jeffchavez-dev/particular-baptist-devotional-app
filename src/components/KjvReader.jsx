@@ -3104,19 +3104,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               </div>
             )
 
+            const sz = prefs.sizePx
             const indents = [0, 0, 20, 36, 48]
             const levelStyles = {
-              1: { fontSize: 15, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", marginTop: 20, marginBottom: 2 },
-              2: { fontSize: 13.5, fontWeight: 500, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", fontStyle: 'italic', marginTop: 10, marginBottom: 1 },
-              3: { fontSize: 12.5, fontWeight: 400, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", marginTop: 6, marginBottom: 1 },
-              4: { fontSize: 11.5, fontWeight: 400, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 4, marginBottom: 0 },
+              1: { fontSize: sz + 1,    fontWeight: 700, color: 'var(--ink)',       fontFamily: "'Cormorant Garamond', Georgia, serif", marginTop: 20, marginBottom: 2 },
+              2: { fontSize: sz - 0.5,  fontWeight: 500, color: 'var(--ink)',       fontFamily: "'Cormorant Garamond', Georgia, serif", fontStyle: 'italic', marginTop: 10, marginBottom: 1 },
+              3: { fontSize: sz - 1.5,  fontWeight: 400, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", marginTop: 6, marginBottom: 1 },
+              4: { fontSize: sz - 2.5,  fontWeight: 400, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', marginTop: 4, marginBottom: 0 },
             }
             return (
               <div style={{ padding: isMobile ? '24px 16px 80px' : '32px 0 80px' }}>
-                <h2 style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--ink)', marginBottom: 4, marginTop: 0 }}>
+                <h2 style={{ fontSize: sz + 6, fontWeight: 700, fontFamily: "'Cormorant Garamond', Georgia, serif", color: 'var(--ink)', marginBottom: 4, marginTop: 0 }}>
                   {book}
                 </h2>
-                <div style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <div style={{ fontSize: sz - 5, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   Book Outline · Berean Study Bible
                 </div>
                 {entries.map((entry, i) => (
@@ -3137,7 +3138,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     <span>{entry.title}</span>
                     <span style={{
                       marginLeft: 8,
-                      fontSize: Math.max(10, (levelStyles[entry.level].fontSize || 12) - 2),
+                      fontSize: Math.max(9, sz - 4),
                       color: 'var(--teal)',
                       fontStyle: 'normal',
                       fontWeight: 400,
