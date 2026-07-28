@@ -3238,7 +3238,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span style={r.chapterDividerLine} />
                             </div>
                         }
-                        {renderScriptureChapterDesc(seg.book, seg.chapter)}
                         {renderChapterLibNotes(seg.book, seg.chapter)}
 
                         <div style={r.verseList}>
