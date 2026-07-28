@@ -3259,7 +3259,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             return (
                               <React.Fragment key={verse}>
                                 {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
-                                {canEdit && renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
                               <div
                                 id={verseId(seg.book, seg.chapter, verse)}
                                 data-anchor-book={seg.book}
@@ -3748,7 +3747,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                         return (
                           <React.Fragment key={verse}>
                             {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
-                            {canEdit && renderScriptureSectionHeading(seg.book, seg.chapter, verse)}
 
                             {/* ── Inline commentary chips (study mode) ── */}
                             {studyMode && _TEXT_VERSIONS.has(version) && (() => {
