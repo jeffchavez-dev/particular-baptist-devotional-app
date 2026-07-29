@@ -2813,35 +2813,36 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function renderBsbSectionHeadings(segBook, segChapter, verse) {
     const headings = getInlineHeadings(segBook, segChapter, verse)
     if (!headings.length) return null
+    const goToOutline = () => handleChapterClick(segBook, 0)
     return (
       <>
         {headings.map((h, i) => {
           if (h.level === 1) return (
-            <div key={i} style={{ marginTop: 28, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button key={i} onClick={goToOutline} style={{ marginTop: 28, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer', width: '100%', textAlign: 'left' }}>
               <span style={{ width: 3, height: 18, background: 'var(--teal)', borderRadius: 2, flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', fontFamily: "'Cormorant Garamond', Georgia, serif", letterSpacing: '0.01em' }}>
                 {h.title}
               </span>
-            </div>
+            </button>
           )
           if (h.level === 2) return (
-            <div key={i} style={{ marginTop: 20, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 0 }}>
+            <button key={i} onClick={goToOutline} style={{ marginTop: 20, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', width: '100%' }}>
               <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
               <span style={{ padding: '0 10px', fontSize: 11.5, fontWeight: 600, fontStyle: 'italic', color: 'var(--ink-muted)', fontFamily: "'Lora', Georgia, serif", whiteSpace: 'nowrap' }}>
                 {h.title}
               </span>
               <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            </div>
+            </button>
           )
           if (h.level === 3) return (
-            <div key={i} style={{ marginTop: 14, marginBottom: 2, paddingLeft: 12, fontSize: 11.5, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
+            <button key={i} onClick={goToOutline} style={{ marginTop: 14, marginBottom: 2, paddingLeft: 12, fontSize: 11.5, color: 'var(--ink-muted)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', padding: '0 0 0 12px' }}>
               {h.title}
-            </div>
+            </button>
           )
           return (
-            <div key={i} style={{ marginTop: 8, marginBottom: 1, paddingLeft: 24, fontSize: 10.5, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic' }}>
+            <button key={i} onClick={goToOutline} style={{ marginTop: 8, marginBottom: 1, paddingLeft: 24, fontSize: 10.5, color: 'var(--ink-faint)', fontFamily: "'DM Sans', sans-serif", fontStyle: 'italic', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', padding: '0 0 0 24px' }}>
               {h.title}
-            </div>
+            </button>
           )
         })}
       </>

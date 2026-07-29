@@ -1,5 +1,5 @@
 {
-  "version": "1.5.45",
-  "date": "2026-07-29",
-  "changelog": "BSB Book Outlines (OT + NT): All 66 books now have structured outlines from the Berean Study Bible (public domain). Tap a book in the sidebar then 'Outline' to see the full hierarchical outline. Inline section headings appear above verses in the reader across all 4 heading levels."
+  "version": "1.5.46",
+  "date": "2026-07-30",
+  "changelog": "BSB inline section headings are now tappable — tap any heading while reading to jump to that book's full outline page."
 }
