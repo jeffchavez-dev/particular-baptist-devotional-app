@@ -2813,7 +2813,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   function renderBsbSectionHeadings(segBook, segChapter, verse) {
     const headings = getInlineHeadings(segBook, segChapter, verse)
     if (!headings.length) return null
-    const goToOutline = () => handleChapterClick(segBook, 0)
+    const goToOutline = () => navigate(segBook, 0)
     return (
       <>
         {headings.map((h, i) => {

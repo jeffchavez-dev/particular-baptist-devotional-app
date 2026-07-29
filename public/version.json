@@ -1,5 +1,5 @@
 {
-  "version": "1.5.46",
+  "version": "1.5.47",
   "date": "2026-07-30",
-  "changelog": "BSB inline section headings are now tappable — tap any heading while reading to jump to that book's full outline page."
+  "changelog": "Fix: tapping inline BSB section headings now correctly navigates to the book's outline page."
 }
