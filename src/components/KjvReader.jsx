@@ -3917,30 +3917,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   </span>
                                 )}
 
-                                {/* ── Bible cross-refs (Matthew, static data) ── */}
-                                {studyMode && (() => {
-                                  const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
-                                  if (!bxrefs.length) return null
-                                  return (
-                                    <div style={r.authorXrefRow}>
-                                      {bxrefs.map((ref, i) => {
-                                        const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
-                                        const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse || null, label }
-                                        return (
-                                          <button
-                                            key={`bxref-${i}`}
-                                            style={r.xrefChip}
-                                            title={label}
-                                            onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
-                                          >
-                                            {label}
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  )
-                                })()}
-
                               </span>
                             </div>
 
@@ -4286,71 +4262,65 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               </button>
                             )}
 
-                            {/* ── Author cross-refs (forward links + automatic back-refs) ── */}
+                            {/* ── Cross-references: static forward/back + author links — merged, deduplicated ── */}
                             {(() => {
-                              const chKey     = `${seg.book}:${seg.chapter}`
-                              const xrefs     = authorCrossRefs[chKey]?.[verse] || []
-                              const backRefs  = authorBackRefs[chKey]?.[verse]  || []
-                              const bbackRefs = getBibleBackRefs(seg.book, seg.chapter, verse)
-                              const avk       = `${seg.book}:${seg.chapter}:${verse}`
+                              const chKey        = `${seg.book}:${seg.chapter}`
+                              const xrefs        = authorCrossRefs[chKey]?.[verse] || []
+                              const backRefs     = authorBackRefs[chKey]?.[verse]  || []
+                              const bxrefs       = studyMode ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
+                              const bbackRefs    = studyMode ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
+                              const avk          = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
-                              if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length && !bbackRefs.length))) return null
+
+                              // Build one deduplicated chip list — static refs first, then author refs
+                              const seen  = new Set()
+                              const chips = [] // { label, onClick, authorRef? }
+
+                              for (const ref of bxrefs) {
+                                const k = `${ref.book}:${ref.chapter}:${ref.verse ?? 0}`
+                                if (seen.has(k)) continue; seen.add(k)
+                                const label = ref.display || `${ref.book} ${ref.chapter}${ref.verse ? ':' + ref.verse : ''}`
+                                const sr = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse || null, label }
+                                chips.push({ label, onClick: e => { e.stopPropagation(); setAuthorRefModal({ ref: sr }) } })
+                              }
+                              for (const ref of bbackRefs) {
+                                const k = `${ref.book}:${ref.chapter}:${ref.verse ?? 0}`
+                                if (seen.has(k)) continue; seen.add(k)
+                                const label = `${ref.book} ${ref.chapter}:${ref.verse}`
+                                const sr = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse, label }
+                                chips.push({ label, onClick: e => { e.stopPropagation(); setAuthorRefModal({ ref: sr }) } })
+                              }
+                              for (const ref of xrefs) {
+                                const k = `${ref.tgt_book}:${ref.tgt_chapter}:${ref.tgt_verse ?? 0}`
+                                if (seen.has(k)) continue; seen.add(k)
+                                const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
+                                const label = ref.label ? ref.label.split(' - ')[0] : tgt
+                                chips.push({ label, onClick: e => { e.stopPropagation(); setAuthorRefModal({ ref }) }, authorRef: ref })
+                              }
+                              for (const ref of backRefs) {
+                                const k = `${ref.src_book}:${ref.src_chapter}:${ref.src_verse ?? 0}`
+                                if (seen.has(k)) continue; seen.add(k)
+                                const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
+                                const label = ref.label ? ref.label.split(' - ')[0] : src
+                                const sr = { id: ref.id, tgt_book: ref.src_book, tgt_chapter: ref.src_chapter, tgt_verse: ref.src_verse, label: ref.label }
+                                chips.push({ label, onClick: e => { e.stopPropagation(); setAuthorRefModal({ ref: sr }) } })
+                              }
+
+                              if (!canEdit && !isAddingHere && !chips.length) return null
                               return (
                                 <div style={r.authorXrefRow} onClick={e => e.stopPropagation()}>
-                                  {/* Forward links (author-added from this verse) */}
-                                  {xrefs.map(ref => {
-                                    const tgt = `${ref.tgt_book} ${ref.tgt_chapter}${ref.tgt_verse ? ':' + ref.tgt_verse : ''}`
-                                    const chipLabel = ref.label ? ref.label.split(' - ')[0] : tgt
-                                    return (
-                                      <span key={ref.id} style={r.xrefChipWrap}>
-                                        <button
-                                          style={canEdit ? r.xrefChipLeft : r.xrefChip}
-                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref }) }}
-                                          title={tgt}
-                                        >{chipLabel}</button>
-                                        {canEdit && (
-                                          <button style={r.xrefChipDelete}
-                                            onClick={e => { e.stopPropagation(); removeAuthorCrossRef(ref) }}
-                                            title="Remove link">×</button>
-                                        )}
+                                  {chips.map((chip, i) => (
+                                    chip.authorRef && canEdit ? (
+                                      <span key={i} style={r.xrefChipWrap}>
+                                        <button style={r.xrefChipLeft} onClick={chip.onClick} title={chip.label}>{chip.label}</button>
+                                        <button style={r.xrefChipDelete}
+                                          onClick={e => { e.stopPropagation(); removeAuthorCrossRef(chip.authorRef) }}
+                                          title="Remove link">×</button>
                                       </span>
+                                    ) : (
+                                      <button key={i} style={r.xrefChip} onClick={chip.onClick} title={chip.label}>{chip.label}</button>
                                     )
-                                  })}
-                                  {/* Author back-references */}
-                                  {backRefs.map(ref => {
-                                    const src = `${ref.src_book} ${ref.src_chapter}:${ref.src_verse}`
-                                    const chipLabel = ref.label ? ref.label.split(' - ')[0] : src
-                                    const syntheticRef = {
-                                      id:          ref.id,
-                                      tgt_book:    ref.src_book,
-                                      tgt_chapter: ref.src_chapter,
-                                      tgt_verse:   ref.src_verse,
-                                      label:       ref.label,
-                                    }
-                                    return (
-                                      <span key={`back-${ref.id}`} style={r.xrefChipWrap}>
-                                        <button
-                                          style={r.xrefChip}
-                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
-                                          title={`Back-link from ${src}`}
-                                        >↩ {chipLabel}</button>
-                                      </span>
-                                    )
-                                  })}
-                                  {/* Static Bible back-references (e.g. Matthew → this verse) */}
-                                  {studyMode && bbackRefs.map((ref, i) => {
-                                    const label = `${ref.book} ${ref.chapter}:${ref.verse}`
-                                    const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse, label }
-                                    return (
-                                      <span key={`bback-${i}`} style={r.xrefChipWrap}>
-                                        <button
-                                          style={r.xrefChip}
-                                          onClick={e => { e.stopPropagation(); setAuthorRefModal({ ref: syntheticRef }) }}
-                                          title={`Referenced by ${label}`}
-                                        >↩ {label}</button>
-                                      </span>
-                                    )
-                                  })}
+                                  ))}
                                   {canEdit && !isAddingHere && (
                                     <button style={r.authorXrefAddBtn}
                                       onClick={e => {
