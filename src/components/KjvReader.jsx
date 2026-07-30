@@ -2623,6 +2623,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     setChapter(newChapter)
     setVisBook(newBook)
     setVisChapter(newChapter)
+    // Dismiss any in-progress word selection / partial highlight toolbar
+    setWordSelStart(null)
+    setPartialRange(null)
+    setSelectedVerses(new Set())
   }
 
   function clearNavHistory() {

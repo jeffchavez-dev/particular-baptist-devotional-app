@@ -1,5 +1,5 @@
 {
-  "version": "1.5.48",
+  "version": "1.5.49",
   "date": "2026-07-31",
-  "changelog": "Zechariah cross-references: all 14 chapters now have study-mode cross-reference chips linking to parallel passages, with automatic back-references from the target verses."
+  "changelog": "Fix: word-selection toolbar now dismisses when navigating to a different chapter, book, or outline page."
 }
