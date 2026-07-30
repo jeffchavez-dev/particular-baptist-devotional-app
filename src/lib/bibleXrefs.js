@@ -16,16 +16,18 @@
  *   // → [{ book: 'Matthew', chapter: 1, verse: 2 }, ...]
  */
 
-import { MATTHEW_XREFS } from '../data/matthewCrossRefs'
-import { ROMANS_XREFS }  from '../data/romansCrossRefs'
-import { JOHN_XREFS }    from '../data/johnCrossRefs'
+import { MATTHEW_XREFS }   from '../data/matthewCrossRefs'
+import { ROMANS_XREFS }    from '../data/romansCrossRefs'
+import { JOHN_XREFS }      from '../data/johnCrossRefs'
+import { ZECHARIAH_XREFS } from '../data/zechariahCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
 const XREF_SOURCES = [
-  { book: 'Matthew', data: MATTHEW_XREFS },
-  { book: 'Romans',  data: ROMANS_XREFS  },
-  { book: 'John',    data: JOHN_XREFS    },
+  { book: 'Matthew',   data: MATTHEW_XREFS   },
+  { book: 'Romans',    data: ROMANS_XREFS    },
+  { book: 'John',      data: JOHN_XREFS      },
+  { book: 'Zechariah', data: ZECHARIAH_XREFS },
 ]
 
 /* ── Forward cache: 'book:ch:v' → parsed ref array ── */
