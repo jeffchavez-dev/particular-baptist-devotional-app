@@ -1,5 +1,5 @@
 {
-  "version": "1.5.50",
+  "version": "1.5.51",
   "date": "2026-07-31",
-  "changelog": "Fix: cross-reference chips are now unified into a single deduplicated row — no duplicate chips, no back-arrow prefix, consistent style for all sources."
+  "changelog": "Add Revelation cross-references: all 22 chapters with verse-level BSB cross-references, unified with the existing chip system (study mode)."
 }
