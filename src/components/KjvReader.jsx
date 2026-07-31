@@ -4264,13 +4264,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                             {/* ── Cross-references: static forward/back + author links — merged, deduplicated ── */}
                             {(() => {
+                              const avk          = `${seg.book}:${seg.chapter}:${verse}`
+                              const isAddingHere = addingCrossRefTo === avk
+                              if (!studyMode && !canEdit && !isAddingHere) return null
+
                               const chKey        = `${seg.book}:${seg.chapter}`
                               const xrefs        = authorCrossRefs[chKey]?.[verse] || []
                               const backRefs     = authorBackRefs[chKey]?.[verse]  || []
                               const bxrefs       = studyMode ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
                               const bbackRefs    = studyMode ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
-                              const avk          = `${seg.book}:${seg.chapter}:${verse}`
-                              const isAddingHere = addingCrossRefTo === avk
 
                               // Build one deduplicated chip list — static refs first, then author refs
                               const seen  = new Set()
