@@ -22,11 +22,13 @@ import { JOHN_XREFS }      from '../data/johnCrossRefs'
 import { ZECHARIAH_XREFS }   from '../data/zechariahCrossRefs'
 import { REVELATION_XREFS } from '../data/revelationCrossRefs'
 import { GENESIS_XREFS }    from '../data/genesisCrossRefs'
+import { MARK_XREFS }      from '../data/markCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
 const XREF_SOURCES = [
   { book: 'Genesis',    data: GENESIS_XREFS    },
+  { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },

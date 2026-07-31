@@ -1,5 +1,5 @@
 {
-  "version": "1.5.53",
+  "version": "1.5.54",
   "date": "2026-07-31",
-  "changelog": "Fix: scripture cross-reference chips no longer appear outside study mode."
+  "changelog": "Add Mark cross-references: all 16 chapters with verse-level BSB cross-references, unified with the existing chip system (study mode)."
 }
