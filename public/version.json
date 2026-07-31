@@ -1,5 +1,5 @@
 {
-  "version": "1.5.51",
+  "version": "1.5.52",
   "date": "2026-07-31",
-  "changelog": "Add Revelation cross-references: all 22 chapters with verse-level BSB cross-references, unified with the existing chip system (study mode)."
+  "changelog": "Add Genesis cross-references: all 50 chapters with verse-level BSB cross-references, unified with the existing chip system (study mode)."
 }
