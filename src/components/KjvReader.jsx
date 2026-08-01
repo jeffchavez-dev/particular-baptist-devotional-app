@@ -2474,6 +2474,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   function copySelection() {
+    // Partial phrase selection — copy highlighted text directly
+    if (partialRange) {
+      const ranges = Array.isArray(partialRange) ? partialRange : [partialRange]
+      const parts = ranges.map(r => {
+        if (r.text) return r.text
+        // Cross-verse first entry has no text stored; look it up from segments
+        const [, b, ch, v] = r.verseKey.split('|')
+        for (const seg of segments) {
+          if (seg.book === b && String(seg.chapter) === ch) {
+            const vObj = seg.verses.find(ve => String(ve.verse) === v)
+            if (vObj) return (vObj.text || '').slice(r.start, r.end)
+          }
+        }
+        return ''
+      }).filter(Boolean)
+      navigator.clipboard.writeText(parts.join(' ')).catch(() => {})
+      setCopiedKey('selection')
+      setTimeout(() => { setCopiedKey(null); setPartialRange(null) }, 1500)
+      return
+    }
+    // Verse selection
     const { lines } = buildSelectionLines()
     navigator.clipboard.writeText(lines.join('\n\n')).catch(() => {})
     setCopiedKey('selection')

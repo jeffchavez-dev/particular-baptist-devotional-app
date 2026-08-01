@@ -1,5 +1,5 @@
 {
-  "version": "1.5.54",
-  "date": "2026-07-31",
-  "changelog": "Add Mark cross-references: all 16 chapters with verse-level BSB cross-references, unified with the existing chip system (study mode)."
+  "version": "1.5.55",
+  "date": "2026-08-02",
+  "changelog": "Fix: copy button now works for phrase (partial highlight) selections, not just full verse selections."
 }
