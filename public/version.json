@@ -1,5 +1,5 @@
 {
-  "version": "1.5.55",
+  "version": "1.5.56",
   "date": "2026-08-02",
-  "changelog": "Fix: copy button now works for phrase (partial highlight) selections, not just full verse selections."
+  "changelog": "Fix: selecting a verse now clears any active word/phrase selection so both toolbars don't show at once."
 }

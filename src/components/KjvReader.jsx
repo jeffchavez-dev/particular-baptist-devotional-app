@@ -2161,6 +2161,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* ── Verse tap-to-select ── */
   function toggleVerse(verseKey) {
+    setWordSelStart(null)
+    setPartialRange(null)
     setSelectedVerses(prev => {
       const next = new Set(prev)
       if (next.has(verseKey)) next.delete(verseKey)
