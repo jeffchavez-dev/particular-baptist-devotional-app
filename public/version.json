@@ -1,5 +1,5 @@
 {
-  "version": "1.5.56",
-  "date": "2026-08-02",
-  "changelog": "Fix: selecting a verse now clears any active word/phrase selection so both toolbars don't show at once."
+  "version": "1.5.57",
+  "date": "2026-08-07",
+  "changelog": "Fix: phrase highlights are now version-specific — a highlight made in ABAB no longer appears misaligned in KJV or other versions."
 }

@@ -2201,7 +2201,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     if (partialRange) {
       const ranges = Array.isArray(partialRange) ? partialRange : [partialRange]
       if (colorId) {
-        ranges.forEach(r => savePartialHighlight(r.verseKey, r.start, r.end, colorId, r.text || ''))
+        ranges.forEach(r => savePartialHighlight(r.verseKey, r.start, r.end, colorId, r.text || '', version))
       } else {
         ranges.forEach(r => removePartialHighlight(r.verseKey, r.start))
       }
@@ -2308,7 +2308,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* Split plain verse text into segments for partial + pending-selection rendering */
   function renderWithPartialHighlights(text, verseKey) {
-    const saved   = partialHighlights[verseKey] || []
+    const saved   = (partialHighlights[verseKey] || []).filter(r => !r.version || r.version === version)
     const pendingRanges = Array.isArray(partialRange) ? partialRange : (partialRange ? [partialRange] : [])
     const pending = pendingRanges.find(r => r.verseKey === verseKey) || null
 
@@ -3916,7 +3916,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   >{(() => {
                                     const pRanges = Array.isArray(partialRange) ? partialRange : (partialRange ? [partialRange] : [])
                                     const hasPending = pRanges.some(r => r.verseKey === verseKey)
-                                    return (partialHighlights[verseKey]?.length || hasPending || wordSelStart?.verseKey === verseKey)
+                                    const hasSaved = (partialHighlights[verseKey] || []).some(r => !r.version || r.version === version)
+                                    return (hasSaved || hasPending || wordSelStart?.verseKey === verseKey)
                                       ? renderWithPartialHighlights(text, verseKey)
                                       : highlightSearchInText(text)
                                   })()}</span>

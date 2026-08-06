@@ -118,12 +118,12 @@ export function loadPartialHighlights() {
   try { return JSON.parse(localStorage.getItem(PHL_KEY) || '{}') } catch { return {} }
 }
 
-export function savePartialHighlight(verseKey, start, end, colorId, text = '') {
+export function savePartialHighlight(verseKey, start, end, colorId, text = '', version = 'kjv') {
   const all = loadPartialHighlights()
   const existing = all[verseKey] || []
-  // Remove any ranges that fully overlap the new range
-  const kept = existing.filter(r => r.end <= start || r.start >= end)
-  kept.push({ start, end, colorId, text })
+  // Remove any ranges that fully overlap the new range (same version only)
+  const kept = existing.filter(r => r.version !== version || r.end <= start || r.start >= end)
+  kept.push({ start, end, colorId, text, version })
   kept.sort((a, b) => a.start - b.start)
   all[verseKey] = kept
   try { localStorage.setItem(PHL_KEY, JSON.stringify(all)) } catch {}
