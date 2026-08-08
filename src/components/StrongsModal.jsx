@@ -169,13 +169,37 @@ function BrowseView({ lang, data, currentId, scriptFont, onSelect }) {
   )
 }
 
+/* ── Scope picker ───────────────────────────────────────────────────── */
+function ScopePicker({ currentBook, corpus, onPickBook, onPickAll }) {
+  return (
+    <div style={m.scopeWrap}>
+      <p style={m.scopeLabel}>Search where?</p>
+      <button style={m.scopeBookBtn} onClick={onPickBook}>
+        <BookScopeIcon />
+        <span>
+          <span style={m.scopeBtnTitle}>In {currentBook}</span>
+          <span style={m.scopeBtnSub}>Results from this book only</span>
+        </span>
+      </button>
+      <button style={m.scopeAllBtn} onClick={onPickAll}>
+        <AllScopeIcon />
+        <span>
+          <span style={m.scopeBtnTitle}>All books</span>
+          <span style={m.scopeBtnSub}>Search the entire {corpus}</span>
+        </span>
+      </button>
+    </div>
+  )
+}
+
 /* ── Scripture search results view ─────────────────────────────────── */
-function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
+function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope = 'all', currentBook }) {
   const [loading,   setLoading]   = useState(true)
-  const [results,   setResults]   = useState([])
+  const [allResults, setAllResults] = useState([])
   const [total,     setTotal]     = useState(0)
   const [capped,    setCapped]    = useState(false)
   const [openBooks, setOpenBooks] = useState(new Set())
+  const [scope,     setScope]     = useState(initialScope)
 
   useEffect(() => {
     setLoading(true)
@@ -183,17 +207,25 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
       const out = lang === 'greek'
         ? searchGreekByStrongs(id)
         : searchHebrewByStrongs(id)
-      setResults(out.results)
+      setAllResults(out.results)
       setTotal(out.total)
       setCapped(out.capped)
-      // Auto-expand first book
-      if (out.results.length > 0) {
-        setOpenBooks(new Set([out.results[0].book]))
-      }
       setLoading(false)
     }, 0)
     return () => clearTimeout(t)
   }, [lang, id])
+
+  const results = useMemo(() => {
+    if (scope === 'book' && currentBook) {
+      return allResults.filter(r => r.book === currentBook)
+    }
+    return allResults
+  }, [allResults, scope, currentBook])
+
+  // Auto-expand first book whenever results change
+  useEffect(() => {
+    if (results.length > 0) setOpenBooks(new Set([results[0].book]))
+  }, [results])
 
   const langLabel = lang === 'greek' ? 'GNT' : 'HOT'
   const isHeb     = lang === 'hebrew'
@@ -216,15 +248,21 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
     return next
   })
 
+  const countLabel = loading ? 'Searching…' : scope === 'book' && currentBook
+    ? `${results.length.toLocaleString()} verse${results.length !== 1 ? 's' : ''} in ${currentBook} · ${langLabel}`
+    : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${allResults.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · ${langLabel}`
+
   return (
     <div style={m.browseWrap}>
       {/* Count bar */}
       <div style={m.browseCount}>
-        {loading
-          ? 'Searching…'
-          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · ${langLabel}`
-        }
-        {!loading && grouped.length > 1 && (
+        {countLabel}
+        {!loading && scope === 'book' && (
+          <button style={m.srWidenBtn} onClick={() => setScope('all')}>
+            All books →
+          </button>
+        )}
+        {!loading && scope === 'all' && grouped.length > 1 && (
           <button
             style={m.srExpandBtn}
             onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
@@ -286,9 +324,9 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
               </div>
             )
           })}
-          {capped && (
+          {capped && scope === 'all' && (
             <div style={m.browseEmpty}>
-              Showing first {results.length} of {total.toLocaleString()} occurrences.
+              Showing first {allResults.length} of {total.toLocaleString()} occurrences.
             </div>
           )}
         </div>
@@ -298,32 +336,41 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate }) {
 }
 
 /* ── LXX Scripture search results view ─────────────────────────────── */
-function LxxScriptureResultsView({ id, scriptFont, onNavigate }) {
-  const [loading,   setLoading]   = useState(true)
-  const [results,   setResults]   = useState([])
-  const [total,     setTotal]     = useState(0)
-  const [capped,    setCapped]    = useState(false)
-  const [openBooks, setOpenBooks] = useState(new Set())
+function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'all', currentBook }) {
+  const [loading,    setLoading]    = useState(true)
+  const [allResults, setAllResults] = useState([])
+  const [total,      setTotal]      = useState(0)
+  const [capped,     setCapped]     = useState(false)
+  const [openBooks,  setOpenBooks]  = useState(new Set())
+  const [scope,      setScope]      = useState(initialScope)
 
   useEffect(() => {
     setLoading(true)
     // Ensure LXX data is loaded, then run the search
     loadLxxWords().then(() => {
       const out = searchLxxByStrongs(id)
-      setResults(out.results)
+      setAllResults(out.results)
       setTotal(out.total)
       setCapped(out.capped)
-      if (out.results.length > 0) {
-        setOpenBooks(new Set([out.results[0].book]))
-      }
       setLoading(false)
     }).catch(() => {
-      setResults([])
+      setAllResults([])
       setTotal(0)
       setCapped(false)
       setLoading(false)
     })
   }, [id])
+
+  const results = useMemo(() => {
+    if (scope === 'book' && currentBook) {
+      return allResults.filter(r => r.book === currentBook)
+    }
+    return allResults
+  }, [allResults, scope, currentBook])
+
+  useEffect(() => {
+    if (results.length > 0) setOpenBooks(new Set([results[0].book]))
+  }, [results])
 
   // Group results by book
   const grouped = useMemo(() => {
@@ -343,15 +390,21 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate }) {
     return next
   })
 
+  const countLabel = loading ? 'Searching LXX…' : scope === 'book' && currentBook
+    ? `${results.length.toLocaleString()} verse${results.length !== 1 ? 's' : ''} in ${currentBook} · LXX`
+    : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${allResults.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · LXX`
+
   return (
     <div style={m.browseWrap}>
       {/* Count bar */}
       <div style={m.browseCount}>
-        {loading
-          ? 'Searching LXX…'
-          : `${total.toLocaleString()} verse${total !== 1 ? 's' : ''}${capped ? ` (showing first ${results.length})` : ''} in ${grouped.length} book${grouped.length !== 1 ? 's' : ''} · LXX`
-        }
-        {!loading && grouped.length > 1 && (
+        {countLabel}
+        {!loading && scope === 'book' && (
+          <button style={m.srWidenBtn} onClick={() => setScope('all')}>
+            All books →
+          </button>
+        )}
+        {!loading && scope === 'all' && grouped.length > 1 && (
           <button
             style={m.srExpandBtn}
             onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
@@ -408,9 +461,9 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate }) {
               </div>
             )
           })}
-          {capped && (
+          {capped && scope === 'all' && (
             <div style={m.browseEmpty}>
-              Showing first {results.length} of {total.toLocaleString()} occurrences.
+              Showing first {allResults.length} of {total.toLocaleString()} occurrences.
             </div>
           )}
         </div>
@@ -430,12 +483,13 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate }) {
  *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
  *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail' }) {
-  const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx'
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook }) {
+  const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx' | 'scripture-scope' | 'scripture-lxx-scope'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
   const [error,   setError]   = useState(null)
   const [activeId, setActiveId] = useState(strongsId)
+  const [scope,   setScope]   = useState('all')  // 'all' | 'book'
 
   /* Determine script font */
   const scriptFont = lang === 'hebrew'
@@ -481,13 +535,13 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
             {view !== 'detail' ? (
               <button style={m.backBtn} onClick={() => setView('detail')}>
                 <BackIcon />
-                {view === 'scripture' || view === 'scripture-lxx' ? 'Back to entry' : 'Back'}
+                {(view === 'scripture' || view === 'scripture-lxx' || view === 'scripture-scope' || view === 'scripture-lxx-scope') ? 'Back to entry' : 'Back'}
               </button>
             ) : (
               <span style={m.headerTitle}>Strong's Lexicon</span>
             )}
             <span style={m.headerLang}>{langLabel}</span>
-            {view === 'scripture-lxx' && (
+            {(view === 'scripture-lxx' || view === 'scripture-lxx-scope') && (
               <span style={{ ...m.headerLang, background:'rgba(12,74,110,0.12)', color:'#0c4a6e', border:'1px solid rgba(12,74,110,0.2)' }}>LXX</span>
             )}
           </div>
@@ -521,13 +575,23 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
                 window.dispatchEvent(new CustomEvent('pb-strongs-find', {
                   detail: { id: activeId, lang, corpus: lang === 'greek' ? 'GNT' : 'HOT', label: entry?.l }
                 }))
-                setView('scripture')
+                if (currentBook) {
+                  setView('scripture-scope')
+                } else {
+                  setScope('all')
+                  setView('scripture')
+                }
               }}
               onFindInLxx={lang === 'greek' ? () => {
                 window.dispatchEvent(new CustomEvent('pb-strongs-find', {
                   detail: { id: activeId, lang: 'greek', corpus: 'LXX', label: entry?.l }
                 }))
-                setView('scripture-lxx')
+                if (currentBook) {
+                  setView('scripture-lxx-scope')
+                } else {
+                  setScope('all')
+                  setView('scripture-lxx')
+                }
               } : undefined}
             />
           )}
@@ -542,11 +606,31 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
             />
           )}
 
+          {(view === 'scripture-scope') && (
+            <ScopePicker
+              currentBook={currentBook}
+              corpus={lang === 'greek' ? 'GNT' : 'HOT'}
+              onPickBook={() => { setScope('book'); setView('scripture') }}
+              onPickAll={() => { setScope('all'); setView('scripture') }}
+            />
+          )}
+
+          {(view === 'scripture-lxx-scope') && (
+            <ScopePicker
+              currentBook={currentBook}
+              corpus="LXX"
+              onPickBook={() => { setScope('book'); setView('scripture-lxx') }}
+              onPickAll={() => { setScope('all'); setView('scripture-lxx') }}
+            />
+          )}
+
           {view === 'scripture' && (
             <ScriptureResultsView
               lang={lang}
               id={activeId}
               scriptFont={scriptFont}
+              initialScope={scope}
+              currentBook={currentBook}
               onNavigate={(book, chapter, verse) => {
                 onClose()
                 onNavigate?.(book, chapter, verse)
@@ -558,6 +642,8 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
             <LxxScriptureResultsView
               id={activeId}
               scriptFont={scriptFont}
+              initialScope={scope}
+              currentBook={currentBook}
               onNavigate={(book, chapter, verse) => {
                 onClose()
                 // Use dedicated LXX navigation callback if provided, else fall back to onNavigate
@@ -620,6 +706,25 @@ function SearchAllIcon() {
       <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
       <path d="M8 8l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
       <path d="M1 8.5h4M1 10.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+function BookScopeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink:0 }}>
+      <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+function AllScopeIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink:0 }}>
+      <rect x="1" y="3" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+      <rect x="11" y="3" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+      <rect x="1" y="13" width="8" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+      <rect x="11" y="13" width="8" height="4" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
     </svg>
   )
 }
@@ -775,6 +880,47 @@ const m = {
     borderRadius:'var(--radius)', padding:'5px 12px',
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'all 0.12s',
+  },
+
+  /* Scope picker */
+  scopeWrap: {
+    padding:'28px 20px 24px',
+    display:'flex', flexDirection:'column', gap:12,
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  scopeLabel: {
+    fontSize:13, fontWeight:700, color:'var(--ink-muted)',
+    letterSpacing:'0.03em', margin:'0 0 4px',
+    textTransform:'uppercase',
+  },
+  scopeBookBtn: {
+    display:'flex', alignItems:'center', gap:14,
+    padding:'14px 16px',
+    border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)',
+    background:'var(--surface)', cursor:'pointer',
+    textAlign:'left', transition:'border-color 0.15s, background 0.15s',
+    color:'var(--teal)',
+  },
+  scopeAllBtn: {
+    display:'flex', alignItems:'center', gap:14,
+    padding:'14px 16px',
+    border:'1.5px solid var(--border)', borderRadius:'var(--radius-lg)',
+    background:'var(--surface)', cursor:'pointer',
+    textAlign:'left', transition:'border-color 0.15s, background 0.15s',
+    color:'var(--ink-muted)',
+  },
+  scopeBtnTitle: {
+    display:'block', fontSize:14, fontWeight:700, color:'var(--ink)', marginBottom:2,
+  },
+  scopeBtnSub: {
+    display:'block', fontSize:11, color:'var(--ink-faint)',
+  },
+
+  /* Widen scope button */
+  srWidenBtn: {
+    marginLeft:'auto', background:'none', border:'none', cursor:'pointer',
+    fontSize:10, fontWeight:700, letterSpacing:'0.05em',
+    color:'var(--teal)', fontFamily:"'DM Sans',sans-serif", padding:'0 2px',
   },
 
   /* Scripture results */

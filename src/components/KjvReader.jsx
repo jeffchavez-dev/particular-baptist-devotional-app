@@ -4740,6 +4740,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           strongsId={strongsModal.strongsId}
           lang={strongsModal.lang}
           initialView={strongsModal.initialView || 'detail'}
+          currentBook={visBookRef.current || null}
           greekFontId={prefs.greekFontId}
           hebrewFontId={prefs.hebrewFontId}
           onClose={() => setStrongsModal(null)}

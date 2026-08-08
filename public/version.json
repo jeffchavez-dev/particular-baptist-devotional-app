@@ -1,5 +1,5 @@
 {
-  "version": "1.5.57",
-  "date": "2026-08-07",
-  "changelog": "Fix: phrase highlights are now version-specific — a highlight made in ABAB no longer appears misaligned in KJV or other versions."
+  "version": "1.5.58",
+  "date": "2026-08-08",
+  "changelog": "Lexicon: tapping 'Find in HOT/GNT/LXX' now asks whether to search the current book or all books, with a one-tap 'All books' option after viewing book-scoped results."
 }
