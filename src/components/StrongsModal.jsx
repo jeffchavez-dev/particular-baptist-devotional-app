@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
-import { searchGreekByStrongs } from '../lib/greek'
-import { searchHebrewByStrongs } from '../lib/hebrew'
+import { loadGreek, searchGreekByStrongs } from '../lib/greek'
+import { loadHebrew, searchHebrewByStrongs } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 
@@ -202,8 +202,11 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
   const [scope,     setScope]     = useState(initialScope)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
-    const t = setTimeout(() => {
+    const loader = lang === 'greek' ? loadGreek() : loadHebrew()
+    loader.then(() => {
+      if (cancelled) return
       const out = lang === 'greek'
         ? searchGreekByStrongs(id)
         : searchHebrewByStrongs(id)
@@ -211,8 +214,10 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
       setTotal(out.total)
       setCapped(out.capped)
       setLoading(false)
-    }, 0)
-    return () => clearTimeout(t)
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
   }, [lang, id])
 
   const results = useMemo(() => {
@@ -483,7 +488,7 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
  *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
  *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook }) {
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, corpus }) {
   const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx' | 'scripture-scope' | 'scripture-lxx-scope'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
@@ -516,7 +521,7 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
 
   const entry = data ? lookupStrongs(lang, activeId) : null
 
-  const langLabel = lang === 'greek' ? 'Greek NT' : 'Hebrew OT'
+  const langLabel = corpus === 'lxx' ? 'LXX Septuagint' : lang === 'greek' ? 'Greek NT' : 'Hebrew OT'
 
   function handleSelectFromList(id) {
     setActiveId(id)

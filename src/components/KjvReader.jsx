@@ -3962,7 +3962,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         style={r.wiStrongsBtn}
                                         onClick={e => {
                                           e.stopPropagation()
-                                          setStrongsModal({ strongsId: wd.s, lang: 'greek' })
+                                          setStrongsModal({ strongsId: wd.s, lang: 'greek', corpus: 'lxx' })
                                         }}
                                         title="Open in-app lexicon"
                                       >
@@ -4171,7 +4171,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               {lw.s ? (
                                                 <button style={r.wiStrongsBtn} onClick={e => {
                                                   e.stopPropagation()
-                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek' })
+                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek', corpus: 'lxx' })
                                                 }}>
                                                   {lw.s}
                                                   <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3}}>
@@ -4740,6 +4740,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           strongsId={strongsModal.strongsId}
           lang={strongsModal.lang}
           initialView={strongsModal.initialView || 'detail'}
+          corpus={strongsModal.corpus || null}
           currentBook={visBookRef.current || null}
           greekFontId={prefs.greekFontId}
           hebrewFontId={prefs.hebrewFontId}
