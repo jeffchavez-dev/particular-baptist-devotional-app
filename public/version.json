@@ -1,5 +1,5 @@
 {
-  "version": "1.5.63",
+  "version": "1.5.64",
   "date": "2026-08-15",
-  "changelog": "Added Galatians, Ephesians, Philippians, and Colossians cross-references to Bible study mode."
+  "changelog": "Fixed cross-reference parser: ver. references no longer bleed into adjacent book context."
 }
