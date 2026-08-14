@@ -25,6 +25,7 @@ import { GENESIS_XREFS }    from '../data/genesisCrossRefs'
 import { MARK_XREFS }      from '../data/markCrossRefs'
 import { LUKE_XREFS }      from '../data/lukeCrossRefs'
 import { ACTS_XREFS }      from '../data/actsCrossRefs'
+import { COR1_XREFS }      from '../data/1corCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -32,7 +33,8 @@ const XREF_SOURCES = [
   { book: 'Genesis',    data: GENESIS_XREFS    },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
-  { book: 'Acts',      data: ACTS_XREFS      },
+  { book: 'Acts',           data: ACTS_XREFS  },
+  { book: '1 Corinthians', data: COR1_XREFS  },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },
