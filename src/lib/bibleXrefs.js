@@ -27,6 +27,10 @@ import { LUKE_XREFS }      from '../data/lukeCrossRefs'
 import { ACTS_XREFS }      from '../data/actsCrossRefs'
 import { COR1_XREFS }      from '../data/1corCrossRefs'
 import { COR2_XREFS }      from '../data/2corCrossRefs'
+import { GAL_XREFS }       from '../data/galatiansCrossRefs'
+import { EPH_XREFS }       from '../data/ephesiansCrossRefs'
+import { PHIL_XREFS }      from '../data/philippiansCrossRefs'
+import { COL_XREFS }       from '../data/colossiansCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -37,6 +41,10 @@ const XREF_SOURCES = [
   { book: 'Acts',           data: ACTS_XREFS  },
   { book: '1 Corinthians', data: COR1_XREFS  },
   { book: '2 Corinthians', data: COR2_XREFS  },
+  { book: 'Galatians',    data: GAL_XREFS   },
+  { book: 'Ephesians',    data: EPH_XREFS   },
+  { book: 'Philippians',  data: PHIL_XREFS  },
+  { book: 'Colossians',   data: COL_XREFS   },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },
