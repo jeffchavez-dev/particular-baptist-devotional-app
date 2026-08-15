@@ -33,6 +33,10 @@ import { PHIL_XREFS }      from '../data/philippiansCrossRefs'
 import { COL_XREFS }       from '../data/colossiansCrossRefs'
 import { THESS1_XREFS }    from '../data/1thessCrossRefs'
 import { THESS2_XREFS }    from '../data/2thessCrossRefs'
+import { TIM1_XREFS }      from '../data/1timCrossRefs'
+import { TIM2_XREFS }      from '../data/2timCrossRefs'
+import { TITUS_XREFS }     from '../data/titusCrossRefs'
+import { PHILEMON_XREFS }  from '../data/philemonCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -49,6 +53,10 @@ const XREF_SOURCES = [
   { book: 'Colossians',       data: COL_XREFS    },
   { book: '1 Thessalonians', data: THESS1_XREFS },
   { book: '2 Thessalonians', data: THESS2_XREFS },
+  { book: '1 Timothy',       data: TIM1_XREFS   },
+  { book: '2 Timothy',       data: TIM2_XREFS   },
+  { book: 'Titus',           data: TITUS_XREFS  },
+  { book: 'Philemon',        data: PHILEMON_XREFS },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },
