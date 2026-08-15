@@ -31,6 +31,8 @@ import { GAL_XREFS }       from '../data/galatiansCrossRefs'
 import { EPH_XREFS }       from '../data/ephesiansCrossRefs'
 import { PHIL_XREFS }      from '../data/philippiansCrossRefs'
 import { COL_XREFS }       from '../data/colossiansCrossRefs'
+import { THESS1_XREFS }    from '../data/1thessCrossRefs'
+import { THESS2_XREFS }    from '../data/2thessCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -44,7 +46,9 @@ const XREF_SOURCES = [
   { book: 'Galatians',    data: GAL_XREFS   },
   { book: 'Ephesians',    data: EPH_XREFS   },
   { book: 'Philippians',  data: PHIL_XREFS  },
-  { book: 'Colossians',   data: COL_XREFS   },
+  { book: 'Colossians',       data: COL_XREFS    },
+  { book: '1 Thessalonians', data: THESS1_XREFS },
+  { book: '2 Thessalonians', data: THESS2_XREFS },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },

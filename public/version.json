@@ -1,5 +1,5 @@
 {
-  "version": "1.5.64",
-  "date": "2026-08-15",
-  "changelog": "Fixed cross-reference parser: ver. references no longer bleed into adjacent book context."
+  "version": "1.5.65",
+  "date": "2026-08-16",
+  "changelog": "Added cross-references for 1 Thessalonians and 2 Thessalonians."
 }
