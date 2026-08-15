@@ -38,6 +38,7 @@ import { TIM2_XREFS }      from '../data/2timCrossRefs'
 import { TITUS_XREFS }     from '../data/titusCrossRefs'
 import { PHILEMON_XREFS }  from '../data/philemonCrossRefs'
 import { HEBREWS_XREFS }  from '../data/hebrewsCrossRefs'
+import { JAMES_XREFS }    from '../data/jamesCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -59,6 +60,7 @@ const XREF_SOURCES = [
   { book: 'Titus',           data: TITUS_XREFS  },
   { book: 'Philemon',        data: PHILEMON_XREFS },
   { book: 'Hebrews',        data: HEBREWS_XREFS  },
+  { book: 'James',          data: JAMES_XREFS    },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },
