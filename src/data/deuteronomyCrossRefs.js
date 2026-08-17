@@ -534,4 +534,3 @@ export const DEUTERONOMY_XREFS = {
   '34:9': 'Exodus 28:3',
   '34:10': 'Exodus 33:11',
 }
-Done: 534 verses
