@@ -58,6 +58,8 @@ import { KGS1_XREFS }          from '../data/1kgsCrossRefs'
 import { KGS2_XREFS }          from '../data/2kgsCrossRefs'
 import { CHR1_XREFS }          from '../data/1chrCrossRefs'
 import { CHR2_XREFS }          from '../data/2chrCrossRefs'
+import { EZRA_XREFS }          from '../data/ezraCrossRefs'
+import { NEH_XREFS }           from '../data/nehCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -76,6 +78,8 @@ const XREF_SOURCES = [
   { book: '2 Kings',       data: KGS2_XREFS         },
   { book: '1 Chronicles', data: CHR1_XREFS         },
   { book: '2 Chronicles', data: CHR2_XREFS         },
+  { book: 'Ezra',         data: EZRA_XREFS         },
+  { book: 'Nehemiah',     data: NEH_XREFS          },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
