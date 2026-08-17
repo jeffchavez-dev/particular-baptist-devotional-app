@@ -62,6 +62,7 @@ import { EZRA_XREFS }          from '../data/ezraCrossRefs'
 import { NEH_XREFS }           from '../data/nehCrossRefs'
 import { ESTH_XREFS }          from '../data/esthCrossRefs'
 import { JOB_XREFS }           from '../data/jobCrossRefs'
+import { PSALMS_XREFS }        from '../data/psalmsCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -84,6 +85,7 @@ const XREF_SOURCES = [
   { book: 'Nehemiah',     data: NEH_XREFS          },
   { book: 'Esther',       data: ESTH_XREFS         },
   { book: 'Job',          data: JOB_XREFS          },
+  { book: 'Psalms',       data: PSALMS_XREFS       },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
