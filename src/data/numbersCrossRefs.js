@@ -483,4 +483,3 @@ export const NUMBERS_XREFS = {
   '36:8': '1 Chronicles 23:22',
   '36:11': 'Joshua 17:3',
 }
-Done: 483 verses
