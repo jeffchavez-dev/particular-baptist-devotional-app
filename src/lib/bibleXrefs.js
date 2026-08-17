@@ -41,6 +41,10 @@ import { HEBREWS_XREFS }  from '../data/hebrewsCrossRefs'
 import { JAMES_XREFS }    from '../data/jamesCrossRefs'
 import { PET1_XREFS }     from '../data/1petCrossRefs'
 import { PET2_XREFS }     from '../data/2petCrossRefs'
+import { JOHN1_XREFS }    from '../data/1johnCrossRefs'
+import { JOHN2_XREFS }    from '../data/2johnCrossRefs'
+import { JOHN3_XREFS }    from '../data/3johnCrossRefs'
+import { JUDE_XREFS }     from '../data/judeCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -65,6 +69,10 @@ const XREF_SOURCES = [
   { book: 'James',          data: JAMES_XREFS    },
   { book: '1 Peter',        data: PET1_XREFS     },
   { book: '2 Peter',        data: PET2_XREFS     },
+  { book: '1 John',         data: JOHN1_XREFS    },
+  { book: '2 John',         data: JOHN2_XREFS    },
+  { book: '3 John',         data: JOHN3_XREFS    },
+  { book: 'Jude',           data: JUDE_XREFS     },
   { book: 'Matthew',   data: MATTHEW_XREFS   },
   { book: 'Romans',    data: ROMANS_XREFS    },
   { book: 'John',      data: JOHN_XREFS      },
