@@ -45,11 +45,17 @@ import { JOHN1_XREFS }    from '../data/1johnCrossRefs'
 import { JOHN2_XREFS }    from '../data/2johnCrossRefs'
 import { JOHN3_XREFS }    from '../data/3johnCrossRefs'
 import { JUDE_XREFS }     from '../data/judeCrossRefs'
+import { EXODUS_XREFS }     from '../data/exodusCrossRefs'
+import { LEVITICUS_XREFS }  from '../data/leviticusCrossRefs'
+import { NUMBERS_XREFS }    from '../data/numbersCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
 const XREF_SOURCES = [
   { book: 'Genesis',    data: GENESIS_XREFS    },
+  { book: 'Exodus',    data: EXODUS_XREFS    },
+  { book: 'Leviticus', data: LEVITICUS_XREFS },
+  { book: 'Numbers',   data: NUMBERS_XREFS   },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
