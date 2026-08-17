@@ -56,6 +56,8 @@ import { SAM1_XREFS }          from '../data/1samCrossRefs'
 import { SAM2_XREFS }          from '../data/2samCrossRefs'
 import { KGS1_XREFS }          from '../data/1kgsCrossRefs'
 import { KGS2_XREFS }          from '../data/2kgsCrossRefs'
+import { CHR1_XREFS }          from '../data/1chrCrossRefs'
+import { CHR2_XREFS }          from '../data/2chrCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -71,7 +73,9 @@ const XREF_SOURCES = [
   { book: '1 Samuel',   data: SAM1_XREFS         },
   { book: '2 Samuel',   data: SAM2_XREFS         },
   { book: '1 Kings',   data: KGS1_XREFS         },
-  { book: '2 Kings',   data: KGS2_XREFS         },
+  { book: '2 Kings',       data: KGS2_XREFS         },
+  { book: '1 Chronicles', data: CHR1_XREFS         },
+  { book: '2 Chronicles', data: CHR2_XREFS         },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
