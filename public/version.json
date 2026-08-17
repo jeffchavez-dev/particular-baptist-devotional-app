@@ -1,5 +1,5 @@
 {
-  "version": "1.5.84",
+  "version": "1.6.0",
   "date": "2026-08-17",
-  "changelog": "Added Psalms cross-references (all 150 chapters) to Bible study mode."
+  "changelog": "Added Job cross-references (all 42 chapters) and fixed Psalms cross-references data format."
 }
