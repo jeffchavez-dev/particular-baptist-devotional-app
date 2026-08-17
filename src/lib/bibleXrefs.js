@@ -49,6 +49,7 @@ import { EXODUS_XREFS }     from '../data/exodusCrossRefs'
 import { LEVITICUS_XREFS }  from '../data/leviticusCrossRefs'
 import { NUMBERS_XREFS }       from '../data/numbersCrossRefs'
 import { DEUTERONOMY_XREFS }   from '../data/deuteronomyCrossRefs'
+import { JOSHUA_XREFS }        from '../data/joshuaCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -58,6 +59,7 @@ const XREF_SOURCES = [
   { book: 'Leviticus', data: LEVITICUS_XREFS },
   { book: 'Numbers',      data: NUMBERS_XREFS      },
   { book: 'Deuteronomy', data: DEUTERONOMY_XREFS  },
+  { book: 'Joshua',      data: JOSHUA_XREFS       },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
