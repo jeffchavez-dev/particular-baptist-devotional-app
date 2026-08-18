@@ -66,6 +66,7 @@ import { PSALMS_XREFS }        from '../data/psalmsCrossRefs'
 import { PROVERBS_XREFS }      from '../data/proverbs CrossRefs'
 import { ECCLES_XREFS }        from '../data/ecclesiastesCrossRefs'
 import { SONG_XREFS }          from '../data/songCrossRefs'
+import { ISAIAH_XREFS }       from '../data/isaiahCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -92,6 +93,7 @@ const XREF_SOURCES = [
   { book: 'Proverbs',     data: PROVERBS_XREFS     },
   { book: 'Ecclesiastes',  data: ECCLES_XREFS       },
   { book: 'Song of Solomon', data: SONG_XREFS },
+  { book: 'Isaiah', data: ISAIAH_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
