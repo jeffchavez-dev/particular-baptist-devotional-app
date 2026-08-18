@@ -64,8 +64,8 @@ import { ESTH_XREFS }          from '../data/esthCrossRefs'
 import { JOB_XREFS }           from '../data/jobCrossRefs'
 import { PSALMS_XREFS }        from '../data/psalmsCrossRefs'
 import { PROVERBS_XREFS }      from '../data/proverbs CrossRefs'
-import { ECCLES_XREFS }
-import { SONG_XREFS }        from '../data/songCrossRefs'        from '../data/ecclesiastesCrossRefs'
+import { ECCLES_XREFS }        from '../data/ecclesiastesCrossRefs'
+import { SONG_XREFS }          from '../data/songCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
