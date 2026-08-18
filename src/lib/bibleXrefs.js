@@ -69,6 +69,7 @@ import { SONG_XREFS }          from '../data/songCrossRefs'
 import { ISAIAH_XREFS }       from '../data/isaiahCrossRefs'
 import { JER_XREFS }          from '../data/jeremiahCrossRefs'
 import { LAM_XREFS }          from '../data/lamentationsCrossRefs'
+import { EZEK_XREFS }         from '../data/ezekielCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -98,6 +99,7 @@ const XREF_SOURCES = [
   { book: 'Isaiah', data: ISAIAH_XREFS },
   { book: 'Jeremiah', data: JER_XREFS },
   { book: 'Lamentations', data: LAM_XREFS },
+  { book: 'Ezekiel', data: EZEK_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
