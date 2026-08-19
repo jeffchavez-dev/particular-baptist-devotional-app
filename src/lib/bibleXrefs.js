@@ -77,6 +77,7 @@ import { AMOS_XREFS }         from '../data/amosCrossRefs'
 import { OBAD_XREFS }         from '../data/obadiah CrossRefs'
 import { JONAH_XREFS }        from '../data/jonah CrossRefs'
 import { MICAH_XREFS }        from '../data/micah CrossRefs'
+import { NAHUM_XREFS }        from '../data/nahum CrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -114,6 +115,7 @@ const XREF_SOURCES = [
   { book: 'Obadiah', data: OBAD_XREFS },
   { book: 'Jonah', data: JONAH_XREFS },
   { book: 'Micah', data: MICAH_XREFS },
+  { book: 'Nahum', data: NAHUM_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
