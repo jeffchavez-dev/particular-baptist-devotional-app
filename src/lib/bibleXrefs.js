@@ -72,6 +72,7 @@ import { LAM_XREFS }          from '../data/lamentationsCrossRefs'
 import { EZEK_XREFS }         from '../data/ezekielCrossRefs'
 import { DAN_XREFS }          from '../data/danielCrossRefs'
 import { HOS_XREFS }          from '../data/hoseaCrossRefs'
+import { JOEL_XREFS }         from '../data/joelCrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -104,6 +105,7 @@ const XREF_SOURCES = [
   { book: 'Ezekiel', data: EZEK_XREFS },
   { book: 'Daniel', data: DAN_XREFS },
   { book: 'Hosea', data: HOS_XREFS },
+  { book: 'Joel', data: JOEL_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
