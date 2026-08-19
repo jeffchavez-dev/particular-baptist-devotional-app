@@ -79,6 +79,7 @@ import { JONAH_XREFS }        from '../data/jonah CrossRefs'
 import { MICAH_XREFS }        from '../data/micah CrossRefs'
 import { NAHUM_XREFS }        from '../data/nahum CrossRefs'
 import { HAB_XREFS }          from '../data/habakkuk CrossRefs'
+import { ZEPH_XREFS }         from '../data/zephaniah CrossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -118,6 +119,7 @@ const XREF_SOURCES = [
   { book: 'Micah', data: MICAH_XREFS },
   { book: 'Nahum', data: NAHUM_XREFS },
   { book: 'Habakkuk', data: HAB_XREFS },
+  { book: 'Zephaniah', data: ZEPH_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
