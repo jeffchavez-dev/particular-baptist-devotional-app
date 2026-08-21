@@ -82,6 +82,7 @@ import { HAB_XREFS }          from '../data/habakkuk CrossRefs'
 import { ZEPH_XREFS }         from '../data/zephaniah CrossRefs'
 import { HAG_XREFS }          from '../data/haggai CrossRefs'
 import { MAL_XREFS }          from '../data/malachi CrossRefs'
+import { KINGSONE_XREFS }     from '../data/1kingsC rossRefs'
 import { parseRefs } from './parseRefs'
 
 /* ── Source books with bundled xref data ── */
@@ -124,6 +125,7 @@ const XREF_SOURCES = [
   { book: 'Zephaniah', data: ZEPH_XREFS },
   { book: 'Haggai', data: HAG_XREFS },
   { book: 'Malachi', data: MAL_XREFS },
+  { book: '1 Kings', data: KINGSONE_XREFS },
   { book: 'Mark',      data: MARK_XREFS      },
   { book: 'Luke',      data: LUKE_XREFS      },
   { book: 'Acts',           data: ACTS_XREFS  },
