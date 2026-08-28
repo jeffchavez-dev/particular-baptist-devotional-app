@@ -4595,7 +4595,7 @@ const re = {
     padding: '10px 12px', fontSize: 16, lineHeight: 1.75,
     color: 'var(--ink)', background: 'var(--parchment)',
     fontFamily: "'DM Sans', sans-serif",
-    outline: 'none', overflowY: 'auto', wordBreak: 'break-word',
+    outline: 'none', overflowY: 'auto', overflowX: 'hidden', wordBreak: 'break-word',
     boxSizing: 'border-box',
   },
 }
@@ -4606,7 +4606,7 @@ const eo = {
   singleBar:  { display: 'flex', alignItems: 'center', gap: 2, padding: '6px 8px', paddingTop: 'max(6px, env(safe-area-inset-top))', background: 'var(--surface)', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' },
   backBtn:    { display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--teal)', padding: '4px 6px', flexShrink: 0 },
   iconBtn:    { display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-muted)', padding: '4px 6px', borderRadius: 6, flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
+  scrollArea: { flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' },
   contentPad: { padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
 }
 

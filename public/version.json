@@ -1,5 +1,1 @@
-{
-  "version": "1.9.5",
-  "date": "2026-08-28",
-  "changelog": "Fixed scripture quote blocks overflowing the screen in note view on desktop."
-}
+{"version":"1.9.6","date":"2026-08-28","changelog":"Fixed scripture quote blocks overflowing in note editor on desktop."}
