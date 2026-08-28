@@ -1652,7 +1652,7 @@ const RichNoteEditor = React.forwardRef(function RichNoteEditor(
         `contenteditable="false" ` +
         `style="margin:6px 0;padding:8px 12px;border-left:3px solid var(--teal);` +
         `background:var(--teal-light);border-radius:0 6px 6px 0;font-style:italic;` +
-        `font-size:0.92em;color:var(--ink-muted);cursor:pointer;">${innerHtml} ` +
+        `font-size:0.92em;color:var(--ink-muted);cursor:pointer;overflow-wrap:break-word;word-break:break-word;">${innerHtml} ` +
         `<em style="font-style:normal;font-weight:700;font-size:0.85em;color:var(--teal);">— ${refLabel} <span style="font-weight:400;opacity:0.7;">${verAbbrev}</span></em></blockquote>&#8203;`
       )
     } else {
@@ -4485,6 +4485,7 @@ const s = {
   richBody: {
     fontSize: 13, color: 'var(--ink)', lineHeight: 1.7,
     fontFamily: "'DM Sans', sans-serif", wordBreak: 'break-word',
+    overflowX: 'hidden',
   },
 
   /* copy/share bar */
@@ -4817,7 +4818,7 @@ const nv = {
     fontFamily: "'DM Sans', sans-serif",
   },
   body: {
-    flex: 1, overflowY: 'auto', padding: '16px 20px 24px',
+    flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 20px 24px',
   },
 }
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.9.4",
+  "version": "1.9.5",
   "date": "2026-08-28",
-  "changelog": "Concordance results (HOT/GNT/LXX) now show KJV verse text inline for at-a-glance context."
+  "changelog": "Fixed scripture quote blocks overflowing the screen in note view on desktop."
 }
