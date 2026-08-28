@@ -1,5 +1,5 @@
 {
-  "version": "1.9.3",
-  "date": "2026-08-22",
-  "changelog": "Added 2 Kings cross-references (all 25 chapters)."
+  "version": "1.9.4",
+  "date": "2026-08-28",
+  "changelog": "Concordance results (HOT/GNT/LXX) now show KJV verse text inline for at-a-glance context."
 }

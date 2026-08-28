@@ -4,6 +4,7 @@ import { loadGreek, searchGreekByStrongs } from '../lib/greek'
 import { loadHebrew, searchHebrewByStrongs } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
+import { loadBibleVersion, getChapterVerses } from '../lib/bibleVersions'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
 function bibleHubUrl(lang, id) {
@@ -200,6 +201,11 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
   const [capped,    setCapped]    = useState(false)
   const [openBooks, setOpenBooks] = useState(new Set())
   const [scope,     setScope]     = useState(initialScope)
+  const [kjvData,   setKjvData]   = useState(null)
+
+  useEffect(() => {
+    loadBibleVersion('kjv').then(setKjvData).catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -310,20 +316,30 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
                 {/* Verse rows */}
                 {isOpen && (
                   <div style={m.srBookRows}>
-                    {rows.map((r, i) => (
-                      <button
-                        key={i}
-                        style={m.srRow}
-                        onClick={() => onNavigate(r.book, r.chapter, r.verse)}
-                      >
-                        <span style={m.srRef}>{r.chapter}:{r.verse}</span>
-                        <span style={{ ...m.srWord, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
-                          {r.w}
-                        </span>
-                        <span style={m.srTranslit}>{r.t}</span>
-                        <span style={m.srGloss}>"{r.g}"</span>
-                      </button>
-                    ))}
+                    {rows.map((r, i) => {
+                      const kjvVerse = kjvData
+                        ? (getChapterVerses(kjvData, r.book, r.chapter) || []).find(v => v.verse === r.verse)?.text
+                        : null
+                      return (
+                        <button
+                          key={i}
+                          style={m.srRow}
+                          onClick={() => onNavigate(r.book, r.chapter, r.verse)}
+                        >
+                          <div style={m.srRowTop}>
+                            <span style={m.srRef}>{r.chapter}:{r.verse}</span>
+                            <span style={{ ...m.srWord, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
+                              {r.w}
+                            </span>
+                            <span style={m.srTranslit}>{r.t}</span>
+                            <span style={m.srGloss}>"{r.g}"</span>
+                          </div>
+                          {kjvVerse && (
+                            <div style={m.srKjvText}>{kjvVerse}</div>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -348,6 +364,11 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
   const [capped,     setCapped]     = useState(false)
   const [openBooks,  setOpenBooks]  = useState(new Set())
   const [scope,      setScope]      = useState(initialScope)
+  const [kjvData,    setKjvData]    = useState(null)
+
+  useEffect(() => {
+    loadBibleVersion('kjv').then(setKjvData).catch(() => {})
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -448,19 +469,29 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
                 </button>
                 {isOpen && (
                   <div style={m.srBookRows}>
-                    {rows.map((r, i) => (
-                      <button
-                        key={i}
-                        style={m.srRow}
-                        onClick={() => onNavigate(r.book, r.chapter, r.verse)}
-                      >
-                        <span style={m.srRef}>{r.chapter}:{r.verse}</span>
-                        <span style={{ ...m.srWord, fontFamily: scriptFont }}>
-                          {r.w}
-                        </span>
-                        <span style={m.srGloss}>LXX Septuagint</span>
-                      </button>
-                    ))}
+                    {rows.map((r, i) => {
+                      const kjvVerse = kjvData
+                        ? (getChapterVerses(kjvData, r.book, r.chapter) || []).find(v => v.verse === r.verse)?.text
+                        : null
+                      return (
+                        <button
+                          key={i}
+                          style={m.srRow}
+                          onClick={() => onNavigate(r.book, r.chapter, r.verse)}
+                        >
+                          <div style={m.srRowTop}>
+                            <span style={m.srRef}>{r.chapter}:{r.verse}</span>
+                            <span style={{ ...m.srWord, fontFamily: scriptFont }}>
+                              {r.w}
+                            </span>
+                            <span style={m.srGloss}>LXX Septuagint</span>
+                          </div>
+                          {kjvVerse && (
+                            <div style={m.srKjvText}>{kjvVerse}</div>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -930,15 +961,18 @@ const m = {
 
   /* Scripture results */
   srRow: {
-    display:'grid',
-    gridTemplateColumns:'56px 1fr',
-    gridTemplateRows:'auto auto',
-    columnGap:10,
+    display:'flex', flexDirection:'column', gap:4,
     width:'100%', padding:'7px 16px 7px 28px',
     border:'none', borderBottom:'1px solid var(--border)',
     background:'none', cursor:'pointer',
     textAlign:'left', fontFamily:"'DM Sans',sans-serif",
     transition:'background 0.1s',
+  },
+  srRowTop: {
+    display:'grid',
+    gridTemplateColumns:'56px 1fr',
+    gridTemplateRows:'auto auto',
+    columnGap:10,
   },
   srRef: {
     gridColumn:'1', gridRow:'1 / 3', alignSelf:'center',
@@ -952,12 +986,18 @@ const m = {
     fontFamily:"'Palatino Linotype','Palatino',serif",
   },
   srTranslit: {
-    display:'none',  // tucked into gloss line to save space
+    display:'none',
   },
   srGloss: {
     gridColumn:'2', gridRow:'2',
     fontSize:11, color:'var(--ink-faint)', lineHeight:1.3,
     fontFamily:"'DM Sans',sans-serif",
+  },
+  srKjvText: {
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.5,
+    fontFamily:"Georgia,serif", fontStyle:'italic',
+    paddingLeft:66, paddingRight:4,
+    display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden',
   },
 
   /* Scripture results — book grouping */

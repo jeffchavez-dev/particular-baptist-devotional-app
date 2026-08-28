@@ -464,3 +464,5 @@ export const KINGSTWO_XREFS = {
   '25:27': 'Jeremiah 52:31-34; 2 Kings 24:12; 2 Kings 24:15; Genesis 40:13; Genesis 40:20',
   '25:29': '2 Samuel 9:7; 2 Samuel 9:13',
 }
+
+export const KGS2_XREFS = KINGSTWO_XREFS
