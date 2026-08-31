@@ -22,6 +22,8 @@ import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import BookLibraryTab from '../components/BookLibraryTab'
 import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSharedNote } from '../lib/noteShare'
 import { getAllQuotes } from '../lib/quoteLibrary'
+import { getVocabList, removeVocabWord } from '../lib/vocab'
+import { getGreekFontCss, getHebrewFontCss } from '../components/FontPrefsPanel'
 
 const SCHEDULE = buildSchedule()
 
@@ -3881,6 +3883,16 @@ export default function LibraryPage() {
   useEffect(() => {
     if (!session && activeTab === 'quotes') setActiveTab('notes')
   }, [session, activeTab])
+
+  const [vocabReview,   setVocabReview]   = useState(null)  // { lang } when review open
+  const [vocabGreek,    setVocabGreek]    = useState(() => getVocabList('greek'))
+  const [vocabHebrew,   setVocabHebrew]   = useState(() => getVocabList('hebrew'))
+  function refreshVocab() {
+    setVocabGreek(getVocabList('greek'))
+    setVocabHebrew(getVocabList('hebrew'))
+  }
+  // Refresh vocab list when tab becomes active
+  useEffect(() => { if (activeTab === 'vocab') refreshVocab() }, [activeTab])
   const [libSearch,     setLibSearch]     = useState('')
   const [bookLibraryCount, setBookLibraryCount] = useState(0)
   const [libSearchOpen, setLibSearchOpen] = useState(false)
@@ -4047,10 +4059,12 @@ export default function LibraryPage() {
   const bookmarksCount  = scBookmarks.length
   const highlightsCount = kjvHighlights.length   + confHighlights.length
 
+  const vocabCount = vocabGreek.length + vocabHebrew.length
   const TABS = [
     { id: 'notes',      label: 'Notes',      count: notesCount      },
     { id: 'bookmarks',  label: 'Bookmarks',  count: bookmarksCount  },
     { id: 'highlights', label: 'Highlights', count: highlightsCount },
+    { id: 'vocab',      label: 'Vocab',      count: vocabCount      },
     // Books tab is only available to signed-in users
     ...(session ? [{ id: 'quotes', label: 'Quotes', count: bookLibraryCount }] : []),
   ]
@@ -4200,6 +4214,50 @@ export default function LibraryPage() {
             }}
           />
         )}
+        {activeTab === 'vocab' && (
+          <div style={{ padding: '16px' }}>
+            {vocabGreek.length === 0 && vocabHebrew.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--ink-faint)', fontSize: 14, lineHeight: 1.7 }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>αβγ</div>
+                No saved words yet.<br />
+                Open any Greek or Hebrew word in the lexicon<br />and tap <strong>Save word</strong> to add it here.
+              </div>
+            ) : (
+              <>
+                {[{ lang: 'greek', label: 'Greek', words: vocabGreek }, { lang: 'hebrew', label: 'Hebrew', words: vocabHebrew }].map(({ lang, label, words }) =>
+                  words.length > 0 && (
+                    <div key={lang} style={{ marginBottom: 28 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
+                          {label} · {words.length} word{words.length !== 1 ? 's' : ''}
+                        </span>
+                        <button
+                          style={vb.reviewBtn}
+                          onClick={() => setVocabReview({ lang, words: [...words] })}
+                        >
+                          ▶ Review
+                        </button>
+                      </div>
+                      {words.map(w => (
+                        <div key={w.id} style={vb.wordRow}>
+                          <span style={{ ...vb.lemma, fontFamily: lang === 'hebrew' ? getHebrewFontCss() : getGreekFontCss(), direction: lang === 'hebrew' ? 'rtl' : 'ltr' }}>
+                            {w.lemma}
+                          </span>
+                          <div style={vb.wordMeta}>
+                            <span style={vb.translit}>{w.translit}</span>
+                            <span style={vb.gloss}>{w.gloss}</span>
+                          </div>
+                          <span style={vb.strongsBadge}>{w.id}</span>
+                          <button style={vb.removeBtn} onClick={() => { removeVocabWord(w.id); refreshVocab() }} aria-label="Remove">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+              </>
+            )}
+          </div>
+        )}
         {activeTab === 'quotes' && (
           session ? (
             <BookLibraryTab searchQuery={libSearch} />
@@ -4220,6 +4278,98 @@ export default function LibraryPage() {
         )}
       </div>
 
+      {vocabReview && (
+        <VocabReviewScreen
+          words={vocabReview.words}
+          lang={vocabReview.lang}
+          onClose={() => setVocabReview(null)}
+        />
+      )}
+
+    </div>
+  )
+}
+
+/* ── Vocab review screen ─────────────────────────────────────────────────── */
+function VocabReviewScreen({ words, lang, onClose }) {
+  const [idx,     setIdx]     = useState(0)
+  const [flipped, setFlipped] = useState(false)
+  const [done,    setDone]    = useState(false)
+
+  const card = words[idx]
+  const isHeb = lang === 'hebrew'
+  const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
+
+  function next() {
+    if (idx + 1 >= words.length) { setDone(true); return }
+    setIdx(i => i + 1)
+    setFlipped(false)
+  }
+  function prev() {
+    if (idx === 0) return
+    setIdx(i => i - 1)
+    setFlipped(false)
+  }
+  function restart() {
+    setIdx(0)
+    setFlipped(false)
+    setDone(false)
+  }
+
+  return (
+    <div style={vr.overlay}>
+      {/* Header */}
+      <div style={vr.header}>
+        <span style={vr.langBadge}>{lang === 'greek' ? 'Greek' : 'Hebrew'}</span>
+        <span style={vr.counter}>{done ? `${words.length} / ${words.length}` : `${idx + 1} / ${words.length}`}</span>
+        <button style={vr.closeBtn} onClick={onClose}>×</button>
+      </div>
+
+      {done ? (
+        /* Completion screen */
+        <div style={vr.doneWrap}>
+          <div style={vr.doneCheck}>✓</div>
+          <p style={vr.doneTitle}>Review complete</p>
+          <p style={vr.doneSub}>{words.length} word{words.length !== 1 ? 's' : ''} reviewed</p>
+          <button style={vr.reviewAgainBtn} onClick={restart}>Review again</button>
+          <button style={vr.doneCloseBtn} onClick={onClose}>Done</button>
+        </div>
+      ) : (
+        /* Card */
+        <div style={vr.cardWrap}>
+          <div
+            style={vr.card}
+            onClick={() => setFlipped(f => !f)}
+          >
+            {/* Front */}
+            <div style={vr.cardFront}>
+              <span style={{ ...vr.cardLemma, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
+                {card.lemma}
+              </span>
+              <span style={vr.cardId}>{card.id}</span>
+              {!flipped && <span style={vr.tapHint}>Tap to reveal</span>}
+            </div>
+
+            {/* Back (revealed) */}
+            {flipped && (
+              <div style={vr.cardBack}>
+                {card.translit && <p style={vr.cardTranslit}>{card.translit}{card.pronun ? ` · /${card.pronun}/` : ''}</p>}
+                {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
+                {card.def && <p style={vr.cardDef}>{card.def}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Nav buttons */}
+          <div style={vr.navRow}>
+            <button style={{ ...vr.navBtn, opacity: idx === 0 ? 0.3 : 1 }} onClick={prev} disabled={idx === 0}>← Prev</button>
+            {!flipped
+              ? <button style={vr.revealBtn} onClick={() => setFlipped(true)}>Reveal</button>
+              : <button style={vr.nextBtn} onClick={next}>{idx + 1 >= words.length ? 'Finish' : 'Next →'}</button>
+            }
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -4927,5 +5077,113 @@ const vm = {
     background: 'none', border: '1px solid var(--border)', borderRadius: 8,
     padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
     color: '#c0392b', fontFamily: "'DM Sans', sans-serif",
+  },
+}
+
+/* ── Vocab list tab styles ───────────────────────────────────────────────── */
+const vb = {
+  wordRow: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '9px 0', borderBottom: '1px solid var(--border)',
+  },
+  lemma: {
+    fontSize: 20, fontWeight: 400, color: 'var(--ink)', minWidth: 60, flexShrink: 0,
+  },
+  wordMeta: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
+  translit: { fontSize: 12, color: 'var(--ink-muted)', fontFamily: "'DM Sans',sans-serif" },
+  gloss: { fontSize: 12, color: 'var(--ink-faint)', fontFamily: "'DM Sans',sans-serif", fontStyle: 'italic' },
+  strongsBadge: {
+    fontSize: 10, fontWeight: 700, color: 'var(--teal)',
+    background: 'var(--teal-light)', borderRadius: 99, padding: '2px 7px',
+    fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+  },
+  removeBtn: {
+    fontSize: 16, color: 'var(--ink-faint)', background: 'none', border: 'none',
+    cursor: 'pointer', padding: '0 4px', flexShrink: 0, lineHeight: 1,
+  },
+  reviewBtn: {
+    fontSize: 11, fontWeight: 700, color: 'var(--teal)',
+    background: 'var(--teal-light)', border: '1px solid rgba(0,120,100,0.25)',
+    borderRadius: 99, padding: '4px 12px', cursor: 'pointer',
+    fontFamily: "'DM Sans',sans-serif",
+  },
+}
+
+/* ── Vocab review screen styles ─────────────────────────────────────────── */
+const vr = {
+  overlay: {
+    position: 'fixed', inset: 0, zIndex: 9000,
+    background: 'var(--parchment)', display: 'flex', flexDirection: 'column',
+    fontFamily: "'DM Sans',sans-serif",
+  },
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+  },
+  langBadge: {
+    fontSize: 12, fontWeight: 700, color: 'var(--teal)',
+    background: 'var(--teal-light)', borderRadius: 99, padding: '3px 10px',
+  },
+  counter: { fontSize: 13, color: 'var(--ink-muted)', fontWeight: 600 },
+  closeBtn: {
+    fontSize: 22, lineHeight: 1, background: 'none', border: 'none',
+    cursor: 'pointer', color: 'var(--ink-muted)', padding: '0 4px',
+  },
+  cardWrap: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', padding: '24px 20px', gap: 28,
+  },
+  card: {
+    width: '100%', maxWidth: 420, minHeight: 220,
+    background: 'var(--surface)', border: '1.5px solid var(--border)',
+    borderRadius: 16, padding: '32px 28px 24px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    cursor: 'pointer', boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+    userSelect: 'none',
+  },
+  cardFront: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%' },
+  cardLemma: { fontSize: 52, fontWeight: 400, color: 'var(--ink)', textAlign: 'center', lineHeight: 1.2 },
+  cardId: { fontSize: 11, fontWeight: 700, color: 'var(--teal)', letterSpacing: '0.05em' },
+  tapHint: { fontSize: 11, color: 'var(--ink-faint)', marginTop: 12 },
+  cardBack: {
+    width: '100%', display: 'flex', flexDirection: 'column', gap: 8,
+    alignItems: 'center', textAlign: 'center',
+  },
+  cardTranslit: { margin: 0, fontSize: 14, color: 'var(--ink-muted)', fontStyle: 'italic' },
+  cardGloss: { margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ink)' },
+  cardDef: {
+    margin: 0, fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.6,
+    maxHeight: 120, overflowY: 'auto',
+    fontFamily: "Georgia,serif",
+  },
+  navRow: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', maxWidth: 420 },
+  navBtn: {
+    flex: 1, padding: '10px 0', background: 'none',
+    border: '1px solid var(--border)', borderRadius: 10,
+    fontSize: 13, fontWeight: 600, color: 'var(--ink-muted)', cursor: 'pointer',
+  },
+  revealBtn: {
+    flex: 2, padding: '12px 0', background: 'var(--teal)', color: 'white',
+    border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+  },
+  nextBtn: {
+    flex: 2, padding: '12px 0', background: 'var(--teal)', color: 'white',
+    border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+  },
+  doneWrap: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center', gap: 12, padding: '24px',
+  },
+  doneCheck: { fontSize: 48, color: 'var(--teal)' },
+  doneTitle: { margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--ink)' },
+  doneSub: { margin: 0, fontSize: 14, color: 'var(--ink-muted)' },
+  reviewAgainBtn: {
+    marginTop: 16, padding: '12px 32px', background: 'var(--teal)', color: 'white',
+    border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+  },
+  doneCloseBtn: {
+    padding: '10px 32px', background: 'none', color: 'var(--ink-muted)',
+    border: '1px solid var(--border)', borderRadius: 10, fontSize: 13,
+    fontWeight: 600, cursor: 'pointer',
   },
 }

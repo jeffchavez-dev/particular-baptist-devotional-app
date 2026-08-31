@@ -5,6 +5,7 @@ import { loadHebrew, searchHebrewByStrongs } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import { loadBibleVersion, getChapterVerses } from '../lib/bibleVersions'
+import { isVocabSaved, toggleVocabWord } from '../lib/vocab'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
 function bibleHubUrl(lang, id) {
@@ -17,6 +18,8 @@ function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture,
   const prefix = lang === 'greek' ? 'G' : 'H'
   const num    = strongsNum(id)
   const bhUrl  = bibleHubUrl(lang, id)
+  const [saved, setSaved] = useState(() => isVocabSaved(id))
+  useEffect(() => { setSaved(isVocabSaved(id)) }, [id])
 
   if (!entry) {
     return (
@@ -71,6 +74,25 @@ function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture,
           <button style={m.findLxxBtn} onClick={onFindInLxx}>
             <SearchAllIcon />
             Find in LXX
+          </button>
+        )}
+        {entry && (
+          <button
+            style={{ ...m.saveVocabBtn, ...(saved ? m.saveVocabBtnSaved : {}) }}
+            onClick={() => {
+              const nowSaved = toggleVocabWord({
+                id, lang,
+                lemma: entry.l || id,
+                translit: entry.x || '',
+                pronun: entry.p || '',
+                gloss: (entry.d || '').split(/[;,.]/)[0].trim().slice(0, 60),
+                def: entry.d || '',
+              })
+              setSaved(nowSaved)
+            }}
+          >
+            <BookmarkIcon filled={saved} />
+            {saved ? 'Saved' : 'Save word'}
           </button>
         )}
         {bhUrl && (
@@ -703,6 +725,15 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
 }
 
 /* ── Tiny SVG icons ─────────────────────────────────────────────────── */
+function BookmarkIcon({ filled }) {
+  return (
+    <svg width="11" height="11" viewBox="0 0 11 14" fill="none" style={{ flexShrink:0 }}>
+      <path d="M1 1h9v12L5.5 9 1 13V1z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"
+        fill={filled ? 'currentColor' : 'none'}/>
+    </svg>
+  )
+}
 function ExternalIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginLeft:3, flexShrink:0 }}>
@@ -916,6 +947,18 @@ const m = {
     borderRadius:'var(--radius)', padding:'5px 12px',
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     transition:'all 0.12s',
+  },
+  saveVocabBtn: {
+    display:'inline-flex', alignItems:'center', gap:6,
+    fontSize:11, fontWeight:600, color:'var(--gold)',
+    background:'var(--gold-faint)', border:'1px solid rgba(180,140,60,0.3)',
+    borderRadius:'var(--radius)', padding:'5px 12px',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'all 0.12s',
+  },
+  saveVocabBtnSaved: {
+    color:'#92700a', background:'rgba(180,140,60,0.18)',
+    border:'1px solid rgba(180,140,60,0.5)',
   },
 
   /* Scope picker */

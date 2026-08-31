@@ -1,1 +1,5 @@
-{"version":"1.9.6","date":"2026-08-28","changelog":"Fixed scripture quote blocks overflowing in note editor on desktop."}
+{
+  "version": "1.10.0",
+  "date": "2026-08-28",
+  "changelog": "New Vocab tab in My Library — save Greek and Hebrew words from the lexicon and review them as flashcards."
+}
