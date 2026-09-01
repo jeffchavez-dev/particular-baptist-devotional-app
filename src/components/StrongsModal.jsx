@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
-import { loadGreek, searchGreekByStrongs } from '../lib/greek'
-import { loadHebrew, searchHebrewByStrongs } from '../lib/hebrew'
+import { loadGreek, searchGreekByStrongs, parseMorphDetails } from '../lib/greek'
+import { loadHebrew, searchHebrewByStrongs, parseHebrewMorphDetails } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import { loadBibleVersion, getChapterVerses } from '../lib/bibleVersions'
@@ -14,7 +14,7 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, savedFrom, onBrowse, onFindInScripture, onFindInLxx }) {
+function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, onFindInScripture, onFindInLxx }) {
   const prefix = lang === 'greek' ? 'G' : 'H'
   const num    = strongsNum(id)
   const bhUrl  = bibleHubUrl(lang, id)
@@ -80,6 +80,11 @@ function EntryDetail({ lang, id, entry, scriptFont, savedFrom, onBrowse, onFindI
           <button
             style={{ ...m.saveVocabBtn, ...(saved ? m.saveVocabBtnSaved : {}) }}
             onClick={() => {
+              const parseFn = lang === 'hebrew' ? parseHebrewMorphDetails : parseMorphDetails
+              const morphParsed = morph ? parseFn(morph) : null
+              const morphStr = morphParsed
+                ? [morphParsed.pos, ...morphParsed.items.map(i => i.value)].filter(Boolean).join(' · ')
+                : null
               const nowSaved = toggleVocabWord({
                 id, lang,
                 lemma: entry.l || id,
@@ -88,6 +93,7 @@ function EntryDetail({ lang, id, entry, scriptFont, savedFrom, onBrowse, onFindI
                 gloss: (entry.d || '').split(/[;,.]/)[0].trim().slice(0, 60),
                 def: entry.d || '',
                 savedFrom,
+                morph: morphStr || null,
               })
               setSaved(nowSaved)
             }}
@@ -542,7 +548,7 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
  *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
  *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, currentChapter, corpus }) {
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, currentChapter, currentVerse, currentMorph, corpus }) {
   const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx' | 'scripture-scope' | 'scripture-lxx-scope'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
@@ -629,7 +635,8 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               id={activeId}
               entry={entry}
               scriptFont={scriptFont}
-              savedFrom={currentBook ? { book: currentBook, chapter: currentChapter } : null}
+              savedFrom={currentBook ? { book: currentBook, chapter: currentChapter, verse: currentVerse || null } : null}
+              morph={currentMorph}
               onBrowse={() => setView('browse')}
               onFindInScripture={() => {
                 window.dispatchEvent(new CustomEvent('pb-strongs-find', {

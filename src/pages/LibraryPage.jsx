@@ -13,7 +13,7 @@ import {
 } from '../lib/annotations'
 import { supabase, getLocalProgress, setLocalProgress, buildSchedule } from '../lib/supabase'
 import { BIBLE_BOOKS } from '../lib/bibleBooks'
-import { loadBibleVersion, BIBLE_VERSIONS } from '../lib/bibleVersions'
+import { loadBibleVersion, getChapterVerses, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { getDefaultReaderVersion, resolveVersion } from '../lib/readerPrefs'
 import { LBCF2 } from '../data/lbcf2'
 import { LBCF1 } from '../data/lbcf1'
@@ -4343,12 +4343,25 @@ function VocabReviewScreen({ words, lang, onClose }) {
   const [idx,     setIdx]     = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done,    setDone]    = useState(false)
-  // track ids reviewed this session to increment counts once
+  const [kjvData, setKjvData] = useState(null)
   const reviewedRef = useRef(new Set())
+
+  useEffect(() => {
+    loadBibleVersion('kjv').then(d => setKjvData(d)).catch(() => {})
+  }, [])
 
   const card = words[idx]
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
+
+  // Look up the KJV verse text for the current card
+  const verseText = useMemo(() => {
+    if (!kjvData || !card?.savedFrom?.book || !card?.savedFrom?.chapter || !card?.savedFrom?.verse) return null
+    try {
+      const verses = getChapterVerses(kjvData, card.savedFrom.book, card.savedFrom.chapter)
+      return verses?.find(v => v.verse === card.savedFrom.verse)?.text || null
+    } catch { return null }
+  }, [kjvData, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
 
   function next() {
     if (idx + 1 >= words.length) { setDone(true); return }
@@ -4407,12 +4420,18 @@ function VocabReviewScreen({ words, lang, onClose }) {
             {/* Back */}
             {flipped && (
               <div style={vr.cardBack}>
+                {card.morph && <p style={vr.cardMorph}>{card.morph}</p>}
                 {card.translit && <p style={vr.cardTranslit}>{card.translit}{card.pronun ? ` · /${card.pronun}/` : ''}</p>}
                 {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
                 {card.def && <p style={vr.cardDef}>{card.def}</p>}
+                {verseText && (
+                  <p style={vr.cardVerse}>
+                    {verseText}
+                  </p>
+                )}
                 {card.savedFrom?.book && (
                   <p style={vr.cardSavedFrom}>
-                    Saved from {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}
+                    {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}{card.savedFrom.verse ? `:${card.savedFrom.verse}` : ''}
                   </p>
                 )}
               </div>
@@ -5239,8 +5258,19 @@ const vr = {
     maxHeight: 120, overflowY: 'auto',
     fontFamily: "Georgia,serif",
   },
+  cardMorph: {
+    margin: '0 0 4px', fontSize: 11, fontWeight: 700,
+    color: 'var(--ink-muted)', fontFamily: "'DM Sans',sans-serif",
+    letterSpacing: '0.03em',
+  },
+  cardVerse: {
+    margin: '10px 0 4px', fontSize: 13, color: 'var(--ink)',
+    fontFamily: "Georgia,serif", lineHeight: 1.6,
+    borderLeft: '3px solid var(--gold)', paddingLeft: 10,
+    textAlign: 'left', width: '100%',
+  },
   cardSavedFrom: {
-    margin: '8px 0 0', fontSize: 11, color: 'var(--teal)',
+    margin: '4px 0 0', fontSize: 11, color: 'var(--teal)',
     fontFamily: "'DM Sans',sans-serif", opacity: 0.85,
   },
   navRow: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', maxWidth: 420 },

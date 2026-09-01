@@ -1,5 +1,5 @@
 {
-  "version": "1.10.1",
+  "version": "1.10.2",
   "date": "2026-09-01",
-  "changelog": "Vocab tab: collapsible Greek/Hebrew boxes, status tags (New/Learning/Mastered), review count badges, saved passage context on flashcard backs."
+  "changelog": "Flashcard backs now show the KJV verse text and word parsing details (e.g. Verb · Qal · Perfect) for words saved from the interlinear panel."
 }
