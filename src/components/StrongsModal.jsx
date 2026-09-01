@@ -5,7 +5,7 @@ import { loadHebrew, searchHebrewByStrongs } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
 import { getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import { loadBibleVersion, getChapterVerses } from '../lib/bibleVersions'
-import { isVocabSaved, toggleVocabWord } from '../lib/vocab'
+import { isVocabSaved, toggleVocabWord, VOCAB_STATUSES } from '../lib/vocab'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
 function bibleHubUrl(lang, id) {
@@ -14,7 +14,7 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture, onFindInLxx }) {
+function EntryDetail({ lang, id, entry, scriptFont, savedFrom, onBrowse, onFindInScripture, onFindInLxx }) {
   const prefix = lang === 'greek' ? 'G' : 'H'
   const num    = strongsNum(id)
   const bhUrl  = bibleHubUrl(lang, id)
@@ -87,6 +87,7 @@ function EntryDetail({ lang, id, entry, scriptFont, onBrowse, onFindInScripture,
                 pronun: entry.p || '',
                 gloss: (entry.d || '').split(/[;,.]/)[0].trim().slice(0, 60),
                 def: entry.d || '',
+                savedFrom,
               })
               setSaved(nowSaved)
             }}
@@ -541,7 +542,7 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
  *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
  *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, corpus }) {
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, currentChapter, corpus }) {
   const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx' | 'scripture-scope' | 'scripture-lxx-scope'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
@@ -628,6 +629,7 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               id={activeId}
               entry={entry}
               scriptFont={scriptFont}
+              savedFrom={currentBook ? { book: currentBook, chapter: currentChapter } : null}
               onBrowse={() => setView('browse')}
               onFindInScripture={() => {
                 window.dispatchEvent(new CustomEvent('pb-strongs-find', {

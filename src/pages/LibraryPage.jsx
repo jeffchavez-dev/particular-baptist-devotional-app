@@ -22,7 +22,7 @@ import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import BookLibraryTab from '../components/BookLibraryTab'
 import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSharedNote } from '../lib/noteShare'
 import { getAllQuotes } from '../lib/quoteLibrary'
-import { getVocabList, removeVocabWord } from '../lib/vocab'
+import { getVocabList, removeVocabWord, setVocabStatus, incrementReviewCount, VOCAB_STATUSES } from '../lib/vocab'
 import { getGreekFontCss, getHebrewFontCss } from '../components/FontPrefsPanel'
 
 const SCHEDULE = buildSchedule()
@@ -4215,7 +4215,7 @@ export default function LibraryPage() {
           />
         )}
         {activeTab === 'vocab' && (
-          <div style={{ padding: '16px' }}>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             {vocabGreek.length === 0 && vocabHebrew.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--ink-faint)', fontSize: 14, lineHeight: 1.7 }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>αβγ</div>
@@ -4223,38 +4223,19 @@ export default function LibraryPage() {
                 Open any Greek or Hebrew word in the lexicon<br />and tap <strong>Save word</strong> to add it here.
               </div>
             ) : (
-              <>
-                {[{ lang: 'greek', label: 'Greek', words: vocabGreek }, { lang: 'hebrew', label: 'Hebrew', words: vocabHebrew }].map(({ lang, label, words }) =>
-                  words.length > 0 && (
-                    <div key={lang} style={{ marginBottom: 28 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-muted)' }}>
-                          {label} · {words.length} word{words.length !== 1 ? 's' : ''}
-                        </span>
-                        <button
-                          style={vb.reviewBtn}
-                          onClick={() => setVocabReview({ lang, words: [...words] })}
-                        >
-                          ▶ Review
-                        </button>
-                      </div>
-                      {words.map(w => (
-                        <div key={w.id} style={vb.wordRow}>
-                          <span style={{ ...vb.lemma, fontFamily: lang === 'hebrew' ? getHebrewFontCss() : getGreekFontCss(), direction: lang === 'hebrew' ? 'rtl' : 'ltr' }}>
-                            {w.lemma}
-                          </span>
-                          <div style={vb.wordMeta}>
-                            <span style={vb.translit}>{w.translit}</span>
-                            <span style={vb.gloss}>{w.gloss}</span>
-                          </div>
-                          <span style={vb.strongsBadge}>{w.id}</span>
-                          <button style={vb.removeBtn} onClick={() => { removeVocabWord(w.id); refreshVocab() }} aria-label="Remove">×</button>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                )}
-              </>
+              [{ lang: 'greek', label: 'Greek', words: vocabGreek }, { lang: 'hebrew', label: 'Hebrew', words: vocabHebrew }].map(({ lang, label, words }) =>
+                words.length > 0 && (
+                  <VocabBox
+                    key={lang}
+                    lang={lang}
+                    label={label}
+                    words={words}
+                    onReview={() => setVocabReview({ lang, words: [...words] })}
+                    onRemove={id => { removeVocabWord(id); refreshVocab() }}
+                    onStatusChange={(id, status) => { setVocabStatus(id, status); refreshVocab() }}
+                  />
+                )
+              )
             )}
           </div>
         )}
@@ -4290,11 +4271,80 @@ export default function LibraryPage() {
   )
 }
 
+/* ── Vocab list box (collapsible per language) ───────────────────────────── */
+function VocabBox({ lang, label, words, onReview, onRemove, onStatusChange }) {
+  const [open, setOpen] = useState(true)
+  const isHeb = lang === 'hebrew'
+  const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
+
+  return (
+    <div style={vb.box}>
+      {/* Box header */}
+      <div style={vb.boxHeader} onClick={() => setOpen(o => !o)}>
+        <svg width="10" height="10" viewBox="0 0 10 10"
+          style={{ flexShrink:0, transform: open ? 'rotate(90deg)' : 'none', transition:'transform 0.15s', color:'var(--ink-faint)' }}>
+          <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+        </svg>
+        <span style={vb.boxLabel}>{label}</span>
+        <span style={vb.boxCount}>{words.length} word{words.length !== 1 ? 's' : ''}</span>
+        <button
+          style={vb.reviewBtn}
+          onClick={e => { e.stopPropagation(); onReview() }}
+        >
+          ▶ Review
+        </button>
+      </div>
+
+      {/* Word list */}
+      {open && (
+        <div style={vb.wordList}>
+          {words.map(w => {
+            const st = VOCAB_STATUSES.find(s => s.id === (w.status || 'new')) || VOCAB_STATUSES[0]
+            const nextStatus = VOCAB_STATUSES[(VOCAB_STATUSES.findIndex(s => s.id === (w.status || 'new')) + 1) % VOCAB_STATUSES.length].id
+            return (
+              <div key={w.id} style={vb.wordRow}>
+                <span style={{ ...vb.lemma, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
+                  {w.lemma}
+                </span>
+                <div style={vb.wordMeta}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {w.translit && <span style={vb.translit}>{w.translit}</span>}
+                    <span style={vb.strongsBadge}>{w.id}</span>
+                    {w.reviewCount > 0 && (
+                      <span style={vb.reviewCountBadge}>×{w.reviewCount}</span>
+                    )}
+                  </div>
+                  {w.gloss && <span style={vb.gloss}>{w.gloss}</span>}
+                  {w.savedFrom?.book && (
+                    <span style={vb.savedFrom}>
+                      {w.savedFrom.book}{w.savedFrom.chapter ? ` ${w.savedFrom.chapter}` : ''}
+                    </span>
+                  )}
+                </div>
+                <button
+                  style={{ ...vb.statusTag, color: st.color, background: st.bg }}
+                  onClick={() => onStatusChange(w.id, nextStatus)}
+                  title="Tap to change status"
+                >
+                  {st.label}
+                </button>
+                <button style={vb.removeBtn} onClick={() => onRemove(w.id)} aria-label="Remove">×</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Vocab review screen ─────────────────────────────────────────────────── */
 function VocabReviewScreen({ words, lang, onClose }) {
   const [idx,     setIdx]     = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done,    setDone]    = useState(false)
+  // track ids reviewed this session to increment counts once
+  const reviewedRef = useRef(new Set())
 
   const card = words[idx]
   const isHeb = lang === 'hebrew'
@@ -4314,6 +4364,15 @@ function VocabReviewScreen({ words, lang, onClose }) {
     setIdx(0)
     setFlipped(false)
     setDone(false)
+    reviewedRef.current = new Set()
+  }
+  function handleReveal() {
+    setFlipped(true)
+    // increment review count once per word per session
+    if (!reviewedRef.current.has(card.id)) {
+      reviewedRef.current.add(card.id)
+      incrementReviewCount(card.id)
+    }
   }
 
   return (
@@ -4326,7 +4385,6 @@ function VocabReviewScreen({ words, lang, onClose }) {
       </div>
 
       {done ? (
-        /* Completion screen */
         <div style={vr.doneWrap}>
           <div style={vr.doneCheck}>✓</div>
           <p style={vr.doneTitle}>Review complete</p>
@@ -4335,12 +4393,8 @@ function VocabReviewScreen({ words, lang, onClose }) {
           <button style={vr.doneCloseBtn} onClick={onClose}>Done</button>
         </div>
       ) : (
-        /* Card */
         <div style={vr.cardWrap}>
-          <div
-            style={vr.card}
-            onClick={() => setFlipped(f => !f)}
-          >
+          <div style={vr.card} onClick={() => !flipped && handleReveal()}>
             {/* Front */}
             <div style={vr.cardFront}>
               <span style={{ ...vr.cardLemma, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
@@ -4350,21 +4404,25 @@ function VocabReviewScreen({ words, lang, onClose }) {
               {!flipped && <span style={vr.tapHint}>Tap to reveal</span>}
             </div>
 
-            {/* Back (revealed) */}
+            {/* Back */}
             {flipped && (
               <div style={vr.cardBack}>
                 {card.translit && <p style={vr.cardTranslit}>{card.translit}{card.pronun ? ` · /${card.pronun}/` : ''}</p>}
                 {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
                 {card.def && <p style={vr.cardDef}>{card.def}</p>}
+                {card.savedFrom?.book && (
+                  <p style={vr.cardSavedFrom}>
+                    Saved from {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}
+                  </p>
+                )}
               </div>
             )}
           </div>
 
-          {/* Nav buttons */}
           <div style={vr.navRow}>
             <button style={{ ...vr.navBtn, opacity: idx === 0 ? 0.3 : 1 }} onClick={prev} disabled={idx === 0}>← Prev</button>
             {!flipped
-              ? <button style={vr.revealBtn} onClick={() => setFlipped(true)}>Reveal</button>
+              ? <button style={vr.revealBtn} onClick={handleReveal}>Reveal</button>
               : <button style={vr.nextBtn} onClick={next}>{idx + 1 >= words.length ? 'Finish' : 'Next →'}</button>
             }
           </div>
@@ -5082,6 +5140,18 @@ const vm = {
 
 /* ── Vocab list tab styles ───────────────────────────────────────────────── */
 const vb = {
+  box: {
+    background: 'var(--surface)', border: '1.5px solid var(--border)',
+    borderRadius: 14, overflow: 'hidden',
+  },
+  boxHeader: {
+    display: 'flex', alignItems: 'center', gap: 10, padding: '13px 16px',
+    cursor: 'pointer', userSelect: 'none',
+    borderBottom: '1px solid var(--border)',
+  },
+  boxLabel: { fontSize: 14, fontWeight: 700, color: 'var(--ink)', flex: 1 },
+  boxCount: { fontSize: 12, color: 'var(--ink-faint)', fontFamily: "'DM Sans',sans-serif" },
+  wordList: { padding: '4px 16px 8px' },
   wordRow: {
     display: 'flex', alignItems: 'center', gap: 10,
     padding: '9px 0', borderBottom: '1px solid var(--border)',
@@ -5089,13 +5159,26 @@ const vb = {
   lemma: {
     fontSize: 20, fontWeight: 400, color: 'var(--ink)', minWidth: 60, flexShrink: 0,
   },
-  wordMeta: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
+  wordMeta: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 },
   translit: { fontSize: 12, color: 'var(--ink-muted)', fontFamily: "'DM Sans',sans-serif" },
   gloss: { fontSize: 12, color: 'var(--ink-faint)', fontFamily: "'DM Sans',sans-serif", fontStyle: 'italic' },
+  savedFrom: {
+    fontSize: 11, color: 'var(--teal)', fontFamily: "'DM Sans',sans-serif", opacity: 0.8,
+  },
   strongsBadge: {
     fontSize: 10, fontWeight: 700, color: 'var(--teal)',
     background: 'var(--teal-light)', borderRadius: 99, padding: '2px 7px',
     fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+  },
+  reviewCountBadge: {
+    fontSize: 10, fontWeight: 700, color: 'var(--ink-muted)',
+    background: 'var(--border)', borderRadius: 99, padding: '2px 6px',
+    fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
+  },
+  statusTag: {
+    fontSize: 10, fontWeight: 700, borderRadius: 99, padding: '3px 8px',
+    border: 'none', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+    flexShrink: 0, whiteSpace: 'nowrap',
   },
   removeBtn: {
     fontSize: 16, color: 'var(--ink-faint)', background: 'none', border: 'none',
@@ -5155,6 +5238,10 @@ const vr = {
     margin: 0, fontSize: 13, color: 'var(--ink-muted)', lineHeight: 1.6,
     maxHeight: 120, overflowY: 'auto',
     fontFamily: "Georgia,serif",
+  },
+  cardSavedFrom: {
+    margin: '8px 0 0', fontSize: 11, color: 'var(--teal)',
+    fontFamily: "'DM Sans',sans-serif", opacity: 0.85,
   },
   navRow: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', maxWidth: 420 },
   navBtn: {
