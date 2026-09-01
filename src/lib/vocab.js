@@ -39,13 +39,14 @@ export function isVocabSaved(id) {
   return !!read()[id]
 }
 
-export function saveVocabWord({ id, lang, lemma, translit, pronun, gloss, def, savedFrom }) {
+export function saveVocabWord({ id, lang, lemma, translit, pronun, gloss, def, savedFrom, morph }) {
   const data = read()
   // Preserve existing review stats if re-saving
   const existing = data[id] || {}
   data[id] = {
     id, lang, lemma, translit, pronun, gloss, def,
     savedFrom: savedFrom || null,
+    morph: morph || existing.morph || null,
     reviewCount: existing.reviewCount || 0,
     status: existing.status || 'new',
     savedAt: existing.savedAt || Date.now(),
