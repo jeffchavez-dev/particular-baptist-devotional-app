@@ -1,5 +1,5 @@
 {
-  "version": "1.10.7",
-  "date": "2026-09-01",
-  "changelog": "Flashcard backs now show the KJV verse text and word parsing details (e.g. Verb · Qal · Perfect) for words saved from the interlinear panel."
+  "version": "1.10.8",
+  "date": "2026-09-02",
+  "changelog": "Bible sidebar now shows a quick-access Bookmarks list below the Parallel section — tap any bookmark to jump straight to that passage."
 }

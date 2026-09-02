@@ -39,6 +39,7 @@ import {
   setHighlight, setItemNote,
   addSearchHistory, getSearchHistory, clearSearchHistory, removeSearchEntry,
   loadPartialHighlights, savePartialHighlight, removePartialHighlight,
+  getAllScriptureBookmarks,
 } from '../lib/annotations'
 import {
   isAuthor,
@@ -884,6 +885,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [highlights,        setHighlights]        = useState(() => loadHighlights())
   const [itemNotes,         setItemNotes]         = useState(() => loadItemNotes())
   const [partialHighlights, setPartialHighlights] = useState(() => loadPartialHighlights())
+  const [sbBookmarks,       setSbBookmarks]       = useState(() => getAllScriptureBookmarks())
   /* Two-tap partial selection: first tap sets start word, second tap finalizes range */
   const [wordSelStart, setWordSelStart] = useState(null) // { verseKey, start, end }
   const [partialRange,  setPartialRange]  = useState(null) // { verseKey, start, end }
@@ -1564,15 +1566,21 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       setPartialHighlights(evt.detail.partial)
     }
 
+    function onBookmarkChanged() {
+      setSbBookmarks(getAllScriptureBookmarks())
+    }
+
     window.addEventListener('pb-annotations-updated', onSync)
     window.addEventListener('pb-highlight-changed', onHighlightChanged)
     window.addEventListener('pb-note-changed', onNoteChanged)
     window.addEventListener('pb-partial-highlight-changed', onPartialHighlightChanged)
+    window.addEventListener('pb-sc-bookmark-changed', onBookmarkChanged)
     return () => {
       window.removeEventListener('pb-annotations-updated', onSync)
       window.removeEventListener('pb-highlight-changed', onHighlightChanged)
       window.removeEventListener('pb-note-changed', onNoteChanged)
       window.removeEventListener('pb-partial-highlight-changed', onPartialHighlightChanged)
+      window.removeEventListener('pb-sc-bookmark-changed', onBookmarkChanged)
     }
   }, [])
 
@@ -3023,6 +3031,28 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                   </button>
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Bookmarks quick access ── */}
+        {sbBookmarks.length > 0 && (
+          <div style={sb.bookmarkSection}>
+            <div style={sb.versionSectionTitle}>Bookmarks</div>
+            <div style={sb.bookmarkList}>
+              {sbBookmarks.slice(0, 12).map(bm => (
+                <button
+                  key={bm.key}
+                  style={sb.bookmarkRow}
+                  onClick={() => {
+                    navigate(bm.book, bm.chapter)
+                    if (isMobile) setSideOpen(false)
+                  }}
+                >
+                  <span style={sb.bookmarkLabel}>{bm.book} {bm.chapter}</span>
+                  <span style={sb.bookmarkChevron}>›</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -4991,6 +5021,25 @@ const sb = {
   },
   parallelPillActive: {
     background:'var(--teal-light)', borderColor:'var(--teal)', color:'var(--teal)',
+  },
+  bookmarkSection: {
+    padding:'10px 12px 8px',
+    borderTop:'1px solid var(--border)',
+  },
+  bookmarkList: {
+    display:'flex', flexDirection:'column', gap:1, marginTop:6,
+  },
+  bookmarkRow: {
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'5px 8px', borderRadius:6, border:'none',
+    background:'transparent', cursor:'pointer', width:'100%',
+    fontFamily:"'DM Sans',sans-serif", transition:'background 0.12s',
+  },
+  bookmarkLabel: {
+    fontSize:12, color:'var(--ink)', fontWeight:500,
+  },
+  bookmarkChevron: {
+    fontSize:14, color:'var(--ink-faint)',
   },
 }
 
