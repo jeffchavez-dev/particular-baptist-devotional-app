@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
 import { loadGreek, searchGreekByStrongs, parseMorphDetails } from '../lib/greek'
 import { loadHebrew, searchHebrewByStrongs, parseHebrewMorphDetails } from '../lib/hebrew'
@@ -14,10 +15,11 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, onFindInScripture, onFindInLxx }) {
-  const prefix = lang === 'greek' ? 'G' : 'H'
-  const num    = strongsNum(id)
-  const bhUrl  = bibleHubUrl(lang, id)
+function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, onFindInScripture, onFindInLxx, onClose }) {
+  const prefix   = lang === 'greek' ? 'G' : 'H'
+  const num      = strongsNum(id)
+  const bhUrl    = bibleHubUrl(lang, id)
+  const navigate = useNavigate()
   const [saved, setSaved] = useState(() => isVocabSaved(id))
   useEffect(() => { setSaved(isVocabSaved(id)) }, [id])
 
@@ -101,6 +103,17 @@ function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, 
             <BookmarkIcon filled={saved} />
             {saved ? 'Saved' : 'Save word'}
           </button>
+          {saved && (
+            <button
+              style={m.reviewVocabBtn}
+              onClick={() => {
+                onClose()
+                navigate('/library', { state: { tab: 'vocab', reviewLang: lang } })
+              }}
+            >
+              ▶ Review
+            </button>
+          )}
         )}
         {bhUrl && (
           <a href={bhUrl} target="_blank" rel="noopener noreferrer" style={m.bhLink}>
@@ -637,6 +650,7 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               scriptFont={scriptFont}
               savedFrom={currentBook ? { book: currentBook, chapter: currentChapter, verse: currentVerse || null } : null}
               morph={currentMorph}
+              onClose={onClose}
               onBrowse={() => setView('browse')}
               onFindInScripture={() => {
                 window.dispatchEvent(new CustomEvent('pb-strongs-find', {
@@ -968,6 +982,13 @@ const m = {
   saveVocabBtnSaved: {
     color:'#92700a', background:'rgba(180,140,60,0.18)',
     border:'1px solid rgba(180,140,60,0.5)',
+  },
+  reviewVocabBtn: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    fontSize:11, fontWeight:700, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid rgba(0,120,100,0.25)',
+    borderRadius:'var(--radius)', padding:'5px 12px',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
   },
 
   /* Scope picker */

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { saveScroll, restoreScroll } from '../lib/pageState'
 import { useAuth } from '../App'
 import {
@@ -3878,6 +3878,7 @@ function HighlightsTab({ kjvHighlights, confHighlights, partialHighlights, navig
 ══════════════════════════════════════════════════════════════ */
 export default function LibraryPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { session } = useAuth()
 
   const [activeTab, setActiveTab] = useState('notes')
@@ -3895,6 +3896,18 @@ export default function LibraryPage() {
   }
   // Refresh vocab list when tab becomes active
   useEffect(() => { if (activeTab === 'vocab') refreshVocab() }, [activeTab])
+  // Handle navigation from StrongsModal "Review" button
+  useEffect(() => {
+    const state = location.state
+    if (state?.tab === 'vocab' && state?.reviewLang) {
+      setActiveTab('vocab')
+      const lang = state.reviewLang
+      const words = lang === 'greek' ? getVocabList('greek') : getVocabList('hebrew')
+      if (words.length > 0) setVocabReview({ lang, words })
+      // Clear state so back-navigation doesn't re-trigger
+      window.history.replaceState({}, '')
+    }
+  }, [location.state])
   const [libSearch,     setLibSearch]     = useState('')
   const [bookLibraryCount, setBookLibraryCount] = useState(0)
   const [libSearchOpen, setLibSearchOpen] = useState(false)
@@ -4424,7 +4437,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
         </div>
       ) : (
         <div style={vr.cardWrap}>
-          <div style={vr.card} onClick={() => !flipped && handleReveal()}>
+          <div style={vr.card} onClick={() => flipped ? setFlipped(false) : handleReveal()}>
             {/* Front */}
             <div style={vr.cardFront}>
               <span style={{ ...vr.cardLemma, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
@@ -4442,7 +4455,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
                 {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
                 {card.def && <p style={vr.cardDef}>{card.def}</p>}
                 {origVerseText && (
-                  <p style={{ ...vr.cardVerse, fontFamily: isHeb ? getHebrewFontCss() : getGreekFontCss(), direction: isHeb ? 'rtl' : 'ltr', fontSize: isHeb ? 17 : 15, borderLeftColor: 'var(--teal)' }}>
+                  <p style={{ ...vr.cardVerse, fontFamily: isHeb ? getHebrewFontCss() : getGreekFontCss(), direction: isHeb ? 'rtl' : 'ltr', fontSize: isHeb ? 20 : 17, borderLeftColor: 'var(--teal)', lineHeight: 1.8 }}>
                     {origVerseText}
                   </p>
                 )}
@@ -4456,6 +4469,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
                     {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}{card.savedFrom.verse ? `:${card.savedFrom.verse}` : ''}
                   </p>
                 )}
+                <span style={{ ...vr.tapHint, marginTop: 8 }}>Tap card to flip back</span>
               </div>
             )}
           </div>
