@@ -103,17 +103,17 @@ function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, 
             <BookmarkIcon filled={saved} />
             {saved ? 'Saved' : 'Save word'}
           </button>
-          {saved && (
-            <button
-              style={m.reviewVocabBtn}
-              onClick={() => {
-                onClose()
-                navigate('/library', { state: { tab: 'vocab', reviewLang: lang } })
-              }}
-            >
-              ▶ Review
-            </button>
-          )}
+        )}
+        {saved && (
+          <button
+            style={m.reviewVocabBtn}
+            onClick={() => {
+              onClose()
+              navigate('/library', { state: { tab: 'vocab', reviewLang: lang } })
+            }}
+          >
+            ▶ Review
+          </button>
         )}
         {bhUrl && (
           <a href={bhUrl} target="_blank" rel="noopener noreferrer" style={m.bhLink}>
