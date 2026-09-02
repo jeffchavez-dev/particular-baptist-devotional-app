@@ -4081,7 +4081,7 @@ export default function LibraryPage() {
     { id: 'highlights', label: 'Highlights', count: highlightsCount },
     { id: 'vocab',      label: 'Vocab',      count: vocabCount      },
     // Books tab is only available to signed-in users
-    ...(session ? [{ id: 'quotes', label: 'Quotes', count: bookLibraryCount }] : []),
+    // { id: 'quotes', label: 'Quotes', count: bookLibraryCount }, // hidden
   ]
 
   const handleRemoveScBookmark    = useCallback((book, chapter) => { toggleScriptureBookmark(book, chapter); setScBookmarks(getAllScriptureBookmarks()) }, [])
