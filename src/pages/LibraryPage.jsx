@@ -4288,7 +4288,7 @@ export default function LibraryPage() {
 
 /* ── Vocab list box (collapsible per language) ───────────────────────────── */
 function VocabBox({ lang, label, words, onReview, onRemove, onStatusChange }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
 
