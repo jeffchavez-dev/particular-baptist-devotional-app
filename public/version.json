@@ -1,5 +1,5 @@
 {
-  "version": "1.10.3",
+  "version": "1.10.4",
   "date": "2026-09-01",
   "changelog": "Flashcard backs now show the KJV verse text and word parsing details (e.g. Verb · Qal · Perfect) for words saved from the interlinear panel."
 }

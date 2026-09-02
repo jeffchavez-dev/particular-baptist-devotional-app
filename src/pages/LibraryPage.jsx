@@ -24,6 +24,8 @@ import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSh
 import { getAllQuotes } from '../lib/quoteLibrary'
 import { getVocabList, removeVocabWord, setVocabStatus, incrementReviewCount, VOCAB_STATUSES } from '../lib/vocab'
 import { getGreekFontCss, getHebrewFontCss } from '../components/FontPrefsPanel'
+import { loadHebrew, getHebrewChapter } from '../lib/hebrew'
+import { loadGreek, getGreekChapter } from '../lib/greek'
 
 const SCHEDULE = buildSchedule()
 
@@ -4343,12 +4345,15 @@ function VocabReviewScreen({ words, lang, onClose }) {
   const [idx,     setIdx]     = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done,    setDone]    = useState(false)
-  const [kjvData, setKjvData] = useState(null)
+  const [kjvData,  setKjvData]  = useState(null)
+  const [origReady, setOrigReady] = useState(false)
   const reviewedRef = useRef(new Set())
 
   useEffect(() => {
     loadBibleVersion('kjv').then(d => setKjvData(d)).catch(() => {})
-  }, [])
+    const loader = lang === 'hebrew' ? loadHebrew : loadGreek
+    loader().then(() => setOrigReady(true)).catch(() => {})
+  }, [lang])
 
   const card = words[idx]
   const isHeb = lang === 'hebrew'
@@ -4362,6 +4367,18 @@ function VocabReviewScreen({ words, lang, onClose }) {
       return verses?.find(v => v.verse === card.savedFrom.verse)?.text || null
     } catch { return null }
   }, [kjvData, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
+
+  // Look up the original language verse text (HOT/GNT) for the current card
+  const origVerseText = useMemo(() => {
+    if (!origReady || !card?.savedFrom?.book || !card?.savedFrom?.chapter || !card?.savedFrom?.verse) return null
+    try {
+      const getFn = lang === 'hebrew' ? getHebrewChapter : getGreekChapter
+      const verses = getFn(card.savedFrom.book, card.savedFrom.chapter)
+      const verseWords = verses?.find(v => v.verse === card.savedFrom.verse)?.words
+      if (!verseWords?.length) return null
+      return verseWords.map(w => w.w).join(' ')
+    } catch { return null }
+  }, [origReady, lang, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
 
   function next() {
     if (idx + 1 >= words.length) { setDone(true); return }
@@ -4424,6 +4441,11 @@ function VocabReviewScreen({ words, lang, onClose }) {
                 {card.translit && <p style={vr.cardTranslit}>{card.translit}{card.pronun ? ` · /${card.pronun}/` : ''}</p>}
                 {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
                 {card.def && <p style={vr.cardDef}>{card.def}</p>}
+                {origVerseText && (
+                  <p style={{ ...vr.cardVerse, fontFamily: isHeb ? getHebrewFontCss() : getGreekFontCss(), direction: isHeb ? 'rtl' : 'ltr', fontSize: isHeb ? 17 : 15, borderLeftColor: 'var(--teal)' }}>
+                    {origVerseText}
+                  </p>
+                )}
                 {verseText && (
                   <p style={vr.cardVerse}>
                     {verseText}
