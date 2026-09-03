@@ -1,5 +1,5 @@
 {
-  "version": "1.10.8",
+  "version": "1.10.9",
   "date": "2026-09-02",
-  "changelog": "Bible sidebar now shows a quick-access Bookmarks list below the Parallel section — tap any bookmark to jump straight to that passage."
+  "changelog": "Sidebar bookmark rows now highlight on hover/tap for clearer feedback."
 }

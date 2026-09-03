@@ -886,6 +886,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [itemNotes,         setItemNotes]         = useState(() => loadItemNotes())
   const [partialHighlights, setPartialHighlights] = useState(() => loadPartialHighlights())
   const [sbBookmarks,       setSbBookmarks]       = useState(() => getAllScriptureBookmarks())
+  const [hoveredBookmark,   setHoveredBookmark]   = useState(null)
   /* Two-tap partial selection: first tap sets start word, second tap finalizes range */
   const [wordSelStart, setWordSelStart] = useState(null) // { verseKey, start, end }
   const [partialRange,  setPartialRange]  = useState(null) // { verseKey, start, end }
@@ -3043,7 +3044,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               {sbBookmarks.slice(0, 12).map(bm => (
                 <button
                   key={bm.key}
-                  style={sb.bookmarkRow}
+                  style={{
+                    ...sb.bookmarkRow,
+                    ...(hoveredBookmark === bm.key ? sb.bookmarkRowHover : {}),
+                  }}
+                  onMouseEnter={() => setHoveredBookmark(bm.key)}
+                  onMouseLeave={() => setHoveredBookmark(null)}
                   onClick={() => {
                     navigate(bm.book, bm.chapter)
                     if (isMobile) setSideOpen(false)
@@ -5034,6 +5040,9 @@ const sb = {
     padding:'5px 8px', borderRadius:6, border:'none',
     background:'transparent', cursor:'pointer', width:'100%',
     fontFamily:"'DM Sans',sans-serif", transition:'background 0.12s',
+  },
+  bookmarkRowHover: {
+    background:'var(--gold-faint)',
   },
   bookmarkLabel: {
     fontSize:12, color:'var(--ink)', fontWeight:500,
