@@ -1,5 +1,5 @@
 {
-  "version": "1.10.9",
+  "version": "1.10.10",
   "date": "2026-09-02",
-  "changelog": "Sidebar bookmark rows now highlight on hover/tap for clearer feedback."
+  "changelog": "Strong's modal now shows the word's transliteration and gloss as a fallback when the local lexicon doesn't have an entry for extended Strong's numbers (e.g. G6063)."
 }

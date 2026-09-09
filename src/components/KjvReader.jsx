@@ -3412,7 +3412,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               e.stopPropagation()
                                               const sLang = wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek'
                                               setLexReturn(null)
-                                              setStrongsModal({ strongsId: wd.s, lang: sLang, verseNum: verse, morph: wd.r || null })
+                                              setStrongsModal({ strongsId: wd.s, lang: sLang, verseNum: verse, morph: wd.r || null, wordGloss: wd.g || null, wordTranslit: wd.t || null })
                                             }}
                                             title="Open in-app lexicon"
                                           >
@@ -3998,7 +3998,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         style={r.wiStrongsBtn}
                                         onClick={e => {
                                           e.stopPropagation()
-                                          setStrongsModal({ strongsId: wd.s, lang: 'greek', corpus: 'lxx', verseNum: verse, morph: wd.r || null })
+                                          setStrongsModal({ strongsId: wd.s, lang: 'greek', corpus: 'lxx', verseNum: verse, morph: wd.r || null, wordGloss: wd.g || null, wordTranslit: wd.t || null })
                                         }}
                                         title="Open in-app lexicon"
                                       >
@@ -4119,7 +4119,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               {wd.s ? (
                                                 <button style={r.wiStrongsBtn} onClick={e => {
                                                   e.stopPropagation()
-                                                  setStrongsModal({ strongsId: wd.s, lang: wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek', verseNum: verse, morph: wd.r || null })
+                                                  setStrongsModal({ strongsId: wd.s, lang: wd.s[0].toUpperCase() === 'H' ? 'hebrew' : 'greek', verseNum: verse, morph: wd.r || null, wordGloss: wd.g || null, wordTranslit: wd.t || null })
                                                 }}>
                                                   {wd.s}
                                                   <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3}}>
@@ -4207,7 +4207,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               {lw.s ? (
                                                 <button style={r.wiStrongsBtn} onClick={e => {
                                                   e.stopPropagation()
-                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek', corpus: 'lxx', verseNum: verse, morph: lw.r || null })
+                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek', corpus: 'lxx', verseNum: verse, morph: lw.r || null, wordGloss: lw.g || null, wordTranslit: lw.t || null })
                                                 }}>
                                                   {lw.s}
                                                   <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{marginLeft:3}}>
@@ -4781,6 +4781,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           currentChapter={visChapterRef.current || null}
           currentVerse={strongsModal?.verseNum || null}
           currentMorph={strongsModal?.morph || null}
+          wordGloss={strongsModal?.wordGloss || null}
+          wordTranslit={strongsModal?.wordTranslit || null}
           greekFontId={prefs.greekFontId}
           hebrewFontId={prefs.hebrewFontId}
           onClose={() => setStrongsModal(null)}

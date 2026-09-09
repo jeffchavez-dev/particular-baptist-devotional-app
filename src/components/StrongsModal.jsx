@@ -15,7 +15,7 @@ function bibleHubUrl(lang, id) {
 }
 
 /* ── Entry detail panel (shared between single & list view) ────────── */
-function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, onFindInScripture, onFindInLxx, onClose }) {
+function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, wordGloss, wordTranslit, onBrowse, onFindInScripture, onFindInLxx, onClose }) {
   const prefix   = lang === 'greek' ? 'G' : 'H'
   const num      = strongsNum(id)
   const bhUrl    = bibleHubUrl(lang, id)
@@ -27,7 +27,15 @@ function EntryDetail({ lang, id, entry, scriptFont, savedFrom, morph, onBrowse, 
     return (
       <div style={m.noEntry}>
         <span style={m.noEntryCode}>{id}</span>
-        <span style={m.noEntryHint}>Entry not found in local lexicon.</span>
+        {wordTranslit && (
+          <span style={m.noEntryTranslit}>{wordTranslit}</span>
+        )}
+        {wordGloss && (
+          <span style={m.noEntryGloss}>"{wordGloss}"</span>
+        )}
+        <span style={m.noEntryHint}>
+          {wordGloss ? 'Full lexicon entry not available for this extended Strong\'s number.' : 'Entry not found in local lexicon.'}
+        </span>
         {bhUrl && (
           <a href={bhUrl} target="_blank" rel="noopener noreferrer" style={m.bhLink}>
             View on BibleHub
@@ -561,7 +569,7 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
  *   onNavigate     — (book, chapter, verse) => void  called when user taps a GNT/HOT scripture result
  *   onNavigateLxx  — (book, chapter, verse) => void  called when user taps an LXX scripture result
  */
-export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, currentChapter, currentVerse, currentMorph, corpus }) {
+export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontId, onClose, onNavigate, onNavigateLxx, initialView = 'detail', currentBook, currentChapter, currentVerse, currentMorph, corpus, wordGloss, wordTranslit }) {
   const [view,    setView]    = useState(initialView)  // 'detail' | 'browse' | 'scripture' | 'scripture-lxx' | 'scripture-scope' | 'scripture-lxx-scope'
   const [data,    setData]    = useState(() => getCachedStrongs(lang))
   const [loading, setLoading] = useState(!getCachedStrongs(lang))
@@ -650,6 +658,8 @@ export default function StrongsModal({ strongsId, lang, greekFontId, hebrewFontI
               scriptFont={scriptFont}
               savedFrom={currentBook ? { book: currentBook, chapter: currentChapter, verse: currentVerse || null } : null}
               morph={currentMorph}
+              wordGloss={wordGloss}
+              wordTranslit={wordTranslit}
               onClose={onClose}
               onBrowse={() => setView('browse')}
               onFindInScripture={() => {
@@ -1115,6 +1125,8 @@ const m = {
     letterSpacing:'0.04em',
   },
   noEntryHint: { fontSize:13, color:'var(--ink-faint)' },
+  noEntryTranslit: { fontSize:15, color:'var(--ink-muted)', fontStyle:'italic', marginTop:2 },
+  noEntryGloss: { fontSize:14, color:'var(--ink)', fontStyle:'italic', marginTop:4 },
 
   /* Browse view */
   browseWrap: {
