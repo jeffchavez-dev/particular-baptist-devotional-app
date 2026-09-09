@@ -5264,7 +5264,10 @@ const vr = {
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0,
+    padding: '14px 20px',
+    paddingTop: 'max(14px, env(safe-area-inset-top))',
+    paddingRight: 'max(20px, env(safe-area-inset-right))',
+    borderBottom: '1px solid var(--border)', flexShrink: 0,
   },
   langBadge: {
     fontSize: 12, fontWeight: 700, color: 'var(--teal)',
@@ -5278,8 +5281,8 @@ const vr = {
   exitBtn: {
     fontSize: 13, fontWeight: 600, background: 'none',
     border: '1.5px solid var(--border)', borderRadius: 8,
-    cursor: 'pointer', color: 'var(--ink-muted)', padding: '4px 12px',
-    fontFamily: "'DM Sans', sans-serif",
+    cursor: 'pointer', color: 'var(--ink-muted)', padding: '8px 16px',
+    fontFamily: "'DM Sans', sans-serif", minHeight: 44, minWidth: 60,
   },
   cardWrap: {
     flex: 1, display: 'flex', flexDirection: 'column',
