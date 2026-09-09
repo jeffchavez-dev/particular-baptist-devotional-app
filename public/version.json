@@ -1,5 +1,5 @@
 {
-  "version": "1.10.11",
+  "version": "1.10.12",
   "date": "2026-09-02",
-  "changelog": "Extended Strong's numbers (e.g. G6063) now resolve to their canonical entry (G1492) in the lexicon modal and link correctly to BibleHub."
+  "changelog": "Vocab review: cards are now shuffled on every new session. Tap the card to reveal. Next button always moves forward. Added Exit button."
 }

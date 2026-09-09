@@ -4354,7 +4354,17 @@ function VocabBox({ lang, label, words, onReview, onRemove, onStatusChange }) {
 }
 
 /* ── Vocab review screen ─────────────────────────────────────────────────── */
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 function VocabReviewScreen({ words, lang, onClose }) {
+  const [deck,    setDeck]    = useState(() => shuffle(words))
   const [idx,     setIdx]     = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [done,    setDone]    = useState(false)
@@ -4368,7 +4378,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
     loader().then(() => setOrigReady(true)).catch(() => {})
   }, [lang])
 
-  const card = words[idx]
+  const card = deck[idx]
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
 
@@ -4394,7 +4404,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
   }, [origReady, lang, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
 
   function next() {
-    if (idx + 1 >= words.length) { setDone(true); return }
+    if (idx + 1 >= deck.length) { setDone(true); return }
     setIdx(i => i + 1)
     setFlipped(false)
   }
@@ -4404,6 +4414,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
     setFlipped(false)
   }
   function restart() {
+    setDeck(shuffle(words))
     setIdx(0)
     setFlipped(false)
     setDone(false)
@@ -4423,8 +4434,8 @@ function VocabReviewScreen({ words, lang, onClose }) {
       {/* Header */}
       <div style={vr.header}>
         <span style={vr.langBadge}>{lang === 'greek' ? 'Greek' : 'Hebrew'}</span>
-        <span style={vr.counter}>{done ? `${words.length} / ${words.length}` : `${idx + 1} / ${words.length}`}</span>
-        <button style={vr.closeBtn} onClick={onClose}>×</button>
+        <span style={vr.counter}>{done ? `${deck.length} / ${deck.length}` : `${idx + 1} / ${deck.length}`}</span>
+        <button style={vr.exitBtn} onClick={onClose}>Exit</button>
       </div>
 
       {done ? (
@@ -4437,7 +4448,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
         </div>
       ) : (
         <div style={vr.cardWrap}>
-          <div style={vr.card} onClick={() => flipped ? setFlipped(false) : handleReveal()}>
+          <div style={vr.card} onClick={() => flipped ? setFlipped(false) : handleReveal()} title={flipped ? 'Tap to flip back' : 'Tap to reveal'}>
             {/* Front */}
             <div style={vr.cardFront}>
               <span style={{ ...vr.cardLemma, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr' }}>
@@ -4476,10 +4487,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
 
           <div style={vr.navRow}>
             <button style={{ ...vr.navBtn, opacity: idx === 0 ? 0.3 : 1 }} onClick={prev} disabled={idx === 0}>← Prev</button>
-            {!flipped
-              ? <button style={vr.revealBtn} onClick={handleReveal}>Reveal</button>
-              : <button style={vr.nextBtn} onClick={next}>{idx + 1 >= words.length ? 'Finish' : 'Next →'}</button>
-            }
+            <button style={vr.nextBtn} onClick={next}>{idx + 1 >= deck.length ? 'Finish' : 'Next →'}</button>
           </div>
         </div>
       )}
@@ -5266,6 +5274,12 @@ const vr = {
   closeBtn: {
     fontSize: 22, lineHeight: 1, background: 'none', border: 'none',
     cursor: 'pointer', color: 'var(--ink-muted)', padding: '0 4px',
+  },
+  exitBtn: {
+    fontSize: 13, fontWeight: 600, background: 'none',
+    border: '1.5px solid var(--border)', borderRadius: 8,
+    cursor: 'pointer', color: 'var(--ink-muted)', padding: '4px 12px',
+    fontFamily: "'DM Sans', sans-serif",
   },
   cardWrap: {
     flex: 1, display: 'flex', flexDirection: 'column',
