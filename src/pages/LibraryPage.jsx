@@ -22,7 +22,7 @@ import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import BookLibraryTab from '../components/BookLibraryTab'
 import { shareLibNote, unshareLibNote, getLibShareToken, noteShareUrl, syncLibSharedNote } from '../lib/noteShare'
 import { getAllQuotes } from '../lib/quoteLibrary'
-import { getVocabList, removeVocabWord, setVocabStatus, incrementReviewCount, VOCAB_STATUSES } from '../lib/vocab'
+import { getVocabList, removeVocabWord, setVocabStatus, updateVocabStatus, incrementReviewCount, VOCAB_STATUSES } from '../lib/vocab'
 import { getGreekFontCss, getHebrewFontCss } from '../components/FontPrefsPanel'
 import { loadHebrew, getHebrewChapter } from '../lib/hebrew'
 import { loadGreek, getGreekChapter } from '../lib/greek'
@@ -4363,13 +4363,23 @@ function shuffle(arr) {
   return a
 }
 
+function buildDeck(words) {
+  const now = Date.now()
+  const newW    = shuffle(words.filter(w => !w.status || w.status === 'new'))
+  const dueW    = shuffle(words.filter(w => w.status === 'learning' && (!w.nextReview || w.nextReview <= now)))
+  const notDueW = shuffle(words.filter(w => w.status === 'learning' && w.nextReview && w.nextReview > now))
+  const mastW   = shuffle(words.filter(w => w.status === 'mastered'))
+  return [...newW, ...dueW, ...notDueW, ...mastW].slice(0, 10)
+}
+
 function VocabReviewScreen({ words, lang, onClose }) {
-  const [deck,    setDeck]    = useState(() => shuffle(words))
-  const [idx,     setIdx]     = useState(0)
-  const [flipped, setFlipped] = useState(false)
-  const [done,    setDone]    = useState(false)
-  const [kjvData,  setKjvData]  = useState(null)
-  const [origReady, setOrigReady] = useState(false)
+  const [deck,         setDeck]         = useState(() => buildDeck(words))
+  const [idx,          setIdx]          = useState(0)
+  const [flipped,      setFlipped]      = useState(false)
+  const [done,         setDone]         = useState(false)
+  const [cardStatuses, setCardStatuses] = useState({})
+  const [kjvData,      setKjvData]      = useState(null)
+  const [origReady,    setOrigReady]    = useState(false)
   const reviewedRef = useRef(new Set())
 
   useEffect(() => {
@@ -4414,11 +4424,16 @@ function VocabReviewScreen({ words, lang, onClose }) {
     setFlipped(false)
   }
   function restart() {
-    setDeck(shuffle(words))
+    setDeck(buildDeck(getVocabList(lang)))
     setIdx(0)
     setFlipped(false)
     setDone(false)
+    setCardStatuses({})
     reviewedRef.current = new Set()
+  }
+  function handleTag(id, status) {
+    updateVocabStatus(id, status)
+    setCardStatuses(prev => ({ ...prev, [id]: status }))
   }
   function handleReveal() {
     setFlipped(true)
@@ -4442,7 +4457,16 @@ function VocabReviewScreen({ words, lang, onClose }) {
         <div style={vr.doneWrap}>
           <div style={vr.doneCheck}>✓</div>
           <p style={vr.doneTitle}>Review complete</p>
-          <p style={vr.doneSub}>{words.length} word{words.length !== 1 ? 's' : ''} reviewed</p>
+          <p style={vr.doneSub}>{deck.length} word{deck.length !== 1 ? 's' : ''} reviewed</p>
+          {Object.keys(cardStatuses).length > 0 && (
+            <div style={vr.doneTags}>
+              {VOCAB_STATUSES.filter(st => st.id !== 'new').map(st => {
+                const count = Object.values(cardStatuses).filter(v => v === st.id).length
+                if (!count) return null
+                return <span key={st.id} style={{ ...vr.doneTagChip, color: st.color, background: st.bg }}>{count} {st.label}</span>
+              })}
+            </div>
+          )}
           <button style={vr.reviewAgainBtn} onClick={restart}>Review again</button>
           <button style={vr.doneCloseBtn} onClick={onClose}>Done</button>
         </div>
@@ -4484,6 +4508,25 @@ function VocabReviewScreen({ words, lang, onClose }) {
               </div>
             )}
           </div>
+
+          {/* Status tag row — visible after reveal */}
+          {flipped && (
+            <div style={vr.statusRow}>
+              {VOCAB_STATUSES.filter(st => st.id !== 'new').map(st => {
+                const current = cardStatuses[card.id] || card.status || 'new'
+                const active = current === st.id
+                return (
+                  <button
+                    key={st.id}
+                    style={{ ...vr.statusTagBtn, color: st.color, background: active ? st.bg : 'transparent', borderColor: active ? st.color : 'var(--border)' }}
+                    onClick={e => { e.stopPropagation(); handleTag(card.id, active ? 'new' : st.id) }}
+                  >
+                    {st.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           <div style={vr.navRow}>
             <button style={{ ...vr.navBtn, opacity: idx === 0 ? 0.3 : 1 }} onClick={prev} disabled={idx === 0}>← Prev</button>
@@ -5355,5 +5398,15 @@ const vr = {
     padding: '10px 32px', background: 'none', color: 'var(--ink-muted)',
     border: '1px solid var(--border)', borderRadius: 10, fontSize: 13,
     fontWeight: 600, cursor: 'pointer',
+  },
+  doneTags: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
+  doneTagChip: { fontSize: 12, fontWeight: 700, borderRadius: 99, padding: '4px 12px' },
+  statusRow: {
+    display: 'flex', gap: 10, width: '100%', maxWidth: 420, justifyContent: 'center',
+  },
+  statusTagBtn: {
+    flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700,
+    cursor: 'pointer', border: '1.5px solid var(--border)',
+    fontFamily: "'DM Sans',sans-serif", transition: 'background 0.12s',
   },
 }

@@ -1,5 +1,5 @@
 {
-  "version": "1.10.12",
-  "date": "2026-09-02",
-  "changelog": "Vocab review: cards are now shuffled on every new session. Tap the card to reveal. Next button always moves forward. Added Exit button."
+  "version": "1.10.13",
+  "date": "2026-09-09",
+  "changelog": "Vocab review: tag words as Learning or Mastered during review, spaced repetition schedules learning words for follow-up, and each session picks up to 10 cards prioritizing new and due words."
 }

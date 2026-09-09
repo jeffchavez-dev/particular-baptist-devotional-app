@@ -87,3 +87,23 @@ export function setVocabStatus(id, status) {
   data[id].status = status
   write(data)
 }
+
+// Update status with spaced-repetition scheduling
+export function updateVocabStatus(id, status) {
+  const data = read()
+  if (!data[id]) return
+  const word = data[id]
+  word.status = status
+  const interval = word.interval || 1
+  if (status === 'learning') {
+    word.nextReview = Date.now() + interval * 86400000
+    word.interval = Math.min(interval * 2, 30)
+  } else if (status === 'mastered') {
+    word.nextReview = null
+  } else {
+    // new — reset
+    word.nextReview = null
+    word.interval = 1
+  }
+  write(data)
+}
