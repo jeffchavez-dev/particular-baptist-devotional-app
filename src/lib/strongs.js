@@ -49,6 +49,21 @@ export async function loadStrongs(lang) {
 }
 
 /**
+ * Maps TAGNT extended Strong's numbers (>5624) to their canonical equivalents.
+ * These are Tyndale House extended numbers for words that happen to have a
+ * canonical Strong's entry under a different spelling/lemma. Derived by lemma
+ * matching between TAGNT data and the openscriptures/strongs lexicon.
+ * The 76 other extended numbers (hapax legomena / variant forms) have no
+ * canonical equivalent and are handled by the UI's gloss/translit fallback.
+ */
+const EXTENDED_GREEK_MAP = {
+  6063: 1492,  // οἶδα → εἴδω (to know/perceive)
+  6077: 4450,  // Πύρρος
+  9992: 5179,  // τύπος (type/example)
+  9402: 5012,  // ταπεινοφροσύνη (humility)
+}
+
+/**
  * Synchronous lookup — only works after loadStrongs() has resolved.
  * @param {'greek'|'hebrew'} lang
  * @param {string} strongsId  e.g. "G1161", "H7225G"
@@ -59,9 +74,27 @@ export function lookupStrongs(lang, strongsId) {
   if (!data || !strongsId) return null
   // Strip prefix letter and any trailing disambiguator letters (e.g. "G" in "H7225G")
   const raw = strongsId.replace(/^[GHgh]/, '').replace(/[A-Za-z]+$/, '')
-  const num = parseInt(raw, 10)
+  let num = parseInt(raw, 10)
   if (isNaN(num)) return null
+  // Remap extended Greek Strong's numbers to their canonical equivalents
+  if (lang === 'greek' && num > 5624 && EXTENDED_GREEK_MAP[num]) {
+    num = EXTENDED_GREEK_MAP[num]
+  }
   return data[String(num)] || null
+}
+
+/**
+ * Resolve an extended Strong's ID to its canonical ID (or return as-is).
+ * Used to generate correct BibleHub URLs for extended numbers.
+ */
+export function resolveStrongsId(lang, strongsId) {
+  if (lang !== 'greek' || !strongsId) return strongsId
+  const raw = strongsId.replace(/^[Gg]/, '').replace(/[A-Za-z]+$/, '')
+  const num = parseInt(raw, 10)
+  if (!isNaN(num) && num > 5624 && EXTENDED_GREEK_MAP[num]) {
+    return `G${EXTENDED_GREEK_MAP[num]}`
+  }
+  return strongsId
 }
 
 /**

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs } from '../lib/strongs'
+import { loadStrongs, lookupStrongs, strongsNum, getCachedStrongs, resolveStrongsId } from '../lib/strongs'
 import { loadGreek, searchGreekByStrongs, parseMorphDetails } from '../lib/greek'
 import { loadHebrew, searchHebrewByStrongs, parseHebrewMorphDetails } from '../lib/hebrew'
 import { loadLxxWords, searchLxxByStrongs } from '../lib/lxx'
@@ -10,7 +10,8 @@ import { isVocabSaved, toggleVocabWord, VOCAB_STATUSES } from '../lib/vocab'
 
 /* ── BibleHub fallback URL ─────────────────────────────────────────── */
 function bibleHubUrl(lang, id) {
-  const num = strongsNum(id)
+  const canonical = resolveStrongsId(lang, id)
+  const num = strongsNum(canonical)
   return num ? `https://biblehub.com/${lang}/${num}.htm` : null
 }
 

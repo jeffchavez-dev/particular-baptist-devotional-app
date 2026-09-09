@@ -1,5 +1,5 @@
 {
-  "version": "1.10.10",
+  "version": "1.10.11",
   "date": "2026-09-02",
-  "changelog": "Strong's modal now shows the word's transliteration and gloss as a fallback when the local lexicon doesn't have an entry for extended Strong's numbers (e.g. G6063)."
+  "changelog": "Extended Strong's numbers (e.g. G6063) now resolve to their canonical entry (G1492) in the lexicon modal and link correctly to BibleHub."
 }

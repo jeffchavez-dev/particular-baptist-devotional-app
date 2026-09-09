@@ -82,9 +82,10 @@ for (const url of FILES) {
     const strongs   = eq2 >= 0 ? strongCol.substring(0, eq2).trim() : strongCol
     const grammar   = eq2 >= 0 ? strongCol.substring(eq2 + 1).trim() : ''
 
-    // Column 4: "βίβλος=book" → dictionary gloss (after '=')
+    // Column 4: "βίβλος=book" → lemma (before '=') and gloss (after '=')
     const dictCol = (cols[4] || '').trim()
     const eq3     = dictCol.indexOf('=')
+    const lemma   = eq3 >= 0 ? dictCol.substring(0, eq3).trim() : ''
     const gloss   = eq3 >= 0 ? dictCol.substring(eq3 + 1).trim() : dictCol
 
     // Build nested output: Book → chapter → verse → [words]
@@ -99,6 +100,7 @@ for (const url of FILES) {
       s: strongs,
       r: grammar,
       ms: msType,
+      ...(lemma ? { l: lemma } : {}),
     })
     wordCount++
   }
