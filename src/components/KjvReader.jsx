@@ -23,8 +23,8 @@ import { getCrossRefs } from '../lib/crossRef'
 import { getBibleXrefs, getBibleBackRefs } from '../lib/bibleXrefs'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { getEsvChapter } from '../lib/esvCache'
-import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS } from '../lib/greek'
-import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS } from '../lib/hebrew'
+import { loadGreek, getGreekChapter, parseGrammar, parseMorphDetails, getMsMarker, NT_BOOKS, searchGreekByMorph } from '../lib/greek'
+import { loadHebrew, getHebrewChapter, parseHebrewMorph, parseHebrewMorphDetails, getHebMsMarker, OT_BOOKS, searchHebrewByMorph } from '../lib/hebrew'
 import { loadLxxWords, bookToLxxSlug } from '../lib/lxx'
 import ShareCardModal from './ShareCardModal'
 import { getCommentary, COMMENTARIES } from '../lib/commentary'
@@ -798,9 +798,57 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
   )
 }
 
+/* ── Morphology concordance results sheet ── */
+function MorphSearchSheet({ searchState, onNavigate, onClose, styles: r }) {
+  if (!searchState) return null
+  const { criteria, lang, results, total, capped } = searchState
+  const corpus = lang === 'hebrew' ? 'HOT' : 'GNT'
+
+  const byBook = results.reduce((acc, res) => {
+    if (!acc[res.book]) acc[res.book] = []
+    acc[res.book].push(res)
+    return acc
+  }, {})
+
+  const criteriaLabel = criteria.map(c => c.value).join(' + ')
+
+  return (
+    <div style={r.morphSheetOverlay} onClick={onClose}>
+      <div style={r.morphSheet} onClick={e => e.stopPropagation()}>
+        <div style={r.morphSheetHeader}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={r.morphSheetTitle}>{corpus} Search</div>
+            <div style={r.morphSheetSubtitle}>{criteriaLabel}</div>
+          </div>
+          <button style={r.morphSheetClose} onClick={onClose}>✕</button>
+        </div>
+        <div style={r.morphSheetCount}>
+          {total === 0 ? 'No results' : `${total}${capped ? '+' : ''} occurrence${total === 1 ? '' : 's'}`}
+          {capped && ' (showing first 300)'}
+        </div>
+        <div style={r.morphSheetScroll}>
+          {Object.entries(byBook).map(([book, verses]) => (
+            <div key={book} style={r.morphSheetBook}>
+              <div style={r.morphSheetBookName}>{book} <span style={r.morphSheetBookCount}>{verses.length}</span></div>
+              {verses.map((v, i) => (
+                <button key={i} style={r.morphSheetVerse} onClick={() => { onNavigate(v.book, v.chapter, v.verse); onClose() }}>
+                  <span style={r.morphSheetVerseRef}>{v.chapter}:{v.verse}</span>
+                  <span style={r.morphSheetVerseWord}>{v.w}</span>
+                  <span style={r.morphSheetVerseGloss}>{v.g}</span>
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Grammar term glossary table ── */
-function MorphTable({ detail, lang, styles: r }) {
+function MorphTable({ detail, lang, styles: r, onMorphSearch }) {
   const [activeDef, setActiveDef] = useState(null)
+  const [criteria, setCriteria] = useState([])
 
   function toggleDef(label, value) {
     const def = getMorphDef(label, value, lang)
@@ -808,50 +856,81 @@ function MorphTable({ detail, lang, styles: r }) {
     setActiveDef(prev => prev?.term === value && prev?.label === label ? null : def)
   }
 
+  function toggleCriterion(label, value) {
+    setCriteria(prev => {
+      const exists = prev.some(c => c.label === label && c.value === value)
+      return exists ? prev.filter(c => !(c.label === label && c.value === value)) : [...prev, { label, value }]
+    })
+  }
+
+  function isCriterion(label, value) {
+    return criteria.some(c => c.label === label && c.value === value)
+  }
+
+  const corpus = lang === 'hebrew' ? 'HOT' : 'GNT'
+
+  function renderRow(label, value) {
+    const hasDef = !!getMorphDef(label, value, lang)
+    const isActive = activeDef?.label === label && activeDef?.term === value
+    const isChecked = isCriterion(label, value)
+    return (
+      <React.Fragment key={label}>
+        <div style={{ ...r.wiMorphRow, alignItems:'center' }}>
+          <span style={r.wiMorphLabel}>{label}</span>
+          <button
+            style={{ ...r.wiMorphValue, ...r.wiMorphValueBtn, ...(hasDef ? {} : { cursor:'default' }), flex:1 }}
+            onClick={() => toggleDef(label, value)}
+          >
+            {value}
+            {hasDef && <span style={r.wiMorphHint}>?</span>}
+          </button>
+          <button
+            style={{ ...r.wiMorphSearchToggle, ...(isChecked ? r.wiMorphSearchToggleOn : {}) }}
+            onClick={() => toggleCriterion(label, value)}
+            title={isChecked ? 'Remove from search' : 'Add to search'}
+          >
+            {isChecked ? '✓' : '+'}
+          </button>
+        </div>
+        {isActive && (
+          <div style={r.wiMorphDefBox}>
+            <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
+            <span style={r.wiMorphDefText}>{activeDef.definition}</span>
+          </div>
+        )}
+      </React.Fragment>
+    )
+  }
+
   return (
     <div style={r.wiMorphBlock}>
-      {/* Part of Speech */}
-      <div style={r.wiMorphRow}>
-        <span style={r.wiMorphLabel}>Part of Speech</span>
-        <button
-          style={{ ...r.wiMorphValue, ...r.wiMorphValueBtn, ...(getMorphDef('Part of Speech', detail.pos, lang) ? {} : {cursor:'default'}) }}
-          onClick={() => toggleDef('Part of Speech', detail.pos)}
-        >
-          {detail.pos}
-          {getMorphDef('Part of Speech', detail.pos, lang) && <span style={r.wiMorphHint}>?</span>}
-        </button>
-      </div>
-
-      {detail.items.map(it => {
-        const hasDef = !!getMorphDef(it.label, it.value, lang)
-        const isActive = activeDef?.label === it.label && activeDef?.term === it.value
-        return (
-          <React.Fragment key={it.label}>
-            <div style={r.wiMorphRow}>
-              <span style={r.wiMorphLabel}>{it.label}</span>
-              <button
-                style={{ ...r.wiMorphValue, ...r.wiMorphValueBtn, ...(hasDef ? {} : {cursor:'default'}) }}
-                onClick={() => toggleDef(it.label, it.value)}
-              >
-                {it.value}
-                {hasDef && <span style={r.wiMorphHint}>?</span>}
-              </button>
-            </div>
-            {isActive && (
-              <div style={r.wiMorphDefBox}>
-                <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
-                <span style={r.wiMorphDefText}>{activeDef.definition}</span>
-              </div>
-            )}
-          </React.Fragment>
-        )
-      })}
+      {renderRow('Part of Speech', detail.pos)}
+      {detail.items.map(it => renderRow(it.label, it.value))}
 
       {/* Part-of-speech definition shown after all items */}
       {activeDef?.label === 'Part of Speech' && (
         <div style={r.wiMorphDefBox}>
           <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
           <span style={r.wiMorphDefText}>{activeDef.definition}</span>
+        </div>
+      )}
+
+      {criteria.length > 0 && (
+        <div style={r.wiMorphSearchBar}>
+          <div style={r.wiMorphSearchChips}>
+            {criteria.map(c => (
+              <span key={c.label + c.value} style={r.wiMorphSearchChip}>
+                {c.value}
+                <button style={r.wiMorphSearchChipX} onClick={() => toggleCriterion(c.label, c.value)}>×</button>
+              </span>
+            ))}
+          </div>
+          <button
+            style={r.wiMorphSearchBtn}
+            onClick={() => onMorphSearch?.(criteria, lang)}
+          >
+            Search {corpus}
+          </button>
         </div>
       )}
     </div>
@@ -1057,6 +1136,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [lexNavVerse,   setLexNavVerse]   = useState(null) // {book,chapter,verse} — highlights lex result in parallel mode
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
   const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang, initialView? } | null
+  const [morphSearch,   setMorphSearch]   = useState(null)  // { criteria, lang, results, total, capped } | null
   const [wordSearchModal, setWordSearchModal] = useState(null) // { word } | null  (KJV word tap)
 
   /* Lexicon back-navigation: remember last scripture-results search so user can return */
@@ -1154,6 +1234,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const textParallelVersion = _TEXT_VERSIONS.has(version)
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
+
+  function handleMorphSearch(criteria, lang) {
+    const out = lang === 'hebrew'
+      ? searchHebrewByMorph(criteria)
+      : searchGreekByMorph(criteria)
+    setMorphSearch({ criteria, lang, results: out.results, total: out.total, capped: out.capped })
+  }
 
   useImperativeHandle(ref, () => ({
     openSidebar:    () => setSideOpen(true),
@@ -3492,7 +3579,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                       {/* ④ Morphology breakdown table */}
                                       {detail && (
-                                        <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} />
+                                        <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} />
                                       )}
 
                                       {/* ⑤ Manuscript note */}
@@ -4182,7 +4269,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               <span style={r.wiStrongsHint}>tap to open lexicon</span>
                                             </div>
                                             {detail && (
-                                              <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} />
+                                              <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} />
                                             )}
                                             {msDesc && (
                                               <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
@@ -4901,6 +4988,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </button>
           <button style={r.lexBackDismiss} onClick={() => { setLexReturn(null); setLexNavVerse(null) }} title="Dismiss">×</button>
         </div>
+      )}
+
+      {/* Morphology concordance sheet */}
+      {morphSearch && (
+        <MorphSearchSheet
+          searchState={morphSearch}
+          styles={r}
+          onClose={() => setMorphSearch(null)}
+          onNavigate={(b, ch, v) => {
+            navigate(b, ch)
+            setTimeout(() => {
+              const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }, 300)
+          }}
+        />
       )}
 
       {/* Author cross-ref verse preview modal */}
@@ -5874,6 +5977,103 @@ const r = {
   wiMorphDefText: {
     fontSize:12, color:'var(--ink)', lineHeight:1.55,
     fontFamily:"'DM Sans',sans-serif",
+  },
+  wiMorphSearchToggle: {
+    background:'none', border:'1px solid var(--border)', borderRadius:4,
+    width:20, height:20, display:'inline-flex', alignItems:'center', justifyContent:'center',
+    fontSize:13, lineHeight:1, cursor:'pointer', color:'var(--ink-muted)',
+    flexShrink:0, padding:0, fontFamily:"'DM Sans',sans-serif",
+  },
+  wiMorphSearchToggleOn: {
+    background:'var(--teal)', borderColor:'var(--teal)', color:'white',
+  },
+  wiMorphSearchBar: {
+    marginTop:8, display:'flex', flexDirection:'column', gap:6,
+    borderTop:'1px solid var(--border)', paddingTop:8,
+  },
+  wiMorphSearchChips: {
+    display:'flex', flexWrap:'wrap', gap:4,
+  },
+  wiMorphSearchChip: {
+    display:'inline-flex', alignItems:'center', gap:3,
+    background:'var(--teal-light)', color:'var(--teal)',
+    borderRadius:12, padding:'2px 8px 2px 8px',
+    fontSize:11, fontWeight:600, fontFamily:"'DM Sans',sans-serif",
+  },
+  wiMorphSearchChipX: {
+    background:'none', border:'none', padding:0, cursor:'pointer',
+    color:'var(--teal)', fontSize:13, lineHeight:1, marginLeft:2,
+  },
+  wiMorphSearchBtn: {
+    background:'var(--teal)', color:'white', border:'none',
+    borderRadius:6, padding:'7px 12px',
+    fontSize:12, fontWeight:700, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", alignSelf:'flex-start',
+  },
+  /* Morph search results sheet */
+  morphSheetOverlay: {
+    position:'fixed', inset:0, zIndex:9200,
+    background:'rgba(0,0,0,0.45)',
+    display:'flex', alignItems:'flex-end',
+  },
+  morphSheet: {
+    background:'var(--surface)', borderRadius:'20px 20px 0 0',
+    width:'100%', maxHeight:'80vh',
+    display:'flex', flexDirection:'column',
+    paddingBottom:'env(safe-area-inset-bottom,0)',
+  },
+  morphSheetHeader: {
+    display:'flex', alignItems:'flex-start', gap:8,
+    padding:'16px 16px 8px',
+    borderBottom:'1px solid var(--border)',
+  },
+  morphSheetTitle: {
+    fontSize:14, fontWeight:700, color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  morphSheetSubtitle: {
+    fontSize:12, color:'var(--teal)', fontWeight:600,
+    fontFamily:"'DM Sans',sans-serif", marginTop:2,
+  },
+  morphSheetClose: {
+    background:'none', border:'none', padding:4,
+    cursor:'pointer', color:'var(--ink-muted)', fontSize:16,
+    flexShrink:0,
+  },
+  morphSheetCount: {
+    fontSize:11, color:'var(--ink-faint)', padding:'6px 16px',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  morphSheetScroll: {
+    overflowY:'auto', flex:1, padding:'0 0 16px',
+  },
+  morphSheetBook: {
+    marginBottom:4,
+  },
+  morphSheetBookName: {
+    fontSize:11, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.06em',
+    color:'var(--ink-faint)', padding:'8px 16px 4px',
+    display:'flex', alignItems:'center', gap:6,
+  },
+  morphSheetBookCount: {
+    background:'var(--border)', color:'var(--ink-muted)',
+    borderRadius:8, padding:'1px 6px', fontSize:10, fontWeight:700,
+  },
+  morphSheetVerse: {
+    width:'100%', textAlign:'left', background:'none', border:'none',
+    display:'flex', alignItems:'baseline', gap:8,
+    padding:'5px 16px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  morphSheetVerseRef: {
+    fontSize:11, color:'var(--gold)', fontWeight:700, flexShrink:0, minWidth:36,
+  },
+  morphSheetVerseWord: {
+    fontSize:14, color:'var(--ink)', fontWeight:500, flexShrink:0,
+  },
+  morphSheetVerseGloss: {
+    fontSize:11, color:'var(--ink-muted)', overflow:'hidden',
+    textOverflow:'ellipsis', whiteSpace:'nowrap',
   },
 
   /* ⑤ Manuscript note */

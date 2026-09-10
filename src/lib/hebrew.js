@@ -238,3 +238,49 @@ export function searchHebrewByStrongs(strongsId, maxResults = 300, onlyBook = nu
   }
   return { results, total, capped: !onlyBook && total > maxResults }
 }
+
+/**
+ * Search all Hebrew OT words for a given morphological profile.
+ * criteria = [{label, value}] — same shape as parseHebrewMorphDetails items,
+ *   plus optionally {label:'Part of Speech', value:'Verb'}.
+ * Returns { results:[{book,chapter,verse,w,t,g,morph}], total }
+ * Capped at maxResults (default 300).
+ */
+export function searchHebrewByMorph(criteria, maxResults = 300) {
+  if (!_hebrewData || !criteria?.length) return { results: [], total: 0 }
+
+  const results = []
+  let total = 0
+
+  for (const book of OT_BOOK_ORDER) {
+    const bookData = _hebrewData[book]
+    if (!bookData) continue
+    const chs = Object.keys(bookData).map(Number).sort((a, b) => a - b)
+    for (const ch of chs) {
+      const verses = bookData[String(ch)]
+      if (!verses) continue
+      const vs = Object.keys(verses).sort((a, b) => parseInt(a) - parseInt(b))
+      for (const vKey of vs) {
+        const words = verses[vKey]
+        if (!Array.isArray(words)) continue
+        const vNum = parseInt(vKey)
+        for (const wd of words) {
+          const parsed = parseHebrewMorphDetails(wd.r)
+          if (!parsed) continue
+          const matches = criteria.every(crit => {
+            if (crit.label === 'Part of Speech') return parsed.pos === crit.value
+            return parsed.items.some(it => it.label === crit.label && it.value === crit.value)
+          })
+          if (matches) {
+            total++
+            if (results.length < maxResults) {
+              results.push({ book, chapter: ch, verse: vNum, w: wd.w, t: wd.t, g: wd.g, morph: wd.r })
+            }
+            break // one per verse
+          }
+        }
+      }
+    }
+  }
+  return { results, total, capped: total > maxResults }
+}

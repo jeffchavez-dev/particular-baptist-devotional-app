@@ -116,6 +116,52 @@ export function searchGreekByStrongs(strongsId, maxResults = 300, onlyBook = nul
   return { results, total, capped: !onlyBook && total > maxResults }
 }
 
+/**
+ * Search all Greek NT words for a given morphological profile.
+ * criteria = [{label, value}] — same shape as parseMorphDetails items,
+ *   plus optionally {label:'Part of Speech', value:'Verb'}.
+ * Returns { results:[{book,chapter,verse,w,t,g,morph}], total, capped }
+ * Capped at maxResults (default 300).
+ */
+export function searchGreekByMorph(criteria, maxResults = 300) {
+  if (!_greekData || !criteria?.length) return { results: [], total: 0, capped: false }
+
+  const results = []
+  let total = 0
+
+  for (const book of NT_BOOK_ORDER) {
+    const bookData = _greekData[book]
+    if (!bookData) continue
+    const chs = Object.keys(bookData).map(Number).sort((a, b) => a - b)
+    for (const ch of chs) {
+      const verses = bookData[String(ch)]
+      if (!verses) continue
+      const vs = Object.keys(verses).sort((a, b) => parseInt(a) - parseInt(b))
+      for (const vKey of vs) {
+        const words = verses[vKey]
+        if (!Array.isArray(words)) continue
+        const vNum = parseInt(vKey)
+        for (const wd of words) {
+          const parsed = parseMorphDetails(wd.r)
+          if (!parsed) continue
+          const matches = criteria.every(crit => {
+            if (crit.label === 'Part of Speech') return parsed.pos === crit.value
+            return parsed.items.some(it => it.label === crit.label && it.value === crit.value)
+          })
+          if (matches) {
+            total++
+            if (results.length < maxResults) {
+              results.push({ book, chapter: ch, verse: vNum, w: wd.w, t: wd.t, g: wd.g, morph: wd.r })
+            }
+            break
+          }
+        }
+      }
+    }
+  }
+  return { results, total, capped: total > maxResults }
+}
+
 /* ── Grammar parser (Robinson morphology) ───────────────────────────────── */
 
 const POS = {

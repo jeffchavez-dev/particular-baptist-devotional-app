@@ -1,5 +1,5 @@
 {
-  "version": "1.10.17",
+  "version": "1.10.19",
   "date": "2026-09-10",
-  "changelog": "About page: added attribution for the grammar glossary definitions, citing the standard Biblical language grammars they draw on (Gesenius, Waltke & O'Connor, Mounce, Wallace) and clarifying they are the author's own educational synthesis."
+  "changelog": "Fix: Greek conjunctions (δέ, γάρ, καί, ἵνα), prepositions (ἐν, εἰς, etc.), and other simple-POS words now show the ? definition badge in the morphology strip. The glossary keys were mismatched against what the Robinson parser produces."
 }

@@ -85,13 +85,14 @@ const GRK_POS = {
   'Indef. Pron':   'Indefinite Pronoun — "someone," "something," "a certain one" (τις, τι — unaccented). Refers to an unspecified person or thing.',
   'Refl. Pron':    'Reflexive Pronoun — "himself," "herself," "itself," "themselves" (ἑαυτοῦ, ἑαυτῆς). Refers back to the subject of the clause.',
   'Adverb':        'An indeclinable word modifying a verb, adjective, or other adverb. Expresses time, place, manner, or degree (e.g. εὐθύς "immediately," πάλιν "again," ἐκεῖ "there").',
-  'Conj':          'Conjunction — a word connecting words, phrases, or clauses. Common examples: καί ("and," "also"), δέ ("but," "and"), ἀλλά ("but"), γάρ ("for," "because"), ὅτι ("that," "because").',
+  'Conjunction':   'A word connecting words, phrases, or clauses. Common examples: καί ("and," "also"), δέ ("but," "and"), ἀλλά ("but"), γάρ ("for," "because"), ὅτι ("that," "because").',
   'Conditional':   'A particle introducing a conditional clause. εἰ introduces 1st/2nd/4th class conditions (real, contrary-to-fact, remote); ἐάν introduces 3rd class conditions (probable/possible future).',
   'Particle':      'An indeclinable function word that adds logical or discourse nuance. Examples: μέν (anticipatory contrast), οὖν ("therefore," "so"), ἄν (makes statements contingent), γέ (emphatic), νή (affirmation).',
-  'Prep':          'Preposition — governs a noun in a particular case to show spatial, temporal, or abstract relationship. Many Greek prepositions take different meanings with different cases (e.g. διά + genitive = "through"; διά + accusative = "on account of").',
+  'Preposition':   'Governs a noun in a particular case to show spatial, temporal, or abstract relationship. Many Greek prepositions take different meanings with different cases (e.g. διά + genitive = "through"; διά + accusative = "on account of").',
   'Interjection':  'An exclamatory expression. Examples: ἰδού ("behold!," "look!"), ἄγε ("come!"), οὐαί ("woe!"). Grammatically independent from the sentence.',
   'Correl/Interrog': 'A word that functions as both a correlative and interrogative pronoun depending on context.',
-  'Adv':           'Adverb — an indeclinable word modifying a verb, adjective, or other adverb.',
+  'Aramaic word':  'A word of Aramaic origin transliterated into Greek. Aramaic was the common spoken language of first-century Palestine alongside Greek.',
+  'Hebrew word':   'A word of Hebrew origin transliterated into Greek, typically a proper name or liturgical term (e.g. Ἀμήν, Ἁλληλούϊα).',
 }
 
 const GRK_CASE = {
