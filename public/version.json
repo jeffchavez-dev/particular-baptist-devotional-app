@@ -1,5 +1,1 @@
-{
-  "version": "1.10.22",
-  "date": "2026-09-10",
-  "changelog": "Morph search: tapping a result navigates to the verse and shows a 'Back to morph results' pill, matching the Strongs concordance back-navigation behavior."
-}
+{"version":"1.10.23","date":"2026-09-10","changelog":"Fix: This word only checkbox no longer overflows on mobile — label now truncates with ellipsis."}

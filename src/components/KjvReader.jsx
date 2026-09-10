@@ -6035,9 +6035,12 @@ const r = {
   wiMorphWordOnlyRow: {
     display:'flex', alignItems:'center', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif",
+    minWidth:0, overflow:'hidden',
   },
   wiMorphWordOnlyLabel: {
     fontSize:12, color:'var(--ink-muted)',
+    flex:1, minWidth:0,
+    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
   },
   wiMorphWordOnlyGloss: {
     color:'var(--ink-faint)', fontStyle:'italic',
