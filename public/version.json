@@ -1,5 +1,5 @@
 {
-  "version": "1.10.14",
+  "version": "1.10.15",
   "date": "2026-09-10",
-  "changelog": "Vocab review: review words per book from the vocab list. Verse references on flashcards now open a parallel HOT/GNT + KJV bottom sheet instead of showing text inline on the card."
+  "changelog": "Fix Find in HOT/GNT missing results for late books (e.g. Zechariah) when searching very common words. Book-scope search now always returns all occurrences in the current book regardless of the global 300-result cap. Also fixes a verse-key parsing bug that silently skipped split-verse entries."
 }

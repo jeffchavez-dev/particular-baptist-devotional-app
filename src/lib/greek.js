@@ -73,7 +73,7 @@ const NT_BOOK_ORDER = [
  * Returns { results:[{book,chapter,verse,w,t,g}], total, capped }
  * One result per verse (first matching word), canonical order, capped at maxResults.
  */
-export function searchGreekByStrongs(strongsId, maxResults = 300) {
+export function searchGreekByStrongs(strongsId, maxResults = 300, onlyBook = null) {
   if (!_greekData || !strongsId) return { results: [], total: 0, capped: false }
   const targetNum = parseInt(
     strongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''),
@@ -83,26 +83,29 @@ export function searchGreekByStrongs(strongsId, maxResults = 300) {
 
   const results = []
   let total = 0
+  const books = onlyBook ? [onlyBook] : NT_BOOK_ORDER
+  const cap   = onlyBook ? Infinity : maxResults
 
-  for (const book of NT_BOOK_ORDER) {
+  for (const book of books) {
     const bookData = _greekData[book]
     if (!bookData) continue
     const chs = Object.keys(bookData).map(Number).sort((a, b) => a - b)
     for (const ch of chs) {
       const verses = bookData[String(ch)]
       if (!verses) continue
-      const vs = Object.keys(verses).map(Number).sort((a, b) => a - b)
-      for (const v of vs) {
-        const words = verses[String(v)]
-        if (!words) continue
+      const vs = Object.keys(verses).sort((a, b) => parseInt(a) - parseInt(b))
+      for (const vKey of vs) {
+        const words = verses[vKey]
+        if (!Array.isArray(words)) continue
+        const vNum = parseInt(vKey)
         for (const wd of words) {
           const n = parseInt(
             (wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10
           )
           if (n === targetNum) {
             total++
-            if (results.length < maxResults) {
-              results.push({ book, chapter: ch, verse: v, w: wd.w, t: wd.t, g: wd.g })
+            if (results.length < cap) {
+              results.push({ book, chapter: ch, verse: vNum, w: wd.w, t: wd.t, g: wd.g })
             }
             break // one entry per verse
           }
@@ -110,7 +113,7 @@ export function searchGreekByStrongs(strongsId, maxResults = 300) {
       }
     }
   }
-  return { results, total, capped: total > maxResults }
+  return { results, total, capped: !onlyBook && total > maxResults }
 }
 
 /* ── Grammar parser (Robinson morphology) ───────────────────────────────── */

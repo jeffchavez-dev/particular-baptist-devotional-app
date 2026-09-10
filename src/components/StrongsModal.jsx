@@ -264,6 +264,7 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
     const loader = lang === 'greek' ? loadGreek() : loadHebrew()
     loader.then(() => {
       if (cancelled) return
+      // Always fetch all-books results (capped at 300)
       const out = lang === 'greek'
         ? searchGreekByStrongs(id)
         : searchHebrewByStrongs(id)
@@ -277,12 +278,20 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
     return () => { cancelled = true }
   }, [lang, id])
 
+  // When scope=book, re-run search targeting only that book (bypasses global cap)
+  const [bookResults, setBookResults] = useState([])
+  useEffect(() => {
+    if (scope !== 'book' || !currentBook) return
+    const out = lang === 'greek'
+      ? searchGreekByStrongs(id, 300, currentBook)
+      : searchHebrewByStrongs(id, 300, currentBook)
+    setBookResults(out.results)
+  }, [scope, currentBook, lang, id])
+
   const results = useMemo(() => {
-    if (scope === 'book' && currentBook) {
-      return allResults.filter(r => r.book === currentBook)
-    }
+    if (scope === 'book' && currentBook) return bookResults
     return allResults
-  }, [allResults, scope, currentBook])
+  }, [allResults, bookResults, scope, currentBook])
 
   // Auto-expand first book whenever results change
   useEffect(() => {
