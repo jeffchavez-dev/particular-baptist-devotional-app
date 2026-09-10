@@ -907,14 +907,6 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch }) {
       {renderRow('Part of Speech', detail.pos)}
       {detail.items.map(it => renderRow(it.label, it.value))}
 
-      {/* Part-of-speech definition shown after all items */}
-      {activeDef?.label === 'Part of Speech' && (
-        <div style={r.wiMorphDefBox}>
-          <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
-          <span style={r.wiMorphDefText}>{activeDef.definition}</span>
-        </div>
-      )}
-
       {criteria.length > 0 && (
         <div style={r.wiMorphSearchBar}>
           <div style={r.wiMorphSearchChips}>

@@ -1,5 +1,5 @@
 {
-  "version": "1.10.19",
+  "version": "1.10.20",
   "date": "2026-09-10",
-  "changelog": "Fix: Greek conjunctions (δέ, γάρ, καί, ἵνα), prepositions (ἐν, εἰς, etc.), and other simple-POS words now show the ? definition badge in the morphology strip. The glossary keys were mismatched against what the Robinson parser produces."
+  "changelog": "Fix: morphology definition no longer shows twice when tapping a Part of Speech row."
 }
