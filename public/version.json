@@ -1,5 +1,5 @@
 {
-  "version": "1.10.16",
+  "version": "1.10.17",
   "date": "2026-09-10",
-  "changelog": "Grammar glossary: tap any morphology term (Qal, Perfect, Inf. Construct, Indicative, etc.) in the word-info strip to see its definition inline. Covers all Hebrew binyanim, aspects, states, and Greek cases, tenses, voices, and moods."
+  "changelog": "About page: added attribution for the grammar glossary definitions, citing the standard Biblical language grammars they draw on (Gesenius, Waltke & O'Connor, Mounce, Wallace) and clarifying they are the author's own educational synthesis."
 }

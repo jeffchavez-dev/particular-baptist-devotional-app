@@ -167,6 +167,12 @@ const DATA_SOURCES = [
     desc: 'NASB 1995 text in JSON format used for the in-app Scripture reader. The New American Standard Bible 1995 is © The Lockman Foundation.',
     badge: 'Copyright',
   },
+  {
+    name: 'Grammar Glossary — Standard Biblical Language Textbooks',
+    href: null,
+    desc: 'The morphology term definitions (binyanim, aspects, cases, tenses, moods, etc.) were written for this app drawing on widely-used Biblical language grammars: Gesenius\' Hebrew Grammar; Waltke & O\'Connor, An Introduction to Biblical Hebrew Syntax; Mounce, Basics of Biblical Greek; Wallace, Greek Grammar Beyond the Basics. The ETCBC morphology codes (Hebrew) and Robinson Morphological Analysis codes (Greek) come from the STEPBible TAHOT/TAGNT data. Definitions are the author\'s own synthesis — not verbatim quotations — and are provided for educational use.',
+    badge: 'Educational',
+  },
 ]
 
 /* ── Collapsible section wrapper — state persisted so back-nav restores it ── */
@@ -1176,14 +1182,20 @@ export default function AboutPage() {
                   <div style={{display:'flex', alignItems:'flex-start', gap:8, flex:1, minWidth:0}}>
                     <span style={s.dataBullet}>▸</span>
                     <div style={{minWidth:0}}>
-                      <a
-                        href={src.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{fontSize:13, fontWeight:600, color:'var(--teal)', textDecoration:'none', fontFamily:"'DM Sans',sans-serif"}}
-                      >
-                        {src.name} ↗
-                      </a>
+                      {src.href ? (
+                        <a
+                          href={src.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{fontSize:13, fontWeight:600, color:'var(--teal)', textDecoration:'none', fontFamily:"'DM Sans',sans-serif"}}
+                        >
+                          {src.name} ↗
+                        </a>
+                      ) : (
+                        <span style={{fontSize:13, fontWeight:600, color:'var(--ink)', fontFamily:"'DM Sans',sans-serif"}}>
+                          {src.name}
+                        </span>
+                      )}
                       <p style={{fontSize:11, color:'var(--ink-muted)', lineHeight:1.6, margin:'2px 0 0'}}>{src.desc}</p>
                     </div>
                   </div>
