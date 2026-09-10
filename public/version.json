@@ -1,5 +1,5 @@
 {
-  "version": "1.10.13",
-  "date": "2026-09-09",
-  "changelog": "Vocab review: tag words as Learning or Mastered during review, spaced repetition schedules learning words for follow-up, and each session picks up to 10 cards prioritizing new and due words."
+  "version": "1.10.14",
+  "date": "2026-09-10",
+  "changelog": "Vocab review: review words per book from the vocab list. Verse references on flashcards now open a parallel HOT/GNT + KJV bottom sheet instead of showing text inline on the card."
 }

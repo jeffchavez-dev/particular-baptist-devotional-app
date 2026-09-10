@@ -4245,7 +4245,7 @@ export default function LibraryPage() {
                     lang={lang}
                     label={label}
                     words={words}
-                    onReview={() => setVocabReview({ lang, words: [...words] })}
+                    onReview={bookWords => setVocabReview({ lang, words: bookWords || [...words] })}
                     onRemove={id => { removeVocabWord(id); refreshVocab() }}
                     onStatusChange={(id, status) => { setVocabStatus(id, status); refreshVocab() }}
                   />
@@ -4292,6 +4292,15 @@ function VocabBox({ lang, label, words, onReview, onRemove, onStatusChange }) {
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
 
+  // Group by book for per-book review
+  const byBook = words.reduce((acc, w) => {
+    const book = w.savedFrom?.book || '—'
+    if (!acc[book]) acc[book] = []
+    acc[book].push(w)
+    return acc
+  }, {})
+  const bookEntries = Object.entries(byBook).sort((a, b) => a[0].localeCompare(b[0]))
+
   return (
     <div style={vb.box}>
       {/* Box header */}
@@ -4306,13 +4315,28 @@ function VocabBox({ lang, label, words, onReview, onRemove, onStatusChange }) {
           style={vb.reviewBtn}
           onClick={e => { e.stopPropagation(); onReview() }}
         >
-          ▶ Review
+          ▶ Review all
         </button>
       </div>
 
       {/* Word list */}
       {open && (
         <div style={vb.wordList}>
+          {/* Per-book review chips */}
+          {bookEntries.length > 1 && (
+            <div style={vb.bookChipRow}>
+              {bookEntries.map(([book, bWords]) => (
+                <button
+                  key={book}
+                  style={vb.bookChip}
+                  onClick={() => onReview(bWords)}
+                  title={`Review ${bWords.length} words from ${book}`}
+                >
+                  {book} <span style={vb.bookChipCount}>×{bWords.length}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {words.map(w => {
             const st = VOCAB_STATUSES.find(s => s.id === (w.status || 'new')) || VOCAB_STATUSES[0]
             const nextStatus = VOCAB_STATUSES[(VOCAB_STATUSES.findIndex(s => s.id === (w.status || 'new')) + 1) % VOCAB_STATUSES.length].id
@@ -4378,6 +4402,7 @@ function VocabReviewScreen({ words, lang, onClose }) {
   const [flipped,      setFlipped]      = useState(false)
   const [done,         setDone]         = useState(false)
   const [cardStatuses, setCardStatuses] = useState({})
+  const [verseModal,   setVerseModal]   = useState(null)
   const [kjvData,      setKjvData]      = useState(null)
   const [origReady,    setOrigReady]    = useState(false)
   const reviewedRef = useRef(new Set())
@@ -4391,27 +4416,6 @@ function VocabReviewScreen({ words, lang, onClose }) {
   const card = deck[idx]
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
-
-  // Look up the KJV verse text for the current card
-  const verseText = useMemo(() => {
-    if (!kjvData || !card?.savedFrom?.book || !card?.savedFrom?.chapter || !card?.savedFrom?.verse) return null
-    try {
-      const verses = getChapterVerses(kjvData, card.savedFrom.book, card.savedFrom.chapter)
-      return verses?.find(v => v.verse === card.savedFrom.verse)?.text || null
-    } catch { return null }
-  }, [kjvData, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
-
-  // Look up the original language verse text (HOT/GNT) for the current card
-  const origVerseText = useMemo(() => {
-    if (!origReady || !card?.savedFrom?.book || !card?.savedFrom?.chapter || !card?.savedFrom?.verse) return null
-    try {
-      const getFn = lang === 'hebrew' ? getHebrewChapter : getGreekChapter
-      const verses = getFn(card.savedFrom.book, card.savedFrom.chapter)
-      const verseWords = verses?.find(v => v.verse === card.savedFrom.verse)?.words
-      if (!verseWords?.length) return null
-      return verseWords.map(w => w.w).join(' ')
-    } catch { return null }
-  }, [origReady, lang, card?.savedFrom?.book, card?.savedFrom?.chapter, card?.savedFrom?.verse])
 
   function next() {
     if (idx + 1 >= deck.length) { setDone(true); return }
@@ -4489,20 +4493,13 @@ function VocabReviewScreen({ words, lang, onClose }) {
                 {card.translit && <p style={vr.cardTranslit}>{card.translit}{card.pronun ? ` · /${card.pronun}/` : ''}</p>}
                 {card.gloss && <p style={vr.cardGloss}>"{card.gloss}"</p>}
                 {card.def && <p style={vr.cardDef}>{card.def}</p>}
-                {origVerseText && (
-                  <p style={{ ...vr.cardVerse, fontFamily: isHeb ? getHebrewFontCss() : getGreekFontCss(), direction: isHeb ? 'rtl' : 'ltr', fontSize: isHeb ? 20 : 17, borderLeftColor: 'var(--teal)', lineHeight: 1.8 }}>
-                    {origVerseText}
-                  </p>
-                )}
-                {verseText && (
-                  <p style={vr.cardVerse}>
-                    {verseText}
-                  </p>
-                )}
                 {card.savedFrom?.book && (
-                  <p style={vr.cardSavedFrom}>
-                    {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}{card.savedFrom.verse ? `:${card.savedFrom.verse}` : ''}
-                  </p>
+                  <button
+                    style={vr.verseChip}
+                    onClick={e => { e.stopPropagation(); setVerseModal(card.savedFrom) }}
+                  >
+                    {card.savedFrom.book}{card.savedFrom.chapter ? ` ${card.savedFrom.chapter}` : ''}{card.savedFrom.verse ? `:${card.savedFrom.verse}` : ''} ›
+                  </button>
                 )}
                 <span style={{ ...vr.tapHint, marginTop: 8 }}>Tap card to flip back</span>
               </div>
@@ -4534,6 +4531,80 @@ function VocabReviewScreen({ words, lang, onClose }) {
           </div>
         </div>
       )}
+
+      {/* Verse parallel sheet */}
+      {verseModal && (
+        <VerseParallelSheet
+          lang={lang}
+          savedFrom={verseModal}
+          kjvData={kjvData}
+          origReady={origReady}
+          onClose={() => setVerseModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function VerseParallelSheet({ lang, savedFrom, kjvData, origReady, onClose }) {
+  const { book, chapter, verse } = savedFrom
+  const isHeb = lang === 'hebrew'
+  const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
+
+  const kjvText = useMemo(() => {
+    if (!kjvData || !book || !chapter || !verse) return null
+    try {
+      const verses = getChapterVerses(kjvData, book, chapter)
+      return verses?.find(v => v.verse === verse)?.text || null
+    } catch { return null }
+  }, [kjvData, book, chapter, verse])
+
+  const origText = useMemo(() => {
+    if (!origReady || !book || !chapter || !verse) return null
+    try {
+      const getFn = lang === 'hebrew' ? getHebrewChapter : getGreekChapter
+      const verses = getFn(book, chapter)
+      const words = verses?.find(v => v.verse === verse)?.words
+      return words?.length ? words.map(w => w.w).join(' ') : null
+    } catch { return null }
+  }, [origReady, lang, book, chapter, verse])
+
+  const label = `${book}${chapter ? ` ${chapter}` : ''}${verse ? `:${verse}` : ''}`
+  const origLabel = lang === 'greek' ? 'GNT' : 'HOT'
+
+  return (
+    <div style={vr.sheetOverlay} onClick={onClose}>
+      <div style={vr.sheet} onClick={e => e.stopPropagation()}>
+        <div style={vr.sheetHeader}>
+          <span style={vr.sheetRef}>{label}</span>
+          <button style={vr.sheetClose} onClick={onClose}>✕</button>
+        </div>
+        {origText ? (
+          <div style={vr.sheetBlock}>
+            <span style={vr.sheetLang}>{origLabel}</span>
+            <p style={{ ...vr.sheetText, fontFamily: scriptFont, direction: isHeb ? 'rtl' : 'ltr', fontSize: isHeb ? 22 : 18, lineHeight: 1.9 }}>
+              {origText}
+            </p>
+          </div>
+        ) : (
+          <div style={vr.sheetBlock}>
+            <span style={vr.sheetLang}>{origLabel}</span>
+            <p style={{ ...vr.sheetText, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Loading…</p>
+          </div>
+        )}
+        <div style={{ height: 1, background: 'var(--border)', margin: '0 20px' }} />
+        {kjvText ? (
+          <div style={vr.sheetBlock}>
+            <span style={vr.sheetLang}>KJV</span>
+            <p style={{ ...vr.sheetText, fontFamily: 'Georgia,serif' }}>{kjvText}</p>
+          </div>
+        ) : (
+          <div style={vr.sheetBlock}>
+            <span style={vr.sheetLang}>KJV</span>
+            <p style={{ ...vr.sheetText, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Loading…</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -5296,6 +5367,18 @@ const vb = {
     borderRadius: 99, padding: '4px 12px', cursor: 'pointer',
     fontFamily: "'DM Sans',sans-serif",
   },
+  bookChipRow: {
+    display: 'flex', flexWrap: 'wrap', gap: 6,
+    padding: '8px 0 10px', borderBottom: '1px solid var(--border)',
+    marginBottom: 4,
+  },
+  bookChip: {
+    fontSize: 11, fontWeight: 600, color: 'var(--ink-muted)',
+    background: 'var(--parchment)', border: '1px solid var(--border)',
+    borderRadius: 99, padding: '4px 10px', cursor: 'pointer',
+    fontFamily: "'DM Sans',sans-serif",
+  },
+  bookChipCount: { color: 'var(--teal)', fontWeight: 700 },
 }
 
 /* ── Vocab review screen styles ─────────────────────────────────────────── */
@@ -5401,6 +5484,41 @@ const vr = {
   },
   doneTags: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
   doneTagChip: { fontSize: 12, fontWeight: 700, borderRadius: 99, padding: '4px 12px' },
+  verseChip: {
+    marginTop: 6, fontSize: 12, fontWeight: 600,
+    color: 'var(--teal)', background: 'var(--teal-light)',
+    border: '1px solid rgba(0,120,100,0.25)', borderRadius: 99,
+    padding: '5px 14px', cursor: 'pointer',
+    fontFamily: "'DM Sans',sans-serif",
+  },
+  sheetOverlay: {
+    position: 'fixed', inset: 0, zIndex: 9100,
+    background: 'rgba(0,0,0,0.45)', display: 'flex',
+    alignItems: 'flex-end',
+  },
+  sheet: {
+    width: '100%', background: 'var(--surface)',
+    borderRadius: '20px 20px 0 0',
+    paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
+    maxHeight: '70vh', overflowY: 'auto',
+    boxShadow: '0 -4px 32px rgba(0,0,0,0.12)',
+  },
+  sheetHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '18px 20px 12px',
+    borderBottom: '1px solid var(--border)',
+  },
+  sheetRef: { fontSize: 15, fontWeight: 700, color: 'var(--ink)' },
+  sheetClose: {
+    fontSize: 18, background: 'none', border: 'none',
+    color: 'var(--ink-faint)', cursor: 'pointer', padding: '0 4px',
+  },
+  sheetBlock: { padding: '14px 20px' },
+  sheetLang: {
+    fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+    color: 'var(--ink-muted)', display: 'block', marginBottom: 6,
+  },
+  sheetText: { margin: 0, fontSize: 15, color: 'var(--ink)', lineHeight: 1.7 },
   statusRow: {
     display: 'flex', gap: 10, width: '100%', maxWidth: 420, justifyContent: 'center',
   },
