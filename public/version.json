@@ -1,1 +1,1 @@
-{"version":"1.10.24","date":"2026-09-10","changelog":"Fix: This word only label now always visible on mobile; only the gloss truncates with ellipsis."}
+{"version":"1.10.25","date":"2026-09-10","changelog":"Fix: This word only checkbox layout fixed — removed gloss from the row so it no longer overflows on any screen size."}
