@@ -55,6 +55,7 @@ import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 import { getStudySession, setStudySession } from '../lib/studySession'
 import { getInlineHeadings, NT_BOOKS_WITH_OUTLINES, BIBLE_OUTLINES } from '../data/bibleOutlines'
+import { getMorphDef } from '../lib/morphGlossary'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -793,6 +794,66 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
       <div style={sb.sidebarTitle}>Books</div>
       {!ntOnly && renderTestament('Old Testament', OT_CATS, 'var(--amber-soft)', 'var(--amber-ink)', 'OT')}
       {!otOnly && renderTestament('New Testament', NT_CATS, 'var(--purple-soft)', 'var(--purple-ink)', 'NT')}
+    </div>
+  )
+}
+
+/* ── Grammar term glossary table ── */
+function MorphTable({ detail, lang, styles: r }) {
+  const [activeDef, setActiveDef] = useState(null)
+
+  function toggleDef(label, value) {
+    const def = getMorphDef(label, value, lang)
+    if (!def) return
+    setActiveDef(prev => prev?.term === value && prev?.label === label ? null : def)
+  }
+
+  return (
+    <div style={r.wiMorphBlock}>
+      {/* Part of Speech */}
+      <div style={r.wiMorphRow}>
+        <span style={r.wiMorphLabel}>Part of Speech</span>
+        <button
+          style={{ ...r.wiMorphValue, ...r.wiMorphValueBtn, ...(getMorphDef('Part of Speech', detail.pos, lang) ? {} : {cursor:'default'}) }}
+          onClick={() => toggleDef('Part of Speech', detail.pos)}
+        >
+          {detail.pos}
+          {getMorphDef('Part of Speech', detail.pos, lang) && <span style={r.wiMorphHint}>?</span>}
+        </button>
+      </div>
+
+      {detail.items.map(it => {
+        const hasDef = !!getMorphDef(it.label, it.value, lang)
+        const isActive = activeDef?.label === it.label && activeDef?.term === it.value
+        return (
+          <React.Fragment key={it.label}>
+            <div style={r.wiMorphRow}>
+              <span style={r.wiMorphLabel}>{it.label}</span>
+              <button
+                style={{ ...r.wiMorphValue, ...r.wiMorphValueBtn, ...(hasDef ? {} : {cursor:'default'}) }}
+                onClick={() => toggleDef(it.label, it.value)}
+              >
+                {it.value}
+                {hasDef && <span style={r.wiMorphHint}>?</span>}
+              </button>
+            </div>
+            {isActive && (
+              <div style={r.wiMorphDefBox}>
+                <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
+                <span style={r.wiMorphDefText}>{activeDef.definition}</span>
+              </div>
+            )}
+          </React.Fragment>
+        )
+      })}
+
+      {/* Part-of-speech definition shown after all items */}
+      {activeDef?.label === 'Part of Speech' && (
+        <div style={r.wiMorphDefBox}>
+          <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
+          <span style={r.wiMorphDefText}>{activeDef.definition}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -3431,18 +3492,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                       {/* ④ Morphology breakdown table */}
                                       {detail && (
-                                        <div style={r.wiMorphBlock}>
-                                          <div style={r.wiMorphRow}>
-                                            <span style={r.wiMorphLabel}>Part of Speech</span>
-                                            <span style={r.wiMorphValue}>{detail.pos}</span>
-                                          </div>
-                                          {detail.items.map(it => (
-                                            <div key={it.label} style={r.wiMorphRow}>
-                                              <span style={r.wiMorphLabel}>{it.label}</span>
-                                              <span style={r.wiMorphValue}>{it.value}</span>
-                                            </div>
-                                          ))}
-                                        </div>
+                                        <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} />
                                       )}
 
                                       {/* ⑤ Manuscript note */}
@@ -4132,18 +4182,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               <span style={r.wiStrongsHint}>tap to open lexicon</span>
                                             </div>
                                             {detail && (
-                                              <div style={r.wiMorphBlock}>
-                                                <div style={r.wiMorphRow}>
-                                                  <span style={r.wiMorphLabel}>Part of Speech</span>
-                                                  <span style={r.wiMorphValue}>{detail.pos}</span>
-                                                </div>
-                                                {detail.items.map(it => (
-                                                  <div key={it.label} style={r.wiMorphRow}>
-                                                    <span style={r.wiMorphLabel}>{it.label}</span>
-                                                    <span style={r.wiMorphValue}>{it.value}</span>
-                                                  </div>
-                                                ))}
-                                              </div>
+                                              <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} />
                                             )}
                                             {msDesc && (
                                               <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
@@ -5812,6 +5851,29 @@ const r = {
   },
   wiMorphValue: {
     fontSize:13, color:'var(--ink)', fontWeight:500,
+  },
+  wiMorphValueBtn: {
+    background:'none', border:'none', padding:0, textAlign:'left',
+    fontFamily:"'DM Sans',sans-serif", display:'flex', alignItems:'center', gap:4,
+  },
+  wiMorphHint: {
+    fontSize:9, fontWeight:800, color:'var(--teal)',
+    background:'var(--teal-light)', borderRadius:'50%',
+    width:14, height:14, display:'inline-flex', alignItems:'center', justifyContent:'center',
+    flexShrink:0, lineHeight:1,
+  },
+  wiMorphDefBox: {
+    display:'flex', flexDirection:'column', gap:4,
+    background:'var(--teal-light)', borderLeft:'2px solid var(--teal)',
+    borderRadius:'0 6px 6px 0', padding:'8px 10px',
+    marginTop:2, marginBottom:2,
+  },
+  wiMorphDefTerm: {
+    fontSize:11, fontWeight:700, color:'var(--teal)', letterSpacing:'0.02em',
+  },
+  wiMorphDefText: {
+    fontSize:12, color:'var(--ink)', lineHeight:1.55,
+    fontFamily:"'DM Sans',sans-serif",
   },
 
   /* ⑤ Manuscript note */
