@@ -246,8 +246,11 @@ export function searchHebrewByStrongs(strongsId, maxResults = 300, onlyBook = nu
  * Returns { results:[{book,chapter,verse,w,t,g,morph}], total }
  * Capped at maxResults (default 300).
  */
-export function searchHebrewByMorph(criteria, maxResults = 300) {
+export function searchHebrewByMorph(criteria, maxResults = 300, onlyStrongsId = null) {
   if (!_hebrewData || !criteria?.length) return { results: [], total: 0 }
+  const targetNum = onlyStrongsId
+    ? parseInt(onlyStrongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+    : null
 
   const results = []
   let total = 0
@@ -267,6 +270,10 @@ export function searchHebrewByMorph(criteria, maxResults = 300) {
         for (const wd of words) {
           const parsed = parseHebrewMorphDetails(wd.r)
           if (!parsed) continue
+          if (targetNum !== null) {
+            const wNum = parseInt((wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+            if (wNum !== targetNum) continue
+          }
           const matches = criteria.every(crit => {
             if (crit.label === 'Part of Speech') return parsed.pos === crit.value
             return parsed.items.some(it => it.label === crit.label && it.value === crit.value)

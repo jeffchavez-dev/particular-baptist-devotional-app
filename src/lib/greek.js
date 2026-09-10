@@ -123,8 +123,11 @@ export function searchGreekByStrongs(strongsId, maxResults = 300, onlyBook = nul
  * Returns { results:[{book,chapter,verse,w,t,g,morph}], total, capped }
  * Capped at maxResults (default 300).
  */
-export function searchGreekByMorph(criteria, maxResults = 300) {
+export function searchGreekByMorph(criteria, maxResults = 300, onlyStrongsId = null) {
   if (!_greekData || !criteria?.length) return { results: [], total: 0, capped: false }
+  const targetNum = onlyStrongsId
+    ? parseInt(onlyStrongsId.replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+    : null
 
   const results = []
   let total = 0
@@ -142,6 +145,10 @@ export function searchGreekByMorph(criteria, maxResults = 300) {
         if (!Array.isArray(words)) continue
         const vNum = parseInt(vKey)
         for (const wd of words) {
+          if (targetNum !== null) {
+            const wNum = parseInt((wd.s || '').replace(/^[GgHh]/, '').replace(/[A-Za-z]+$/, ''), 10)
+            if (wNum !== targetNum) continue
+          }
           const parsed = parseMorphDetails(wd.r)
           if (!parsed) continue
           const matches = criteria.every(crit => {

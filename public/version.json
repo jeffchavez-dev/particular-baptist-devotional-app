@@ -1,5 +1,5 @@
 {
-  "version": "1.10.20",
+  "version": "1.10.21",
   "date": "2026-09-10",
-  "changelog": "Fix: morphology definition no longer shows twice when tapping a Part of Speech row."
+  "changelog": "Morphology search: added 'This word only' checkbox to narrow results to the current lemma (Strong's ID) in addition to the selected morph properties."
 }

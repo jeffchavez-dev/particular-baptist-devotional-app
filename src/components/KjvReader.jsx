@@ -801,7 +801,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
 /* ── Morphology concordance results sheet ── */
 function MorphSearchSheet({ searchState, onNavigate, onClose, styles: r }) {
   if (!searchState) return null
-  const { criteria, lang, results, total, capped } = searchState
+  const { criteria, lang, onlyStrongsId, results, total, capped } = searchState
   const corpus = lang === 'hebrew' ? 'HOT' : 'GNT'
 
   const byBook = results.reduce((acc, res) => {
@@ -811,6 +811,7 @@ function MorphSearchSheet({ searchState, onNavigate, onClose, styles: r }) {
   }, {})
 
   const criteriaLabel = criteria.map(c => c.value).join(' + ')
+  const scopeLabel = onlyStrongsId ? `${onlyStrongsId} · ` : ''
 
   return (
     <div style={r.morphSheetOverlay} onClick={onClose}>
@@ -818,7 +819,7 @@ function MorphSearchSheet({ searchState, onNavigate, onClose, styles: r }) {
         <div style={r.morphSheetHeader}>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={r.morphSheetTitle}>{corpus} Search</div>
-            <div style={r.morphSheetSubtitle}>{criteriaLabel}</div>
+            <div style={r.morphSheetSubtitle}>{scopeLabel}{criteriaLabel}</div>
           </div>
           <button style={r.morphSheetClose} onClick={onClose}>✕</button>
         </div>
@@ -846,9 +847,10 @@ function MorphSearchSheet({ searchState, onNavigate, onClose, styles: r }) {
 }
 
 /* ── Grammar term glossary table ── */
-function MorphTable({ detail, lang, styles: r, onMorphSearch }) {
+function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGloss }) {
   const [activeDef, setActiveDef] = useState(null)
   const [criteria, setCriteria] = useState([])
+  const [wordOnly, setWordOnly] = useState(false)
 
   function toggleDef(label, value) {
     const def = getMorphDef(label, value, lang)
@@ -917,9 +919,23 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch }) {
               </span>
             ))}
           </div>
+          {strongsId && (
+            <label style={r.wiMorphWordOnlyRow}>
+              <input
+                type="checkbox"
+                checked={wordOnly}
+                onChange={e => setWordOnly(e.target.checked)}
+                style={{ accentColor:'var(--teal)', marginRight:6 }}
+              />
+              <span style={r.wiMorphWordOnlyLabel}>
+                This word only
+                {wordGloss && <span style={r.wiMorphWordOnlyGloss}> — "{wordGloss}"</span>}
+              </span>
+            </label>
+          )}
           <button
             style={r.wiMorphSearchBtn}
-            onClick={() => onMorphSearch?.(criteria, lang)}
+            onClick={() => onMorphSearch?.(criteria, lang, wordOnly && strongsId ? strongsId : null)}
           >
             Search {corpus}
           </button>
@@ -1227,11 +1243,11 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     ? ([...parallelVersions].find(v => _TEXT_VERSIONS.has(v) && v !== version) ?? null)
     : null
 
-  function handleMorphSearch(criteria, lang) {
+  function handleMorphSearch(criteria, lang, onlyStrongsId = null) {
     const out = lang === 'hebrew'
-      ? searchHebrewByMorph(criteria)
-      : searchGreekByMorph(criteria)
-    setMorphSearch({ criteria, lang, results: out.results, total: out.total, capped: out.capped })
+      ? searchHebrewByMorph(criteria, 300, onlyStrongsId)
+      : searchGreekByMorph(criteria, 300, onlyStrongsId)
+    setMorphSearch({ criteria, lang, onlyStrongsId, results: out.results, total: out.total, capped: out.capped })
   }
 
   useImperativeHandle(ref, () => ({
@@ -3571,7 +3587,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                       {/* ④ Morphology breakdown table */}
                                       {detail && (
-                                        <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} />
+                                        <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} strongsId={wd.s || null} wordGloss={wd.g || null} />
                                       )}
 
                                       {/* ⑤ Manuscript note */}
@@ -4261,7 +4277,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                               <span style={r.wiStrongsHint}>tap to open lexicon</span>
                                             </div>
                                             {detail && (
-                                              <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} />
+                                              <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} strongsId={wd.s || null} wordGloss={wd.g || null} />
                                             )}
                                             {msDesc && (
                                               <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
@@ -5995,6 +6011,16 @@ const r = {
   wiMorphSearchChipX: {
     background:'none', border:'none', padding:0, cursor:'pointer',
     color:'var(--teal)', fontSize:13, lineHeight:1, marginLeft:2,
+  },
+  wiMorphWordOnlyRow: {
+    display:'flex', alignItems:'center', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  wiMorphWordOnlyLabel: {
+    fontSize:12, color:'var(--ink-muted)',
+  },
+  wiMorphWordOnlyGloss: {
+    color:'var(--ink-faint)', fontStyle:'italic',
   },
   wiMorphSearchBtn: {
     background:'var(--teal)', color:'white', border:'none',
