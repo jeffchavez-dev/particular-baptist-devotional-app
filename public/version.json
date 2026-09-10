@@ -1,5 +1,5 @@
 {
-  "version": "1.10.21",
+  "version": "1.10.22",
   "date": "2026-09-10",
-  "changelog": "Morphology search: added 'This word only' checkbox to narrow results to the current lemma (Strong's ID) in addition to the selected morph properties."
+  "changelog": "Morph search: tapping a result navigates to the verse and shows a 'Back to morph results' pill, matching the Strongs concordance back-navigation behavior."
 }

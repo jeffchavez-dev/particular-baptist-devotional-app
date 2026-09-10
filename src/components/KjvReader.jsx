@@ -1144,7 +1144,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [lexNavVerse,   setLexNavVerse]   = useState(null) // {book,chapter,verse} — highlights lex result in parallel mode
   const [displayMode,   setDisplayMode]   = useState('orig') // 'orig'|'translit'|'gloss'
   const [strongsModal,  setStrongsModal]  = useState(null)  // { strongsId, lang, initialView? } | null
-  const [morphSearch,   setMorphSearch]   = useState(null)  // { criteria, lang, results, total, capped } | null
+  const [morphSearch,       setMorphSearch]       = useState(null)  // { criteria, lang, results, total, capped } | null
+  const [morphSearchReturn, setMorphSearchReturn] = useState(null)  // stashed search when navigating away
   const [wordSearchModal, setWordSearchModal] = useState(null) // { word } | null  (KJV word tap)
 
   /* Lexicon back-navigation: remember last scripture-results search so user can return */
@@ -1247,6 +1248,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     const out = lang === 'hebrew'
       ? searchHebrewByMorph(criteria, 300, onlyStrongsId)
       : searchGreekByMorph(criteria, 300, onlyStrongsId)
+    setMorphSearchReturn(null)
     setMorphSearch({ criteria, lang, onlyStrongsId, results: out.results, total: out.total, capped: out.capped })
   }
 
@@ -5005,6 +5007,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           styles={r}
           onClose={() => setMorphSearch(null)}
           onNavigate={(b, ch, v) => {
+            setMorphSearchReturn(morphSearch)
+            setMorphSearch(null)
             navigate(b, ch)
             setTimeout(() => {
               const el = readerRef.current?.querySelector(`#${verseId(b, ch, v)}`)
@@ -5012,6 +5016,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             }, 300)
           }}
         />
+      )}
+
+      {/* Morph results back pill */}
+      {morphSearchReturn && !morphSearch && (
+        <div style={{ ...r.lexBackPill, bottom: lexReturn ? 118 : 76 }}>
+          <button
+            style={r.lexBackBtn}
+            onClick={() => { setMorphSearch(morphSearchReturn); setMorphSearchReturn(null) }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink:0 }}>
+              <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to morph results
+          </button>
+          <button style={r.lexBackDismiss} onClick={() => setMorphSearchReturn(null)} title="Dismiss">×</button>
+        </div>
       )}
 
       {/* Author cross-ref verse preview modal */}
