@@ -1,1 +1,1 @@
-{"version":"1.10.23","date":"2026-09-10","changelog":"Fix: This word only checkbox no longer overflows on mobile — label now truncates with ellipsis."}
+{"version":"1.10.24","date":"2026-09-10","changelog":"Fix: This word only label now always visible on mobile; only the gloss truncates with ellipsis."}

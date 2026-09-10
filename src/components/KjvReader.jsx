@@ -925,12 +925,10 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
                 type="checkbox"
                 checked={wordOnly}
                 onChange={e => setWordOnly(e.target.checked)}
-                style={{ accentColor:'var(--teal)', marginRight:6 }}
+                style={{ accentColor:'var(--teal)', marginRight:6, flexShrink:0 }}
               />
-              <span style={r.wiMorphWordOnlyLabel}>
-                This word only
-                {wordGloss && <span style={r.wiMorphWordOnlyGloss}> — "{wordGloss}"</span>}
-              </span>
+              <span style={r.wiMorphWordOnlyLabel}>This word only</span>
+              {wordGloss && <span style={r.wiMorphWordOnlyGloss}> — "{wordGloss}"</span>}
             </label>
           )}
           <button
@@ -6035,15 +6033,15 @@ const r = {
   wiMorphWordOnlyRow: {
     display:'flex', alignItems:'center', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif",
-    minWidth:0, overflow:'hidden',
+    minWidth:0,
   },
   wiMorphWordOnlyLabel: {
-    fontSize:12, color:'var(--ink-muted)',
-    flex:1, minWidth:0,
-    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+    fontSize:12, color:'var(--ink-muted)', flexShrink:0,
   },
   wiMorphWordOnlyGloss: {
-    color:'var(--ink-faint)', fontStyle:'italic',
+    fontSize:12, color:'var(--ink-faint)', fontStyle:'italic',
+    flex:1, minWidth:0,
+    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
   },
   wiMorphSearchBtn: {
     background:'var(--teal)', color:'white', border:'none',
