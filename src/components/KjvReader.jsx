@@ -925,7 +925,7 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
                 type="checkbox"
                 checked={wordOnly}
                 readOnly
-                style={{ accentColor:'var(--teal)', cursor:'pointer', verticalAlign:'middle' }}
+                style={{ accentColor:'var(--teal)', cursor:'pointer' }}
               />
               {' '}This word only
             </div>
@@ -6030,12 +6030,11 @@ const r = {
     color:'var(--teal)', fontSize:13, lineHeight:1, marginLeft:2,
   },
   wiMorphWordOnlyRow: {
-    display:'block', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif",
+    display:'inline-flex', alignItems:'center', gap:6, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", fontSize:12, color:'var(--ink-muted)',
   },
   wiMorphWordOnlyLabel: {
     fontSize:12, color:'var(--ink-muted)',
-    verticalAlign:'middle', marginLeft:6,
   },
   wiMorphSearchBtn: {
     background:'var(--teal)', color:'white', border:'none',
