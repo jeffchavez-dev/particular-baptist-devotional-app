@@ -6013,11 +6013,11 @@ const r = {
     background:'var(--teal)', borderColor:'var(--teal)', color:'white',
   },
   wiMorphSearchBar: {
-    marginTop:8, display:'flex', flexDirection:'column', gap:6,
+    marginTop:8, display:'flex', flexDirection:'column', gap:6, alignItems:'flex-start',
     borderTop:'1px solid var(--border)', paddingTop:8,
   },
   wiMorphSearchChips: {
-    display:'flex', flexWrap:'wrap', gap:4,
+    display:'flex', flexWrap:'wrap', gap:4, alignSelf:'stretch',
   },
   wiMorphSearchChip: {
     display:'inline-flex', alignItems:'center', gap:3,

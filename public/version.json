@@ -1,1 +1,1 @@
-{"version":"1.10.29","date":"2026-09-14","changelog":"Fixed 'This word only' checkbox alignment — now left-aligned beside the label."}
+{"version":"1.10.30","date":"2026-09-15","changelog":"Fixed 'This word only' checkbox alignment on mobile — was being stretched by parent flex column."}
