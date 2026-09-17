@@ -4387,25 +4387,62 @@ function shuffle(arr) {
   return a
 }
 
-function buildDeck(words) {
+function buildDeck(words, mode = 'smart', sessionWeakIds = new Set(), sessionReviewedIds = new Set()) {
   const now = Date.now()
-  const newW    = shuffle(words.filter(w => !w.status || w.status === 'new'))
-  const dueW    = shuffle(words.filter(w => w.status === 'learning' && (!w.nextReview || w.nextReview <= now)))
-  const notDueW = shuffle(words.filter(w => w.status === 'learning' && w.nextReview && w.nextReview > now))
-  const mastW   = shuffle(words.filter(w => w.status === 'mastered'))
-  return [...newW, ...dueW, ...notDueW, ...mastW].slice(0, 10)
+  const weakWords    = words.filter(w => sessionWeakIds.has(w.id))
+  const freshWords   = words.filter(w => !sessionReviewedIds.has(w.id) && (!w.status || w.status === 'new'))
+  const dueWords     = words.filter(w => !sessionReviewedIds.has(w.id) && w.status === 'learning' && (!w.nextReview || w.nextReview <= now))
+  const notDueWords  = words.filter(w => !sessionReviewedIds.has(w.id) && w.status === 'learning' && w.nextReview && w.nextReview > now)
+
+  if (mode === 'weak') {
+    const deck = shuffle(weakWords)
+    return deck.length ? deck.slice(0, 10) : shuffle(words).slice(0, 10)
+  }
+  if (mode === 'fresh') {
+    const deck = shuffle([...freshWords, ...dueWords, ...notDueWords])
+    return deck.length ? deck.slice(0, 10) : shuffle(words).slice(0, 10)
+  }
+  if (mode === 'mixed') {
+    return shuffle(words).slice(0, 10)
+  }
+  // smart: 70% weak, 30% new
+  const weakTarget  = Math.round(10 * 0.7)
+  const freshTarget = 10 - weakTarget
+  const weakPart    = shuffle(weakWords).slice(0, weakTarget)
+  const freshPool   = shuffle([...freshWords, ...dueWords])
+  const freshPart   = freshPool.slice(0, freshTarget)
+  const fill        = shuffle([...notDueWords, ...words]).filter(w => !weakPart.includes(w) && !freshPart.includes(w))
+  const deck        = [...weakPart, ...freshPart]
+  if (deck.length < 10) deck.push(...fill.slice(0, 10 - deck.length))
+  return shuffle(deck).slice(0, 10)
 }
 
+const ROUND_TIPS = [
+  null,
+  'Spacing effect: review these cards tomorrow for 2× retention.',
+  "You're building long-term memory — great work!",
+  'Consider ending here — massed practice shows diminishing returns.',
+]
+
+const NEXT_MODES = [
+  { id: 'smart',  emoji: '📚', label: 'Smart Review',   sub: 'Auto-spaces cards · mixes weak + new', recommended: true },
+  { id: 'weak',   emoji: '💪', label: 'Focus on Weak',  sub: 'Only cards you marked "Learning"' },
+  { id: 'fresh',  emoji: '✨', label: 'Fresh Cards',    sub: 'Skip already-reviewed · new vocab only' },
+  { id: 'mixed',  emoji: '🔄', label: 'Mixed Review',   sub: 'Random mix of all cards' },
+]
+
 function VocabReviewScreen({ words, lang, onClose }) {
-  const [deck,         setDeck]         = useState(() => buildDeck(words))
+  const [deck,         setDeck]         = useState(() => buildDeck(words, 'smart'))
   const [idx,          setIdx]          = useState(0)
   const [flipped,      setFlipped]      = useState(false)
-  const [done,         setDone]         = useState(false)
+  const [roundDone,    setRoundDone]    = useState(false)
+  const [roundNum,     setRoundNum]     = useState(1)
   const [cardStatuses, setCardStatuses] = useState({})
   const [verseModal,   setVerseModal]   = useState(null)
   const [kjvData,      setKjvData]      = useState(null)
   const [origReady,    setOrigReady]    = useState(false)
-  const reviewedRef = useRef(new Set())
+  const reviewedRef    = useRef(new Set())
+  const sessionWeakRef = useRef(new Set())
 
   useEffect(() => {
     loadBibleVersion('kjv').then(d => setKjvData(d)).catch(() => {})
@@ -4416,9 +4453,10 @@ function VocabReviewScreen({ words, lang, onClose }) {
   const card = deck[idx]
   const isHeb = lang === 'hebrew'
   const scriptFont = isHeb ? getHebrewFontCss() : getGreekFontCss()
+  const weakCount = sessionWeakRef.current.size
 
   function next() {
-    if (idx + 1 >= deck.length) { setDone(true); return }
+    if (idx + 1 >= deck.length) { setRoundDone(true); return }
     setIdx(i => i + 1)
     setFlipped(false)
   }
@@ -4427,40 +4465,44 @@ function VocabReviewScreen({ words, lang, onClose }) {
     setIdx(i => i - 1)
     setFlipped(false)
   }
-  function restart() {
-    setDeck(buildDeck(getVocabList(lang)))
+  function startNextRound(mode) {
+    const freshWords = getVocabList(lang)
+    setDeck(buildDeck(freshWords, mode, sessionWeakRef.current, reviewedRef.current))
     setIdx(0)
     setFlipped(false)
-    setDone(false)
+    setRoundDone(false)
+    setRoundNum(n => n + 1)
     setCardStatuses({})
-    reviewedRef.current = new Set()
   }
   function handleTag(id, status) {
     updateVocabStatus(id, status)
     setCardStatuses(prev => ({ ...prev, [id]: status }))
+    if (status === 'learning') sessionWeakRef.current.add(id)
+    else sessionWeakRef.current.delete(id)
   }
   function handleReveal() {
     setFlipped(true)
-    // increment review count once per word per session
     if (!reviewedRef.current.has(card.id)) {
       reviewedRef.current.add(card.id)
       incrementReviewCount(card.id)
     }
   }
 
+  const tip = ROUND_TIPS[Math.min(roundNum, ROUND_TIPS.length - 1)]
+
   return (
     <div style={vr.overlay}>
       {/* Header */}
       <div style={vr.header}>
         <span style={vr.langBadge}>{lang === 'greek' ? 'Greek' : 'Hebrew'}</span>
-        <span style={vr.counter}>{done ? `${deck.length} / ${deck.length}` : `${idx + 1} / ${deck.length}`}</span>
+        <span style={vr.counter}>{roundDone ? `${deck.length} / ${deck.length}` : `${idx + 1} / ${deck.length}`}</span>
         <button style={vr.exitBtn} onClick={onClose}>Exit</button>
       </div>
 
-      {done ? (
+      {roundDone ? (
         <div style={vr.doneWrap}>
           <div style={vr.doneCheck}>✓</div>
-          <p style={vr.doneTitle}>Review complete</p>
+          <p style={vr.doneTitle}>Round {roundNum} complete</p>
           <p style={vr.doneSub}>{deck.length} word{deck.length !== 1 ? 's' : ''} reviewed</p>
           {Object.keys(cardStatuses).length > 0 && (
             <div style={vr.doneTags}>
@@ -4471,8 +4513,20 @@ function VocabReviewScreen({ words, lang, onClose }) {
               })}
             </div>
           )}
-          <button style={vr.reviewAgainBtn} onClick={restart}>Review again</button>
-          <button style={vr.doneCloseBtn} onClick={onClose}>Done</button>
+          {tip && <p style={vr.roundTip}>💡 {tip}</p>}
+          <p style={vr.roundNextLabel}>Next round</p>
+          <div style={vr.modeList}>
+            {NEXT_MODES.map((m, i) => (
+              <button key={m.id} style={{ ...vr.modeBtn, ...(i === 0 ? vr.modeBtnPrimary : {}) }} onClick={() => startNextRound(m.id)}>
+                <span style={vr.modeEmoji}>{m.emoji}</span>
+                <span style={vr.modeMeta}>
+                  <span style={vr.modeLabel}>{m.label}{m.recommended ? <span style={vr.modeRec}> recommended</span> : null}</span>
+                  <span style={vr.modeSub}>{m.id === 'weak' ? (weakCount ? `${weakCount} word${weakCount !== 1 ? 's' : ''} to drill` : m.sub) : m.sub}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <button style={vr.doneCloseBtn} onClick={onClose}>End session</button>
         </div>
       ) : (
         <div style={vr.cardWrap}>
@@ -5484,6 +5538,30 @@ const vr = {
   },
   doneTags: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' },
   doneTagChip: { fontSize: 12, fontWeight: 700, borderRadius: 99, padding: '4px 12px' },
+  roundTip: {
+    margin: '4px 0 0', fontSize: 13, color: 'var(--ink-muted)',
+    background: 'rgba(180,140,60,0.1)', border: '1px solid rgba(180,140,60,0.25)',
+    borderRadius: 10, padding: '10px 16px', maxWidth: 340, textAlign: 'center', lineHeight: 1.5,
+  },
+  roundNextLabel: {
+    margin: '16px 0 6px', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+    color: 'var(--ink-faint)', textTransform: 'uppercase',
+  },
+  modeList: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 340 },
+  modeBtn: {
+    display: 'flex', alignItems: 'center', gap: 12,
+    background: 'var(--surface)', border: '1.5px solid var(--border)',
+    borderRadius: 12, padding: '12px 16px', cursor: 'pointer', textAlign: 'left',
+    fontFamily: "'DM Sans',sans-serif",
+  },
+  modeBtnPrimary: {
+    background: 'var(--teal-light)', borderColor: 'var(--teal)',
+  },
+  modeEmoji: { fontSize: 22, flexShrink: 0, lineHeight: 1 },
+  modeMeta: { display: 'flex', flexDirection: 'column', gap: 2 },
+  modeLabel: { fontSize: 14, fontWeight: 700, color: 'var(--ink)' },
+  modeRec: { fontSize: 11, fontWeight: 600, color: 'var(--teal)', marginLeft: 6 },
+  modeSub: { fontSize: 12, color: 'var(--ink-muted)' },
   verseChip: {
     marginTop: 6, fontSize: 12, fontWeight: 600,
     color: 'var(--teal)', background: 'var(--teal-light)',

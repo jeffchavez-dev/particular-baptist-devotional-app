@@ -1,1 +1,1 @@
-{"version":"1.10.30","date":"2026-09-15","changelog":"Fixed 'This word only' checkbox alignment on mobile — was being stretched by parent flex column."}
+{"version":"1.10.31","date":"2026-09-17","changelog":"Vocab review: hybrid spaced-repetition system with 4 next-round modes (Smart, Weak Focus, Fresh Cards, Mixed), round counter, weak-word tracking, and learning tips after each round."}
