@@ -5183,7 +5183,7 @@ const sb = {
     fontSize:10, color:'var(--ink-faint)',
   },
   chapterGrid: {
-    display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:4,
+    display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:4,
     padding:'8px 14px 4px 22px', background:'rgba(0,0,0,0.02)',
   },
   chapterBtn: {
