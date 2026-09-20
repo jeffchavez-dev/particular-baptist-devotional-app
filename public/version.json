@@ -1,1 +1,1 @@
-{"version":"1.10.31","date":"2026-09-17","changelog":"Vocab review: hybrid spaced-repetition system with 4 next-round modes (Smart, Weak Focus, Fresh Cards, Mixed), round counter, weak-word tracking, and learning tips after each round."}
+{"version":"1.10.32","date":"2026-09-20","changelog":"Greek grammar parsing: tapping ? on any morphology value now shows the Greek grammatical term (e.g. ὁ ἀόριστος for Aorist) above the English definition."}

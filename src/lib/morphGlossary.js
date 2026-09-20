@@ -152,10 +152,63 @@ const GRK_PERSON = {
 
 const HEB_PERSON = GRK_PERSON
 
+/* ── Greek grammatical terms (from grammar vocabulary reference) ─────── */
+// Maps each English grammar value to its Greek grammatical name.
+
+const GRK_TERMS = {
+  // Part of Speech
+  'Verb':           'τὸ ῥῆμα',
+  'Noun':           'τὸ ὄνομα',
+  'Adj':            'τὸ ἐπίθετον',
+  'Adjective':      'τὸ ἐπίθετον',
+  'Pronoun':        'τὸ ἀντώνυμον',
+  'Adverb':         'τὸ ἐπίρρημα',
+  'Conjunction':    'ὁ συνδεσμός',
+  'Article':        'τὸ ἄρθρον',
+  'Preposition':    'ἡ προθέσις',
+  // Case
+  'Nominative':     'ἡ ὀνομαστική',
+  'Accusative':     'ἡ αἰτιατική',
+  'Genitive':       'ἡ γενική',
+  'Dative':         'ἡ δοτική',
+  'Vocative':       'ἡ κλητική',
+  // Gender
+  'Masculine':      'ἀρσενικόν',
+  'Feminine':       'θηλυκόν',
+  'Neuter':         'οὐδέτερον',
+  // Tense
+  'Present':        'ὁ ἐνεστώς',
+  'Aorist':         'ὁ ἀόριστος',
+  '2nd Aorist':     'ὁ ἀόριστος β′',
+  'Imperfect':      'ὁ παρατατικός',
+  'Future':         'ὁ μέλλων',
+  'Perfect':        'ὁ παρακείμενος',
+  '2nd Perfect':    'ὁ παρακείμενος β′',
+  'Pluperfect':     'ὁ ὑπερσυντελικός',
+  // Voice
+  'Active':         'ἡ ἐνεργητική',
+  'Middle':         'ἡ μέση',
+  'Passive':        'ἡ παθητική',
+  // Mood
+  'Indicative':     'ἡ ὁριστική',
+  'Imperative':     'ἡ προστακτική',
+  'Subjunctive':    'ἡ ὑποτακτική',
+  'Optative':       'ἡ εὐκτική',
+  'Participle':     'ἡ μετοχή',
+  'Infinitive':     'ἡ ἀπαρέμφατος',
+  // Number
+  'Singular':       'ἑνικός',
+  'Plural':         'πληθυντικός',
+  // Person
+  '1st':            'πρῶτον πρόσωπον',
+  '2nd':            'δεύτερον πρόσωπον',
+  '3rd':            'τρίτον πρόσωπον',
+}
+
 /* ── Main lookup ─────────────────────────────────────────────────────── */
 
 /**
- * Returns { term, definition } or null if no entry found.
+ * Returns { term, definition, greekTerm? } or null if no entry found.
  * @param {string} label  — row label, e.g. "Stem", "Aspect", "Tense", "Mood", "Part of Speech"
  * @param {string} value  — displayed value, e.g. "Qal", "Perfect", "Indicative"
  * @param {'hebrew'|'greek'} lang
@@ -184,5 +237,6 @@ export function getMorphDef(label, value, lang) {
   }
 
   if (!def) return null
-  return { term: value, label, definition: def }
+  const greekTerm = lang === 'greek' ? (GRK_TERMS[value] || null) : null
+  return { term: value, label, definition: def, greekTerm }
 }

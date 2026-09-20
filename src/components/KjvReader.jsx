@@ -896,6 +896,9 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
         </div>
         {isActive && (
           <div style={r.wiMorphDefBox}>
+            {activeDef.greekTerm && (
+              <span style={r.wiMorphDefGreek}>{activeDef.greekTerm}</span>
+            )}
             <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
             <span style={r.wiMorphDefText}>{activeDef.definition}</span>
           </div>
@@ -5995,6 +5998,11 @@ const r = {
     background:'var(--teal-light)', borderLeft:'2px solid var(--teal)',
     borderRadius:'0 6px 6px 0', padding:'8px 10px',
     marginTop:2, marginBottom:2,
+  },
+  wiMorphDefGreek: {
+    fontSize:17, fontStyle:'italic', color:'var(--teal)',
+    fontFamily:"'GFS Didot', 'Palatino Linotype', Georgia, serif",
+    lineHeight:1.3, marginBottom:1,
   },
   wiMorphDefTerm: {
     fontSize:11, fontWeight:700, color:'var(--teal)', letterSpacing:'0.02em',
