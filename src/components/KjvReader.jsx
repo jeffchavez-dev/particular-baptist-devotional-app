@@ -714,7 +714,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                 const isReading  = selectedBook === b
                 const isExpanded = expandedBook === b
                 return (
-                  <div key={b}>
+                  <div key={b} style={isExpanded && chCount > 1 ? { gridColumn:'1 / -1' } : {}}>
                     <button
                       style={{
                         ...sb.bookBtn,
@@ -734,7 +734,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                       </span>
                     </button>
                     {isExpanded && chCount > 1 && (
-                      <div style={{ gridColumn:'1 / -1' }}>
+                      <div>
                         {NT_BOOKS_WITH_OUTLINES.has(b) && (
                           <button
                             style={{

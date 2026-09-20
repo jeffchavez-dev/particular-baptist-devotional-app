@@ -1,1 +1,1 @@
-{"version":"1.10.36","date":"2026-09-21","changelog":"Greek reader: tap any discourse particle (δέ, καί, οὖν, γάρ, ἀλλά, etc.) to see its Discourse Function block — semantic constraint, description, and Runge/Levinsohn source reference."}
+{"version":"1.10.37","date":"2026-09-21","changelog":"Fix: expanded chapter grid now spans full width of both book columns in the mobile sidebar."}
