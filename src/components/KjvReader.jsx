@@ -899,7 +899,6 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
             {activeDef.greekTerm && (
               <span style={r.wiMorphDefGreek}>{activeDef.greekTerm}</span>
             )}
-            <span style={r.wiMorphDefTerm}>{activeDef.term}</span>
             <span style={r.wiMorphDefText}>{activeDef.definition}</span>
           </div>
         )}
