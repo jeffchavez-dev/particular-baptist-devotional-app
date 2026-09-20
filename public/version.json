@@ -1,1 +1,1 @@
-{"version":"1.10.37","date":"2026-09-21","changelog":"Fix: expanded chapter grid now spans full width of both book columns in the mobile sidebar."}
+{"version":"1.10.38","date":"2026-09-21","changelog":"Fix: Discourse Function block now matches particles regardless of accent (μὲν/μέν, καὶ/καί, δὲ/δέ, etc.)."}

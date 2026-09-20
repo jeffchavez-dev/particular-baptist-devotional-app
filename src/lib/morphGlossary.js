@@ -277,17 +277,23 @@ const GRK_DISCOURSE_PARTICLES = {
   },
 }
 
+// Pre-build an accent-stripped lookup so grave/acute/circumflex variants all match.
+// Greek particles shift accents by position (μέν → μὲν, καί → καὶ, etc.)
+function stripAccents(str) {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC')
+}
+const _PARTICLE_LOOKUP = Object.fromEntries(
+  Object.entries(GRK_DISCOURSE_PARTICLES).map(([k, v]) => [stripAccents(k), v])
+)
+
 /**
  * Returns the discourse-function entry for a specific Greek particle/conjunction,
- * matched by the word's surface form. Returns null if the word is not a known
- * discourse particle.
+ * matched accent-insensitively on the word's surface form.
  * @param {string} word — the surface form of the Greek word (wd.w)
  */
 export function getParticleDef(word) {
   if (!word) return null
-  // Normalise: strip combining characters that might vary between Unicode forms
-  const normalised = word.normalize('NFC').trim()
-  return GRK_DISCOURSE_PARTICLES[normalised] || null
+  return _PARTICLE_LOOKUP[stripAccents(word.trim())] || null
 }
 
 /* ── Main lookup ─────────────────────────────────────────────────────── */
