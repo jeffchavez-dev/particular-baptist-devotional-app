@@ -174,6 +174,18 @@ const DATA_SOURCES = [
     desc: 'The morphology term definitions (binyanim, aspects, cases, tenses, moods, etc.) were written for this app drawing on widely-used Biblical language grammars: Gesenius\' Hebrew Grammar; Waltke & O\'Connor, An Introduction to Biblical Hebrew Syntax; Mounce, Basics of Biblical Greek; Wallace, Greek Grammar Beyond the Basics. The ETCBC morphology codes (Hebrew) and Robinson Morphological Analysis codes (Greek) come from the STEPBible TAHOT/TAGNT data. Definitions are the author\'s own synthesis — not verbatim quotations — and are provided for educational use.',
     badge: 'Educational',
   },
+  {
+    name: 'Runge, Steven E. — Discourse Grammar of the Greek New Testament',
+    href: null,
+    desc: 'Discourse function definitions for Greek particles and conjunctions (δέ, καί, οὖν, γάρ, ἀλλά, ὥστε, διό, τότε, μέν, ἔπειτα, διὰ τοῦτο) are drawn from Runge\'s Discourse Grammar of the Greek New Testament (Hendrickson / Lexham Press, 2010). These appear in the word-info strip when a particle is tapped in the GNT reader. Definitions are paraphrased for clarity — not verbatim quotations.',
+    badge: 'Educational',
+  },
+  {
+    name: 'Levinsohn, Stephen H. — Discourse Features of New Testament Greek',
+    href: null,
+    desc: 'Additional discourse-function analysis for Greek particles is drawn from Levinsohn\'s Discourse Features of New Testament Greek (SIL International, 2nd ed. 2000). Cited alongside Runge in the particle Discourse Function block in the GNT reader. Definitions are paraphrased for clarity — not verbatim quotations.',
+    badge: 'Educational',
+  },
 ]
 
 /* ── Collapsible section wrapper — state persisted so back-nav restores it ── */
