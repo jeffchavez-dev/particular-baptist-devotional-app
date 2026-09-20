@@ -1,1 +1,1 @@
-{"version":"1.10.34","date":"2026-09-21","changelog":"Wider sidebars with smooth slide animation on both mobile and desktop. Scripture: 280px desktop / 300px mobile, 5-column chapter grid. Confession: 300px desktop / 320px mobile, collapsible via hamburger on all screen sizes."}
+{"version":"1.10.35","date":"2026-09-21","changelog":"Scripture sidebar: mobile width 360px, bookmarks as compact chips, OT/NT books in 2-column grid (half the scroll depth)."}

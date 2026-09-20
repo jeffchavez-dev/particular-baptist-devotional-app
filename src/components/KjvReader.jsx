@@ -18,7 +18,7 @@ function parseNoteDisplay(raw) {
   } catch { return raw }
 }
 import { useNavigate } from 'react-router-dom'
-import { BIBLE_BOOKS } from '../lib/bibleBooks'
+import { BIBLE_BOOKS, BOOK_ABBR } from '../lib/bibleBooks'
 import { getCrossRefs } from '../lib/crossRef'
 import { getBibleXrefs, getBibleBackRefs } from '../lib/bibleXrefs'
 import { loadBibleVersion, getVersionMetadata, BIBLE_VERSIONS } from '../lib/bibleVersions'
@@ -734,7 +734,7 @@ function BookSidebar({ selectedBook, selectedChapter, onNavigate, onClose, isMob
                       </span>
                     </button>
                     {isExpanded && chCount > 1 && (
-                      <div>
+                      <div style={{ gridColumn:'1 / -1' }}>
                         {NT_BOOKS_WITH_OUTLINES.has(b) && (
                           <button
                             style={{
@@ -3138,7 +3138,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
         ...(isMobile ? {
           position:'fixed', left:0, top:0, bottom:0, zIndex:200,
-          width: 300,
+          width: 360,
         } : { top: topInset }),
       }}>
         {isMobile && (
@@ -3196,23 +3196,17 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         {sbBookmarks.length > 0 && (
           <div style={sb.bookmarkSection}>
             <div style={sb.versionSectionTitle}>Bookmarks</div>
-            <div style={sb.bookmarkList}>
-              {sbBookmarks.slice(0, 12).map(bm => (
+            <div style={sb.bookmarkChips}>
+              {sbBookmarks.slice(0, 16).map(bm => (
                 <button
                   key={bm.key}
-                  style={{
-                    ...sb.bookmarkRow,
-                    ...(hoveredBookmark === bm.key ? sb.bookmarkRowHover : {}),
-                  }}
-                  onMouseEnter={() => setHoveredBookmark(bm.key)}
-                  onMouseLeave={() => setHoveredBookmark(null)}
+                  style={sb.bookmarkChip}
                   onClick={() => {
                     navigate(bm.book, bm.chapter)
                     if (isMobile) setSideOpen(false)
                   }}
                 >
-                  <span style={sb.bookmarkLabel}>{bm.book} {bm.chapter}</span>
-                  <span style={sb.bookmarkChevron}>›</span>
+                  {(BOOK_ABBR[bm.book] || bm.book.slice(0, 4))} {bm.chapter}
                 </button>
               ))}
             </div>
@@ -5131,13 +5125,13 @@ const sb = {
     fontFamily:"'DM Sans',sans-serif", transition:'background 0.15s',
   },
   catLabel: { fontSize:11, fontWeight:700, letterSpacing:'0.02em' },
-  bookList: { paddingLeft:0, paddingBottom:4 },
+  bookList: { display:'grid', gridTemplateColumns:'1fr 1fr', paddingLeft:0, paddingBottom:4 },
   bookBtn: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
-    width:'100%', padding:'5px 14px 5px 22px',
+    width:'100%', padding:'5px 8px 5px 10px',
     border:'none', borderLeft:'3px solid transparent',
     background:'transparent', cursor:'pointer',
-    fontFamily:"'DM Sans',sans-serif", fontSize:12.5, color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif", fontSize:11.5, color:'var(--ink)',
     transition:'all 0.12s', textAlign:'left',
   },
   bookMeta: { display:'flex', alignItems:'center', fontSize:10, color:'var(--ink-faint)', marginLeft:4, flexShrink:0 },
@@ -5202,23 +5196,15 @@ const sb = {
     padding:'10px 12px 8px',
     borderTop:'1px solid var(--border)',
   },
-  bookmarkList: {
-    display:'flex', flexDirection:'column', gap:1, marginTop:6,
+  bookmarkChips: {
+    display:'flex', flexWrap:'wrap', gap:4, marginTop:6,
   },
-  bookmarkRow: {
-    display:'flex', alignItems:'center', justifyContent:'space-between',
-    padding:'5px 8px', borderRadius:6, border:'none',
-    background:'transparent', cursor:'pointer', width:'100%',
-    fontFamily:"'DM Sans',sans-serif", transition:'background 0.12s',
-  },
-  bookmarkRowHover: {
-    background:'var(--gold-faint)',
-  },
-  bookmarkLabel: {
-    fontSize:12, color:'var(--ink)', fontWeight:500,
-  },
-  bookmarkChevron: {
-    fontSize:14, color:'var(--ink-faint)',
+  bookmarkChip: {
+    fontSize:11, fontWeight:600, padding:'3px 8px',
+    borderRadius:99, border:'1px solid var(--border)',
+    background:'var(--surface)', color:'var(--ink)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    whiteSpace:'nowrap', transition:'background 0.12s',
   },
 }
 
