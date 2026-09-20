@@ -205,6 +205,91 @@ const GRK_TERMS = {
   '3rd':            'τρίτον πρόσωπον',
 }
 
+/* ── Greek discourse particles (Runge + Levinsohn) ──────────────────── */
+// Keyed by surface form. Most particles are uninflected so surface = lemma.
+
+const GRK_DISCOURSE_PARTICLES = {
+  'καί': {
+    label: 'καί',
+    function: 'Associative / Additive',
+    definition: 'Links items of equal status. Does not itself mark continuity or discontinuity — it simply indicates that the connected elements are closely related to one another. When used as an additive marker it constrains what follows to be processed as being added to and associated with previous material.',
+    sources: 'Runge §2; Levinsohn p. 16',
+  },
+  'δέ': {
+    label: 'δέ',
+    function: 'Distinctive',
+    definition: 'Constrains what follows to be processed as a distinct point that advances the argument. The writer explicitly signals a new, distinct development in the story or argument based on how the writer conceived of it. If the exegete seeks to understand the author\'s intent, development markers like δέ are worthy of attention.',
+    sources: 'Runge §3; Levinsohn p. 21',
+  },
+  'οὖν': {
+    label: 'οὖν',
+    function: 'Inferential + Distinctive',
+    definition: 'Adds the constraint of close continuity with what precedes. Like καί it closely links discourse elements together, but with the added constraint of a new development. It is both inferential and distinctive: the clause it introduces continues the preceding thought while marking it as a new, logical step. (Levinsohn: + continuity + development.)',
+    sources: 'Levinsohn p. 30',
+  },
+  'γάρ': {
+    label: 'γάρ',
+    function: 'Support / Strengthening',
+    definition: 'Signals close continuity with what precedes (like καί, οὖν, and διὰ τοῦτο) but does not advance the mainline of the discourse. Instead it introduces offline material that strengthens or supports what precedes (Levinsohn). More precisely, it constrains what follows to be processed as strengthening an assertion or assumption presented in or implied by the immediate context (Runge). Semantic constraint: SUPPORT.',
+    sources: 'Runge §6; Levinsohn p. 37',
+  },
+  'ἀλλά': {
+    label: 'ἀλλά',
+    function: 'Countering / Correction',
+    definition: 'A correlator of items of equal status, like καί and μέν, but differs from καί by being unmarked for continuity (−continuity), and differs from μέν by not being forward-pointing. The constraint it brings is "correction" of some aspect in the preceding context — a global marker of contrast (Heckert). Instructs the recipient to process a corrective relation holding between two pieces of information (Fresch 2015). Semantic constraint: CORRECTION.',
+    sources: 'Runge §5 (Fresch 2015); Levinsohn p. 40',
+  },
+  'διό': {
+    label: 'διό',
+    function: 'Inferential + Continuative',
+    definition: 'Contrasts with οὖν: while οὖν moves the argument on to a new point, διό does not. It is inferential and continuative — drawing a conclusion that continues the same line of thought rather than advancing to a new development.',
+    sources: 'Levinsohn',
+  },
+  'ὥστε': {
+    label: 'ὥστε',
+    function: 'Inferential + Result',
+    definition: 'Constrains what follows to be processed as the result — actual, natural, conceived, or intended — of what has previously been stated (Porter). It is both inferential and a result marker: the clause it introduces is the outcome or consequence of what precedes. Semantic constraint: RESULT.',
+    sources: 'Runge; Levinsohn (citing Porter)',
+  },
+  'διὰ τοῦτο': {
+    label: 'διὰ τοῦτο',
+    function: 'Semantic Constraint: Causal',
+    definition: 'The clause introduced by this is constrained to have a causal relation with the preceding discourse. It is similar to οὖν in that both indicate + development and + continuity, but διὰ τοῦτο offers a narrower semantic constraint than οὖν — the connection is specifically causal. Semantic constraint: CAUSAL.',
+    sources: 'Levinsohn p. 34',
+  },
+  'τότε': {
+    label: 'τότε',
+    function: 'Semantic Constraint: Temporal',
+    definition: 'Since the default expectation in narrative is that events are sequentially ordered and temporally related, this particle indicates that the writer chose to mark what follows as a distinct development that is specifically temporal in nature. Semantic constraint: TEMPORAL.',
+    sources: 'Runge; Levinsohn p. 29',
+  },
+  'μέν': {
+    label: 'μέν',
+    function: 'Semantic Constraint: Expectation',
+    definition: 'Expresses + continuity and signals a forward-pointing correlation with an element introduced by δέ in most cases. It does not mark development. It is anticipatory in nature, creating the expectation that another related point will follow. Its most common usage is to correlate a clause with one that follows introduced by δέ or ἀλλά. Semantic constraint: EXPECTATION.',
+    sources: 'Runge; Levinsohn p. 40, 54',
+  },
+  'ἔπειτα': {
+    label: 'ἔπειτα',
+    function: 'Chronological Sequence',
+    definition: '"Next" — marks what follows as the next step in a chronological sequence. The constraint it brings is one of temporal ordering: the event or item it introduces comes after what was previously mentioned in a sequential series.',
+    sources: 'Levinsohn',
+  },
+}
+
+/**
+ * Returns the discourse-function entry for a specific Greek particle/conjunction,
+ * matched by the word's surface form. Returns null if the word is not a known
+ * discourse particle.
+ * @param {string} word — the surface form of the Greek word (wd.w)
+ */
+export function getParticleDef(word) {
+  if (!word) return null
+  // Normalise: strip combining characters that might vary between Unicode forms
+  const normalised = word.normalize('NFC').trim()
+  return GRK_DISCOURSE_PARTICLES[normalised] || null
+}
+
 /* ── Main lookup ─────────────────────────────────────────────────────── */
 
 /**

@@ -55,7 +55,7 @@ import { getBibleProgress, setBibleChapter, BIBLE_KEY } from '../lib/supabase'
 import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 import { getStudySession, setStudySession } from '../lib/studySession'
 import { getInlineHeadings, NT_BOOKS_WITH_OUTLINES, BIBLE_OUTLINES } from '../data/bibleOutlines'
-import { getMorphDef } from '../lib/morphGlossary'
+import { getMorphDef, getParticleDef } from '../lib/morphGlossary'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -3584,6 +3584,22 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                         <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} strongsId={wd.s || null} wordGloss={wd.g || null} />
                                       )}
 
+                                      {/* ④b Discourse Function (Greek particles only) */}
+                                      {!isHeb && (() => {
+                                        const pd = getParticleDef(wd.w)
+                                        if (!pd) return null
+                                        return (
+                                          <div style={r.wiDiscourseBlock}>
+                                            <div style={r.wiDiscourseHeader}>
+                                              <span style={r.wiDiscourseLabel}>Discourse Function</span>
+                                              <span style={r.wiDiscourseSource}>{pd.sources}</span>
+                                            </div>
+                                            <div style={r.wiDiscourseFn}>{pd.function}</div>
+                                            <div style={r.wiDiscourseText}>{pd.definition}</div>
+                                          </div>
+                                        )
+                                      })()}
+
                                       {/* ⑤ Manuscript note */}
                                       {msDesc && (
                                         <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
@@ -6033,6 +6049,31 @@ const r = {
     borderRadius:6, padding:'7px 12px',
     fontSize:12, fontWeight:700, cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif", alignSelf:'flex-start',
+  },
+  /* Discourse Function block */
+  wiDiscourseBlock: {
+    marginTop:10, padding:'9px 11px',
+    borderRadius:8, border:'1px solid var(--teal-light)',
+    background:'color-mix(in srgb, var(--teal) 6%, var(--surface))',
+  },
+  wiDiscourseHeader: {
+    display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:3,
+  },
+  wiDiscourseLabel: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
+    color:'var(--teal)', fontFamily:"'DM Sans',sans-serif",
+  },
+  wiDiscourseSource: {
+    fontSize:9.5, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
+    fontStyle:'italic',
+  },
+  wiDiscourseFn: {
+    fontSize:12.5, fontWeight:700, color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif", marginBottom:5,
+  },
+  wiDiscourseText: {
+    fontSize:12, color:'var(--ink-muted)', lineHeight:1.55,
+    fontFamily:"'DM Sans',sans-serif",
   },
   /* Morph search results sheet */
   morphSheetOverlay: {
