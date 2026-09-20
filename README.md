@@ -49,8 +49,18 @@ A progressive web app for daily devotional reading, Bible study, confession read
 - **Visible Translations setting** — choose which versions appear in the version picker and parallel panel; default visible set is KJV, HOT, GNT, ABAB; all others are opt-in via Settings
 - Commentary font size follows the user's Reading Font Size setting
 - Scripture bookmarks and completion tracking
+- **Animated sidebar** — Scripture book navigator slides in/out with a smooth cubic-bezier transition on both mobile and desktop; desktop sidebar animates via width collapse, mobile via translateX
+- **Scripture sidebar (mobile)** — 360px wide panel with:
+  - Bookmarks shown as horizontal wrapping pill chips (abbreviated book names, up to 16 bookmarks) instead of a vertical list
+  - OT and NT book lists in a 2-column CSS grid, halving scroll depth (39 OT books → ~20 rows; 27 NT books → ~14 rows)
+  - Tapping a book expands its chapter grid spanning the full width of both columns
+  - Chapter grid shows 6 chapters per row
+- **Morphology popups** — tapping a chip on a parsed Greek/Hebrew word shows a definition popup with:
+  - The Greek grammatical term (e.g. ὁ ἀόριστος for Aorist) shown above the definition
+  - **Discourse Function block** (Greek only) — when a known discourse particle is tapped (δέ, καί, οὖν, γάρ, ἀλλά, διό, ὥστε, διὰ τοῦτο, τότε, μέν, ἔπειτα), a teal-tinted block appears showing the particle's semantic constraint, discourse function description, and Runge/Levinsohn source citation. Matches accent-insensitively so μὲν/μέν, καὶ/καί etc. all resolve correctly.
+- **Morph search "This word only" checkbox** — filters concordance results to the exact surface form; checkbox and label are left-aligned on all screen sizes
 
-**Done when:** a highlight/note/bookmark made in the reader survives a reload, toggling study mode reveals commentary + cross-ref chips for a chapter known to have both, and disabling a translation in Settings removes it from both the version dropdown and the parallel panel immediately.
+**Done when:** a highlight/note/bookmark made in the reader survives a reload, toggling study mode reveals commentary + cross-ref chips for a chapter known to have both, disabling a translation in Settings removes it from both the version dropdown and the parallel panel immediately, and tapping μέν in the GNT reader shows a Discourse Function block citing Runge and Levinsohn.
 
 ### Bible Reading Plans
 - Multiple named reading plans with configurable pace and rest days
@@ -104,6 +114,18 @@ A progressive web app for daily devotional reading, Bible study, confession read
 
 **Done when:** the tour completes start-to-finish on both a mobile and a desktop viewport with no tooltip clipped off-screen or step blocked by an unrelated overlay.
 
+### Vocabulary Review (Spaced Repetition)
+- Hybrid spaced-repetition flashcard system for Greek/Hebrew vocabulary from the user's library
+- **4 review modes** selectable at the end of each round:
+  - **Smart** — 70% weak words + 30% fresh cards
+  - **Weak Focus** — session-tagged learning cards only
+  - **Fresh Cards** — unreviewed words only
+  - **Mixed** — random shuffle across all words
+- Round-end screen shows: round counter, status chip summary (new/learning/known counts), a contextual learning tip, and the 4 mode buttons
+- Session state (`sessionWeakRef`, `reviewedRef`) accumulates across rounds without resetting between them
+
+**Done when:** completing a 10-card round shows the round-end screen with the correct chip summary, selecting a mode builds the next deck correctly from session-accumulated weak/reviewed sets, and switching to Weak Focus when no weak words exist shows an appropriate empty state.
+
 ### Share Cards
 - Generate a shareable image card from any Bible verse selection, chapter, confession article, or catechism Q&A
 - **Formats** — Square (1:1 for Instagram/Facebook), Story (9:16), Landscape (16:9)
@@ -127,6 +149,7 @@ A progressive web app for daily devotional reading, Bible study, confession read
 - App version with changelog and one-tap update
 - Sync button with detailed result summary
 - Push notifications (see below)
+- **Data Sources** — credits all open data and scholarship sources used in the app, including STEPBible (morphology), BibleHub Strong's, public domain Bible texts, and discourse grammar references (Runge, Levinsohn)
 
 **Done when:** every toggle/button here reflects its new state immediately, toggling a translation off removes it from the Scripture picker on the same navigation without a reload, and the state persists after a reload.
 
