@@ -4289,6 +4289,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                             {detail && (
                                               <MorphTable detail={detail} lang={isHeb ? 'hebrew' : 'greek'} styles={r} onMorphSearch={handleMorphSearch} strongsId={wd.s || null} wordGloss={wd.g || null} />
                                             )}
+                                            {!isHeb && (() => {
+                                              const pd = getParticleDef(wd.w)
+                                              if (!pd) return null
+                                              return (
+                                                <div style={r.wiDiscourseBlock}>
+                                                  <div style={r.wiDiscourseHeader}>
+                                                    <span style={r.wiDiscourseLabel}>Discourse Function</span>
+                                                    <span style={r.wiDiscourseSource}>{pd.sources}</span>
+                                                  </div>
+                                                  <div style={r.wiDiscourseFn}>{pd.function}</div>
+                                                  <div style={r.wiDiscourseText}>{pd.definition}</div>
+                                                </div>
+                                              )
+                                            })()}
                                             {msDesc && (
                                               <div style={{ ...r.wiMsNote, borderColor: msColor, color: msColor }}>
                                                 <span style={{ fontWeight:700, marginRight:4 }}>{msMarker}</span>{msDesc}
