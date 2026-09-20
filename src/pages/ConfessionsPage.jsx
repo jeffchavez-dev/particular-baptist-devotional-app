@@ -777,7 +777,7 @@ export default function ConfessionsPage() {
   const [search,        setSearch]        = useState(_saved.search)
   const [searchPanelOpen, setSearchPanelOpen] = useState(false)
   const [openSources,     setOpenSources]     = useState(() => new Set())
-  const [navOpen,         setNavOpen]         = useState(false)
+  const [navOpen,         setNavOpen]         = useState(() => window.innerWidth >= 768)
   const [kjvModal,      setKjvModal]      = useState(null)
   const [shareCard,     setShareCard]     = useState(null)
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
@@ -1360,13 +1360,12 @@ export default function ConfessionsPage() {
         }}
       >
         <div style={s.headerInner}>
-          {/* Hamburger — always top-left on mobile */}
-          {isMobile && (
-            <button
+          {/* Hamburger — visible on all sizes to toggle sidebar */}
+          <button
               onClick={() => setNavOpen(o => !o)}
               className="btn btn-ghost"
               style={{gap:5, fontSize:12, padding:'5px 10px', flexShrink:0}}
-              aria-label="Open navigation"
+              aria-label="Toggle navigation"
               title="Navigation"
               data-onboarding="confession-hamburger"
             >
@@ -1376,7 +1375,6 @@ export default function ConfessionsPage() {
                 <rect x="1" y="11.5" width="11" height="1.5" rx=".75" fill="currentColor"/>
               </svg>
             </button>
-          )}
 
           {/* Source badge + name (desktop always; mobile when tab selected) */}
           {!isMobile && tab && (
@@ -1587,6 +1585,8 @@ export default function ConfessionsPage() {
             ...s.desktopSidebar,
             top: headerH + offlineBannerH,
             height: `calc(100vh - ${headerH + offlineBannerH}px)`,
+            width: navOpen ? 300 : 0,
+            overflow: navOpen ? 'auto' : 'hidden',
           }}>
             {SidebarContent}
           </aside>
@@ -1960,11 +1960,12 @@ const s = {
   layout: { display:'flex', maxWidth:1200, margin:'0 auto' },
 
   desktopSidebar: {
-    width:240, flexShrink:0,
+    width:300, flexShrink:0,
     position:'sticky', top:53, alignSelf:'flex-start',
     height:'calc(100vh - 53px)', overflowY:'auto',
     borderRight:'1px solid var(--border)',
     background:'var(--surface)',
+    transition:'width 0.28s cubic-bezier(0.4,0,0.2,1)',
   },
 
   sidebarContent: { padding:'12px 8px 24px' },
@@ -2005,7 +2006,7 @@ const s = {
     zIndex:40, backdropFilter:'blur(2px)',
   },
   mobileSidebar: {
-    position:'fixed', top:0, left:0, bottom:0, width:280,
+    position:'fixed', top:0, left:0, bottom:0, width:320,
     background:'var(--surface)', borderRight:'1px solid var(--border)',
     boxShadow:'4px 0 24px rgba(0,0,0,0.12)',
     zIndex:50, display:'flex', flexDirection:'column',

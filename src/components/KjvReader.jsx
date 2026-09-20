@@ -1001,7 +1001,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [loading,       setLoading]       = useState(true)
   const [dataReady,     setDataReady]     = useState(false)
   const [error,         setError]         = useState(null)
-  const [sideOpen,      setSideOpen]      = useState(false)
+  const [sideOpen,      setSideOpen]      = useState(() => window.innerWidth >= 768)
 
   // Allow onboarding overlay to close the sidebar on any device
   useEffect(() => {
@@ -3133,13 +3133,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Book sidebar */}
       <aside style={{
         ...r.sidebar,
-        /* Desktop: push sidebar down by topInset so it starts below the fixed header */
+        transform: sideOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+        boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
         ...(isMobile ? {
           position:'fixed', left:0, top:0, bottom:0, zIndex:200,
-          transform: sideOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition:'transform 0.25s',
-          boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
-          width: 240,
+          width: 300,
         } : { top: topInset }),
       }}>
         {isMobile && (
@@ -3301,8 +3300,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         )
       })()}
 
-      {/* Reader panel — on desktop, paddingLeft clears the 220px sidebar */}
-      <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : 220 }} ref={readerRef}>
+      {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
+      <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
         <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)' }}>
 
@@ -5174,7 +5173,7 @@ const sb = {
     fontSize:10, color:'var(--ink-faint)',
   },
   chapterGrid: {
-    display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:4,
+    display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:4,
     padding:'8px 14px 4px 22px', background:'rgba(0,0,0,0.02)',
   },
   chapterBtn: {
@@ -5235,8 +5234,8 @@ const r = {
   backdrop: { position:'fixed', inset:0, background:'rgba(0,0,0,0.4)', zIndex:199 },
   sidebar: {
     position:'absolute', left:0, top:0, bottom:0,
-    width:220, background:'var(--surface)',
-    borderRight:'1px solid var(--border)', overflowY:'auto',
+    width:280, background:'var(--surface)',
+    borderRight:'1px solid var(--border)', overflowY:'auto', zIndex:100,
   },
   mobileNavHeader: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
