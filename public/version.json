@@ -1,1 +1,1 @@
-{"version":"1.10.47","date":"2026-09-21","changelog":"New: Each hymn in the Hymns section now shows a teal scripture reference chip; hymn text now respects the Reading Font Size setting."}
+{"version":"1.10.48","date":"2026-09-21","changelog":"Fix: Hymn chips no longer repeat on every verse of a chapter — chapter-level hymn refs now appear only on verse 1."}
