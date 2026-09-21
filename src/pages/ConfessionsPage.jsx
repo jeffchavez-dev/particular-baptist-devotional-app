@@ -1947,7 +1947,7 @@ export default function ConfessionsPage() {
                       <div key={id} id={`hymn-${id}`} style={hy.hymnRow}>
                         <div style={hy.hymnNum}>#{id}</div>
                         <div style={hy.hymnBody}>
-                          <div style={hy.hymnFirstLine}>{highlight(h.firstLine, q)}</div>
+                          <div style={{...hy.hymnFirstLine, fontSize: prefs.sizePx, fontFamily: getFontCss(prefs.fontId)}}>{highlight(h.firstLine, q)}</div>
                           {scriptureRef && (
                             <button
                               style={hy.hymnScriptureChip}
@@ -1956,7 +1956,7 @@ export default function ConfessionsPage() {
                               {scriptureRef.display}
                             </button>
                           )}
-                          <pre style={hy.hymnText}>{highlight(h.text, q)}</pre>
+                          <pre style={{...hy.hymnText, fontSize: prefs.sizePx * 0.9, fontFamily: getFontCss(prefs.fontId)}}>{highlight(h.text, q)}</pre>
                         </div>
                       </div>
                     )
