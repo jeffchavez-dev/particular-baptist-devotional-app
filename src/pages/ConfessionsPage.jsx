@@ -1279,32 +1279,16 @@ export default function ConfessionsPage() {
             }}
             onClick={() => {
               setSidebarConf(key)
-              if (key === 'catechism' || key === 'orthodox') setTab(key)
+              if (key === 'catechism' || key === 'orthodox' || key === 'hymns') setTab(key)
             }}
           >
             <span style={{...s.confBadgeDot, background: sidebarConf === key ? info.color : 'var(--border-strong)'}} />
             <span style={{flex:1, textAlign:'left'}}>{info.label}</span>
             <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>
-              {key === '2lbcf' ? '1689' : key === 'catechism' ? '1693' : key === 'orthodox' ? '1680' : '1644'}
+              {key === '2lbcf' ? '1689' : key === 'catechism' ? '1693' : key === 'orthodox' ? '1680' : key === '1lbcf' ? '1644' : info.stat}
             </span>
           </button>
         ))}
-
-        {/* Hymns entry */}
-        <button
-          style={{
-            ...s.confSelectorBtn,
-            ...(sidebarConf === 'hymns' ? {
-              background: 'var(--amber-soft)', color: 'var(--amber-ink)',
-              borderColor: 'var(--amber-ink)', fontWeight: 700,
-            } : {}),
-          }}
-          onClick={() => { setSidebarConf('hymns'); setTab('hymns') }}
-        >
-          <span style={{...s.confBadgeDot, background: sidebarConf === 'hymns' ? 'var(--amber-ink)' : 'var(--border-strong)'}} />
-          <span style={{flex:1, textAlign:'left'}}>Hymns</span>
-          <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>819</span>
-        </button>
 
         {/* Proof Texts entry */}
         <button
@@ -1347,6 +1331,32 @@ export default function ConfessionsPage() {
               >
                 <span style={{...s.chapLabel, color: sidebarSrc.color}}>{ch.label}</span>
                 <span style={s.chapTitle}>{ch.title}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Hymn number nav */}
+      {sidebarConf === 'hymns' && (
+        <>
+          <div style={s.sidebarDivider} />
+          <div style={s.chapterListLabel}>Jump to Hymn</div>
+          <div style={hy.hymnNumGrid}>
+            {Object.keys(HYMN_TEXTS).sort((a,b) => parseInt(a)-parseInt(b)).map(id => (
+              <button
+                key={id}
+                style={hy.hymnNumBtn}
+                onClick={() => {
+                  setTab('hymns')
+                  setNavOpen(false)
+                  setTimeout(() => {
+                    const el = document.getElementById(`hymn-${id}`)
+                    if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
+                  }, 120)
+                }}
+              >
+                {id}
               </button>
             ))}
           </div>
@@ -1980,6 +1990,17 @@ export default function ConfessionsPage() {
 
 /* ─── Hymn styles ─── */
 const hy = {
+  hymnNumGrid: {
+    display:'flex', flexWrap:'wrap', gap:4, padding:'8px 12px 12px',
+  },
+  hymnNumBtn: {
+    fontSize:10, fontWeight:600, padding:'3px 6px',
+    borderRadius:6, border:'1px solid var(--border)',
+    background:'var(--surface)', color:'var(--ink-muted)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    minWidth:28, textAlign:'center',
+    transition:'background 0.1s, color 0.1s',
+  },
   hymnRow: {
     display:'flex', gap:14, padding:'16px 0',
     borderBottom:'1px solid var(--border)',

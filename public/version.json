@@ -1,1 +1,1 @@
-{"version":"1.10.44","date":"2026-09-21","changelog":"New: Hymns section in Confession page lists all 819 hymns from Trinity Hymnal (Baptist Ed.) and Grace Hymns. Hymn chips in Scripture study mode now have an 'Open in Hymns →' button that deep-links to the correct hymn in the Confession page."}
+{"version":"1.10.45","date":"2026-09-21","changelog":"Fix: removed duplicate Hymns entry in Confession sidebar; added hymn number picker in sidebar for quick navigation to any hymn."}
