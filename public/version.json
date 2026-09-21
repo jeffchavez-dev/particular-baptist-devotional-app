@@ -1,1 +1,1 @@
-{"version":"1.10.53","date":"2026-09-21","changelog":"Fix: Hymn 8 'Angel voices, ever singing' now correctly shows Psalms 103:20 instead of Isaiah 40."}
+{"version":"1.10.54","date":"2026-09-21","changelog":"Add 422 missing hymn scripture refs (now 765 of 819 covered) from the complete Trinity Hymnal Baptist Edition index cross-check. Also adds chapter-level reverse lookup entries to hymnRefs.js for all newly covered hymns."}
