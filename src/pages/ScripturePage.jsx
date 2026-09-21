@@ -804,7 +804,7 @@ const s = {
 
   /* header — fixed so hiding it doesn't leave a gap in the flex layout */
   header: {
-    position:'fixed', top:0, left:0, right:0, zIndex:20,
+    position:'fixed', top:0, left:0, right:0, zIndex:210,
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
@@ -853,7 +853,7 @@ const s = {
     letterSpacing:'0.04em', textTransform:'uppercase',
   },
   versionDropdown: {
-    position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:200,
+    position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:400,
     background:'var(--surface)', border:'1px solid var(--border)',
     borderRadius:'var(--radius-lg)', boxShadow:'0 4px 20px rgba(0,0,0,0.12)',
     minWidth:180, overflow:'hidden',
