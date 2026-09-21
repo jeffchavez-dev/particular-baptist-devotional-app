@@ -7,7 +7,7 @@ export const HYMN_SCRIPTURE = {
   '145': { book: 'Luke', chapter: 2, verse: 25, display: 'Luke 2:25' },
   '6': { book: 'Psalms', chapter: 22, verse: 23, display: 'Psalms 22:23' },
   '7': { book: 'Psalms', chapter: 72, verse: 18 , display: 'Psalms 72:18' },
-  '8': { book: '1 Chronicles', chapter: 29, verse: null, display: 'Isaiah 40' },
+  '8': { book: 'Psalms', chapter: 103, verse: 20, display: 'Psalms 103:20' },
   '10': { book: 'Psalms', chapter: 103, verse: 1 , display: 'Psalms 103:1' },
   '12': { book: 'Psalms', chapter: 135, verse: 1 , display: 'Psalms 135:1' },
   '13': { book: 'Psalms', chapter: 145, verse: 10 , display: 'Psalms 145:10' },
