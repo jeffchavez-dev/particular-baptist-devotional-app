@@ -7,6 +7,7 @@ import { LBCF2 }              from '../data/lbcf2'
 import { CATECHISM }          from '../data/catechism'
 import { LBCF1 }              from '../data/lbcf1'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
+import { HYMN_TEXTS }         from '../data/hymnTexts'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 import { parseRefs } from '../lib/parseRefs'
 import { buildScriptureIndex, BOOK_MAP } from '../lib/scriptureParser'
@@ -145,6 +146,7 @@ const SOURCES = {
   'catechism': { label: 'Catechism', name: "Keach's Baptist Catechism (1693)",             desc: 'One hundred and fourteen questions and answers teaching the essentials of Christian doctrine — designed for instruction in faith and practice for all ages.', stat: '114 Q&A',      color: 'var(--teal)',       bg: 'var(--teal-light)',  href: 'https://baptistcatechism.org/' },
   '1lbcf':     { label: '1LBCF',     name: 'First London Baptist Confession (1644)',        desc: 'The founding document of the Particular Baptist movement — fifty-two articles affirming biblical faith and believer\'s baptism.', stat: '52 articles',  color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: 'https://london1644.info/en/fulltext.html' },
   'orthodox':  { label: 'Orthodox',  name: 'An Orthodox Catechism (1680)',                  desc: 'Composed by Hercules Collins following the structure of the Heidelberg Catechism while affirming Particular Baptist distinctives.', stat: '148 Q&A',      color: 'var(--sky)',        bg: 'var(--sky-light)',   href: 'https://1689.com/an-orthodox-catechism/' },
+  'hymns':     { label: 'Hymns',     name: 'Trinity Hymnal — Baptist Edition',              desc: 'All 819 hymns from the Trinity Hymnal Baptist Edition, cross-referenced to Scripture. Hymn chips appear in the Bible reader study mode for verses with known scripture references.', stat: '819 hymns',   color: 'var(--amber-ink)', bg: 'var(--amber-soft)',  href: null },
 }
 
 /* ── Proof-text helpers (sidebar panel) ── */
@@ -1034,6 +1036,7 @@ export default function ConfessionsPage() {
     else if (source === 'catechism') domId = `qa-${itemKey}`
     else if (source === '1lbcf')     domId = `art-${itemKey}`
     else if (source === 'orthodox')  domId = `qa-${itemKey}`
+    else if (source === 'hymns')     domId = `hymn-${itemKey}`
     if (!domId) return
     const timer = setTimeout(() => {
       const el = document.getElementById(domId)
@@ -1286,6 +1289,22 @@ export default function ConfessionsPage() {
             </span>
           </button>
         ))}
+
+        {/* Hymns entry */}
+        <button
+          style={{
+            ...s.confSelectorBtn,
+            ...(sidebarConf === 'hymns' ? {
+              background: 'var(--amber-soft)', color: 'var(--amber-ink)',
+              borderColor: 'var(--amber-ink)', fontWeight: 700,
+            } : {}),
+          }}
+          onClick={() => { setSidebarConf('hymns'); setTab('hymns') }}
+        >
+          <span style={{...s.confBadgeDot, background: sidebarConf === 'hymns' ? 'var(--amber-ink)' : 'var(--border-strong)'}} />
+          <span style={{flex:1, textAlign:'left'}}>Hymns</span>
+          <span style={{fontSize:10, opacity:0.6, fontWeight:400}}>819</span>
+        </button>
 
         {/* Proof Texts entry */}
         <button
@@ -1898,6 +1917,41 @@ export default function ConfessionsPage() {
             </div>
           )}
 
+          {/* ── Hymns ── */}
+          {tab === 'hymns' && (() => {
+            const allHymns = Object.entries(HYMN_TEXTS).sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+            const trinityHymns = allHymns.filter(([, h]) => h.collection === 'trinity')
+            const graceHymns   = allHymns.filter(([, h]) => h.collection === 'grace')
+            function HymnGroup({ hymns, groupLabel }) {
+              return (
+                <div style={{ marginBottom: 32 }}>
+                  <div style={s.chapterHeader}>
+                    <h2 style={s.chapterTitle}>{groupLabel}</h2>
+                  </div>
+                  {hymns.map(([id, h]) => {
+                    const filt = q && !(h.firstLine.toLowerCase().includes(q) || h.text.toLowerCase().includes(q))
+                    if (filt) return null
+                    return (
+                      <div key={id} id={`hymn-${id}`} style={hy.hymnRow}>
+                        <div style={hy.hymnNum}>#{id}</div>
+                        <div style={hy.hymnBody}>
+                          <div style={hy.hymnFirstLine}>{highlight(h.firstLine, q)}</div>
+                          <pre style={hy.hymnText}>{highlight(h.text, q)}</pre>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+            return (
+              <div>
+                <HymnGroup hymns={trinityHymns} groupLabel="Trinity Hymnal — Baptist Edition" />
+                <HymnGroup hymns={graceHymns}   groupLabel="Grace Hymns" />
+              </div>
+            )
+          })()}
+
           </>)}
 
         </main>
@@ -1922,6 +1976,28 @@ export default function ConfessionsPage() {
       />
     </div>
   )
+}
+
+/* ─── Hymn styles ─── */
+const hy = {
+  hymnRow: {
+    display:'flex', gap:14, padding:'16px 0',
+    borderBottom:'1px solid var(--border)',
+  },
+  hymnNum: {
+    fontSize:11, fontWeight:700, color:'var(--amber-ink)',
+    fontFamily:"'DM Sans',sans-serif", letterSpacing:'0.04em',
+    minWidth:32, paddingTop:2, flexShrink:0,
+  },
+  hymnBody: { flex:1, minWidth:0 },
+  hymnFirstLine: {
+    fontSize:15, fontWeight:600, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", marginBottom:6, lineHeight:1.3,
+  },
+  hymnText: {
+    fontFamily:"'Cormorant Garamond',serif", fontSize:13, lineHeight:1.7,
+    color:'var(--ink-muted)', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word',
+  },
 }
 
 /* ─── Styles ─── */

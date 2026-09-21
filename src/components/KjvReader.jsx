@@ -4995,6 +4995,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 <span style={r.hymnModalCollection}>
                   {hymn.collection === 'trinity' ? 'Trinity Hymnal (Baptist Ed.)' : 'Grace Hymns'}
                 </span>
+                <button
+                  style={r.hymnModalGoTo}
+                  onClick={() => {
+                    setHymnModal(null)
+                    routerNavigate(`/confessions?t=hymns`, { state: { itemKey: id, source: 'hymns' } })
+                  }}
+                >
+                  Open in Hymns →
+                </button>
               </div>
             </div>
           </div>
@@ -5893,10 +5902,17 @@ const r = {
   },
   hymnModalFooter: {
     padding:'10px 16px', borderTop:'1px solid var(--border)',
+    display:'flex', alignItems:'center', justifyContent:'space-between', gap:8,
   },
   hymnModalCollection: {
     fontSize:10, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
     fontStyle:'italic',
+  },
+  hymnModalGoTo: {
+    fontSize:11, fontWeight:600, color:'var(--amber-ink)',
+    background:'var(--amber-soft)', border:'1px solid var(--amber-ink)',
+    borderRadius:99, padding:'4px 12px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", flexShrink:0,
   },
 
   /* Inline confession cross-reference chips */
