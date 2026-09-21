@@ -56,6 +56,8 @@ import { getMemorizeVerse, setMemorizeVerse } from '../lib/memorize'
 import { getStudySession, setStudySession } from '../lib/studySession'
 import { getInlineHeadings, NT_BOOKS_WITH_OUTLINES, BIBLE_OUTLINES } from '../data/bibleOutlines'
 import { getMorphDef, getParticleDef } from '../lib/morphGlossary'
+import { getHymnRefs } from '../lib/hymnXrefs'
+import { HYMN_TEXTS } from '../data/hymnTexts'
 
 /* ── Module-level version data cache — per version ── */
 const _versionDataCache = {}
@@ -385,6 +387,7 @@ const SRC_CHIP = {
   '1LBCF':    { bg:'rgba(124,82,48,0.10)', color:'#7c5230', border:'rgba(124,82,48,0.2)' },
   'Orthodox': { bg:'rgba(12,74,110,0.10)', color:'#0c4a6e', border:'rgba(12,74,110,0.2)' },
 }
+const HYMN_CHIP = { bg:'rgba(146,94,20,0.10)', color:'#7a4f0f', border:'rgba(146,94,20,0.25)' }
 
 /* ── Highlight colour picker popup ── */
 function ColorPicker({ currentColor, onSelect, onClose }) {
@@ -1021,9 +1024,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   useEffect(() => { versionRef.current     = version     }, [version])
   useEffect(() => { prefsSizeRef.current   = prefs.sizePx }, [prefs.sizePx])
 
-  /* Share + confession modals */
+  /* Share + confession + hymn modals */
   const [shareCard,       setShareCard]       = useState(null)
   const [confessionModal, setConfessionModal] = useState(null)
+  const [hymnModal,       setHymnModal]       = useState(null)
 
   /* Memorize confirm — { incoming: {verseKey,ref,text,version}, existing: {...} } */
   const [memorizeConfirm, setMemorizeConfirm] = useState(null)
@@ -3698,6 +3702,30 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   )
                                 })()}
 
+                                {/* ── Hymn chips (morph mode) ── */}
+                                {studyMode && (() => {
+                                  const hymnIds = getHymnRefs(seg.book, seg.chapter, verse)
+                                  if (!hymnIds.length) return null
+                                  return (
+                                    <span style={r.inlineCrossRefs}>
+                                      {hymnIds.map(id => {
+                                        const h = HYMN_TEXTS[id]
+                                        if (!h) return null
+                                        return (
+                                          <button
+                                            key={id}
+                                            style={{ ...r.inlineChip, background: HYMN_CHIP.bg, color: HYMN_CHIP.color, borderColor: HYMN_CHIP.border }}
+                                            onClick={(e) => { e.stopPropagation(); setHymnModal({ id, hymn: h }) }}
+                                          >
+                                            <span style={{ ...r.inlineChipSrc, background: HYMN_CHIP.color }}>♪</span>
+                                            <span style={r.inlineChipLabel}>#{id}</span>
+                                          </button>
+                                        )
+                                      })}
+                                    </span>
+                                  )
+                                })()}
+
                                 {/* ── Bible cross-refs (Matthew, static data) ── */}
                                 {studyMode && (() => {
                                   const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
@@ -4131,6 +4159,30 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     })}
                                   </span>
                                 )}
+
+                                {/* ── Hymn chips (main reader) ── */}
+                                {studyMode && (() => {
+                                  const hymnIds = getHymnRefs(seg.book, seg.chapter, verse)
+                                  if (!hymnIds.length) return null
+                                  return (
+                                    <span style={r.inlineCrossRefs}>
+                                      {hymnIds.map(id => {
+                                        const h = HYMN_TEXTS[id]
+                                        if (!h) return null
+                                        return (
+                                          <button
+                                            key={id}
+                                            style={{ ...r.inlineChip, background: HYMN_CHIP.bg, color: HYMN_CHIP.color, borderColor: HYMN_CHIP.border }}
+                                            onClick={(e) => { e.stopPropagation(); setHymnModal({ id, hymn: h }) }}
+                                          >
+                                            <span style={{ ...r.inlineChipSrc, background: HYMN_CHIP.color }}>♪</span>
+                                            <span style={r.inlineChipLabel}>#{id}</span>
+                                          </button>
+                                        )
+                                      })}
+                                    </span>
+                                  )
+                                })()}
 
                               </span>
                             </div>
@@ -4922,6 +4974,32 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           }}
         />
       )}
+
+      {/* Hymn modal */}
+      {hymnModal && (() => {
+        const { id, hymn } = hymnModal
+        return (
+          <div style={r.hymnModalOverlay} onClick={() => setHymnModal(null)}>
+            <div style={r.hymnModalBox} onClick={e => e.stopPropagation()}>
+              <div style={r.hymnModalHeader}>
+                <div style={r.hymnModalTitle}>
+                  <span style={r.hymnModalNum}>#{id}</span>
+                  <span style={r.hymnModalFirstLine}>{hymn.firstLine}</span>
+                </div>
+                <button style={r.hymnModalClose} onClick={() => setHymnModal(null)}>✕</button>
+              </div>
+              <div style={r.hymnModalBody}>
+                <pre style={r.hymnModalText}>{hymn.text}</pre>
+              </div>
+              <div style={r.hymnModalFooter}>
+                <span style={r.hymnModalCollection}>
+                  {hymn.collection === 'trinity' ? 'Trinity Hymnal (Baptist Ed.)' : 'Grace Hymns'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Strong's lexicon modal */}
       {/* Book completion celebration */}
@@ -5775,6 +5853,50 @@ const r = {
     background:'none', border:'1px dashed var(--border)',
     borderRadius:99, padding:'2px 10px', cursor:'pointer',
     fontFamily:"'DM Sans',sans-serif",
+  },
+
+  /* Hymn modal */
+  hymnModalOverlay: {
+    position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1200,
+    display:'flex', alignItems:'center', justifyContent:'center',
+    padding:'16px',
+  },
+  hymnModalBox: {
+    background:'var(--surface)', borderRadius:12, maxWidth:480, width:'100%',
+    maxHeight:'80vh', display:'flex', flexDirection:'column',
+    boxShadow:'0 8px 40px rgba(0,0,0,0.22)',
+    border:'1px solid var(--border)',
+  },
+  hymnModalHeader: {
+    display:'flex', alignItems:'flex-start', justifyContent:'space-between',
+    padding:'16px 16px 12px', borderBottom:'1px solid var(--border)', gap:8,
+  },
+  hymnModalTitle: { display:'flex', flexDirection:'column', gap:3, flex:1 },
+  hymnModalNum: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.08em',
+    color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
+  },
+  hymnModalFirstLine: {
+    fontSize:14, fontWeight:600, color:'var(--ink)',
+    fontFamily:"'Cormorant Garamond',serif", lineHeight:1.3,
+  },
+  hymnModalClose: {
+    fontSize:14, color:'var(--ink-muted)', background:'none', border:'none',
+    cursor:'pointer', padding:'2px 4px', flexShrink:0,
+  },
+  hymnModalBody: {
+    overflowY:'auto', padding:'14px 16px', flex:1,
+  },
+  hymnModalText: {
+    fontFamily:"'Cormorant Garamond',serif", fontSize:14, lineHeight:1.7,
+    color:'var(--ink)', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-word',
+  },
+  hymnModalFooter: {
+    padding:'10px 16px', borderTop:'1px solid var(--border)',
+  },
+  hymnModalCollection: {
+    fontSize:10, color:'var(--ink-muted)', fontFamily:"'DM Sans',sans-serif",
+    fontStyle:'italic',
   },
 
   /* Inline confession cross-reference chips */
