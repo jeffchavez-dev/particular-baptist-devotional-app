@@ -387,7 +387,7 @@ const SRC_CHIP = {
   '1LBCF':    { bg:'rgba(124,82,48,0.10)', color:'#7c5230', border:'rgba(124,82,48,0.2)' },
   'Orthodox': { bg:'rgba(12,74,110,0.10)', color:'#0c4a6e', border:'rgba(12,74,110,0.2)' },
 }
-const HYMN_CHIP = { bg:'rgba(146,94,20,0.10)', color:'#7a4f0f', border:'rgba(146,94,20,0.25)' }
+const HYMN_CHIP = { bg:'rgba(219,74,120,0.10)', color:'#b03068', border:'rgba(219,74,120,0.28)' }
 
 /* ── Highlight colour picker popup ── */
 function ColorPicker({ currentColor, onSelect, onClose }) {
