@@ -1,1 +1,1 @@
-{"version":"1.10.51","date":"2026-09-21","changelog":"Fix: Corrected 84 more hymn scripture refs from complete Trinity Hymnal Baptist Edition index cross-check — mostly OCR verse errors (e.g. verse '4' where '1' was intended), plus wrong books (e.g. hymn 3 → Ps 117:1, hymn 442 → 1 John 3:1, hymn 286 → Ps 32:8)."}
+{"version":"1.10.52","date":"2026-09-21","changelog":"Fix: Corrected 7 remaining hymn scripture refs (hymns 10, 94, 103, 124, 176, 266, 420) — now all known hymn refs validated against the complete Trinity Hymnal Baptist Edition index."}
