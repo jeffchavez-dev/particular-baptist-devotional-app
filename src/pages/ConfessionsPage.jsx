@@ -8,6 +8,7 @@ import { CATECHISM }          from '../data/catechism'
 import { LBCF1 }              from '../data/lbcf1'
 import { ORTHODOX_CATECHISM } from '../data/orthodoxCatechism'
 import { HYMN_TEXTS }         from '../data/hymnTexts'
+import { HYMN_SCRIPTURE }     from '../data/hymnScripture'
 import { saveState, loadState, saveScroll, restoreScroll } from '../lib/pageState'
 import { parseRefs } from '../lib/parseRefs'
 import { buildScriptureIndex, BOOK_MAP } from '../lib/scriptureParser'
@@ -1941,11 +1942,20 @@ export default function ConfessionsPage() {
                   {hymns.map(([id, h]) => {
                     const filt = q && !(h.firstLine.toLowerCase().includes(q) || h.text.toLowerCase().includes(q))
                     if (filt) return null
+                    const scriptureRef = HYMN_SCRIPTURE[id]
                     return (
                       <div key={id} id={`hymn-${id}`} style={hy.hymnRow}>
                         <div style={hy.hymnNum}>#{id}</div>
                         <div style={hy.hymnBody}>
                           <div style={hy.hymnFirstLine}>{highlight(h.firstLine, q)}</div>
+                          {scriptureRef && (
+                            <button
+                              style={hy.hymnScriptureChip}
+                              onClick={() => setKjvModal({ book: scriptureRef.book, chapter: scriptureRef.chapter, verse: scriptureRef.verse, refDisplay: scriptureRef.display })}
+                            >
+                              {scriptureRef.display}
+                            </button>
+                          )}
                           <pre style={hy.hymnText}>{highlight(h.text, q)}</pre>
                         </div>
                       </div>
@@ -2000,6 +2010,13 @@ const hy = {
     cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
     minWidth:28, textAlign:'center',
     transition:'background 0.1s, color 0.1s',
+  },
+  hymnScriptureChip: {
+    fontSize:11, fontWeight:500, color:'var(--teal)',
+    background:'var(--teal-light)', border:'1px solid transparent',
+    borderRadius:99, padding:'2px 9px', cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif", lineHeight:1.4,
+    display:'inline-block', marginBottom:6,
   },
   hymnRow: {
     display:'flex', gap:14, padding:'16px 0',
