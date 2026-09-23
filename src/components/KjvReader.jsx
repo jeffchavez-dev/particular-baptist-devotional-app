@@ -389,6 +389,31 @@ const SRC_CHIP = {
 }
 const HYMN_CHIP = { bg:'rgba(219,74,120,0.10)', color:'#b03068', border:'rgba(219,74,120,0.28)' }
 
+/* ── Study layer toggle pills ── */
+function StudyLayerPills({ layers, onToggle, styles: r }) {
+  const PILLS = [
+    { key: 'commentary', label: 'Commentary', color: 'var(--gold)',            bg: 'rgba(146,94,20,0.09)',  border: 'rgba(146,94,20,0.28)' },
+    { key: 'scripture',  label: 'Scripture',  color: '#1a4a7a',                bg: 'rgba(26,74,122,0.09)', border: 'rgba(26,74,122,0.22)' },
+    { key: 'confession', label: 'Confession', color: '#3d2b6b',                bg: 'rgba(61,43,107,0.09)', border: 'rgba(61,43,107,0.22)' },
+    { key: 'hymns',      label: 'Hymns',      color: 'rgba(219,74,120,1)',      bg: 'rgba(219,74,120,0.08)', border: 'rgba(219,74,120,0.25)' },
+  ]
+  return (
+    <div style={r.studyPillRow}>
+      {PILLS.map(({ key, label, color, bg, border }) => {
+        const on = layers[key]
+        return (
+          <button key={key}
+            style={{ ...r.studyPill, ...(on ? { background: bg, borderColor: border, color } : {}) }}
+            onClick={() => onToggle(key)}>
+            <span style={{ ...r.studyPillDot, background: on ? color : 'var(--border)' }} />
+            {label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ── Highlight colour picker popup ── */
 function ColorPicker({ currentColor, onSelect, onClose }) {
   const ref = useRef(null)
@@ -1082,6 +1107,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [noteDraft,   setNoteDraft]       = useState('')
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
   const [colorBarOpen,      setColorBarOpen]      = useState(false)
+
+  /* Study layer toggles */
+  const [studyLayers, setStudyLayers] = useState(() => {
+    const s = getStudySession()
+    return s.studyLayers ?? { commentary: true, scripture: true, confession: true, hymns: true }
+  })
+  useEffect(() => { setStudySession({ studyLayers }) }, [studyLayers])
+  const toggleLayer = key => setStudyLayers(prev => ({ ...prev, [key]: !prev[key] }))
 
   /* Inline commentary (study mode) */
   const [inlineComId,  setInlineComId]  = useState(() => getStudySession().inlineComId || 'mhc')
@@ -3217,8 +3250,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
 
-        {/* ── Commentary selector (sidebar) — only in study mode ── */}
-        {studyMode && _TEXT_VERSIONS.has(version) && (
+        {/* ── Commentary selector (sidebar) — only in study mode with commentary layer on ── */}
+        {studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (
           <div style={{ padding:'0 12px 4px', borderBottom:'1px solid var(--border)' }} data-onboarding="commentary-selector">
             <div style={{ fontSize:11, fontWeight:600, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif", textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Commentary</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
@@ -3457,6 +3490,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span style={r.chapterDividerLine} />
                             </div>
                         }
+                        {studyMode && seg.book === book && seg.chapter === chapter && (
+                          <StudyLayerPills layers={studyLayers} onToggle={toggleLayer} styles={r} />
+                        )}
                         {renderChapterLibNotes(seg.book, seg.chapter)}
 
                         <div style={r.verseList}>
@@ -3680,7 +3716,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 )}
 
                                 {/* ── Confession cross-refs (morph mode) ── */}
-                                {studyMode && (() => {
+                                {studyMode && studyLayers.confession && (() => {
                                   const verseRefs = getCrossRefs(seg.book, seg.chapter, verse)
                                   if (!verseRefs.length) return null
                                   return (
@@ -3703,7 +3739,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 })()}
 
                                 {/* ── Hymn chips (morph mode) ── */}
-                                {studyMode && (() => {
+                                {studyMode && studyLayers.hymns && (() => {
                                   const hymnIds = getHymnRefs(seg.book, seg.chapter, verse)
                                   if (!hymnIds.length) return null
                                   return (
@@ -3727,7 +3763,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 })()}
 
                                 {/* ── Bible cross-refs (Matthew, static data) ── */}
-                                {studyMode && (() => {
+                                {studyMode && studyLayers.scripture && (() => {
                                   const bxrefs = getBibleXrefs(seg.book, seg.chapter, verse)
                                   if (!bxrefs.length) return null
                                   return (
@@ -3789,7 +3825,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           </span>
                                         )
                                       })}
-                                      {studyMode && bbackRefs.map((ref, i) => {
+                                      {studyMode && studyLayers.scripture && bbackRefs.map((ref, i) => {
                                         const label = `${ref.book} ${ref.chapter}:${ref.verse}`
                                         const syntheticRef = { tgt_book: ref.book, tgt_chapter: ref.chapter, tgt_verse: ref.verse, label }
                                         return (
@@ -3962,6 +3998,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           <span style={r.chapterDividerLine} />
                         </div>
                     }
+                    {studyMode && seg.book === book && seg.chapter === chapter && (
+                      <StudyLayerPills layers={studyLayers} onToggle={toggleLayer} styles={r} />
+                    )}
                     {renderScriptureChapterDesc(seg.book, seg.chapter)}
 
 
@@ -3996,7 +4035,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
 
                             {/* ── Inline commentary chips (study mode) ── */}
-                            {studyMode && _TEXT_VERSIONS.has(version) && (() => {
+                            {studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (() => {
                               const segKey  = `${seg.book}|${seg.chapter}`
                               const comData = inlineComData[segKey]
                               const sections = comData?.sections ?? []
@@ -4142,7 +4181,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   })()}</span>
                                 )}
 
-                                {studyMode && verseRefs.length > 0 && (
+                                {studyMode && studyLayers.confession && verseRefs.length > 0 && (
                                   <span style={r.inlineCrossRefs} {...(verse === 1 ? { 'data-onboarding': 'confession-chips' } : {})}>
                                     {verseRefs.map(ref => {
                                       const chip = SRC_CHIP[ref.src] || {}
@@ -4161,7 +4200,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 )}
 
                                 {/* ── Hymn chips (main reader) ── */}
-                                {studyMode && (() => {
+                                {studyMode && studyLayers.hymns && (() => {
                                   const hymnIds = getHymnRefs(seg.book, seg.chapter, verse)
                                   if (!hymnIds.length) return null
                                   return (
@@ -4541,8 +4580,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const chKey        = `${seg.book}:${seg.chapter}`
                               const xrefs        = authorCrossRefs[chKey]?.[verse] || []
                               const backRefs     = authorBackRefs[chKey]?.[verse]  || []
-                              const bxrefs       = studyMode ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
-                              const bbackRefs    = studyMode ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
+                              const bxrefs       = studyMode && studyLayers.scripture ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
+                              const bbackRefs    = studyMode && studyLayers.scripture ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
 
                               // Build one deduplicated chip list — static refs first, then author refs
                               const seen  = new Set()
@@ -5916,6 +5955,23 @@ const r = {
   },
 
   /* Inline confession cross-reference chips */
+  studyPillRow: {
+    display:'flex', flexWrap:'wrap', gap:6,
+    padding:'8px 0 10px', marginBottom:4,
+  },
+  studyPill: {
+    display:'inline-flex', alignItems:'center', gap:5,
+    padding:'4px 10px 4px 7px', borderRadius:99,
+    border:'1px solid var(--border)',
+    background:'var(--surface)', color:'var(--ink-muted)',
+    fontSize:11, fontWeight:600, cursor:'pointer',
+    fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.12s, color 0.12s',
+  },
+  studyPillDot: {
+    width:7, height:7, borderRadius:'50%', display:'inline-block',
+    flexShrink:0, transition:'background 0.12s',
+  },
   inlineCrossRefs: {
     display:'inline-flex', flexWrap:'wrap', gap:4,
     marginLeft:6, verticalAlign:'middle',

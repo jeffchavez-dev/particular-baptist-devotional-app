@@ -1,1 +1,1 @@
-{"version":"1.10.58","date":"2026-09-21","changelog":"Fix GNT/HOT/LXX word copy — words now copy on one line instead of each word on a separate line."}
+{"version":"1.10.59","date":"2026-09-23","changelog":"Add study layer toggles — independent pills to show/hide Commentary, Scripture, Confession, and Hymn chips in study mode. All layers on by default; preference persisted in localStorage."}
