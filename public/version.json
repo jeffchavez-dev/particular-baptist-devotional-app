@@ -1,1 +1,1 @@
-{"version":"1.10.57","date":"2026-09-21","changelog":"Allow copying individual words in GNT, HOT, and LXX panels."}
+{"version":"1.10.58","date":"2026-09-21","changelog":"Fix GNT/HOT/LXX word copy — words now copy on one line instead of each word on a separate line."}

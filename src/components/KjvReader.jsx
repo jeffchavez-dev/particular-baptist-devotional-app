@@ -4271,7 +4271,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           background: isNT ? 'rgba(61,43,107,0.10)' : 'rgba(29,107,90,0.10)',
                                           color:      isNT ? '#3d2b6b' : '#1d6b5a',
                                         }}>{lang}</span>
-                                        <div style={{ display:'flex', flexWrap:'wrap', gap:'2px 4px', direction: isHeb ? 'rtl' : 'ltr', flex:1 }}>
+                                        <div style={{ direction: isHeb ? 'rtl' : 'ltr', flex:1, lineHeight:1.9 }}>
                                           {morphVerse.words.map((wd, wi) => {
                                             const isSel = wi === morphWordSel
                                             return (
@@ -4375,7 +4375,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           background: 'rgba(12,74,110,0.10)',
                                           color: '#0c4a6e',
                                         }}>LXX</span>
-                                        <div style={{ display:'flex', flexWrap:'wrap', gap:'2px 4px', flex:1 }}>
+                                        <div style={{ flex:1, lineHeight:1.9 }}>
                                           {lxxVerse.words.map((lw, wi) => {
                                             const isSel = wi === lxxWordSel
                                             return (
@@ -6035,12 +6035,12 @@ const r = {
     display:'flex', gap:8, padding:'5px 0', alignItems:'flex-start', cursor:'pointer',
   },
   greekWordWrap: {
-    flex:1, display:'flex', flexWrap:'wrap', gap:'3px 2px',
-    lineHeight:2, alignItems:'baseline',
+    flex:1, lineHeight:2,
   },
   greekToken: {
-    display:'inline-flex', alignItems:'baseline',
+    display:'inline-block',
     padding:'2px 5px 2px 4px', borderRadius:5,
+    margin:'1px 2px',
     cursor:'pointer', userSelect:'text',
     transition:'background 0.1s, color 0.1s, outline 0.1s',
     fontFamily:"'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif",
