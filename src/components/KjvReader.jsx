@@ -6041,7 +6041,7 @@ const r = {
   greekToken: {
     display:'inline-flex', alignItems:'baseline',
     padding:'2px 5px 2px 4px', borderRadius:5,
-    cursor:'pointer', userSelect:'none',
+    cursor:'pointer', userSelect:'text',
     transition:'background 0.1s, color 0.1s, outline 0.1s',
     fontFamily:"'Palatino Linotype','Palatino','Book Antiqua','Times New Roman',serif",
     fontSize:'1em', color:'var(--ink)',
