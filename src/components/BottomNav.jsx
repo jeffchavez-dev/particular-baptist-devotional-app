@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 
 const TABS = [
   {
-    path: '/',
+    path: '/home',
     label: 'Devotional',
     icon: (active) => (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -102,7 +102,7 @@ export default function BottomNav() {
   useEffect(() => { setVisible(true) }, [pathname])
 
   function getActive() {
-    if (pathname === '/') return '/'
+    if (pathname === '/home') return '/home'
     if (pathname.startsWith('/confessions')) return '/confessions'
     if (pathname.startsWith('/scripture'))  return '/scripture'
     if (pathname.startsWith('/library'))    return '/library'
@@ -113,9 +113,7 @@ export default function BottomNav() {
   if (active === null) return null
 
   function getTargetPath(tab) {
-    if (tab.path !== '/') return tab.path
-    // Home always goes to the Dashboard (/)
-    return '/'
+    return tab.path
   }
 
   const desktopNav = isDesktop ? {

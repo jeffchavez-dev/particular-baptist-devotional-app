@@ -197,8 +197,9 @@ export default function App() {
                 )}
                 <div style={!isOnline ? { paddingTop: 34 } : {}}>
                   <Routes>
-                    <Route path="/auth"        element={session ? <Navigate to="/" /> : <AuthPage />} />
-                    <Route path="/"            element={<Dashboard />} />
+                    <Route path="/auth"        element={session ? <Navigate to="/scripture" replace /> : <AuthPage />} />
+                    <Route path="/"            element={<Navigate to="/scripture" replace />} />
+                    <Route path="/home"        element={<Dashboard />} />
                     <Route path="/quiz"        element={<QuizPage />} />
                     <Route path="/scripture"   element={<ScripturePage />} />
                     <Route path="/confessions" element={<ConfessionsPage />} />
