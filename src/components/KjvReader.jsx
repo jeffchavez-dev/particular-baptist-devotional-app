@@ -415,7 +415,7 @@ function StudyLayerPills({ layers, onToggle, styles: r }) {
 }
 
 /* ── Desktop right-side commentary panel ── */
-function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries }) {
+function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries, sizePx }) {
   const lastSecRef = React.useRef(null)
 
   // Find last section whose range starts at or before the visible verse
@@ -470,7 +470,7 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
             ) : null}
             <div style={r.comPanelSecBody} onClick={onLinkClick}>
               {activeSec.paragraphs.map((html, pi) => (
-                <p key={pi} style={r.comPanelPara} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
+                <p key={pi} style={{ ...r.comPanelPara, fontSize: sizePx ? sizePx - 3 : 13 }} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
               ))}
             </div>
           </div>
@@ -4994,6 +4994,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             styles={r}
             topInset={topInset}
             commentaries={COMMENTARIES}
+            sizePx={prefs.sizePx}
           />
         )
       })()}
