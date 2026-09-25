@@ -415,8 +415,27 @@ function StudyLayerPills({ layers, onToggle, styles: r }) {
 }
 
 /* ── Desktop right-side commentary panel ── */
-function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries, sizePx }) {
+function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries, sizePx, onWidthChange }) {
   const lastSecRef = React.useRef(null)
+  const [panelWidth, setPanelWidth] = React.useState(340)
+  const dragRef = React.useRef(null)
+
+  function onDragStart(e) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = panelWidth
+    function onMove(e) {
+      const newW = Math.max(240, Math.min(600, startW + (startX - e.clientX)))
+      setPanelWidth(newW)
+      onWidthChange?.(newW)
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }
 
   // Find last section whose range starts at or before the visible verse
   const activeIdx = (() => {
@@ -436,7 +455,17 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
   const comKeys = Object.keys(commentaries)
 
   return (
-    <div style={{ ...r.comPanel, top: topInset }}>
+    <div style={{ ...r.comPanel, top: topInset, width: panelWidth }}>
+      {/* Resize handle */}
+      <div
+        onMouseDown={onDragStart}
+        style={{
+          position:'absolute', left:0, top:0, bottom:0, width:5,
+          cursor:'col-resize', zIndex:10,
+          background:'transparent',
+        }}
+        title="Drag to resize"
+      />
       {/* Header: commentary selector */}
       <div style={r.comPanelHeader}>
         <span style={r.comPanelLabel}>Commentary</span>
@@ -1183,6 +1212,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const toggleLayer = onToggleLayer ?? (key => setStudyLayersLocal(prev => ({ ...prev, [key]: !prev[key] })))
 
   /* Inline commentary (study mode) */
+  const [comPanelWidth, setComPanelWidth] = useState(340)
   const [inlineComId,  setInlineComId]  = useState(() => getStudySession().inlineComId || 'mhc')
   const [inlineComData, setInlineComData] = useState({}) // { [segKey]: { sections, loading } }
   const [inlineComExp, setInlineComExp] = useState(() => getStudySession().inlineComExp || {})   // { [secKey]: bool }
@@ -3469,7 +3499,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
-        <div style={{ ...r.content, maxWidth: isMobile ? 720 : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : 'calc((100vw - 220px) * 0.8)', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? 356 : undefined }}>
+        <div style={{ ...r.content, maxWidth: isMobile ? 720 : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : 'calc((100vw - 220px) * 0.8)', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
 
           {/* ══════════════════════════════════════════════
               BOOK OUTLINE VIEW (chapter === 0)
@@ -4995,6 +5025,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             topInset={topInset}
             commentaries={COMMENTARIES}
             sizePx={prefs.sizePx}
+            onWidthChange={setComPanelWidth}
           />
         )
       })()}
