@@ -3301,7 +3301,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
         {!isMobile && (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0, position:'sticky', top:0, zIndex:10, background:'var(--surface)' }}>
             <button
               onClick={() => setSideOpen(false)}
               style={{ ...r.closeBtn, borderRadius:6, padding:'4px 6px', background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', gap:4, fontSize:11, fontFamily:"'DM Sans',sans-serif" }}
