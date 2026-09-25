@@ -3460,7 +3460,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
-        <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? 356 : undefined }}>
+        <div style={{ ...r.content, maxWidth: isMobile ? 720 : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : 'calc((100vw - 220px) * 0.8)', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? 356 : undefined }}>
 
           {/* ══════════════════════════════════════════════
               BOOK OUTLINE VIEW (chapter === 0)
@@ -4243,7 +4243,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           >
                             {/* ── main verse row — verse number = full verse select; text = two-tap partial highlight ── */}
                             <div style={prefs.parallelLayout === 'columns' ? { display:'flex', alignItems:'flex-start', gap:12, width:'100%' } : {}}>
-                            <div style={{ ...r.verseRow, ...(prefs.parallelLayout === 'columns' ? { flex:'1 1 0%', minWidth:0 } : {}) }}>
+                            <div style={{ ...r.verseRow, ...(prefs.parallelLayout === 'columns' ? { flex:1, minWidth:0 } : {}) }}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
@@ -4426,7 +4426,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const parseMorphDetailFn = isHeb ? parseHebrewMorphDetails : parseMorphDetails
 
                               return (
-                                <div style={{ ...r.parallelBlock, ...(prefs.parallelLayout === 'columns' ? { flex:'0 0 42%', borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
+                                <div style={{ ...r.parallelBlock, ...(prefs.parallelLayout === 'columns' ? { flex: sideOpen ? '0 0 42%' : 1, minWidth:180, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
 
                                   {/* ── GNT / HOT word chips ── */}
                                   {morphVerse && (
@@ -4616,7 +4616,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const lxxVerse = parallelLxxData[`${seg.book}:${seg.chapter}`]?.find(pv => (pv.v ?? pv.verse) === verse)
                               const cols = prefs.parallelLayout === 'columns'
                               return (
-                                <div style={{ ...r.parallelBlock, ...(cols ? { flex:'0 0 42%', borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : { borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }) }}>
+                                <div style={{ ...r.parallelBlock, ...(cols ? { flex: sideOpen ? '0 0 42%' : 1, minWidth:180, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : { borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }) }}>
                                   <div style={r.parallelLine}>
                                     <span style={{ ...r.parallelBadge, background:'rgba(120,80,20,0.10)', color:'var(--amber-ink)' }}>
                                       {tLabel}
