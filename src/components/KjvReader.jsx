@@ -3301,7 +3301,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
         {!isMobile && (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0, position:'sticky', top:0, zIndex:10, background:'var(--surface)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0 }}>
             <button
               onClick={() => setSideOpen(false)}
               style={{ ...r.closeBtn, borderRadius:6, padding:'4px 6px', background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', gap:4, fontSize:11, fontFamily:"'DM Sans',sans-serif" }}
@@ -3315,6 +3315,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
 
+        <div style={r.sidebarScroll}>
         {/* ── Parallel section ── */}
         {_TEXT_VERSIONS.has(version) && (
           <div style={sb.parallelSection} data-onboarding="parallel-section">
@@ -3409,6 +3410,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           ntOnly={version === 'greek'}
           otOnly={version === 'hebrew' || version === 'lxx'}
         />
+        </div>{/* end sidebarScroll */}
       </aside>
 
       {/* ── Fixed chapter navigation arrows — hidden when chrome is hidden ── */}
@@ -5542,8 +5544,10 @@ const r = {
   sidebar: {
     position:'absolute', left:0, top:0, bottom:0,
     width:280, background:'var(--surface)',
-    borderRight:'1px solid var(--border)', overflowY:'auto', zIndex:100,
+    borderRight:'1px solid var(--border)', zIndex:100,
+    display:'flex', flexDirection:'column', overflow:'hidden',
   },
+  sidebarScroll: { flex:1, overflowY:'auto', minHeight:0 },
   mobileNavHeader: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
     padding:'12px 14px', borderBottom:'1px solid var(--border)',
