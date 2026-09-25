@@ -1,1 +1,1 @@
-{"version":"1.10.60","date":"2026-09-25","changelog":"Desktop commentary panel — on desktop in study mode, commentary now shows in a fixed right panel (340px) that scroll-syncs to the visible verse. Inline commentary chips are mobile-only. Commentary selector moves into the panel header on desktop."}
+{"version":"1.10.61","date":"2026-09-25","changelog":"Desktop: sidebar can now be collapsed/expanded with a Hide/Books button. Settings: new Parallel View Layout option — toggle between Inline (default) and Side by side for parallel Bible versions."}

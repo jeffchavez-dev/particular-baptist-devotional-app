@@ -3256,6 +3256,29 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <div style={r.backdrop} onClick={() => setSideOpen(false)} />
       )}
 
+      {/* Desktop sidebar expand tab — visible when sidebar is collapsed */}
+      {!isMobile && !sideOpen && (
+        <button
+          onClick={() => setSideOpen(true)}
+          style={{
+            position:'absolute', left:0, top: topInset + 56, zIndex:110,
+            display:'flex', alignItems:'center', gap:4,
+            padding:'6px 8px 6px 6px', borderRadius:'0 6px 6px 0',
+            background:'var(--surface)', border:'1px solid var(--border)',
+            borderLeft:'none', cursor:'pointer',
+            color:'var(--ink-faint)', fontSize:11,
+            fontFamily:"'DM Sans',sans-serif",
+            boxShadow:'2px 2px 8px rgba(0,0,0,0.08)',
+          }}
+          title="Show sidebar"
+        >
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M5 2l4.5 5L5 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Books
+        </button>
+      )}
+
       {/* Book sidebar */}
       <aside style={{
         ...r.sidebar,
@@ -3274,6 +3297,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
               </svg>
+            </button>
+          </div>
+        )}
+        {!isMobile && (
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0 }}>
+            <button
+              onClick={() => setSideOpen(false)}
+              style={{ ...r.closeBtn, borderRadius:6, padding:'4px 6px', background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', gap:4, fontSize:11, fontFamily:"'DM Sans',sans-serif" }}
+              title="Collapse sidebar"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M9 2L4.5 7l4.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Hide
             </button>
           </div>
         )}
@@ -4205,7 +4242,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                             }}
                           >
                             {/* ── main verse row — verse number = full verse select; text = two-tap partial highlight ── */}
-                            <div style={r.verseRow}>
+                            <div style={prefs.parallelLayout === 'columns' ? { display:'flex', alignItems:'flex-start', gap:12, width:'100%' } : {}}>
+                            <div style={{ ...r.verseRow, ...(prefs.parallelLayout === 'columns' ? { flex:'1 1 0%', minWidth:0 } : {}) }}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
@@ -4388,7 +4426,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const parseMorphDetailFn = isHeb ? parseHebrewMorphDetails : parseMorphDetails
 
                               return (
-                                <div style={r.parallelBlock}>
+                                <div style={{ ...r.parallelBlock, ...(prefs.parallelLayout === 'columns' ? { flex:'0 0 42%', borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
 
                                   {/* ── GNT / HOT word chips ── */}
                                   {morphVerse && (
@@ -4576,8 +4614,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const tLabel  = BIBLE_VERSIONS.find(v => v.id === textParallelVersion)?.abbreviation ?? textParallelVersion.toUpperCase()
                               const morphVerse = parallelData[`${seg.book}:${seg.chapter}`]?.find(pv => pv.verse === verse)
                               const lxxVerse = parallelLxxData[`${seg.book}:${seg.chapter}`]?.find(pv => (pv.v ?? pv.verse) === verse)
+                              const cols = prefs.parallelLayout === 'columns'
                               return (
-                                <div style={{ ...r.parallelBlock, borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }}>
+                                <div style={{ ...r.parallelBlock, ...(cols ? { flex:'0 0 42%', borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : { borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }) }}>
                                   <div style={r.parallelLine}>
                                     <span style={{ ...r.parallelBadge, background:'rgba(120,80,20,0.10)', color:'var(--amber-ink)' }}>
                                       {tLabel}
@@ -4589,6 +4628,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 </div>
                               )
                             })()}
+                            </div>{/* ── end columns wrapper ── */}
 
                             {studyMode && displayNote && !isEditing && (
                               <div

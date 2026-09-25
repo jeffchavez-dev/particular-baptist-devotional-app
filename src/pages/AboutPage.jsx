@@ -770,6 +770,32 @@ export default function AboutPage() {
               </div>
             </div>
 
+            {/* Parallel View Layout */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Parallel View Layout</span>
+                <span style={s.settingHint}>How parallel Bible versions appear alongside each verse</span>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {[{ id: 'inline', label: 'Inline' }, { id: 'columns', label: 'Side by side' }].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updatePrefs({ ...prefs, parallelLayout: opt.id })}
+                    style={{
+                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
+                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                      border: prefs.parallelLayout === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
+                      background: prefs.parallelLayout === opt.id ? 'var(--teal-light)' : 'transparent',
+                      color: prefs.parallelLayout === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
+                      transition:'background 0.12s, color 0.12s',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Default Bible Translation */}
             <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
               <div style={s.settingLabel}>
