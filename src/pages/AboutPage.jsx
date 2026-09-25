@@ -770,8 +770,8 @@ export default function AboutPage() {
               </div>
             </div>
 
-            {/* Parallel View Layout */}
-            <div style={s.settingRow}>
+            {/* Parallel View Layout — desktop/tablet only */}
+            {window.innerWidth >= 768 && <div style={s.settingRow}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Parallel View Layout</span>
                 <span style={s.settingHint}>How parallel Bible versions appear alongside each verse</span>
@@ -794,7 +794,7 @@ export default function AboutPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
             {/* Default Bible Translation */}
             <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
