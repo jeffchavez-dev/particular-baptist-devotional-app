@@ -3459,8 +3459,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         const nextCh = chapter === 0 ? null : getNextChapter(book, chapter)
         const hasPrev = !!prevCh && (!allowed || allowed.has(prevCh.book))
         const hasNext = !!nextCh && (!allowed || allowed.has(nextCh.book))
-        // On desktop the sidebar is 220px wide; leave room for it on the left
-        const leftOffset = isMobile ? 6 : 228
+        // On desktop, leave room for the sidebar only when it's open
+        const leftOffset = isMobile ? 6 : (sideOpen ? 286 : 6)
         return (
           <>
             <button

@@ -1,1 +1,1 @@
-{"version":"1.10.63","date":"2026-09-25","changelog":"Study layer toggle pills (Commentary, Scripture, Confession, Hymns) now appear in the navigation bar on desktop when study mode is active."}
+{"version":"1.10.64","date":"2026-09-25","changelog":"Fixed previous chapter button staying in the middle when sidebar is hidden; fixed mobile blank screen double-redirect."}

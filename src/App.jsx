@@ -205,7 +205,7 @@ export default function App() {
                     <Route path="/confessions" element={<ConfessionsPage />} />
                     <Route path="/about"       element={<AboutPage />} />
                     <Route path="/library"     element={<LibraryPage />} />
-                    <Route path="*"            element={<Navigate to="/" />} />
+                    <Route path="*"            element={<Navigate to="/scripture" replace />} />
                   </Routes>
                   <BottomNav />
                 </div>
