@@ -420,6 +420,28 @@ export default function ScripturePage() {
             </svg>
           </button>
 
+          {/* Study layer pills — desktop only, centered in nav bar */}
+          {studyMode && isDesktopRef.current && (
+            <div style={s.studyPillRow}>
+              {[
+                { key: 'commentary', label: 'Commentary', color: 'var(--gold)',        bg: 'rgba(146,94,20,0.09)',  border: 'rgba(146,94,20,0.28)' },
+                { key: 'scripture',  label: 'Scripture',  color: '#1a4a7a',            bg: 'rgba(26,74,122,0.09)',  border: 'rgba(26,74,122,0.22)' },
+                { key: 'confession', label: 'Confession', color: '#3d2b6b',            bg: 'rgba(61,43,107,0.09)',  border: 'rgba(61,43,107,0.22)' },
+                { key: 'hymns',      label: 'Hymns',      color: 'rgba(219,74,120,1)', bg: 'rgba(219,74,120,0.08)', border: 'rgba(219,74,120,0.25)' },
+              ].map(({ key, label, color, bg, border }) => {
+                const on = studyLayers[key]
+                return (
+                  <button key={key}
+                    style={{ ...s.studyPill, pointerEvents:'auto', ...(on ? { background: bg, borderColor: border, color } : {}) }}
+                    onClick={() => toggleLayer(key)}>
+                    <span style={{ ...s.studyPillDot, background: on ? color : 'var(--border)' }} />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {/* Search icon button */}
           <button
             style={s.menuBtn}
@@ -435,27 +457,6 @@ export default function ScripturePage() {
           </button>
         </div>
 
-        {/* ── Study layer pills — desktop only, when study mode is on ── */}
-        {studyMode && isDesktopRef.current && (
-          <div style={s.studyPillRow}>
-            {[
-              { key: 'commentary', label: 'Commentary', color: 'var(--gold)',         bg: 'rgba(146,94,20,0.09)',  border: 'rgba(146,94,20,0.28)' },
-              { key: 'scripture',  label: 'Scripture',  color: '#1a4a7a',             bg: 'rgba(26,74,122,0.09)',  border: 'rgba(26,74,122,0.22)' },
-              { key: 'confession', label: 'Confession', color: '#3d2b6b',             bg: 'rgba(61,43,107,0.09)',  border: 'rgba(61,43,107,0.22)' },
-              { key: 'hymns',      label: 'Hymns',      color: 'rgba(219,74,120,1)', bg: 'rgba(219,74,120,0.08)', border: 'rgba(219,74,120,0.25)' },
-            ].map(({ key, label, color, bg, border }) => {
-              const on = studyLayers[key]
-              return (
-                <button key={key}
-                  style={{ ...s.studyPill, ...(on ? { background: bg, borderColor: border, color } : {}) }}
-                  onClick={() => toggleLayer(key)}>
-                  <span style={{ ...s.studyPillDot, background: on ? color : 'var(--border)' }} />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        )}
       </header>
 
       {/* ── Search Panel (right drawer) ── */}
@@ -840,9 +841,12 @@ const s = {
     background:'var(--surface)', borderBottom:'1px solid var(--border)',
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
-  headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:8 },
+  headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:8, position:'relative' },
 
-  studyPillRow: { display:'flex', flexWrap:'wrap', gap:6, padding:'0 16px 8px', justifyContent:'center' },
+  studyPillRow: {
+    position:'absolute', left:'50%', top:'50%', transform:'translate(-50%,-50%)',
+    display:'flex', gap:6, pointerEvents:'none',
+  },
   studyPill: {
     display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
     borderRadius:99, border:'1px solid var(--border)', background:'none',
