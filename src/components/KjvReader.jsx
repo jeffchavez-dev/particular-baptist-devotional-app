@@ -3256,7 +3256,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <div style={r.backdrop} onClick={() => setSideOpen(false)} />
       )}
 
-      {/* Desktop sidebar expand tab — visible when sidebar is collapsed */}
+      {/* Desktop sidebar tabs — expand (Books) or collapse (Hide), same style */}
       {!isMobile && !sideOpen && (
         <button
           onClick={() => setSideOpen(true)}
@@ -3278,6 +3278,27 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           Books
         </button>
       )}
+      {!isMobile && sideOpen && (
+        <button
+          onClick={() => setSideOpen(false)}
+          style={{
+            position:'absolute', left:280, top: topInset + 56, zIndex:110,
+            display:'flex', alignItems:'center', gap:4,
+            padding:'6px 6px 6px 8px', borderRadius:'0 6px 6px 0',
+            background:'var(--surface)', border:'1px solid var(--border)',
+            borderLeft:'none', cursor:'pointer',
+            color:'var(--ink-faint)', fontSize:11,
+            fontFamily:"'DM Sans',sans-serif",
+            boxShadow:'2px 2px 8px rgba(0,0,0,0.08)',
+          }}
+          title="Collapse sidebar"
+        >
+          Hide
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+            <path d="M9 2L4.5 7l4.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
 
       {/* Book sidebar */}
       <aside style={{
@@ -3297,20 +3318,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
               </svg>
-            </button>
-          </div>
-        )}
-        {!isMobile && (
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', padding:'6px 8px 2px', flexShrink:0 }}>
-            <button
-              onClick={() => setSideOpen(false)}
-              style={{ ...r.closeBtn, borderRadius:6, padding:'4px 6px', background:'none', border:'none', cursor:'pointer', color:'var(--ink-faint)', display:'flex', alignItems:'center', gap:4, fontSize:11, fontFamily:"'DM Sans',sans-serif" }}
-              title="Collapse sidebar"
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9 2L4.5 7l4.5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Hide
             </button>
           </div>
         )}
