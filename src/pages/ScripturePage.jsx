@@ -89,6 +89,14 @@ export default function ScripturePage() {
   // Study mode: show/hide all notes and cross-reference chips (off by default for clean reading)
   const [studyMode, setStudyMode] = useState(() => getStudySession().studyMode)
   useEffect(() => { setStudySession({ studyMode }) }, [studyMode])
+
+  // Study layer toggles — lifted here so they can render in the desktop nav bar
+  const [studyLayers, setStudyLayers] = useState(() => {
+    const s = getStudySession()
+    return s.studyLayers ?? { commentary: true, scripture: true, confession: true, hymns: true }
+  })
+  useEffect(() => { setStudySession({ studyLayers }) }, [studyLayers])
+  const toggleLayer = key => setStudyLayers(prev => ({ ...prev, [key]: !prev[key] }))
   // Allow onboarding overlay to enable study mode via custom event
   useEffect(() => {
     function onEnableStudy() { setStudyMode(true) }
@@ -426,6 +434,28 @@ export default function ScripturePage() {
             </svg>
           </button>
         </div>
+
+        {/* ── Study layer pills — desktop only, when study mode is on ── */}
+        {studyMode && isDesktopRef.current && (
+          <div style={s.studyPillRow}>
+            {[
+              { key: 'commentary', label: 'Commentary', color: 'var(--gold)',         bg: 'rgba(146,94,20,0.09)',  border: 'rgba(146,94,20,0.28)' },
+              { key: 'scripture',  label: 'Scripture',  color: '#1a4a7a',             bg: 'rgba(26,74,122,0.09)',  border: 'rgba(26,74,122,0.22)' },
+              { key: 'confession', label: 'Confession', color: '#3d2b6b',             bg: 'rgba(61,43,107,0.09)',  border: 'rgba(61,43,107,0.22)' },
+              { key: 'hymns',      label: 'Hymns',      color: 'rgba(219,74,120,1)', bg: 'rgba(219,74,120,0.08)', border: 'rgba(219,74,120,0.25)' },
+            ].map(({ key, label, color, bg, border }) => {
+              const on = studyLayers[key]
+              return (
+                <button key={key}
+                  style={{ ...s.studyPill, ...(on ? { background: bg, borderColor: border, color } : {}) }}
+                  onClick={() => toggleLayer(key)}>
+                  <span style={{ ...s.studyPillDot, background: on ? color : 'var(--border)' }} />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
       </header>
 
       {/* ── Search Panel (right drawer) ── */}
@@ -747,6 +777,8 @@ export default function ScripturePage() {
           }}
           authorEditMode={authorEditMode}
           studyMode={studyMode}
+          studyLayers={studyLayers}
+          onToggleLayer={toggleLayer}
           onSearchResults={(hits, total, capped, q) => {
             setSearchResults(hits)
             setSearchResultsTotal(total)
@@ -809,6 +841,15 @@ const s = {
     boxShadow:'0 1px 4px rgba(0,0,0,0.05)',
   },
   headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:8 },
+
+  studyPillRow: { display:'flex', flexWrap:'wrap', gap:6, padding:'0 16px 8px' },
+  studyPill: {
+    display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
+    borderRadius:99, border:'1px solid var(--border)', background:'none',
+    cursor:'pointer', fontSize:11.5, fontWeight:600, color:'var(--ink-muted)',
+    fontFamily:"'DM Sans',sans-serif", transition:'all 0.15s', whiteSpace:'nowrap',
+  },
+  studyPillDot: { width:6, height:6, borderRadius:'50%', flexShrink:0 },
 
   menuBtn: {
     display:'flex', alignItems:'center', justifyContent:'center',

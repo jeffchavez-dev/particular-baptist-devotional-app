@@ -1039,7 +1039,7 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, studyLayers: studyLayersProp, onToggleLayer, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -1174,13 +1174,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   const [selectedVerses, setSelectedVerses] = useState(() => new Set())
   const [colorBarOpen,      setColorBarOpen]      = useState(false)
 
-  /* Study layer toggles */
-  const [studyLayers, setStudyLayers] = useState(() => {
+  /* Study layer toggles — use props when provided (desktop, lifted to ScripturePage) */
+  const [studyLayersLocal, setStudyLayersLocal] = useState(() => {
     const s = getStudySession()
     return s.studyLayers ?? { commentary: true, scripture: true, confession: true, hymns: true }
   })
-  useEffect(() => { setStudySession({ studyLayers }) }, [studyLayers])
-  const toggleLayer = key => setStudyLayers(prev => ({ ...prev, [key]: !prev[key] }))
+  const studyLayers = studyLayersProp ?? studyLayersLocal
+  const toggleLayer = onToggleLayer ?? (key => setStudyLayersLocal(prev => ({ ...prev, [key]: !prev[key] })))
 
   /* Inline commentary (study mode) */
   const [inlineComId,  setInlineComId]  = useState(() => getStudySession().inlineComId || 'mhc')
@@ -3616,7 +3616,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span style={r.chapterDividerLine} />
                             </div>
                         }
-                        {studyMode && seg.book === book && seg.chapter === chapter && (
+                        {isMobile && studyMode && seg.book === book && seg.chapter === chapter && (
                           <StudyLayerPills layers={studyLayers} onToggle={toggleLayer} styles={r} />
                         )}
                         {renderChapterLibNotes(seg.book, seg.chapter)}
@@ -4124,7 +4124,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           <span style={r.chapterDividerLine} />
                         </div>
                     }
-                    {studyMode && seg.book === book && seg.chapter === chapter && (
+                    {isMobile && studyMode && seg.book === book && seg.chapter === chapter && (
                       <StudyLayerPills layers={studyLayers} onToggle={toggleLayer} styles={r} />
                     )}
                     {renderScriptureChapterDesc(seg.book, seg.chapter)}
