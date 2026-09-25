@@ -5709,7 +5709,7 @@ const r = {
 
   /* Content */
   content: {
-    flex:1, padding:'1.5rem 1.5rem 8rem',
+    flex:1, padding:'1.5rem calc(1.5rem + env(safe-area-inset-right, 0px)) 8rem calc(1.5rem + env(safe-area-inset-left, 0px))',
     maxWidth:720, margin:'0 auto', width:'100%',
   },
   loadingState: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'4rem', gap:8 },

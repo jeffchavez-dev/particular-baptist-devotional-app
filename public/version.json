@@ -1,1 +1,1 @@
-{"version":"1.10.64","date":"2026-09-25","changelog":"Fixed previous chapter button staying in the middle when sidebar is hidden; fixed mobile blank screen double-redirect."}
+{"version":"1.10.65","date":"2026-09-25","changelog":"Fixed mobile right padding in Scripture reader to respect device safe area insets."}
