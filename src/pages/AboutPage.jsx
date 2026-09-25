@@ -797,7 +797,7 @@ export default function AboutPage() {
             </div>}
 
             {/* Default Bible Translation */}
-            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12}}>
+            <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12, overflow:'hidden'}}>
               <div style={s.settingLabel}>
                 <span style={s.settingName}>Default Bible Translation</span>
                 <span style={s.settingHint}>Used when opening Scripture from devotionals and confession proof texts</span>
@@ -824,7 +824,7 @@ export default function AboutPage() {
                   border:'1.5px solid var(--teal)',
                   background:`var(--teal-light) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231d6b5a' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 14px center`,
                   color:'var(--teal)',
-                  minWidth:160, flexShrink:0,
+                  minWidth:0, maxWidth:'100%', width:'100%',
                   outline:'none',
                 }}
               >
