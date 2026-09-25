@@ -122,10 +122,7 @@ export default function BottomNav() {
     left: '50%',
     right: 'auto',
     transform: 'translateX(-50%)',
-    maxWidth: 640,
-    borderLeft: '1px solid var(--border)',
-    borderRight: '1px solid var(--border)',
-    borderRadius: '14px 14px 0 0',
+    maxWidth: 480,
   } : {}
 
   return (
@@ -134,7 +131,7 @@ export default function BottomNav() {
         data-bottom-nav
         style={{
           ...n.spacer,
-          height: visible ? 'calc(64px + env(safe-area-inset-bottom))' : 0,
+          height: visible ? 'calc(80px + env(safe-area-inset-bottom))' : 0,
         }}
       />
       <nav
@@ -143,8 +140,8 @@ export default function BottomNav() {
           ...n.nav,
           ...desktopNav,
           transform: isDesktop
-            ? `translateX(-50%) translateY(${visible ? '0' : '100%'})`
-            : `translateY(${visible ? '0' : '100%'})`,
+            ? `translateX(-50%) translateY(${visible ? '0' : 'calc(100% + 24px)'})`
+            : `translateY(${visible ? '0' : 'calc(100% + 24px)'})`,
           transition: 'transform 0.28s ease',
         }}
         aria-label="Main navigation"
@@ -172,27 +169,29 @@ export default function BottomNav() {
 }
 
 const n = {
-  spacer: { height: 'calc(64px + env(safe-area-inset-bottom))', display: 'block', transition: 'height 0.28s ease' },
+  spacer: { height: 'calc(80px + env(safe-area-inset-bottom))', display: 'block', transition: 'height 0.28s ease' },
   nav: {
-    position: 'fixed', bottom: 0, left: 0, right: 0,
-    paddingBottom: 'env(safe-area-inset-bottom)',
-    background: 'var(--surface)', borderTop: '1px solid var(--border)',
-    display: 'flex', alignItems: 'flex-start', zIndex: 100,
-    boxShadow: '0 -2px 16px rgba(0,0,0,0.08)',
-    paddingLeft:  'env(safe-area-inset-left)',
-    paddingRight: 'env(safe-area-inset-right)',
+    position: 'fixed',
+    bottom: 'calc(12px + env(safe-area-inset-bottom))',
+    left: 16, right: 16,
+    borderRadius: 99,
+    background: 'var(--surface)',
+    display: 'flex', alignItems: 'center', zIndex: 100,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.07)',
+    border: '1px solid var(--border)',
+    padding: '0 4px',
   },
   tabWrap: { height: 64 },
   tab: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
     justifyContent: 'center', gap: 0, background: 'none', border: 'none',
-    cursor: 'pointer', padding: '12px 4px 8px', position: 'relative',
+    cursor: 'pointer', padding: '12px 4px', position: 'relative',
     transition: 'color 0.15s', fontFamily: "'DM Sans', sans-serif",
     WebKitTapHighlightColor: 'transparent',
   },
   icon: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
   indicator: {
-    position: 'absolute', top: 0, left: '20%', right: '20%',
-    height: 2, borderRadius: '0 0 2px 2px', background: 'var(--teal)',
+    position: 'absolute', bottom: 6, left: '30%', right: '30%',
+    height: 3, borderRadius: 99, background: 'var(--teal)',
   },
 }
