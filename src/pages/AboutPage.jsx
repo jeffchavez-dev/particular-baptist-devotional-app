@@ -818,8 +818,8 @@ export default function AboutPage() {
                 }}
                 style={{
                   appearance:'none', WebkitAppearance:'none',
-                  padding:'8px 36px 8px 14px', borderRadius:99,
-                  fontSize:13, fontWeight:700,
+                  padding:'6px 32px 6px 12px', borderRadius:99,
+                  fontSize:11, fontWeight:600,
                   fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
                   border:'1.5px solid var(--teal)',
                   background:`var(--teal-light) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231d6b5a' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 14px center`,
