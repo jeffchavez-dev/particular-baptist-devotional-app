@@ -842,7 +842,7 @@ const s = {
   },
   headerInner: { maxWidth:'100%', padding:'10px 16px', display:'flex', alignItems:'center', gap:8 },
 
-  studyPillRow: { display:'flex', flexWrap:'wrap', gap:6, padding:'0 16px 8px' },
+  studyPillRow: { display:'flex', flexWrap:'wrap', gap:6, padding:'0 16px 8px', justifyContent:'center' },
   studyPill: {
     display:'flex', alignItems:'center', gap:5, padding:'4px 10px',
     borderRadius:99, border:'1px solid var(--border)', background:'none',
