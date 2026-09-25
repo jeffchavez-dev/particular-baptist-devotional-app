@@ -414,6 +414,72 @@ function StudyLayerPills({ layers, onToggle, styles: r }) {
   )
 }
 
+/* ── Desktop right-side commentary panel ── */
+function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries }) {
+  const lastSecRef = React.useRef(null)
+
+  // Find last section whose range starts at or before the visible verse
+  const activeIdx = (() => {
+    if (!sections.length) return -1
+    // Sections with no startVerse (intro) always qualify as index 0
+    let idx = -1
+    for (let i = 0; i < sections.length; i++) {
+      const sv = sections[i].startVerse
+      if (sv == null || sv <= visVerse) idx = i
+    }
+    return idx
+  })()
+
+  const activeSec = activeIdx >= 0 ? sections[activeIdx] : lastSecRef.current
+  if (activeIdx >= 0) lastSecRef.current = sections[activeIdx]
+
+  const comKeys = Object.keys(commentaries)
+
+  return (
+    <div style={{ ...r.comPanel, top: topInset }}>
+      {/* Header: commentary selector */}
+      <div style={r.comPanelHeader}>
+        <span style={r.comPanelLabel}>Commentary</span>
+        <div style={r.comPanelTabs}>
+          {comKeys.map(id => (
+            <button key={id}
+              style={{ ...r.comPanelTab, ...(comId === id ? r.comPanelTabActive : {}) }}
+              onClick={() => onChangeId(id)}
+            >
+              {commentaries[id].shortName}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={r.comPanelBody}>
+        {isLoading && (
+          <div style={r.comLoadingRow}>
+            <div style={r.comSpinner} />
+            <span style={r.comLoadingText}>Loading {commentaries[comId]?.shortName}…</span>
+          </div>
+        )}
+        {!isLoading && !activeSec && (
+          <div style={r.comPanelEmpty}>No commentary for this passage.</div>
+        )}
+        {!isLoading && activeSec && (
+          <div>
+            {activeSec.heading ? (
+              <div style={r.comPanelSecHeading}>{activeSec.heading}</div>
+            ) : null}
+            <div style={r.comPanelSecBody} onClick={onLinkClick}>
+              {activeSec.paragraphs.map((html, pi) => (
+                <p key={pi} style={r.comPanelPara} dangerouslySetInnerHTML={{ __html: linkifyCommentaryRefs(html) }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ── Highlight colour picker popup ── */
 function ColorPicker({ currentColor, onSelect, onClose }) {
   const ref = useRef(null)
@@ -1475,6 +1541,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
      Kept separate from book/chapter so updating it never resets segments. */
   const [visBook,    setVisBook]    = useState(book)
   const [visChapter, setVisChapter] = useState(chapter)
+  const [visVerse,   setVisVerse]   = useState(1)
   /* Always-current refs so share/copy functions don't capture stale closure values */
   const visBookRef    = useRef(book)
   const visChapterRef = useRef(chapter)
@@ -1741,6 +1808,28 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     root.querySelectorAll('[data-seg-book]').forEach(el => observer.observe(el))
     return () => observer.disconnect()
   }, [segments, morphSegments])
+
+  /* Verse-level scroll-spy — drives the desktop commentary panel */
+  useEffect(() => {
+    if (isMobile) return
+    const root = readerRef.current
+    if (!root) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const v = parseInt(entry.target.dataset.anchorVerse, 10)
+          if (v) setVisVerse(v)
+        }
+      },
+      { root, rootMargin: '0px 0px -55% 0px', threshold: 0 }
+    )
+    root.querySelectorAll('[data-anchor-verse]').forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [segments, morphSegments, isMobile])
+
+  /* Reset visVerse on chapter navigation */
+  useEffect(() => { setVisVerse(1) }, [visChapter, visBook])
 
   /* Refresh highlights + notes when a cross-device sync completes */
   useEffect(() => {
@@ -3250,8 +3339,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           </div>
         )}
 
-        {/* ── Commentary selector (sidebar) — only in study mode with commentary layer on ── */}
-        {studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (
+        {/* ── Commentary selector (sidebar) — mobile only; desktop uses the right panel header ── */}
+        {isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (
           <div style={{ padding:'0 12px 4px', borderBottom:'1px solid var(--border)' }} data-onboarding="commentary-selector">
             <div style={{ fontSize:11, fontWeight:600, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif", textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:6 }}>Commentary</div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
@@ -3334,7 +3423,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
-        <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)' }}>
+        <div style={{ ...r.content, maxWidth: isMobile ? 720 : 'calc((100vw - 220px) * 0.8)', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? 356 : undefined }}>
 
           {/* ══════════════════════════════════════════════
               BOOK OUTLINE VIEW (chapter === 0)
@@ -4034,8 +4123,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           <React.Fragment key={verse}>
                             {renderBsbSectionHeadings(seg.book, seg.chapter, verse)}
 
-                            {/* ── Inline commentary chips (study mode) ── */}
-                            {studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (() => {
+                            {/* ── Inline commentary chips (mobile study mode only) ── */}
+                            {isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (() => {
                               const segKey  = `${seg.book}|${seg.chapter}`
                               const comData = inlineComData[segKey]
                               const sections = comData?.sections ?? []
@@ -4824,6 +4913,42 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         </div>
       </div>
 
+      {/* ── Desktop commentary right panel ── */}
+      {!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version) && (() => {
+        const segKey  = `${visBook}|${visChapter}`
+        const comData = inlineComData[segKey]
+        const sections  = comData?.sections ?? []
+        const isLoading = !!comData?.loading
+        return (
+          <CommentaryRightPanel
+            comId={inlineComId}
+            sections={sections}
+            isLoading={isLoading}
+            visVerse={visVerse}
+            expanded={inlineComExp}
+            onToggle={(k) => setInlineComExp(prev => ({ ...prev, [k]: !prev[k] }))}
+            onChangeId={setInlineComId}
+            onLinkClick={(e) => {
+              const a = e.target.closest('a')
+              if (!a) return
+              e.preventDefault()
+              const inapp = a.getAttribute('data-inapp-ref')
+              if (inapp) {
+                const [b, ch, v] = inapp.split('|')
+                setAuthorRefModal({ ref: { tgt_book: b, tgt_chapter: parseInt(ch, 10), tgt_verse: v ? parseInt(v, 10) : null } })
+                return
+              }
+              const parsed = parseBibleHubHref(a.getAttribute('href'))
+              if (!parsed) return
+              setAuthorRefModal({ ref: { tgt_book: parsed.book, tgt_chapter: parsed.chapter, tgt_verse: parsed.verse || null } })
+            }}
+            styles={r}
+            topInset={topInset}
+            commentaries={COMMENTARIES}
+          />
+        )
+      })()}
+
       {/* ── Floating action bar — tap to select verses, then act ── */}
       {(selectedVerses.size > 0 || !!wordSelStart || (Array.isArray(partialRange) ? partialRange.length > 0 : !!partialRange)) && (
         <div style={r.floatingBar}>
@@ -5557,6 +5682,58 @@ const r = {
   comSelectorBtnActive: {
     background:'var(--gold-faint)', borderColor:'var(--gold)',
     color:'var(--gold-dark,#92400e)',
+  },
+  comPanel: {
+    position:'fixed', right:0, width:340,
+    bottom:0,
+    display:'flex', flexDirection:'column',
+    background:'var(--surface)',
+    borderLeft:'1px solid var(--border)',
+    zIndex:80,
+    overflow:'hidden',
+  },
+  comPanelHeader: {
+    display:'flex', flexDirection:'column', gap:6,
+    padding:'12px 14px 10px',
+    borderBottom:'1px solid var(--border)',
+    flexShrink:0,
+  },
+  comPanelLabel: {
+    fontSize:10, fontWeight:700, letterSpacing:'0.08em',
+    textTransform:'uppercase', color:'var(--ink-faint)',
+    fontFamily:"'DM Sans',sans-serif",
+  },
+  comPanelTabs: {
+    display:'flex', gap:4,
+  },
+  comPanelTab: {
+    fontSize:11, fontWeight:600, padding:'3px 10px',
+    borderRadius:99, border:'1px solid var(--border)',
+    background:'transparent', color:'var(--ink-muted)',
+    cursor:'pointer', fontFamily:"'DM Sans',sans-serif",
+    transition:'background 0.12s, color 0.12s',
+  },
+  comPanelTabActive: {
+    background:'rgba(146,94,20,0.10)', color:'var(--gold)',
+    borderColor:'rgba(146,94,20,0.28)',
+  },
+  comPanelBody: {
+    flex:1, overflowY:'auto', padding:'14px 16px',
+  },
+  comPanelSecHeading: {
+    fontSize:12, fontWeight:700, color:'var(--gold)',
+    fontFamily:"'DM Sans',sans-serif",
+    marginBottom:10, lineHeight:1.4,
+  },
+  comPanelSecBody: {},
+  comPanelPara: {
+    fontSize:12, lineHeight:1.75, color:'var(--ink)',
+    fontFamily:'Georgia, serif', marginBottom:10,
+  },
+  comPanelEmpty: {
+    fontSize:12, color:'var(--ink-faint)',
+    fontFamily:"'DM Sans',sans-serif",
+    padding:'24px 0', textAlign:'center',
   },
   comLoadingRow: {
     display:'flex', alignItems:'center', gap:8,
