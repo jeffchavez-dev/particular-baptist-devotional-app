@@ -3307,7 +3307,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
         boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
         ...(isMobile ? {
-          position:'fixed', left:0, top:0, bottom:0, zIndex:200,
+          position:'fixed', left:0, top: topInset, bottom:0, zIndex:215,
           width: 360,
         } : { top: topInset }),
       }}>
