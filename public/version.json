@@ -1,1 +1,1 @@
-{"version":"1.10.73","date":"2026-09-26","changelog":"Line spacing now applies to parallel panels (GNT, HOT, LXX) as well as the main text."}
+{"version":"1.10.74","date":"2026-09-26","changelog":"Fixed copying Greek/Hebrew text — words now copy with proper spaces between them."}

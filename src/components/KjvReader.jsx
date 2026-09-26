@@ -4501,7 +4501,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                                 }}
                                                 title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s || ''}`}
                                               >
-                                                {wd.w}
+                                                {wd.w}{' '}
                                               </span>
                                             )
                                           })}
@@ -4605,7 +4605,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                                 }}
                                                 title={lw.s || ''}
                                               >
-                                                {lw.w}
+                                                {lw.w}{' '}
                                               </span>
                                             )
                                           })}
