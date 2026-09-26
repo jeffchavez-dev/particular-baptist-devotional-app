@@ -32,7 +32,7 @@ import BookCelebration from './BookCelebration'
 import ConfessionModal from './ConfessionModal'
 import StrongsModal from './StrongsModal'
 import { usePrefs, useAuth } from '../App'
-import { getFontCss, getGreekFontCss, getHebrewFontCss, LINE_SPACING_OPTIONS, CONTENT_WIDTH_OPTIONS } from './FontPrefsPanel'
+import { getFontCss, getGreekFontCss, getHebrewFontCss } from './FontPrefsPanel'
 import {
   HIGHLIGHT_COLORS, getHlStyle,
   loadHighlights, loadItemNotes,
@@ -3279,8 +3279,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
     )
   }
 
-  const lineSpacingOpt = LINE_SPACING_OPTIONS.find(o => o.id === (prefs.lineSpacing ?? 'normal')) || LINE_SPACING_OPTIONS[1]
-  const contentWidthOpt = CONTENT_WIDTH_OPTIONS.find(o => o.id === (prefs.contentWidth ?? 'normal')) || CONTENT_WIDTH_OPTIONS[1]
+  const lineSpacingVal = typeof prefs.lineSpacing === 'number' ? prefs.lineSpacing : 1.85
+  const contentWidthVal = typeof prefs.contentWidth === 'number' ? prefs.contentWidth : 720
 
   return (
     <div style={r.wrap}>
@@ -3503,7 +3503,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
-        <div style={{ ...r.content, maxWidth: isMobile ? contentWidthOpt.maxWidth : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : Math.min(contentWidthOpt.maxWidth, window.innerWidth - 220) + 'px', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
+        <div style={{ ...r.content, maxWidth: isMobile ? contentWidthVal : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : Math.min(contentWidthVal, window.innerWidth - 220) + 'px', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
 
           {/* ══════════════════════════════════════════════
               BOOK OUTLINE VIEW (chapter === 0)
@@ -4286,7 +4286,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                           >
                             {/* ── main verse row — verse number = full verse select; text = two-tap partial highlight ── */}
                             <div style={(!isMobile && prefs.parallelLayout === 'columns') ? { display:'flex', alignItems:'flex-start', gap:12, width:'100%' } : {}}>
-                            <div style={{ ...r.verseRow, lineHeight: lineSpacingOpt.rowHeight, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex:1, minWidth:0 } : {}) }}>
+                            <div style={{ ...r.verseRow, lineHeight: lineSpacingVal, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex:1, minWidth:0 } : {}) }}>
                               <span
                                 style={{ ...r.verseNum, ...(hlColorId ? { color: hlStyle.numClr, background: hlStyle.numBg } : {}), cursor: 'pointer', userSelect: 'none' }}
                                 onClick={e => { e.stopPropagation(); toggleVerse(verseKey) }}
@@ -4335,7 +4335,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     style={{
                                       ...r.verseText,
                                       fontSize: prefs.sizePx,
-                                      lineHeight: lineSpacingOpt.lineHeight,
+                                      lineHeight: lineSpacingVal,
                                       fontFamily: version === 'lxx'
                                         ? getGreekFontCss(prefs.greekFontId)
                                         : getFontCss(prefs.fontId),

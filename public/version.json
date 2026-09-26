@@ -1,1 +1,1 @@
-{"version":"1.10.71","date":"2026-09-26","changelog":"Added live scripture preview in Settings — updates instantly as you change font, size, line spacing, and content width."}
+{"version":"1.10.72","date":"2026-09-26","changelog":"Line spacing and content width now use numeric steppers (like font size) for precise control."}

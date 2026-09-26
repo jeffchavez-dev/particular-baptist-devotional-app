@@ -100,18 +100,19 @@ export function getHebrewFontCss(fontId) {
 }
 
 const PREFS_KEY = 'pb-reading-prefs'
-export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl', includeOrthodox: false, parallelLayout: 'inline', lineSpacing: 'normal', contentWidth: 'normal' }
+export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl', includeOrthodox: false, parallelLayout: 'inline', lineSpacing: 1.85, contentWidth: 720 }
 
-export const LINE_SPACING_OPTIONS = [
-  { id: 'compact',  label: 'Compact',  lineHeight: 1.55, rowHeight: 1.45 },
-  { id: 'normal',   label: 'Normal',   lineHeight: 1.85, rowHeight: 1.8  },
-  { id: 'relaxed',  label: 'Relaxed',  lineHeight: 2.2,  rowHeight: 2.15 },
-]
-export const CONTENT_WIDTH_OPTIONS = [
-  { id: 'narrow', label: 'Narrow', maxWidth: 560 },
-  { id: 'normal', label: 'Normal', maxWidth: 720 },
-  { id: 'wide',   label: 'Wide',   maxWidth: 900 },
-]
+export const LINE_SPACING_MIN  = 1.2
+export const LINE_SPACING_MAX  = 2.8
+export const LINE_SPACING_STEP = 0.1
+
+export const CONTENT_WIDTH_MIN  = 400
+export const CONTENT_WIDTH_MAX  = 1000
+export const CONTENT_WIDTH_STEP = 40
+
+// kept for KjvReader compatibility — derives values directly from numeric prefs
+export const LINE_SPACING_OPTIONS = []
+export const CONTENT_WIDTH_OPTIONS = []
 
 export function loadPrefs() {
   try {

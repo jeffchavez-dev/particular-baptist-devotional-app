@@ -6,7 +6,7 @@ import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { useOnboardingCtx } from '../App'
-import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS, LINE_SPACING_OPTIONS, CONTENT_WIDTH_OPTIONS } from '../components/FontPrefsPanel'
+import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS, LINE_SPACING_MIN, LINE_SPACING_MAX, LINE_SPACING_STEP, CONTENT_WIDTH_MIN, CONTENT_WIDTH_MAX, CONTENT_WIDTH_STEP } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll, syncBibleProgressDown } from '../lib/supabase'
 import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
 import { syncMultiPlansUp, syncMultiPlansDown } from '../lib/multiPlan'
@@ -699,171 +699,97 @@ export default function AboutPage() {
             {/* Notifications */}
             <NotificationSettings userId={session?.user?.id} />
 
-            {/* Live preview */}
-            <div style={{
-              borderRadius: 10, border: '1px solid var(--border)',
-              background: 'var(--parchment)', padding: '16px 20px', marginBottom: 4,
-            }}>
-              <div style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-                color: 'var(--ink-faint)', fontFamily: "'DM Sans',sans-serif", marginBottom: 10,
-              }}>Preview</div>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: 'var(--teal)', minWidth: 18,
-                  fontFamily: "'DM Sans',sans-serif", paddingTop: 3,
-                }}>1</span>
-                <span style={{
-                  fontFamily: activeFont.css,
-                  fontSize: prefs.sizePx,
-                  lineHeight: (LINE_SPACING_OPTIONS.find(o => o.id === (prefs.lineSpacing ?? 'normal')) || LINE_SPACING_OPTIONS[1]).lineHeight,
-                  color: 'var(--ink)',
-                  maxWidth: (CONTENT_WIDTH_OPTIONS.find(o => o.id === (prefs.contentWidth ?? 'normal')) || CONTENT_WIDTH_OPTIONS[1]).maxWidth,
-                  transition: 'font-size 0.15s, line-height 0.15s',
-                }}>
-                  For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.
-                </span>
-              </div>
-            </div>
+            {/* ── Reading Preferences compact block ── */}
+            {(() => {
+              const lineSpacing = typeof prefs.lineSpacing === 'number' ? prefs.lineSpacing : 1.85
+              const contentWidth = typeof prefs.contentWidth === 'number' ? prefs.contentWidth : 720
+              const labelStyle = { fontSize:10, fontWeight:700, color:'var(--ink-faint)', fontFamily:"'DM Sans',sans-serif", marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em' }
+              const cellStyle = (extra={}) => ({ padding:'10px 14px', ...extra })
+              const stepBtn = (disabled) => ({ ...s.sizeStepBtn, opacity: disabled ? 0.35 : 1 })
+              return (
+                <div style={{ border:'1px solid var(--border)', borderRadius:12, overflow:'hidden', marginBottom:4 }}>
 
-            {/* Font Size */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Reading Font Size</span>
-                <span style={s.settingHint}>Applies to confession &amp; reading text</span>
-              </div>
-              <div style={s.sizeRow}>
-                <button
-                  onClick={() => updatePrefs({ ...prefs, sizePx: Math.max(FONT_SIZE_MIN, prefs.sizePx - FONT_SIZE_STEP) })}
-                  disabled={prefs.sizePx <= FONT_SIZE_MIN}
-                  title="Decrease font size"
-                  style={{ ...s.sizeStepBtn, opacity: prefs.sizePx <= FONT_SIZE_MIN ? 0.35 : 1 }}
-                >A<sup style={{fontSize:'0.6em',lineHeight:1}}>−</sup></button>
-                <span style={s.sizeCurrent}>{prefs.sizePx}px</span>
-                <button
-                  onClick={() => updatePrefs({ ...prefs, sizePx: Math.min(FONT_SIZE_MAX, prefs.sizePx + FONT_SIZE_STEP) })}
-                  disabled={prefs.sizePx >= FONT_SIZE_MAX}
-                  title="Increase font size"
-                  style={{ ...s.sizeStepBtn, fontSize: prefs.sizePx * 0.8, fontFamily: activeFont.css, opacity: prefs.sizePx >= FONT_SIZE_MAX ? 0.35 : 1 }}
-                >A<sup style={{fontSize:'0.6em',lineHeight:1}}>+</sup></button>
-              </div>
-            </div>
+                  {/* Live preview */}
+                  <div style={{ background:'var(--parchment)', padding:'14px 16px', borderBottom:'1px solid var(--border)' }}>
+                    <div style={{ ...labelStyle, marginBottom:10 }}>Preview</div>
+                    {[
+                      { num:16, text:'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.' },
+                      { num:17, text:'For God sent not his Son into the world to condemn the world; but that the world through him might be saved.' },
+                    ].map(v => (
+                      <div key={v.num} style={{ display:'flex', gap:10, alignItems:'flex-start', marginBottom: v.num===16 ? 6 : 0 }}>
+                        <span style={{ fontSize:10, fontWeight:700, color:'var(--teal)', minWidth:18, fontFamily:"'DM Sans',sans-serif", paddingTop:3, flexShrink:0 }}>{v.num}</span>
+                        <span style={{ fontFamily:activeFont.css, fontSize:prefs.sizePx, color:'var(--ink)', lineHeight:lineSpacing, transition:'font-size 0.15s, line-height 0.15s' }}>{v.text}</span>
+                      </div>
+                    ))}
+                  </div>
 
-            {/* Font Style */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Reading Font Style</span>
-                <span style={s.settingHint}>Typeface for confession &amp; reading text</span>
-              </div>
-              <div style={s.fontDropdownWrap}>
-                <FontDropdown
-                  value={prefs.fontId}
-                  options={FONT_OPTIONS}
-                  onChange={id => updatePrefs({ ...prefs, fontId: id })}
-                  sampleKey="sample"
-                />
-              </div>
-            </div>
+                  {/* Font size + style */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid var(--border)' }}>
+                    <div style={cellStyle({ borderRight:'1px solid var(--border)' })}>
+                      <div style={labelStyle}>Font Size</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <button onClick={() => updatePrefs({ ...prefs, sizePx: Math.max(FONT_SIZE_MIN, prefs.sizePx - FONT_SIZE_STEP) })} disabled={prefs.sizePx <= FONT_SIZE_MIN} style={stepBtn(prefs.sizePx <= FONT_SIZE_MIN)}>A<sup style={{fontSize:'0.6em',lineHeight:1}}>−</sup></button>
+                        <span style={s.sizeCurrent}>{prefs.sizePx}px</span>
+                        <button onClick={() => updatePrefs({ ...prefs, sizePx: Math.min(FONT_SIZE_MAX, prefs.sizePx + FONT_SIZE_STEP) })} disabled={prefs.sizePx >= FONT_SIZE_MAX} style={{ ...stepBtn(prefs.sizePx >= FONT_SIZE_MAX), fontSize: prefs.sizePx * 0.8, fontFamily: activeFont.css }}>A<sup style={{fontSize:'0.6em',lineHeight:1}}>+</sup></button>
+                      </div>
+                    </div>
+                    <div style={cellStyle()}>
+                      <div style={labelStyle}>Font Style</div>
+                      <FontDropdown value={prefs.fontId} options={FONT_OPTIONS} onChange={id => updatePrefs({ ...prefs, fontId: id })} sampleKey="sample" />
+                    </div>
+                  </div>
 
-            {/* Greek Script Font */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Greek NT Font</span>
-                <span style={s.settingHint}>Typeface for Greek New Testament text</span>
-              </div>
-              <div style={s.fontDropdownWrap}>
-                <FontDropdown
-                  value={prefs.greekFontId}
-                  options={GREEK_FONTS}
-                  onChange={id => updatePrefs({ ...prefs, greekFontId: id })}
-                  sampleKey="sample"
-                />
-              </div>
-            </div>
+                  {/* Greek + Hebrew */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid var(--border)' }}>
+                    <div style={cellStyle({ borderRight:'1px solid var(--border)' })}>
+                      <div style={labelStyle}>Greek NT</div>
+                      <FontDropdown value={prefs.greekFontId} options={GREEK_FONTS} onChange={id => updatePrefs({ ...prefs, greekFontId: id })} sampleKey="sample" />
+                    </div>
+                    <div style={cellStyle()}>
+                      <div style={labelStyle}>Hebrew OT</div>
+                      <FontDropdown value={prefs.hebrewFontId} options={HEBREW_FONTS} onChange={id => updatePrefs({ ...prefs, hebrewFontId: id })} sampleKey="sample" />
+                    </div>
+                  </div>
 
-            {/* Hebrew Script Font */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Hebrew OT Font</span>
-                <span style={s.settingHint}>Typeface for Hebrew Old Testament text</span>
-              </div>
-              <div style={s.fontDropdownWrap}>
-                <FontDropdown
-                  value={prefs.hebrewFontId}
-                  options={HEBREW_FONTS}
-                  onChange={id => updatePrefs({ ...prefs, hebrewFontId: id })}
-                  sampleKey="sample"
-                />
-              </div>
-            </div>
+                  {/* Line spacing + content width — numeric steppers */}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid var(--border)' }}>
+                    <div style={cellStyle({ borderRight:'1px solid var(--border)' })}>
+                      <div style={labelStyle}>Line Spacing</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <button onClick={() => updatePrefs({ ...prefs, lineSpacing: Math.max(LINE_SPACING_MIN, +(lineSpacing - LINE_SPACING_STEP).toFixed(2)) })} disabled={lineSpacing <= LINE_SPACING_MIN} style={stepBtn(lineSpacing <= LINE_SPACING_MIN)}>−</button>
+                        <span style={s.sizeCurrent}>{lineSpacing.toFixed(1)}</span>
+                        <button onClick={() => updatePrefs({ ...prefs, lineSpacing: Math.min(LINE_SPACING_MAX, +(lineSpacing + LINE_SPACING_STEP).toFixed(2)) })} disabled={lineSpacing >= LINE_SPACING_MAX} style={stepBtn(lineSpacing >= LINE_SPACING_MAX)}>+</button>
+                      </div>
+                    </div>
+                    <div style={cellStyle()}>
+                      <div style={labelStyle}>Content Width</div>
+                      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                        <button onClick={() => updatePrefs({ ...prefs, contentWidth: Math.max(CONTENT_WIDTH_MIN, contentWidth - CONTENT_WIDTH_STEP) })} disabled={contentWidth <= CONTENT_WIDTH_MIN} style={stepBtn(contentWidth <= CONTENT_WIDTH_MIN)}>−</button>
+                        <span style={s.sizeCurrent}>{contentWidth}px</span>
+                        <button onClick={() => updatePrefs({ ...prefs, contentWidth: Math.min(CONTENT_WIDTH_MAX, contentWidth + CONTENT_WIDTH_STEP) })} disabled={contentWidth >= CONTENT_WIDTH_MAX} style={stepBtn(contentWidth >= CONTENT_WIDTH_MAX)}>+</button>
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Parallel View Layout — desktop/tablet only */}
-            {window.innerWidth >= 768 && <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Parallel View Layout</span>
-                <span style={s.settingHint}>How parallel Bible versions appear alongside each verse</span>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                {[{ id: 'inline', label: 'Inline' }, { id: 'columns', label: 'Side by side' }].map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => updatePrefs({ ...prefs, parallelLayout: opt.id })}
-                    style={{
-                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
-                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
-                      border: prefs.parallelLayout === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
-                      background: prefs.parallelLayout === opt.id ? 'var(--teal-light)' : 'transparent',
-                      color: prefs.parallelLayout === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
-                      transition:'background 0.12s, color 0.12s',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>}
-
-            {/* Line Spacing */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Line Spacing</span>
-                <span style={s.settingHint}>Vertical space between lines of scripture text</span>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                {LINE_SPACING_OPTIONS.map(opt => (
-                  <button key={opt.id} onClick={() => updatePrefs({ ...prefs, lineSpacing: opt.id })}
-                    style={{
-                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
-                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
-                      border: (prefs.lineSpacing ?? 'normal') === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
-                      background: (prefs.lineSpacing ?? 'normal') === opt.id ? 'var(--teal-light)' : 'transparent',
-                      color: (prefs.lineSpacing ?? 'normal') === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
-                      transition:'background 0.12s, color 0.12s',
-                    }}>{opt.label}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Content Width */}
-            <div style={s.settingRow}>
-              <div style={s.settingLabel}>
-                <span style={s.settingName}>Content Width</span>
-                <span style={s.settingHint}>How wide the scripture text column appears</span>
-              </div>
-              <div style={{ display:'flex', gap:6 }}>
-                {CONTENT_WIDTH_OPTIONS.map(opt => (
-                  <button key={opt.id} onClick={() => updatePrefs({ ...prefs, contentWidth: opt.id })}
-                    style={{
-                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
-                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
-                      border: (prefs.contentWidth ?? 'normal') === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
-                      background: (prefs.contentWidth ?? 'normal') === opt.id ? 'var(--teal-light)' : 'transparent',
-                      color: (prefs.contentWidth ?? 'normal') === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
-                      transition:'background 0.12s, color 0.12s',
-                    }}>{opt.label}</button>
-                ))}
-              </div>
-            </div>
+                  {/* Parallel layout — desktop only */}
+                  {window.innerWidth >= 768 && (
+                    <div style={cellStyle()}>
+                      <div style={labelStyle}>Parallel Layout</div>
+                      <div style={{ display:'flex', gap:4 }}>
+                        {[{ id:'inline', label:'Inline' }, { id:'columns', label:'Side by side' }].map(opt => (
+                          <button key={opt.id} onClick={() => updatePrefs({ ...prefs, parallelLayout: opt.id })} style={{
+                            padding:'4px 14px', borderRadius:99, fontSize:11, fontWeight:700, fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                            border: prefs.parallelLayout === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
+                            background: prefs.parallelLayout === opt.id ? 'var(--teal-light)' : 'transparent',
+                            color: prefs.parallelLayout === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
+                          }}>{opt.label}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Default Bible Translation */}
             <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12, overflow:'hidden'}}>
