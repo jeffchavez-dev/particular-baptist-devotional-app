@@ -936,6 +936,7 @@ const sp = {
     display:'flex', flexDirection:'column',
     transition:'transform 0.25s', fontFamily:"'DM Sans',sans-serif",
     overflow:'hidden',
+    paddingTop:'env(safe-area-inset-top, 0px)',
   },
   panelHeader: {
     display:'flex', alignItems:'center', justifyContent:'space-between',
