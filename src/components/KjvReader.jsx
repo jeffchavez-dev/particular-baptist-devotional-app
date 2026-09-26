@@ -4466,7 +4466,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const parseMorphDetailFn = isHeb ? parseHebrewMorphDetails : parseMorphDetails
 
                               return (
-                                <div style={{ ...r.parallelBlock, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex: sideOpen ? '0 0 42%' : 1, minWidth:180, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
+                                <div style={{ ...r.parallelBlock, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex: 1, minWidth:0, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
 
                                   {/* ── GNT / HOT word chips ── */}
                                   {morphVerse && (
@@ -4656,7 +4656,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const lxxVerse = parallelLxxData[`${seg.book}:${seg.chapter}`]?.find(pv => (pv.v ?? pv.verse) === verse)
                               const cols = !isMobile && prefs.parallelLayout === 'columns'
                               return (
-                                <div style={{ ...r.parallelBlock, ...(cols ? { flex: sideOpen ? '0 0 42%' : 1, minWidth:180, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : { borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }) }}>
+                                <div style={{ ...r.parallelBlock, ...(cols ? { flex: 1, minWidth:0, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : { borderTop: morphVerse || lxxVerse ? 'none' : '1px solid var(--border)', paddingTop: morphVerse || lxxVerse ? 0 : 8 }) }}>
                                   <div style={r.parallelLine}>
                                     <span style={{ ...r.parallelBadge, background:'rgba(120,80,20,0.10)', color:'var(--amber-ink)' }}>
                                       {tLabel}

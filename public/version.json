@@ -1,1 +1,1 @@
-{"version":"1.10.67","date":"2026-09-26","changelog":"Verse selection toolbar now dismisses when opening the sidebar or switching Bible version."}
+{"version":"1.10.68","date":"2026-09-26","changelog":"Fixed parallel columns having unequal widths when the sidebar is open — all columns now share space equally."}
