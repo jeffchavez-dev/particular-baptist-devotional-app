@@ -283,33 +283,9 @@ export default function FontPrefsPanel({ prefs, onUpdate }) {
             />
           </div>
 
-          <div style={p.divider} />
-
-          {/* Line spacing */}
-          <div style={p.row}>
-            <span style={p.rowLabel}>Spacing</span>
-            <SegmentedControl
-              value={prefs.lineSpacing ?? 'normal'}
-              options={LINE_SPACING_OPTIONS}
-              onChange={id => set({ lineSpacing: id })}
-            />
-          </div>
-
-          <div style={p.divider} />
-
-          {/* Content width */}
-          <div style={p.row}>
-            <span style={p.rowLabel}>Width</span>
-            <SegmentedControl
-              value={prefs.contentWidth ?? 'normal'}
-              options={CONTENT_WIDTH_OPTIONS}
-              onChange={id => set({ contentWidth: id })}
-            />
-          </div>
-
           {/* Reset */}
           <button
-            onClick={() => set({ sizePx: DEFAULT_PREFS.sizePx, fontId: DEFAULT_PREFS.fontId, lineSpacing: DEFAULT_PREFS.lineSpacing, contentWidth: DEFAULT_PREFS.contentWidth })}
+            onClick={() => set({ sizePx: DEFAULT_PREFS.sizePx, fontId: DEFAULT_PREFS.fontId })}
             style={p.resetBtn}
           >
             Reset to default

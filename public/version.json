@@ -1,1 +1,1 @@
-{"version":"1.10.69","date":"2026-09-26","changelog":"Added Line Spacing (Compact / Normal / Relaxed) and Content Width (Narrow / Normal / Wide) controls to the reading preferences panel (Aa button)."}
+{"version":"1.10.70","date":"2026-09-26","changelog":"Moved Line Spacing and Content Width controls to Settings page, under the reading font options."}

@@ -6,7 +6,7 @@ import { useAuth } from '../App'
 import { useTheme } from '../App'
 import { usePrefs } from '../App'
 import { useOnboardingCtx } from '../App'
-import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS } from '../components/FontPrefsPanel'
+import { FontDropdown, FONT_OPTIONS, FONT_SIZES, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP, GREEK_FONTS, HEBREW_FONTS, LINE_SPACING_OPTIONS, CONTENT_WIDTH_OPTIONS } from '../components/FontPrefsPanel'
 import { supabase, getLocalProgress, syncAll, syncBibleProgressDown } from '../lib/supabase'
 import { syncBooksUp, syncBooksDown } from '../lib/bookLibrary'
 import { syncMultiPlansUp, syncMultiPlansDown } from '../lib/multiPlan'
@@ -795,6 +795,48 @@ export default function AboutPage() {
                 ))}
               </div>
             </div>}
+
+            {/* Line Spacing */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Line Spacing</span>
+                <span style={s.settingHint}>Vertical space between lines of scripture text</span>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {LINE_SPACING_OPTIONS.map(opt => (
+                  <button key={opt.id} onClick={() => updatePrefs({ ...prefs, lineSpacing: opt.id })}
+                    style={{
+                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
+                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                      border: (prefs.lineSpacing ?? 'normal') === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
+                      background: (prefs.lineSpacing ?? 'normal') === opt.id ? 'var(--teal-light)' : 'transparent',
+                      color: (prefs.lineSpacing ?? 'normal') === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
+                      transition:'background 0.12s, color 0.12s',
+                    }}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content Width */}
+            <div style={s.settingRow}>
+              <div style={s.settingLabel}>
+                <span style={s.settingName}>Content Width</span>
+                <span style={s.settingHint}>How wide the scripture text column appears</span>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {CONTENT_WIDTH_OPTIONS.map(opt => (
+                  <button key={opt.id} onClick={() => updatePrefs({ ...prefs, contentWidth: opt.id })}
+                    style={{
+                      padding:'5px 14px', borderRadius:99, fontSize:12, fontWeight:700,
+                      fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+                      border: (prefs.contentWidth ?? 'normal') === opt.id ? '1.5px solid var(--teal)' : '1.5px solid var(--border)',
+                      background: (prefs.contentWidth ?? 'normal') === opt.id ? 'var(--teal-light)' : 'transparent',
+                      color: (prefs.contentWidth ?? 'normal') === opt.id ? 'var(--teal)' : 'var(--ink-muted)',
+                      transition:'background 0.12s, color 0.12s',
+                    }}>{opt.label}</button>
+                ))}
+              </div>
+            </div>
 
             {/* Default Bible Translation */}
             <div style={{...s.settingRow, alignItems:'flex-start', flexWrap:'wrap', gap:12, overflow:'hidden'}}>
