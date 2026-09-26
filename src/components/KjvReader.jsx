@@ -1385,7 +1385,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
   }
 
   useImperativeHandle(ref, () => ({
-    openSidebar:    () => setSideOpen(true),
+    openSidebar:    () => { clearSelection(); setSideOpen(true) },
+    clearSelection: () => clearSelection(),
     setSearchQuery: (q) => { setSearchQuery(q); setSearchFocus(0); setBibleResults(null) },
     submitSearch:   (q) => submitSearch(q),
     clearSearch:    () => closeSearch(),
@@ -3289,7 +3290,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Desktop sidebar tabs — expand (Books) or collapse (Hide), same style */}
       {!isMobile && !sideOpen && (
         <button
-          onClick={() => setSideOpen(true)}
+          onClick={() => { clearSelection(); setSideOpen(true) }}
           style={{
             position:'absolute', left:0, top: topInset + 56, zIndex:110,
             display:'flex', alignItems:'center', gap:4,

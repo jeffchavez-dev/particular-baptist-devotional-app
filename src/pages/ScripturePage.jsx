@@ -768,6 +768,7 @@ export default function ScripturePage() {
           onVersionChange={v => {
             setReadVersion(v)
             try { localStorage.setItem('reader-version', v) } catch {}
+            kjvRef.current?.clearSelection()
           }}
           todayChapter={todayBibleChapter}
           onNavChange={(b, c) => { setReadBook(b); setReadChapter(c) }}
