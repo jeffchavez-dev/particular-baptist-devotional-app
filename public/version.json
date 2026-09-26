@@ -1,1 +1,1 @@
-{"version":"1.10.72","date":"2026-09-26","changelog":"Line spacing and content width now use numeric steppers (like font size) for precise control."}
+{"version":"1.10.73","date":"2026-09-26","changelog":"Line spacing now applies to parallel panels (GNT, HOT, LXX) as well as the main text."}

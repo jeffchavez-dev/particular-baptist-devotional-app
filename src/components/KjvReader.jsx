@@ -4481,7 +4481,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           background: isNT ? 'rgba(61,43,107,0.10)' : 'rgba(29,107,90,0.10)',
                                           color:      isNT ? '#3d2b6b' : '#1d6b5a',
                                         }}>{lang}</span>
-                                        <div style={{ direction: isHeb ? 'rtl' : 'ltr', flex:1, lineHeight:1.9 }}>
+                                        <div style={{ direction: isHeb ? 'rtl' : 'ltr', flex:1, lineHeight:lineSpacingVal }}>
                                           {morphVerse.words.map((wd, wi) => {
                                             const isSel = wi === morphWordSel
                                             return (
@@ -4585,7 +4585,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           background: 'rgba(12,74,110,0.10)',
                                           color: '#0c4a6e',
                                         }}>LXX</span>
-                                        <div style={{ flex:1, lineHeight:1.9 }}>
+                                        <div style={{ flex:1, lineHeight:lineSpacingVal }}>
                                           {lxxVerse.words.map((lw, wi) => {
                                             const isSel = wi === lxxWordSel
                                             return (
@@ -4665,7 +4665,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                     <span style={{ ...r.parallelBadge, background:'rgba(120,80,20,0.10)', color:'var(--amber-ink)' }}>
                                       {tLabel}
                                     </span>
-                                    <span style={{ fontSize: prefs.sizePx * 0.92, color:'var(--ink-muted)', lineHeight:1.7, flex:1 }}>
+                                    <span style={{ fontSize: prefs.sizePx * 0.92, color:'var(--ink-muted)', lineHeight:lineSpacingVal, flex:1 }}>
                                       {tVerse.text}
                                     </span>
                                   </div>
