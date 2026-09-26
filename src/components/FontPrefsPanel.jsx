@@ -1,5 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react'
 
+function SegmentedControl({ value, options, onChange }) {
+  return (
+    <div style={{ display:'flex', gap:2, flex:1 }}>
+      {options.map(opt => (
+        <button
+          key={opt.id}
+          onClick={() => onChange(opt.id)}
+          style={{
+            flex:1, padding:'4px 0', border:'1px solid var(--border)',
+            borderRadius:'var(--radius)', fontSize:10, fontWeight:600,
+            fontFamily:"'DM Sans',sans-serif", cursor:'pointer',
+            background: value === opt.id ? 'var(--teal)' : 'var(--parchment)',
+            color: value === opt.id ? 'white' : 'var(--ink-muted)',
+            transition:'background 0.12s, color 0.12s',
+          }}
+        >{opt.label}</button>
+      ))}
+    </div>
+  )
+}
+
 /* ── Font options ── */
 export const FONT_OPTIONS = [
   { id:'cormorant', label:'Cormorant',  css:"'Cormorant Garamond', Georgia, serif",             sample:'The fear of the Lord' },
@@ -79,7 +100,18 @@ export function getHebrewFontCss(fontId) {
 }
 
 const PREFS_KEY = 'pb-reading-prefs'
-export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl', includeOrthodox: false, parallelLayout: 'inline' }
+export const DEFAULT_PREFS = { sizePx: 16, fontId: 'cormorant', greekFontId: 'gentium', hebrewFontId: 'frankruhl', includeOrthodox: false, parallelLayout: 'inline', lineSpacing: 'normal', contentWidth: 'normal' }
+
+export const LINE_SPACING_OPTIONS = [
+  { id: 'compact',  label: 'Compact',  lineHeight: 1.55, rowHeight: 1.45 },
+  { id: 'normal',   label: 'Normal',   lineHeight: 1.85, rowHeight: 1.8  },
+  { id: 'relaxed',  label: 'Relaxed',  lineHeight: 2.2,  rowHeight: 2.15 },
+]
+export const CONTENT_WIDTH_OPTIONS = [
+  { id: 'narrow', label: 'Narrow', maxWidth: 560 },
+  { id: 'normal', label: 'Normal', maxWidth: 720 },
+  { id: 'wide',   label: 'Wide',   maxWidth: 900 },
+]
 
 export function loadPrefs() {
   try {
@@ -251,9 +283,33 @@ export default function FontPrefsPanel({ prefs, onUpdate }) {
             />
           </div>
 
+          <div style={p.divider} />
+
+          {/* Line spacing */}
+          <div style={p.row}>
+            <span style={p.rowLabel}>Spacing</span>
+            <SegmentedControl
+              value={prefs.lineSpacing ?? 'normal'}
+              options={LINE_SPACING_OPTIONS}
+              onChange={id => set({ lineSpacing: id })}
+            />
+          </div>
+
+          <div style={p.divider} />
+
+          {/* Content width */}
+          <div style={p.row}>
+            <span style={p.rowLabel}>Width</span>
+            <SegmentedControl
+              value={prefs.contentWidth ?? 'normal'}
+              options={CONTENT_WIDTH_OPTIONS}
+              onChange={id => set({ contentWidth: id })}
+            />
+          </div>
+
           {/* Reset */}
           <button
-            onClick={() => set({ sizePx: DEFAULT_PREFS.sizePx, fontId: DEFAULT_PREFS.fontId })}
+            onClick={() => set({ sizePx: DEFAULT_PREFS.sizePx, fontId: DEFAULT_PREFS.fontId, lineSpacing: DEFAULT_PREFS.lineSpacing, contentWidth: DEFAULT_PREFS.contentWidth })}
             style={p.resetBtn}
           >
             Reset to default
