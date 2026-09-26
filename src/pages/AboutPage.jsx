@@ -699,6 +699,33 @@ export default function AboutPage() {
             {/* Notifications */}
             <NotificationSettings userId={session?.user?.id} />
 
+            {/* Live preview */}
+            <div style={{
+              borderRadius: 10, border: '1px solid var(--border)',
+              background: 'var(--parchment)', padding: '16px 20px', marginBottom: 4,
+            }}>
+              <div style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                color: 'var(--ink-faint)', fontFamily: "'DM Sans',sans-serif", marginBottom: 10,
+              }}>Preview</div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--teal)', minWidth: 18,
+                  fontFamily: "'DM Sans',sans-serif", paddingTop: 3,
+                }}>1</span>
+                <span style={{
+                  fontFamily: activeFont.css,
+                  fontSize: prefs.sizePx,
+                  lineHeight: (LINE_SPACING_OPTIONS.find(o => o.id === (prefs.lineSpacing ?? 'normal')) || LINE_SPACING_OPTIONS[1]).lineHeight,
+                  color: 'var(--ink)',
+                  maxWidth: (CONTENT_WIDTH_OPTIONS.find(o => o.id === (prefs.contentWidth ?? 'normal')) || CONTENT_WIDTH_OPTIONS[1]).maxWidth,
+                  transition: 'font-size 0.15s, line-height 0.15s',
+                }}>
+                  For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.
+                </span>
+              </div>
+            </div>
+
             {/* Font Size */}
             <div style={s.settingRow}>
               <div style={s.settingLabel}>
