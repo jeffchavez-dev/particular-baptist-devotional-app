@@ -783,6 +783,8 @@ export default function ConfessionsPage() {
   const [navOpen,         setNavOpen]         = useState(() => window.innerWidth >= 768)
   const [kjvModal,      setKjvModal]      = useState(null)
   const [shareCard,     setShareCard]     = useState(null)
+  const [hymnPage,      setHymnPage]      = useState(1)
+  const HYMNS_PER_PAGE = 50
   const [isMobile,      setIsMobile]      = useState(() => window.innerWidth < 768)
   const [sidebarConf,   setSidebarConf]   = useState(tab || '2lbcf')
 
@@ -940,6 +942,9 @@ export default function ConfessionsPage() {
 
   /* Always restore chrome visibility when tab changes */
   useEffect(() => { setChromeVis(true) }, [tab])
+
+  /* Reset hymn pagination when tab or search changes */
+  useEffect(() => { setHymnPage(1) }, [tab, search])
 
   /* Pinch-to-zoom on content area */
   useEffect(() => {
@@ -1931,17 +1936,24 @@ export default function ConfessionsPage() {
           {/* ── Hymns ── */}
           {tab === 'hymns' && (() => {
             const allHymns = Object.entries(HYMN_TEXTS).sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-            const trinityHymns = allHymns.filter(([, h]) => h.collection === 'trinity')
-            const graceHymns   = allHymns.filter(([, h]) => h.collection === 'grace')
+            const filtered = q
+              ? allHymns.filter(([, h]) => h.firstLine.toLowerCase().includes(q) || h.text.toLowerCase().includes(q))
+              : allHymns
+            const visible = filtered.slice(0, hymnPage * HYMNS_PER_PAGE)
+            const hasMore = visible.length < filtered.length
+
+            // Group visible into trinity / grace
+            const trinityVisible = visible.filter(([, h]) => h.collection === 'trinity')
+            const graceVisible   = visible.filter(([, h]) => h.collection === 'grace')
+
             function HymnGroup({ hymns, groupLabel }) {
+              if (!hymns.length) return null
               return (
                 <div style={{ marginBottom: 32 }}>
                   <div style={s.chapterHeader}>
                     <h2 style={s.chapterTitle}>{groupLabel}</h2>
                   </div>
                   {hymns.map(([id, h]) => {
-                    const filt = q && !(h.firstLine.toLowerCase().includes(q) || h.text.toLowerCase().includes(q))
-                    if (filt) return null
                     const scriptureRef = HYMN_SCRIPTURE[id]
                     return (
                       <div key={id} id={`hymn-${id}`} style={hy.hymnRow}>
@@ -1966,8 +1978,18 @@ export default function ConfessionsPage() {
             }
             return (
               <div>
-                <HymnGroup hymns={trinityHymns} groupLabel="Trinity Hymnal — Baptist Edition" />
-                <HymnGroup hymns={graceHymns}   groupLabel="Grace Hymns" />
+                <HymnGroup hymns={trinityVisible} groupLabel="Trinity Hymnal — Baptist Edition" />
+                <HymnGroup hymns={graceVisible}   groupLabel="Grace Hymns" />
+                {hasMore && (
+                  <div style={{ textAlign:'center', padding:'16px 0 32px' }}>
+                    <button
+                      onClick={() => setHymnPage(p => p + 1)}
+                      style={{ padding:'8px 24px', borderRadius:99, border:'1px solid var(--border)', background:'var(--surface)', color:'var(--ink-muted)', fontSize:13, fontWeight:600, fontFamily:"'DM Sans',sans-serif", cursor:'pointer' }}
+                    >
+                      Load more ({filtered.length - visible.length} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })()}
