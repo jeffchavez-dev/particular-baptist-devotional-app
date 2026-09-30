@@ -3704,30 +3704,31 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                       const isSel    = isWordVerse && selectedWord?.wordIdx === wi
                                       const lbl      = getWordLabel(wd)
                                       return (
-                                        <span
-                                          key={wi}
-                                          style={{
-                                            ...r.greekToken,
-                                            ...(displayMode === 'orig' ? (isHeb ? r.hebrewTokenOrig : r.greekTokenGk) : {}),
-                                            ...(isSel ? r.greekTokenSel : {}),
-                                            fontSize: chipFontSize,
-                                            fontFamily: chipFontFamily,
-                                          }}
-                                          onClick={e => { e.stopPropagation(); handleWordTap(verseKey, wi) }}
-                                          title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s}`}
-                                        >
-                                          {lbl}
-                                          {msMarker && (
-                                            <sup style={{
-                                              fontSize:'0.55em', marginLeft:1, fontFamily:"'DM Sans',sans-serif",
-                                              color: isHeb
-                                                ? (msMarker === 'Q' ? '#5a3e8c' : '#1d6b5a')
-                                                : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c'),
-                                            }}>
-                                              {msMarker}
-                                            </sup>
-                                          )}
-                                        </span>
+                                        <React.Fragment key={wi}>
+                                          <span
+                                            style={{
+                                              ...r.greekToken,
+                                              ...(displayMode === 'orig' ? (isHeb ? r.hebrewTokenOrig : r.greekTokenGk) : {}),
+                                              ...(isSel ? r.greekTokenSel : {}),
+                                              fontSize: chipFontSize,
+                                              fontFamily: chipFontFamily,
+                                            }}
+                                            onClick={e => { e.stopPropagation(); handleWordTap(verseKey, wi) }}
+                                            title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s}`}
+                                          >
+                                            {lbl}
+                                            {msMarker && (
+                                              <sup style={{
+                                                fontSize:'0.55em', marginLeft:1, fontFamily:"'DM Sans',sans-serif",
+                                                color: isHeb
+                                                  ? (msMarker === 'Q' ? '#5a3e8c' : '#1d6b5a')
+                                                  : (msMarker === 'TR' ? '#7c5230' : '#3e5a8c'),
+                                              }}>
+                                                {msMarker}
+                                              </sup>
+                                            )}
+                                          </span>{' '}
+                                        </React.Fragment>
                                       )
                                     })}
                                   </div>
@@ -4298,34 +4299,35 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               <span style={r.verseBody}>
                                 {version === 'lxx' && lxxVerseWords ? (
                                   /* ── LXX clickable word chips ── */
-                                  <span style={{ display:'inline-flex', flexWrap:'wrap', gap:'2px 4px', alignItems:'baseline' }}>
+                                  <span style={{ display:'inline', lineHeight:'inherit' }}>
                                     {lxxVerseWords.map((wd, wi) => {
                                       const isSel = isLxxWordVerse && lxxReaderWord?.wordIdx === wi
                                       return (
-                                        <span
-                                          key={wi}
-                                          style={{
-                                            ...r.greekToken,
-                                            ...r.greekTokenGk,
-                                            ...(isSel ? r.greekTokenSel : {}),
-                                            fontSize: prefs.sizePx * 1.15,
-                                            fontFamily: getGreekFontCss(prefs.greekFontId),
-                                            cursor: wd.s ? 'pointer' : 'default',
-                                          }}
-                                          onClick={e => {
-                                            e.stopPropagation()
-                                            const same = lxxReaderWord?.verseKey === verseKey && lxxReaderWord?.wordIdx === wi
-                                            if (same) {
-                                              setLxxReaderWord(null)
-                                            } else {
-                                              setLxxReaderWord({ verseKey, wordIdx: wi })
-                                              setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
-                                            }
-                                          }}
-                                          title={wd.s || ''}
-                                        >
-                                          {wd.w}
-                                        </span>
+                                        <React.Fragment key={wi}>
+                                          <span
+                                            style={{
+                                              ...r.greekToken,
+                                              ...r.greekTokenGk,
+                                              ...(isSel ? r.greekTokenSel : {}),
+                                              fontSize: prefs.sizePx * 1.15,
+                                              fontFamily: getGreekFontCss(prefs.greekFontId),
+                                              cursor: wd.s ? 'pointer' : 'default',
+                                            }}
+                                            onClick={e => {
+                                              e.stopPropagation()
+                                              const same = lxxReaderWord?.verseKey === verseKey && lxxReaderWord?.wordIdx === wi
+                                              if (same) {
+                                                setLxxReaderWord(null)
+                                              } else {
+                                                setLxxReaderWord({ verseKey, wordIdx: wi })
+                                                setSelectedVerses(prev => { const next = new Set(prev); next.add(verseKey); return next })
+                                              }
+                                            }}
+                                            title={wd.s || ''}
+                                          >
+                                            {wd.w}
+                                          </span>{' '}
+                                        </React.Fragment>
                                       )
                                     })}
                                   </span>
@@ -4485,24 +4487,25 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           {morphVerse.words.map((wd, wi) => {
                                             const isSel = wi === morphWordSel
                                             return (
-                                              <span
-                                                key={wi}
-                                                style={{
-                                                  ...r.greekToken,
-                                                  ...(isHeb ? r.hebrewTokenOrig : r.greekTokenGk),
-                                                  ...(isSel ? r.greekTokenSel : {}),
-                                                  fontSize: isHeb ? hebSize : grSize,
-                                                  fontFamily: isHeb ? hebFont : grFont,
-                                                  cursor:'pointer',
-                                                }}
-                                                onClick={e => {
-                                                  e.stopPropagation()
-                                                  setParallelWord(isSel ? null : { verseKey: morphVK, lang, wordIdx: wi })
-                                                }}
-                                                title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s || ''}`}
-                                              >
-                                                {wd.w}{' '}
-                                              </span>
+                                              <React.Fragment key={wi}>
+                                                <span
+                                                  style={{
+                                                    ...r.greekToken,
+                                                    ...(isHeb ? r.hebrewTokenOrig : r.greekTokenGk),
+                                                    ...(isSel ? r.greekTokenSel : {}),
+                                                    fontSize: isHeb ? hebSize : grSize,
+                                                    fontFamily: isHeb ? hebFont : grFont,
+                                                    cursor:'pointer',
+                                                  }}
+                                                  onClick={e => {
+                                                    e.stopPropagation()
+                                                    setParallelWord(isSel ? null : { verseKey: morphVK, lang, wordIdx: wi })
+                                                  }}
+                                                  title={`${wd.w}  ${wd.t}  "${wd.g}"  ${wd.s || ''}`}
+                                                >
+                                                  {wd.w}
+                                                </span>{' '}
+                                              </React.Fragment>
                                             )
                                           })}
                                         </div>
@@ -4589,24 +4592,25 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                           {lxxVerse.words.map((lw, wi) => {
                                             const isSel = wi === lxxWordSel
                                             return (
-                                              <span
-                                                key={wi}
-                                                style={{
-                                                  ...r.greekToken,
-                                                  ...r.greekTokenGk,
-                                                  ...(isSel ? r.greekTokenSel : {}),
-                                                  fontSize: grSize,
-                                                  fontFamily: grFont,
-                                                  cursor: lw.s ? 'pointer' : 'default',
-                                                }}
-                                                onClick={e => {
-                                                  e.stopPropagation()
-                                                  setParallelWord(isSel ? null : { verseKey: lxxVK, lang: 'LXX', wordIdx: wi })
-                                                }}
-                                                title={lw.s || ''}
-                                              >
-                                                {lw.w}{' '}
-                                              </span>
+                                              <React.Fragment key={wi}>
+                                                <span
+                                                  style={{
+                                                    ...r.greekToken,
+                                                    ...r.greekTokenGk,
+                                                    ...(isSel ? r.greekTokenSel : {}),
+                                                    fontSize: grSize,
+                                                    fontFamily: grFont,
+                                                    cursor: lw.s ? 'pointer' : 'default',
+                                                  }}
+                                                  onClick={e => {
+                                                    e.stopPropagation()
+                                                    setParallelWord(isSel ? null : { verseKey: lxxVK, lang: 'LXX', wordIdx: wi })
+                                                  }}
+                                                  title={lw.s || ''}
+                                                >
+                                                  {lw.w}
+                                                </span>{' '}
+                                              </React.Fragment>
                                             )
                                           })}
                                         </div>

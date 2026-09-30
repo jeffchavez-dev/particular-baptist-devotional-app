@@ -1,1 +1,1 @@
-{"version":"1.10.75","date":"2026-09-28","changelog":"Fixed hymn page crash — hymns now load 50 at a time instead of all 819 at once."}
+{"version":"1.10.76","date":"2026-09-30","changelog":"Fixed copying Greek/Hebrew — spaces between words now appear correctly in all parallel views."}
