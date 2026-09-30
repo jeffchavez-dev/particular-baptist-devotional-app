@@ -1068,7 +1068,7 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, studyLayers: studyLayersProp, onToggleLayer, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, studyLayers: studyLayersProp, onToggleLayer, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true, idleHide = false }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -3303,6 +3303,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             color:'var(--ink-faint)', fontSize:11,
             fontFamily:"'DM Sans',sans-serif",
             boxShadow:'2px 2px 8px rgba(0,0,0,0.08)',
+            opacity: idleHide ? 0 : 1,
+            pointerEvents: idleHide ? 'none' : 'auto',
+            transition: 'opacity 0.6s ease',
           }}
           title="Show sidebar"
         >
@@ -3468,7 +3471,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         return (
           <>
             <button
-              style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev && chromeVis ? 1 : 0, pointerEvents: hasPrev && chromeVis ? 'auto' : 'none', transition: 'opacity 0.28s ease' }}
+              style={{ ...r.chNavArrow, left: leftOffset, opacity: hasPrev && chromeVis && !idleHide ? 1 : 0, pointerEvents: hasPrev && chromeVis && !idleHide ? 'auto' : 'none', transition: 'opacity 0.6s ease' }}
               onClick={() => {
                 // Always compute from bookRef/chapterRef (not render closure) so
                 // rapid taps see the most recent navigation target, not stale state.
@@ -3483,7 +3486,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               </svg>
             </button>
             <button
-              style={{ ...r.chNavArrow, right: 6, opacity: hasNext && chromeVis ? 1 : 0, pointerEvents: hasNext && chromeVis ? 'auto' : 'none', transition: 'opacity 0.28s ease' }}
+              style={{ ...r.chNavArrow, right: 6, opacity: hasNext && chromeVis && !idleHide ? 1 : 0, pointerEvents: hasNext && chromeVis && !idleHide ? 'auto' : 'none', transition: 'opacity 0.6s ease' }}
               onClick={() => {
                 // Same ref-based lookup for rapid-tap correctness.
                 const next = getNextChapter(bookRef.current, chapterRef.current)

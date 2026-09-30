@@ -1,1 +1,1 @@
-{"version":"1.10.76","date":"2026-09-30","changelog":"Fixed copying Greek/Hebrew — spaces between words now appear correctly in all parallel views."}
+{"version":"1.10.77","date":"2026-09-30","changelog":"Auto-hide UI on Scripture page: header, nav bar, arrows, and sidebar button fade after 3s of inactivity and reappear on any interaction."}

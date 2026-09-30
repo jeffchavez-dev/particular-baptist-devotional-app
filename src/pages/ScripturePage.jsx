@@ -159,6 +159,8 @@ export default function ScripturePage() {
   const headerHRef     = useRef(57)    // mutable ref — read inside scroll handler
   const [headerH,    setHeaderH]   = useState(57)
   const [chromeVis,  setChromeVis] = useState(true)
+  const [idleHide,   setIdleHide]  = useState(false)
+  const idleTimer = useRef(null)
   // Timestamp until which we ignore scroll events — prevents the single
   // layout-snap event (caused by paddingTop toggling) from re-triggering the header.
   const suppressUntil = useRef(0)
@@ -176,6 +178,37 @@ export default function ScripturePage() {
     const handler = () => { isDesktopRef.current = window.innerWidth >= 768 }
     window.addEventListener('resize', handler)
     return () => window.removeEventListener('resize', handler)
+  }, [])
+
+  // Idle auto-hide: fade all chrome after 3s of no activity on the scripture page.
+  useEffect(() => {
+    function resetIdle() {
+      setIdleHide(false)
+      clearTimeout(idleTimer.current)
+      idleTimer.current = setTimeout(() => setIdleHide(true), 3000)
+      window.dispatchEvent(new CustomEvent('pb-idle', { detail: { idle: false } }))
+    }
+    function startFade() {
+      window.dispatchEvent(new CustomEvent('pb-idle', { detail: { idle: true } }))
+    }
+    // Patch: dispatch idle event when timer fires
+    function resetIdleAndSchedule() {
+      setIdleHide(false)
+      window.dispatchEvent(new CustomEvent('pb-idle', { detail: { idle: false } }))
+      clearTimeout(idleTimer.current)
+      idleTimer.current = setTimeout(() => {
+        setIdleHide(true)
+        window.dispatchEvent(new CustomEvent('pb-idle', { detail: { idle: true } }))
+      }, 3000)
+    }
+    const events = ['mousemove', 'mousedown', 'touchstart', 'touchmove', 'keydown', 'wheel']
+    events.forEach(ev => window.addEventListener(ev, resetIdleAndSchedule, { passive: true }))
+    resetIdleAndSchedule() // start timer on mount
+    return () => {
+      clearTimeout(idleTimer.current)
+      events.forEach(ev => window.removeEventListener(ev, resetIdleAndSchedule))
+      window.dispatchEvent(new CustomEvent('pb-idle', { detail: { idle: false } }))
+    }
   }, [])
 
   // Register the scroll-direction handler ONCE (empty deps).
@@ -285,7 +318,9 @@ export default function ScripturePage() {
           ...s.header,
           top:        offlineBannerH,   // slide below offline banner when present
           transform:  chromeVis ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 0.28s ease',
+          opacity:    idleHide ? 0 : 1,
+          pointerEvents: idleHide ? 'none' : 'auto',
+          transition: 'transform 0.28s ease, opacity 0.6s ease',
         }}
       >
         <div style={s.headerInner}>
@@ -795,6 +830,7 @@ export default function ScripturePage() {
             setIsBookmarked(!!result[`${readBook}|${readChapter}`])
           }}
           chromeVis={chromeVis}
+          idleHide={idleHide}
         />
       </div>
 

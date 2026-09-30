@@ -98,6 +98,15 @@ export default function BottomNav() {
     return () => window.removeEventListener('pb-scroll-dir', onScrollDir)
   }, [])
 
+  /* Idle fade — only while on the scripture page */
+  const [idle, setIdle] = useState(false)
+  useEffect(() => {
+    if (!pathname.startsWith('/scripture')) { setIdle(false); return }
+    function onIdle(e) { setIdle(e.detail.idle) }
+    window.addEventListener('pb-idle', onIdle)
+    return () => { window.removeEventListener('pb-idle', onIdle); setIdle(false) }
+  }, [pathname])
+
   /* Always show when route changes */
   useEffect(() => { setVisible(true) }, [pathname])
 
@@ -140,7 +149,9 @@ export default function BottomNav() {
           transform: isDesktop
             ? `translateX(-50%) translateY(${visible ? '0' : 'calc(100% + 24px)'})`
             : `translateY(${visible ? '0' : 'calc(100% + 24px)'})`,
-          transition: 'transform 0.28s ease',
+          opacity: idle ? 0 : 1,
+          pointerEvents: idle ? 'none' : 'auto',
+          transition: 'transform 0.28s ease, opacity 0.6s ease',
         }}
         aria-label="Main navigation"
       >
