@@ -1,1 +1,1 @@
-{"version":"1.10.78","date":"2026-09-30","changelog":"Fixed invisible bottom padding blocking text when nav bar is idle-hidden."}
+{"version":"1.10.79","date":"2026-09-30","changelog":"Fixed Scripture cross-reference chips now correctly hide when the Scripture layer is toggled off."}

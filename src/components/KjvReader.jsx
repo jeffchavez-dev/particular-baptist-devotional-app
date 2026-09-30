@@ -3962,9 +3962,10 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                 {/* ── Author cross-refs (morph mode) ── */}
                                 {(() => {
                                   const chKey     = `${seg.book}:${seg.chapter}`
-                                  const xrefs     = authorCrossRefs[chKey]?.[verse] || []
-                                  const backRefs  = authorBackRefs[chKey]?.[verse]  || []
-                                  const bbackRefs = getBibleBackRefs(seg.book, seg.chapter, verse)
+                                  const scriptureOn = studyLayers.scripture
+                                  const xrefs     = (studyMode && scriptureOn) || canEdit ? authorCrossRefs[chKey]?.[verse] || [] : []
+                                  const backRefs  = (studyMode && scriptureOn) || canEdit ? authorBackRefs[chKey]?.[verse]  || [] : []
+                                  const bbackRefs = studyMode && scriptureOn ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
                                   const avk       = `${seg.book}:${seg.chapter}:${verse}`
                                   const isAddingHere = addingCrossRefTo === avk
                                   if (!canEdit && !isAddingHere && (!studyMode || (!xrefs.length && !backRefs.length && !bbackRefs.length))) return null
@@ -4756,12 +4757,14 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const avk          = `${seg.book}:${seg.chapter}:${verse}`
                               const isAddingHere = addingCrossRefTo === avk
                               if (!studyMode && !canEdit && !isAddingHere) return null
+                              // When scripture layer is off, only show author-editable xrefs
+                              const scriptureOn  = studyLayers.scripture
 
                               const chKey        = `${seg.book}:${seg.chapter}`
-                              const xrefs        = authorCrossRefs[chKey]?.[verse] || []
-                              const backRefs     = authorBackRefs[chKey]?.[verse]  || []
-                              const bxrefs       = studyMode && studyLayers.scripture ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
-                              const bbackRefs    = studyMode && studyLayers.scripture ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
+                              const bxrefs       = studyMode && scriptureOn ? getBibleXrefs(seg.book, seg.chapter, verse)    : []
+                              const bbackRefs    = studyMode && scriptureOn ? getBibleBackRefs(seg.book, seg.chapter, verse) : []
+                              const xrefs        = (studyMode && scriptureOn) || canEdit ? authorCrossRefs[chKey]?.[verse] || [] : []
+                              const backRefs     = (studyMode && scriptureOn) || canEdit ? authorBackRefs[chKey]?.[verse]  || [] : []
 
                               // Build one deduplicated chip list — static refs first, then author refs
                               const seen  = new Set()
