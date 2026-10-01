@@ -331,12 +331,8 @@ export default function ScripturePage() {
             title="Select book & chapter"
             data-onboarding="scripture-book-pill"
           >
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ flexShrink:0, opacity:0.5 }}>
-              <rect x="1" y="1" width="9" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M3 3.5h5M3 5.5h5M3 7.5h3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
             <span style={s.readBookName}>{BOOK_ABBR[readBook] ?? readBook}</span>
-            <span style={s.readBookCh}>{readChapter === 0 ? 'Outline' : `Ch. ${readChapter}`}</span>
+            <span style={s.readBookCh}>{readChapter === 0 ? 'Outline' : readChapter}</span>
           </button>
 
           {/* Version dropdown */}
