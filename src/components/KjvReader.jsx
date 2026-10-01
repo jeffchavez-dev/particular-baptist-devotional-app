@@ -3415,7 +3415,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                     if (isMobile) setSideOpen(false)
                   }}
                 >
-                  {(BOOK_ABBR[bm.book] || bm.book.slice(0, 4))} {bm.chapter}
+                  {(BOOK_ABBR[bm.book] || bm.book.slice(0, 4))} {bm.chapter}{bm.verse ? `:${bm.verse}` : ''}
                 </button>
               ))}
             </div>
@@ -5110,22 +5110,26 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               )}
             </button>
 
-            {/* Bookmark chapter — moved from top nav */}
-            {onToggleBookmark && (
-              <button
-                style={{ ...r.floatingBtn, ...(isBookmarked ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
-                onClick={onToggleBookmark}
-                title={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M4 2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V14l-4-2.5L4 14V2.5z"
-                    stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
-                    fill={isBookmarked ? 'currentColor' : 'none'} fillOpacity={isBookmarked ? 0.25 : 0}
-                  />
-                </svg>
-              </button>
-            )}
+            {/* Bookmark verse */}
+            {onToggleBookmark && (() => {
+              const firstVerse = [...selectedVerses].map(k => parseInt(k.split(':')[1])).sort((a,b)=>a-b)[0]
+              const bmActive = sbBookmarks.some(bm => bm.book===visBook && bm.chapter===visChapter && bm.verse===firstVerse)
+              return (
+                <button
+                  style={{ ...r.floatingBtn, ...(bmActive ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}) }}
+                  onClick={() => onToggleBookmark(visBook, visChapter, firstVerse)}
+                  title={bmActive ? 'Remove bookmark' : 'Bookmark verse'}
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M4 2.5A1.5 1.5 0 015.5 1h5A1.5 1.5 0 0112 2.5V14l-4-2.5L4 14V2.5z"
+                      stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+                      fill={bmActive ? 'currentColor' : 'none'} fillOpacity={bmActive ? 0.25 : 0}
+                    />
+                  </svg>
+                </button>
+              )
+            })()}
 
             {/* Memorize — single verse only */}
             <button

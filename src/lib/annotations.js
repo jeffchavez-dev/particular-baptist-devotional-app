@@ -424,28 +424,35 @@ export function getScriptureBookmarks() {
   try { return JSON.parse(localStorage.getItem(SC_BM_KEY) || '{}') } catch { return {} }
 }
 
-export function toggleScriptureBookmark(book, chapter) {
+export function toggleScriptureBookmark(book, chapter, verse) {
   const all = getScriptureBookmarks()
-  const key = `${book}|${chapter}`
+  // Key includes verse when provided; fall back to chapter-only key for legacy entries
+  const key = verse ? `${book}|${chapter}|${verse}` : `${book}|${chapter}`
   if (all[key]) delete all[key]
   else all[key] = new Date().toISOString()
   try { localStorage.setItem(SC_BM_KEY, JSON.stringify(all)) } catch {}
   window.dispatchEvent(new CustomEvent('pb-sc-bookmark-changed', {
-    detail: { book, chapter, bookmarks: all },
+    detail: { book, chapter, verse, bookmarks: all },
   }))
   return all
 }
 
-export function isScriptureBookmarked(book, chapter) {
-  return !!(getScriptureBookmarks()[`${book}|${chapter}`])
+export function isScriptureBookmarked(book, chapter, verse) {
+  const all = getScriptureBookmarks()
+  if (verse) return !!(all[`${book}|${chapter}|${verse}`])
+  // Legacy: also check chapter-only key
+  return !!(all[`${book}|${chapter}`])
 }
 
 export function getAllScriptureBookmarks() {
   const all = getScriptureBookmarks()
   return Object.entries(all)
     .map(([k, ts]) => {
-      const [book, ch] = k.split('|')
-      return { key: k, book, chapter: parseInt(ch), savedAt: ts }
+      const parts = k.split('|')
+      const book = parts[0]
+      const chapter = parseInt(parts[1])
+      const verse = parts[2] ? parseInt(parts[2]) : null
+      return { key: k, book, chapter, verse, savedAt: ts }
     })
     .sort((a, b) => b.savedAt.localeCompare(a.savedAt)) // newest first
 }

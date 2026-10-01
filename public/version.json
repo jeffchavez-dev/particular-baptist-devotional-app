@@ -1,1 +1,1 @@
-{"version":"1.10.81","date":"2026-10-01","changelog":"Fixed gap at top of Scripture content and sidebar when immersive/idle mode hides the header."}
+{"version":"1.10.82","date":"2026-10-01","changelog":"Bookmarks now save verse position (e.g. Rom 8:28), shown as chips in sidebar. Header bookmark button removed — use the verse selection toolbar instead."}
