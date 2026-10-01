@@ -455,7 +455,7 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
   const comKeys = Object.keys(commentaries)
 
   return (
-    <div style={{ ...r.comPanel, top: topInset, width: panelWidth }}>
+    <div style={{ ...r.comPanel, top: topInset, width: panelWidth, transition:'top 0.6s ease' }}>
       {/* Resize handle */}
       <div
         onMouseDown={onDragStart}
@@ -3281,6 +3281,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   const lineSpacingVal = typeof prefs.lineSpacing === 'number' ? prefs.lineSpacing : 1.85
   const contentWidthVal = typeof prefs.contentWidth === 'number' ? prefs.contentWidth : 720
+  const effectiveInset = idleHide ? 0 : topInset
 
   return (
     <div style={r.wrap}>
@@ -3295,7 +3296,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <button
           onClick={() => { clearSelection(); setSideOpen(true) }}
           style={{
-            position:'absolute', left:0, top: topInset + 56, zIndex:110,
+            position:'absolute', left:0, top: effectiveInset + 56, zIndex:110,
             display:'flex', alignItems:'center', gap:4,
             padding:'6px 8px 6px 6px', borderRadius:'0 6px 6px 0',
             background:'var(--surface)', border:'1px solid var(--border)',
@@ -3319,7 +3320,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         <button
           onClick={() => setSideOpen(false)}
           style={{
-            position:'absolute', left:280, top: topInset + 56, zIndex:110,
+            position:'absolute', left:280, top: effectiveInset + 56, zIndex:110,
             display:'flex', alignItems:'center', gap:4,
             padding:'6px 6px 6px 8px', borderRadius:'0 6px 6px 0',
             background:'var(--surface)', border:'1px solid var(--border)',
@@ -3344,9 +3345,9 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
         transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
         boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
         ...(isMobile ? {
-          position:'fixed', left:0, top: topInset, bottom:0, zIndex:215,
+          position:'fixed', left:0, top: effectiveInset, bottom:0, zIndex:215,
           width: 360,
-        } : { top: topInset }),
+        } : { top: effectiveInset }),
       }}>
         {isMobile && (
           <div style={r.mobileNavHeader}>
@@ -3504,7 +3505,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       })()}
 
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
-      <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
+      <div style={{ ...r.readerWrap, paddingTop: effectiveInset, transition:'padding-top 0.6s ease', paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
         <div style={{ ...r.content, maxWidth: isMobile ? contentWidthVal : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : Math.min(contentWidthVal, window.innerWidth - 220) + 'px', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
 
@@ -5037,7 +5038,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
               setAuthorRefModal({ ref: { tgt_book: parsed.book, tgt_chapter: parsed.chapter, tgt_verse: parsed.verse || null } })
             }}
             styles={r}
-            topInset={topInset}
+            topInset={effectiveInset}
             commentaries={COMMENTARIES}
             sizePx={prefs.sizePx}
             onWidthChange={setComPanelWidth}
