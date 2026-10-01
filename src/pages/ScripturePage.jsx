@@ -433,11 +433,35 @@ export default function ScripturePage() {
             </svg>
           </button>
 
-          {/* Study mode toggle — show/hide all notes and reference chips */}
+          {/* Bookmark current chapter */}
           <button
             style={{
               ...s.menuBtn,
               ...(isAuthorUser ? {} : { marginLeft:'auto' }),
+              ...(isBookmarked ? { color:'var(--gold)', borderColor:'var(--gold)', background:'var(--gold-faint)' } : {}),
+            }}
+            onClick={() => {
+              const result = toggleScriptureBookmark(readBook, readChapter)
+              setIsBookmarked(result)
+            }}
+            aria-label={isBookmarked ? 'Remove chapter bookmark' : 'Bookmark this chapter'}
+            title={isBookmarked ? 'Remove bookmark' : 'Bookmark chapter'}
+          >
+            <svg width="15" height="17" viewBox="0 0 15 17" fill="none">
+              <path
+                d="M2 2h11v14l-5.5-3.5L2 16V2z"
+                stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+                fill={isBookmarked ? 'currentColor' : 'none'}
+                fillOpacity={isBookmarked ? 0.18 : 0}
+              />
+            </svg>
+          </button>
+
+          {/* Study mode toggle — show/hide all notes and reference chips */}
+          <button
+            style={{
+              ...s.menuBtn,
+              ...(isAuthorUser ? { } : {}),
               ...(studyMode ? { color:'var(--teal)', borderColor:'var(--teal)', background:'var(--teal-light)' } : {}),
             }}
             onClick={() => setStudyMode(m => !m)}
