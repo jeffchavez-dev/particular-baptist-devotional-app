@@ -138,7 +138,7 @@ export default function BottomNav() {
         data-bottom-nav
         style={{
           ...n.spacer,
-          height: visible && !idle ? 'calc(80px + env(safe-area-inset-bottom))' : 0,
+          height: !idle ? 'calc(80px + env(safe-area-inset-bottom))' : 0,
         }}
       />
       <nav

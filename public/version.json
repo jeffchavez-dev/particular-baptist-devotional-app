@@ -1,1 +1,1 @@
-{"version":"1.10.85","date":"2026-10-01","changelog":"HOT and LXX panels now split at exactly 50/50 width when shown side by side."}
+{"version":"1.10.86","date":"2026-10-05","changelog":"HOT+LXX side-by-side only on desktop in columns layout mode; nav hide no longer causes content to jump."}
