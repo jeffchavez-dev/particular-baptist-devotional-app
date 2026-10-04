@@ -4478,12 +4478,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                               return (
                                 <div style={{ ...r.parallelBlock, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex: 1, minWidth:0, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
-                                  {(() => { const hotLxxCols = !isMobile && prefs.parallelLayout === 'columns' && isHeb && morphVerse && lxxVerse; return (
-                                  <div style={hotLxxCols ? { display:'flex', gap:0, alignItems:'flex-start' } : {}}>
+                                  {/* hotLxxCols: side-by-side only on desktop columns layout */}
+                                  <div style={(!isMobile && prefs.parallelLayout === 'columns' && isHeb && morphVerse && lxxVerse) ? { display:'flex', gap:0, alignItems:'flex-start' } : {}}>
 
                                   {/* ── GNT / HOT word chips ── */}
                                   {morphVerse && (
-                                    <div style={hotLxxCols ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden' } : {}}>
+                                    <div style={(!isMobile && prefs.parallelLayout === 'columns' && isHeb && lxxVerse) ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden' } : {}}>
                                     <>
                                       <div style={r.parallelLine}>
                                         <span style={{
@@ -4590,7 +4590,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
                                   {/* ── LXX word chips (OT only) ── */}
                                   {isHeb && lxxVerse && (
-                                    <div style={hotLxxCols && morphVerse ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden', borderLeft:'1px solid var(--border)', paddingLeft:8 } : {}}>
+                                    <div style={(!isMobile && prefs.parallelLayout === 'columns' && morphVerse) ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden', borderLeft:'1px solid var(--border)', paddingLeft:8 } : {}}>
                                     <>
                                       <div style={r.parallelLine}>
                                         <span style={{
@@ -4661,7 +4661,6 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   )}
 
                                   </div>{/* end HOT+LXX flex row */}
-                                  </div>) })()}
                                 </div>
                               )
                             })()}
