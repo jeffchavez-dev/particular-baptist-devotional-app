@@ -1622,7 +1622,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* Load GNT/HOT parallel word data for each visible segment */
   useEffect(() => {
-    if (!(parallelVersions.has('gnt') || parallelVersions.has('hot')) || version === 'greek' || version === 'hebrew' || version === 'lxx') return
+    if (!(parallelVersions.has('gnt') || parallelVersions.has('hot')) || version === 'greek' || version === 'hebrew') return
     for (const seg of segments) {
       const key = `${seg.book}:${seg.chapter}`
       if (parallelLoadedRef.current.has(key)) continue
@@ -1643,7 +1643,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
   /* Load LXX parallel word+Strongs data for OT segments */
   useEffect(() => {
-    if (!parallelVersions.has('lxx') || version === 'greek' || version === 'hebrew' || version === 'lxx') return
+    if (!parallelVersions.has('lxx') || version === 'greek' || version === 'lxx') return
     for (const seg of segments) {
       if (NT_BOOKS.has(seg.book)) continue // LXX is OT only
       const key = `lxx:${seg.book}:${seg.chapter}`
@@ -3362,12 +3362,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
 
         <div style={r.sidebarScroll}>
         {/* ── Parallel section ── */}
-        {_TEXT_VERSIONS.has(version) && (
+        {(_TEXT_VERSIONS.has(version) || version === 'hebrew' || version === 'lxx') && (
           <div style={sb.parallelSection} data-onboarding="parallel-section">
             <div style={sb.versionSectionTitle}>Parallel</div>
             <div style={sb.parallelPills}>
               {(() => {
                 const visible = getVisibleVersions()
+                // When in HOT reader mode, only offer LXX as companion
+                if (version === 'hebrew') {
+                  return visible.includes('lxx') ? [{ id: 'lxx', label: 'LXX', title: 'Greek Septuagint alongside Hebrew' }] : []
+                }
+                // When in LXX reader mode, only offer HOT as companion
+                if (version === 'lxx') {
+                  return visible.includes('hebrew') ? [{ id: 'hot', label: 'HOT', title: 'Hebrew Old Testament alongside LXX' }] : []
+                }
                 // Text versions: IDs match between BIBLE_VERSIONS and the parallel engine
                 const textEntries = BIBLE_VERSIONS
                   .filter(v => !v.type && visible.includes(v.id) && v.id !== version)
