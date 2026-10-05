@@ -3897,6 +3897,69 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   </button>
                                 )}
 
+                                {/* ── LXX parallel (HOT mode only) ── */}
+                                {isHeb && parallelVersions.has('lxx') && (() => {
+                                  const pKey = `${seg.book}:${seg.chapter}`
+                                  const lxxCh = parallelLxxData[pKey]
+                                  const lxxVerse = lxxCh?.find(pv => (pv.v ?? pv.verse) === verse)
+                                  if (!lxxVerse) return null
+                                  const grFont = getGreekFontCss(prefs.greekFontId)
+                                  const grSize = prefs.sizePx * 1.15
+                                  const lxxVK = `par|LXX|${seg.book}|${seg.chapter}|${verse}`
+                                  const pW = parallelWord
+                                  const lxxWordSel = pW?.verseKey === lxxVK ? pW.wordIdx : -1
+                                  return (
+                                    <div style={{ ...r.parallelBlock, marginTop:4 }}>
+                                      <div style={r.parallelLine}>
+                                        <span style={{ ...r.parallelBadge, background:'rgba(12,74,110,0.10)', color:'#0c4a6e' }}>LXX</span>
+                                        <div style={{ flex:1, lineHeight:lineSpacingVal }}>
+                                          {lxxVerse.words.map((lw, wi) => {
+                                            const isSel = wi === lxxWordSel
+                                            return (
+                                              <React.Fragment key={wi}>
+                                                <span
+                                                  style={{
+                                                    ...r.greekToken, ...r.greekTokenGk,
+                                                    ...(isSel ? r.greekTokenSel : {}),
+                                                    fontSize: grSize, fontFamily: grFont,
+                                                    cursor: lw.s ? 'pointer' : 'default',
+                                                  }}
+                                                  onClick={e => {
+                                                    e.stopPropagation()
+                                                    setParallelWord(isSel ? null : { verseKey: lxxVK, lang: 'LXX', wordIdx: wi })
+                                                  }}
+                                                  title={lw.s || ''}
+                                                >{lw.w}</span>{' '}
+                                              </React.Fragment>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+                                      {lxxWordSel >= 0 && (() => {
+                                        const lw = lxxVerse.words[lxxWordSel]
+                                        if (!lw) return null
+                                        return (
+                                          <div style={{ ...r.wordInfoStrip, marginLeft:28 }} onClick={e => e.stopPropagation()}>
+                                            <div style={r.wiScriptRow}>
+                                              <span style={{ ...r.wordInfoGreek, fontSize: prefs.sizePx * 1.4, fontFamily: grFont }}>{lw.w}</span>
+                                              <span style={{ fontSize:11, color:'var(--ink-faint)', fontStyle:'italic', marginLeft:6 }}>LXX Septuagint</span>
+                                            </div>
+                                            <div style={r.wiStrongsRow}>
+                                              <span style={r.wiStrongsLabel}>Strong's</span>
+                                              {lw.s ? (
+                                                <button style={r.wiStrongsBtn} onClick={e => {
+                                                  e.stopPropagation()
+                                                  setStrongsModal({ strongsId: lw.s, lang: 'greek', corpus: 'lxx', verseNum: verse, morph: lw.r || null, wordGloss: lw.g || null, wordTranslit: lw.t || null })
+                                                }}>{lw.s}</button>
+                                              ) : <span style={r.wiStrongsNum}>—</span>}
+                                            </div>
+                                          </div>
+                                        )
+                                      })()}
+                                    </div>
+                                  )
+                                })()}
+
                                 {/* ── Confession cross-refs (morph mode) ── */}
                                 {studyMode && studyLayers.confession && (() => {
                                   const verseRefs = getCrossRefs(seg.book, seg.chapter, verse)

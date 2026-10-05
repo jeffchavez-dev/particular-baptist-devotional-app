@@ -1,1 +1,1 @@
-{"version":"1.10.87","date":"2026-10-05","changelog":"HOT reader now shows LXX as a parallel option in the sidebar; LXX reader shows HOT as a parallel option."}
+{"version":"1.10.88","date":"2026-10-05","changelog":"LXX parallel now renders correctly in HOT reader mode — Greek Septuagint appears beneath each Hebrew verse with word-level Strongs lookup."}
