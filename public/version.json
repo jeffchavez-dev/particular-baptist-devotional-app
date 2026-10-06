@@ -1,1 +1,1 @@
-{"version":"1.10.88","date":"2026-10-05","changelog":"LXX parallel now renders correctly in HOT reader mode — Greek Septuagint appears beneath each Hebrew verse with word-level Strongs lookup."}
+{"version":"1.10.89","date":"2026-10-06","changelog":"Sidebar and Books/Hide buttons now slide smoothly instead of jumping when immersive idle mode activates."}

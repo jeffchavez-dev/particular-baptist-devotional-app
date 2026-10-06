@@ -3306,7 +3306,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             boxShadow:'2px 2px 8px rgba(0,0,0,0.08)',
             opacity: idleHide ? 0 : 1,
             pointerEvents: idleHide ? 'none' : 'auto',
-            transition: 'opacity 0.6s ease',
+            transition: 'opacity 0.6s ease, top 0.6s ease',
           }}
           title="Show sidebar"
         >
@@ -3328,6 +3328,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
             color:'var(--ink-faint)', fontSize:11,
             fontFamily:"'DM Sans',sans-serif",
             boxShadow:'2px 2px 8px rgba(0,0,0,0.08)',
+            transition: 'top 0.6s ease',
           }}
           title="Collapse sidebar"
         >
@@ -3342,7 +3343,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       <aside style={{
         ...r.sidebar,
         transform: sideOpen ? 'translateX(0)' : 'translateX(-100%)',
-        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1), top 0.6s ease',
         boxShadow: sideOpen ? '4px 0 24px rgba(0,0,0,0.18)' : 'none',
         ...(isMobile ? {
           position:'fixed', left:0, top: effectiveInset, bottom:0, zIndex:215,
