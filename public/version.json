@@ -1,1 +1,1 @@
-{"version":"1.10.90","date":"2026-10-07","changelog":"Three-column parallel view (text + HOT + LXX) now uses equal widths."}
+{"version":"1.10.91","date":"2026-10-07","changelog":"HOT+LXX parallel: show 'LXX versification differs' note when the LXX numbers a verse differently (e.g. Zec 1:18–21 = LXX 2:1–4)."}

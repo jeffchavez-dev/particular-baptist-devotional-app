@@ -3903,7 +3903,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   const pKey = `${seg.book}:${seg.chapter}`
                                   const lxxCh = parallelLxxData[pKey]
                                   const lxxVerse = lxxCh?.find(pv => (pv.v ?? pv.verse) === verse)
-                                  if (!lxxVerse) return null
+                                  if (!lxxVerse) return (
+                                    <div style={{ ...r.parallelBlock, marginTop:4, display:'flex', alignItems:'center', gap:6 }}>
+                                      <span style={{ ...r.parallelBadge, background:'rgba(12,74,110,0.10)', color:'#0c4a6e' }}>LXX</span>
+                                      <span style={{ fontSize: prefs.sizePx * 0.78, color:'var(--ink-faint)', fontStyle:'italic' }}>versification differs</span>
+                                    </div>
+                                  )
                                   const grFont = getGreekFontCss(prefs.greekFontId)
                                   const grSize = prefs.sizePx * 1.15
                                   const lxxVK = `par|LXX|${seg.book}|${seg.chapter}|${verse}`
@@ -4661,6 +4666,12 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                                   )}
 
                                   {/* ── LXX word chips (OT only) ── */}
+                                  {isHeb && parallelVersions.has('lxx') && !lxxVerse && morphVerse && (
+                                    <div style={(!isMobile && prefs.parallelLayout === 'columns') ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden', borderLeft:'1px solid var(--border)', paddingLeft:8, display:'flex', alignItems:'center', gap:6, paddingTop:4 } : { display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                                      <span style={{ ...r.parallelBadge, background:'rgba(12,74,110,0.10)', color:'#0c4a6e' }}>LXX</span>
+                                      <span style={{ fontSize: prefs.sizePx * 0.78, color:'var(--ink-faint)', fontStyle:'italic' }}>versification differs</span>
+                                    </div>
+                                  )}
                                   {isHeb && lxxVerse && (
                                     <div style={(!isMobile && prefs.parallelLayout === 'columns' && morphVerse) ? { flex:'0 0 50%', width:'50%', minWidth:0, overflow:'hidden', borderLeft:'1px solid var(--border)', paddingLeft:8 } : {}}>
                                     <>
