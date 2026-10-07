@@ -4549,7 +4549,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const parseMorphDetailFn = isHeb ? parseHebrewMorphDetails : parseMorphDetails
 
                               return (
-                                <div style={{ ...r.parallelBlock, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex: 1, minWidth:0, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
+                                <div style={{ ...r.parallelBlock, ...(!isMobile && prefs.parallelLayout === 'columns' ? { flex: (isHeb && morphVerse && lxxVerse) ? 2 : 1, minWidth:0, borderTop:'none', borderLeft:'1px solid var(--border)', paddingLeft:12, marginTop:0, marginLeft:4, paddingTop:4 } : {}) }}>
                                   {/* hotLxxCols: side-by-side only on desktop columns layout */}
                                   <div style={(!isMobile && prefs.parallelLayout === 'columns' && isHeb && morphVerse && lxxVerse) ? { display:'flex', gap:0, alignItems:'flex-start' } : {}}>
 
