@@ -323,7 +323,13 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
     const lines = []
     for (const [book, rows] of grouped) {
       lines.push(`${book} (${rows.length})`)
-      for (const r of rows) lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+      for (const r of rows) {
+        const kjvText = kjvData
+          ? (getChapterVerses(kjvData, r.book, r.chapter) || []).find(v => v.verse === r.verse)?.text
+          : null
+        lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+        if (kjvText) lines.push(`    ${kjvText}`)
+      }
       lines.push('')
     }
     navigator.clipboard.writeText(lines.join('\n').trimEnd())
@@ -499,7 +505,13 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
     const lines = []
     for (const [book, rows] of grouped) {
       lines.push(`${book} (${rows.length})`)
-      for (const r of rows) lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+      for (const r of rows) {
+        const kjvText = kjvData
+          ? (getChapterVerses(kjvData, r.book, r.chapter) || []).find(v => v.verse === r.verse)?.text
+          : null
+        lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+        if (kjvText) lines.push(`    ${kjvText}`)
+      }
       lines.push('')
     }
     navigator.clipboard.writeText(lines.join('\n').trimEnd())
