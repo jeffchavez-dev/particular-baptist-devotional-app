@@ -318,6 +318,18 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
     next.has(book) ? next.delete(book) : next.add(book)
     return next
   })
+  const [copied, setCopied] = useState(false)
+  function copyResults() {
+    const lines = []
+    for (const [book, rows] of grouped) {
+      lines.push(`${book} (${rows.length})`)
+      for (const r of rows) lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+      lines.push('')
+    }
+    navigator.clipboard.writeText(lines.join('\n').trimEnd())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const countLabel = loading ? 'Searching…' : scope === 'book' && currentBook
     ? `${results.length.toLocaleString()} verse${results.length !== 1 ? 's' : ''} in ${currentBook} · ${langLabel}`
@@ -333,13 +345,20 @@ function ScriptureResultsView({ lang, id, scriptFont, onNavigate, initialScope =
             All books →
           </button>
         )}
-        {!loading && scope === 'all' && grouped.length > 1 && (
-          <button
-            style={m.srExpandBtn}
-            onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
-          >
-            {allOpen ? 'Collapse all' : 'Expand all'}
-          </button>
+        {!loading && grouped.length > 0 && (
+          <div style={{ display:'flex', gap:4 }}>
+            {scope === 'all' && grouped.length > 1 && (
+              <button
+                style={m.srExpandBtn}
+                onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
+              >
+                {allOpen ? 'Collapse all' : 'Expand all'}
+              </button>
+            )}
+            <button style={m.srExpandBtn} onClick={copyResults}>
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -475,6 +494,18 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
     next.has(book) ? next.delete(book) : next.add(book)
     return next
   })
+  const [copied, setCopied] = useState(false)
+  function copyResults() {
+    const lines = []
+    for (const [book, rows] of grouped) {
+      lines.push(`${book} (${rows.length})`)
+      for (const r of rows) lines.push(`  ${r.chapter}:${r.verse}  ${r.w}  "${r.g}"`)
+      lines.push('')
+    }
+    navigator.clipboard.writeText(lines.join('\n').trimEnd())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const countLabel = loading ? 'Searching LXX…' : scope === 'book' && currentBook
     ? `${results.length.toLocaleString()} verse${results.length !== 1 ? 's' : ''} in ${currentBook} · LXX`
@@ -490,13 +521,20 @@ function LxxScriptureResultsView({ id, scriptFont, onNavigate, initialScope = 'a
             All books →
           </button>
         )}
-        {!loading && scope === 'all' && grouped.length > 1 && (
-          <button
-            style={m.srExpandBtn}
-            onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
-          >
-            {allOpen ? 'Collapse all' : 'Expand all'}
-          </button>
+        {!loading && grouped.length > 0 && (
+          <div style={{ display:'flex', gap:4 }}>
+            {scope === 'all' && grouped.length > 1 && (
+              <button
+                style={m.srExpandBtn}
+                onClick={() => setOpenBooks(allOpen ? new Set() : new Set(allBooks))}
+              >
+                {allOpen ? 'Collapse all' : 'Expand all'}
+              </button>
+            )}
+            <button style={m.srExpandBtn} onClick={copyResults}>
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
         )}
       </div>
 
