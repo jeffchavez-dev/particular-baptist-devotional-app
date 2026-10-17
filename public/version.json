@@ -1,1 +1,1 @@
-{"version":"1.10.94","date":"2026-10-17","changelog":"Concordance Copy now includes the full KJV verse text under each result."}
+{"version":"1.10.95","date":"2026-10-17","changelog":"Commentary fixes: desktop panel now tracks the last verse of a chapter correctly; mobile inline chips also appear on the last verse before a new section."}

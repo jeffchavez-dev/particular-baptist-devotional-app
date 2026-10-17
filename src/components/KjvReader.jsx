@@ -1853,7 +1853,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (v) setVisVerse(v)
         }
       },
-      { root, rootMargin: '0px 0px -55% 0px', threshold: 0 }
+      { root, rootMargin: '0px 0px -30% 0px', threshold: 0 }
     )
     root.querySelectorAll('[data-anchor-verse]').forEach(el => observer.observe(el))
     return () => observer.disconnect()
@@ -4297,8 +4297,15 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                               const introSects = verse === 1
                                 ? sections.filter(s => s.startVerse == null)
                                 : []
-                              // Sections whose range starts at this verse
-                              const verseSects = sections.filter(s => s.startVerse === verse)
+                              // Sections whose range starts at this verse, OR whose range
+                              // ends here (i.e. last verse before the next section starts)
+                              const namedSects = sections.filter(s => s.startVerse != null)
+                              const verseSects = namedSects.filter((s, i) => {
+                                if (s.startVerse === verse) return true
+                                // also show if this verse is the last one before the next section
+                                const next = namedSects[i + 1]
+                                return next && s.startVerse < verse && next.startVerse > verse
+                              })
                               const allSects = [...introSects, ...verseSects]
 
                               if (isLoading && verse === 1) {
