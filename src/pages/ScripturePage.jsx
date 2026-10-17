@@ -56,6 +56,7 @@ export default function ScripturePage() {
   const [panelSearching,     setPanelSearching]     = useState(false)
   // Which book groups are expanded in the results list
   const [openBooks, setOpenBooks] = useState(new Set())
+  const [searchCopied, setSearchCopied] = useState(false)
   // Scripture chapter bookmark state
   const [isBookmarked, setIsBookmarked] = useState(() => isScriptureBookmarked('Genesis', 1))
   useEffect(() => {
@@ -572,18 +573,38 @@ export default function ScripturePage() {
                   </>
                 )}
               </div>
-              {/* Expand/collapse all */}
+              {/* Expand/collapse all + Copy */}
               {!panelSearching && searchResults.length > 0 && (
-                <button style={sp.expandAllBtn} onClick={() => {
-                  const books = [...new Set(searchResults.map(r => r.book))]
-                  const allOpen = books.every(b => openBooks.has(b))
-                  setOpenBooks(allOpen ? new Set() : new Set(books))
-                }}>
-                  {(() => {
+                <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                  <button style={sp.expandAllBtn} onClick={() => {
                     const books = [...new Set(searchResults.map(r => r.book))]
-                    return books.every(b => openBooks.has(b)) ? 'Collapse all' : 'Expand all'
-                  })()}
-                </button>
+                    const allOpen = books.every(b => openBooks.has(b))
+                    setOpenBooks(allOpen ? new Set() : new Set(books))
+                  }}>
+                    {(() => {
+                      const books = [...new Set(searchResults.map(r => r.book))]
+                      return books.every(b => openBooks.has(b)) ? 'Collapse all' : 'Expand all'
+                    })()}
+                  </button>
+                  <button style={sp.expandAllBtn} onClick={() => {
+                    const map = new Map()
+                    for (const hit of searchResults) {
+                      if (!map.has(hit.book)) map.set(hit.book, [])
+                      map.get(hit.book).push(hit)
+                    }
+                    const lines = []
+                    for (const [book, hits] of map) {
+                      lines.push(`${book} (${hits.length})`)
+                      for (const h of hits) lines.push(`  ${h.chapter}:${h.verse}  ${h.text}`)
+                      lines.push('')
+                    }
+                    navigator.clipboard.writeText(lines.join('\n').trimEnd())
+                    setSearchCopied(true)
+                    setTimeout(() => setSearchCopied(false), 2000)
+                  }}>
+                    {searchCopied ? '✓ Copied' : 'Copy'}
+                  </button>
+                </div>
               )}
             </div>
 
