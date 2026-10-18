@@ -567,7 +567,9 @@ export default function ScripturePage() {
                     <div style={sp.resultsSubtitle}>
                       {(() => {
                         const books = new Set(searchResults.map(r => r.book))
-                        return `${books.size} book${books.size !== 1 ? 's' : ''} · "${panelQuery}"`
+                        const terms = panelQuery.trim().split(/\s*\+\s*/).filter(Boolean)
+                        const termLabel = terms.length > 1 ? terms.map(t => `"${t.trim()}"`).join(' + ') : `"${panelQuery}"`
+                        return `${books.size} book${books.size !== 1 ? 's' : ''} · ${termLabel}`
                       })()}
                     </div>
                   </>
@@ -629,14 +631,14 @@ export default function ScripturePage() {
               }
               const grouped = BIBLE_BOOKS.filter(b => map.has(b.name)).map(b => ({ book: b.name, hits: map.get(b.name) }))
 
-              const q = panelQuery.toLowerCase()
-              const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+              const terms = panelQuery.trim().split(/\s*\+\s*/).map(t => t.trim().toLowerCase()).filter(Boolean)
               function hlText(text) {
                 try {
-                  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+                  const pattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+                  const parts = text.split(new RegExp(`(${pattern})`, 'gi'))
                   if (parts.length === 1) return text
                   return parts.map((p, i) =>
-                    p.toLowerCase() === q
+                    terms.includes(p.toLowerCase())
                       ? <mark key={i} style={{ background:'#fef08a', color:'inherit', borderRadius:2, padding:'0 1px' }}>{p}</mark>
                       : p
                   )

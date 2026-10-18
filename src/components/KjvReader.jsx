@@ -205,7 +205,8 @@ const SLUG_TO_BOOK = Object.fromEntries(
  */
 function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 200) {
   if (!versionData || !query.trim()) return { hits: [], total: 0, capped: false }
-  const q = query.trim().toLowerCase()
+  // Support "word1 + word2" AND search — all terms must appear in the verse
+  const terms = query.trim().split(/\s*\+\s*/).map(t => t.trim().toLowerCase()).filter(Boolean)
   const hits = []
   let total = 0
   for (const book of BIBLE_BOOKS) {
@@ -220,7 +221,8 @@ function searchBibleVersion(versionData, query, version = 'kjv', maxResults = 20
       for (const v of verses) {
         if (seen.has(v.v)) continue
         seen.add(v.v)
-        if (v.t && v.t.toLowerCase().includes(q)) {
+        const lower = v.t ? v.t.toLowerCase() : ''
+        if (terms.every(t => lower.includes(t))) {
           total++
           if (hits.length < maxResults) {
             hits.push({ book: book.name, chapter: ch, verse: v.v, text: stripFootnotes(v.t, ch, version) })

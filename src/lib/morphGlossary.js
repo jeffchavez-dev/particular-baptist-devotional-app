@@ -283,7 +283,7 @@ function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').normalize('NFC')
 }
 const _PARTICLE_LOOKUP = Object.fromEntries(
-  Object.entries(GRK_DISCOURSE_PARTICLES).map(([k, v]) => [stripAccents(k), v])
+  Object.entries(GRK_DISCOURSE_PARTICLES).map(([k, v]) => [stripAccents(k).toLowerCase(), v])
 )
 
 /**
@@ -293,7 +293,7 @@ const _PARTICLE_LOOKUP = Object.fromEntries(
  */
 export function getParticleDef(word) {
   if (!word) return null
-  return _PARTICLE_LOOKUP[stripAccents(word.trim())] || null
+  return _PARTICLE_LOOKUP[stripAccents(word.trim()).toLowerCase()] || null
 }
 
 /* ── Main lookup ─────────────────────────────────────────────────────── */
