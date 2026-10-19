@@ -122,9 +122,11 @@ export function parseHebrewMorph(code) {
   }
 
   if (posCode === 'R' || posCode === 'S') {
-    const per = PER[main[1]] || ''
-    const gen = GEN_S[main[2]] || ''
-    const num = NUM_S[main[3]] || ''
+    // ETCBC suffix format: S + 'p' (pronominal type marker) + person + gender + number
+    const off = (main[1] === 'p' || main[1] === 'P') ? 1 : 0
+    const per = PER[main[1 + off]] || ''
+    const gen = GEN_S[main[2 + off]] || ''
+    const num = NUM_S[main[3 + off]] || ''
     const detail = [per, gen, num].filter(Boolean).join(' ')
     return detail ? `${pos} · ${detail}` : pos
   }
@@ -164,9 +166,10 @@ export function parseHebrewMorphDetails(code) {
     if (num)   items.push({ label:'Number', value: num   })
     if (state) items.push({ label:'State',  value: state })
   } else if (posCode === 'R' || posCode === 'S') {
-    const per = PER[main[1]]
-    const gen = GEN[main[2]]
-    const num = NUM[main[3]]
+    const off = (main[1] === 'p' || main[1] === 'P') ? 1 : 0
+    const per = PER[main[1 + off]]
+    const gen = GEN[main[2 + off]]
+    const num = NUM[main[3 + off]]
     if (per) items.push({ label:'Person', value: per })
     if (gen) items.push({ label:'Gender', value: gen })
     if (num) items.push({ label:'Number', value: num })
