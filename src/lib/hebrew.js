@@ -101,8 +101,8 @@ export function parseHebrewMorph(code) {
   const stripped = code.startsWith('H') ? code.slice(1) : code
   const main     = stripped.split('/').pop() || stripped
 
-  const posCode = main[0]
-  const pos     = POS[posCode] || posCode
+  const posCode = main[0].toUpperCase()
+  const pos     = POS[posCode] || main[0]
 
   if (posCode === 'V') {
     const stem   = STEM[main[1]]    || main[1]  || ''
@@ -139,8 +139,8 @@ export function parseHebrewMorph(code) {
  * Returns { pos: string, items: [{label, value}] } or null.
  */
 function _parsePart(main) {
-  const posCode = main[0]
-  const pos     = POS[posCode] || posCode
+  const posCode = main[0].toUpperCase()
+  const pos     = POS[posCode] || main[0]
   const items   = []
   if (posCode === 'V') {
     const stem   = STEM[main[1]]
@@ -176,9 +176,9 @@ function _parsePart(main) {
 const PREFIX_POS = new Set(['C', 'P', 'D', 'T'])
 
 function _isPrefix(partStr, isOnly) {
-  const c = partStr[0]
+  const c = partStr[0].toUpperCase()
   if (PREFIX_POS.has(c)) return true
-  // R (article/relative marker) acts as prefix only when not the sole part
+  // R (inseparable prep marker in TAHOT) acts as prefix only when not the sole part
   if (c === 'R' && !isOnly) return true
   return false
 }
@@ -198,8 +198,9 @@ export function parseHebrewMorphDetails(code) {
   const prefixEnd = mainIdx >= 0 ? mainIdx : 0
   // In TAHOT, R as a prefix encodes inseparable prepositions (בְּ כְּ לְ), not a pronoun
   const prefixes  = parts.slice(0, prefixEnd).map(p => {
-    if (p[0] === 'R') return 'Prep'
-    return POS[p[0]] || p[0]
+    const u = p[0].toUpperCase()
+    if (u === 'R') return 'Prep'
+    return POS[u] || p[0]
   }).filter(Boolean)
   if (prefixes.length) primary.prefix = prefixes.join(' + ')
 
