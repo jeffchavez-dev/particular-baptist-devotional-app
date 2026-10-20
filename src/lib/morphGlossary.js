@@ -22,6 +22,12 @@ const HEB_POS = {
   'Particle': 'An indeclinable function word serving a grammatical role: definite article הַ, negative particle לֹא, the marker of the definite direct object אֵת, interrogative הֲ, etc.',
 }
 
+const HEB_PREFIX = {
+  'Prep': 'Inseparable preposition — one of the three prefix prepositions (בְּ "in/with/by," כְּ "like/as," לְ "to/for/of") that attach directly to the following word. Unlike separable prepositions (מִן, עַל, אֶל), these never stand alone.',
+  'Conj': 'Conjunction prefix — typically the waw וְ/וַ ("and"), attached directly to the following word. Its exact nuance (simple "and," sequential "and then," adversative "but") depends on context and the verb form it joins.',
+  'Adv':  'Adverbial prefix — a modifier attached to the following word.',
+}
+
 const HEB_STEMS = {
   'Qal':       'The basic, simple active stem — the most common binyan. Expresses the fundamental meaning of the root with no added nuance of intensity or causation (e.g. כָּתַב "he wrote").',
   'Niphal':    'The simple passive or reflexive stem — often the passive of the Qal (e.g. "it was written"), but can also express middle/reflexive action ("he presented himself," "they devoted themselves").',
@@ -310,6 +316,7 @@ export function getMorphDef(label, value, lang) {
 
   if (lang === 'hebrew') {
     if (label === 'Part of Speech') def = HEB_POS[value]
+    else if (label === 'Prefix')    def = HEB_PREFIX[value]
     else if (label === 'Stem')      def = HEB_STEMS[value]
     else if (label === 'Aspect')    def = HEB_ASPECTS[value]
     else if (label === 'Gender')    def = HEB_GENDER[value]
