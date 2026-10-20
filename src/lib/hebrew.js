@@ -138,15 +138,10 @@ export function parseHebrewMorph(code) {
  * Parse an ETCBC code into a structured label list for detailed display.
  * Returns { pos: string, items: [{label, value}] } or null.
  */
-export function parseHebrewMorphDetails(code) {
-  if (!code) return null
-  const stripped = code.startsWith('H') ? code.slice(1) : code
-  const main     = stripped.split('/').pop() || stripped
-
+function _parsePart(main) {
   const posCode = main[0]
   const pos     = POS[posCode] || posCode
   const items   = []
-
   if (posCode === 'V') {
     const stem   = STEM[main[1]]
     const aspect = ASPCT[main[2]]
@@ -174,8 +169,22 @@ export function parseHebrewMorphDetails(code) {
     if (gen) items.push({ label:'Gender', value: gen })
     if (num) items.push({ label:'Number', value: num })
   }
-
   return { pos, items }
+}
+
+export function parseHebrewMorphDetails(code) {
+  if (!code) return null
+  const stripped = code.startsWith('H') ? code.slice(1) : code
+  const parts    = stripped.split('/')
+
+  // Primary part: first segment (or only segment when no slash)
+  const primary = _parsePart(parts[0])
+
+  // Suffix part: last segment when compound (e.g. HVqp1cp/Sp2mp)
+  const suffixPart = parts.length > 1 ? _parsePart(parts[parts.length - 1]) : null
+  const suffix = suffixPart?.pos === 'Suffix' ? suffixPart : null
+
+  return { ...primary, suffix }
 }
 
 /**

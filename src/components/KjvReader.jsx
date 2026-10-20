@@ -1035,6 +1035,11 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
     <div style={r.wiMorphBlock}>
       {renderRow('Part of Speech', detail.pos)}
       {detail.items.map(it => renderRow(it.label, it.value))}
+      {detail.suffix && <>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-faint)', paddingTop: 6, paddingBottom: 2 }}>Object Suffix</div>
+        {renderRow('Part of Speech', detail.suffix.pos)}
+        {detail.suffix.items.map(it => renderRow(it.label, it.value))}
+      </>}
 
       {criteria.length > 0 && (
         <div style={r.wiMorphSearchBar}>

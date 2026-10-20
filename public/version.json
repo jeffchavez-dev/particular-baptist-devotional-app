@@ -1,1 +1,1 @@
-{"version":"1.10.97","date":"2026-10-19","changelog":"Fixed Hebrew suffix tokens showing only 'Suffix' with no person/gender/number — pronominal suffixes now display full parsing (e.g. 'Suffix · 2nd Masculine Plural')."}
+{"version":"1.10.98","date":"2026-10-20","changelog":"Hebrew compound words (verb + pronominal suffix) now show both parts — e.g. 'Verb · Qal Perfect · 1st Common Plural' and 'Object Suffix · 2nd Masculine Plural' — instead of only the suffix."}
