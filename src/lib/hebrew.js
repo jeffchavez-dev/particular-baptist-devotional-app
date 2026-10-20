@@ -196,7 +196,11 @@ export function parseHebrewMorphDetails(code) {
 
   // Collect leading prefix labels (e.g. Prep, Conj, Article)
   const prefixEnd = mainIdx >= 0 ? mainIdx : 0
-  const prefixes  = parts.slice(0, prefixEnd).map(p => POS[p[0]] || p[0]).filter(Boolean)
+  // In TAHOT, R as a prefix encodes inseparable prepositions (בְּ כְּ לְ), not a pronoun
+  const prefixes  = parts.slice(0, prefixEnd).map(p => {
+    if (p[0] === 'R') return 'Prep'
+    return POS[p[0]] || p[0]
+  }).filter(Boolean)
   if (prefixes.length) primary.prefix = prefixes.join(' + ')
 
   // Suffix: last segment when it's an S code and distinct from main
