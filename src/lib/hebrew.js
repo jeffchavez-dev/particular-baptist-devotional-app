@@ -172,17 +172,29 @@ function _parsePart(main) {
   return { pos, items }
 }
 
+// Prefix POS codes that carry no detail rows of their own
+const PREFIX_POS = new Set(['C', 'P', 'D', 'T'])
+
 export function parseHebrewMorphDetails(code) {
   if (!code) return null
   const stripped = code.startsWith('H') ? code.slice(1) : code
   const parts    = stripped.split('/')
 
-  // Primary part: first segment (or only segment when no slash)
-  const primary = _parsePart(parts[0])
+  // Find the first substantive part (V/N/A/R/S) — skip leading prefixes (C/P/D/T)
+  const mainIdx  = parts.findIndex(p => !PREFIX_POS.has(p[0]))
+  const mainPart = mainIdx >= 0 ? parts[mainIdx] : parts[0]
+  const primary  = _parsePart(mainPart)
 
-  // Suffix part: last segment when compound (e.g. HVqp1cp/Sp2mp)
-  const suffixPart = parts.length > 1 ? _parsePart(parts[parts.length - 1]) : null
-  const suffix = suffixPart?.pos === 'Suffix' ? suffixPart : null
+  // Collect any leading prefix labels (e.g. Conj, Prep)
+  const prefixes = parts.slice(0, mainIdx >= 0 ? mainIdx : 0)
+    .map(p => POS[p[0]] || p[0])
+    .filter(Boolean)
+  if (prefixes.length) primary.prefix = prefixes.join(' + ')
+
+  // Suffix part: last segment when it's an S code and different from main
+  const lastPart   = parts[parts.length - 1]
+  const suffixPart = parts.length > 1 && lastPart !== mainPart ? _parsePart(lastPart) : null
+  const suffix     = suffixPart?.pos === 'Suffix' ? suffixPart : null
 
   return { ...primary, suffix }
 }

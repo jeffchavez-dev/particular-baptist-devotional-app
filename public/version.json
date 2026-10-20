@@ -1,1 +1,1 @@
-{"version":"1.10.98","date":"2026-10-20","changelog":"Hebrew compound words (verb + pronominal suffix) now show both parts — e.g. 'Verb · Qal Perfect · 1st Common Plural' and 'Object Suffix · 2nd Masculine Plural' — instead of only the suffix."}
+{"version":"1.10.99","date":"2026-10-20","changelog":"Fixed Hebrew morph parsing for words with conjunction/preposition prefixes (e.g. וְנִשְׂמְחָה) — prefix codes no longer hide the verb details. Compound words now correctly show prefix, verb, and suffix sections."}

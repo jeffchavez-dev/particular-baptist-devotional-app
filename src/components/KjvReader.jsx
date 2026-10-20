@@ -1033,6 +1033,7 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
 
   return (
     <div style={r.wiMorphBlock}>
+      {detail.prefix && renderRow('Prefix', detail.prefix)}
       {renderRow('Part of Speech', detail.pos)}
       {detail.items.map(it => renderRow(it.label, it.value))}
       {detail.suffix && <>
