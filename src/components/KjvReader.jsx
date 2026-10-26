@@ -5359,7 +5359,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
                 <button style={r.hymnModalClose} onClick={() => setHymnModal(null)}>✕</button>
               </div>
               <div style={r.hymnModalBody}>
-                <pre style={r.hymnModalText}>{hymn.text}</pre>
+                <pre style={{ ...r.hymnModalText, fontSize: prefs.sizePx }}>{hymn.text}</pre>
               </div>
               <div style={r.hymnModalFooter}>
                 <span style={r.hymnModalCollection}>

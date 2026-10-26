@@ -1,1 +1,1 @@
-{"version":"1.11.0","date":"2026-10-20","changelog":"Hebrew morph panel now correctly handles all prefix patterns — conjunctions, prepositions, and article/relative markers (HR/Ncmsa type codes) — showing the actual noun/verb details instead of just 'Pron'."}
+{"version":"1.11.1","date":"2026-10-26","changelog":"Fixed hymn sidebar navigation jumping to the correct hymn regardless of pagination. Fixed hymn modal text not responding to font size preference."}

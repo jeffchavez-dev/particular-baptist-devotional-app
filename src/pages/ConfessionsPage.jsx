@@ -1356,6 +1356,11 @@ export default function ConfessionsPage() {
                 onClick={() => {
                   setTab('hymns')
                   setNavOpen(false)
+                  // Ensure the target hymn's page is loaded before scrolling
+                  const allIds = Object.keys(HYMN_TEXTS).sort((a,b) => parseInt(a)-parseInt(b))
+                  const idx    = allIds.indexOf(id)
+                  const needed = Math.ceil((idx + 1) / HYMNS_PER_PAGE)
+                  setHymnPage(p => Math.max(p, needed))
                   setTimeout(() => {
                     const el = document.getElementById(`hymn-${id}`)
                     if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: 'smooth' })
