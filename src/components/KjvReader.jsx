@@ -3524,7 +3524,7 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       {/* Reader panel — on desktop, paddingLeft clears the sidebar */}
       <div style={{ ...r.readerWrap, paddingTop: topInset, paddingLeft: isMobile ? 0 : (sideOpen ? 280 : 0), transition:'padding-left 0.28s cubic-bezier(0.4,0,0.2,1)' }} ref={readerRef}>
 
-        <div style={{ ...r.content, maxWidth: isMobile ? contentWidthVal : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : Math.min(contentWidthVal, window.innerWidth - 220) + 'px', paddingRight: (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
+        <div style={{ ...r.content, maxWidth: isMobile ? contentWidthVal : (!sideOpen && prefs.parallelLayout === 'columns') ? 'calc(100vw - 32px)' : Math.min(contentWidthVal, window.innerWidth - 220) + 'px', paddingRight: isMobile ? 28 : (!isMobile && studyMode && studyLayers.commentary && _TEXT_VERSIONS.has(version)) ? comPanelWidth + 16 : undefined }}>
 
           {/* ══════════════════════════════════════════════
               BOOK OUTLINE VIEW (chapter === 0)

@@ -1,1 +1,1 @@
-{"version":"1.11.1","date":"2026-10-26","changelog":"Fixed hymn sidebar navigation jumping to the correct hymn regardless of pagination. Fixed hymn modal text not responding to font size preference."}
+{"version":"1.11.2","date":"2026-10-26","changelog":"Increased right padding on mobile scripture reader to visually balance the verse-number indent on the left."}
