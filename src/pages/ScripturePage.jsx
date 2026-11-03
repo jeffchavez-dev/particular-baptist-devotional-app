@@ -5,7 +5,7 @@ import KjvReader from '../components/KjvReader'
 import { getTodayDayNum } from '../lib/supabase'
 import { DAY_BIBLE } from '../data/readingPlan'
 import { saveScroll, restoreScroll } from '../lib/pageState'
-import { getDefaultReaderVersion, originalVersionForBook, setDefaultReaderVersion, getVisibleVersions } from '../lib/readerPrefs'
+import { getDefaultReaderVersion, originalVersionForBook, resolveVersion, setDefaultReaderVersion, getVisibleVersions } from '../lib/readerPrefs'
 import { getStudySession, setStudySession } from '../lib/studySession'
 import { BIBLE_VERSIONS } from '../lib/bibleVersions'
 import { BIBLE_BOOKS, BOOK_ABBR } from '../lib/bibleBooks'
@@ -24,15 +24,11 @@ export default function ScripturePage() {
   const [readSearch,  setReadSearch]  = useState('')
   const [readVersion, setReadVersion] = useState(() => {
     // Session override > user preference > 'kjv'
-    // 'original' is a meta-preference: resolve to 'hebrew' on first load
-    // (the reader starts at Genesis which is OT; switches happen via navigation)
+    // 'original' is kept as-is; effectiveVersion resolves it per book at render time
     try {
       const session = localStorage.getItem('reader-version')
-      // sessionStorage stores concrete version IDs only ('kjv','abab','hebrew','greek','lxx')
-      if (session && session !== 'original') return session
-      const pref = getDefaultReaderVersion()
-      // 'original' resolves to 'hebrew' on cold start (reader opens at Genesis by default)
-      return pref === 'original' ? 'hebrew' : pref
+      if (session) return session
+      return getDefaultReaderVersion()
     } catch { return 'kjv' }
   })
   const [navHistory,    setNavHistory]    = useState([])
@@ -309,6 +305,9 @@ export default function ScripturePage() {
     return DAY_BIBLE[today] || null
   }, [])
 
+  // Resolve 'original' meta-version → 'hebrew' (OT) or 'greek' (NT) based on current book
+  const effectiveVersion = resolveVersion(readVersion, readBook, BIBLE_BOOKS)
+
   return (
     <div style={{ ...s.page, height: `calc(100vh - ${offlineBannerH}px)` }}>
 
@@ -345,7 +344,9 @@ export default function ScripturePage() {
               title="Select Bible translation"
             >
               <span style={s.versionBtnLabel}>
-                {BIBLE_VERSIONS.find(v => v.id === readVersion)?.abbreviation || readVersion.toUpperCase()}
+                {readVersion === 'original'
+                  ? (effectiveVersion === 'greek' ? 'GNT' : 'HOT')
+                  : (BIBLE_VERSIONS.find(v => v.id === readVersion)?.abbreviation || readVersion.toUpperCase())}
               </span>
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink:0, opacity:0.6 }}>
                 <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -817,9 +818,10 @@ export default function ScripturePage() {
       }}>
         <KjvReader
           ref={kjvRef}
-          version={readVersion}
+          version={effectiveVersion}
           topInset={headerH}
           onVersionChange={v => {
+            // When the user manually switches away from 'original', exit the meta-mode
             setReadVersion(v)
             try { localStorage.setItem('reader-version', v) } catch {}
             kjvRef.current?.clearSelection()

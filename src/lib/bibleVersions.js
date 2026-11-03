@@ -52,6 +52,16 @@ export const BIBLE_VERSIONS = [
     source: 'STEPBible.org CC BY 4.0',
   },
   {
+    id: 'original',
+    label: 'Original Languages',
+    abbreviation: 'ORIG',
+    language: 'Hebrew / Greek',
+    year: 'BHS · NA28',
+    description: 'Auto-switches: Hebrew OT (TAHOT) for Old Testament books, Greek NT (BGNT) for New Testament books',
+    type: 'original',   // meta-version: resolved to 'hebrew' or 'greek' based on current book
+    scope: 'all',
+  },
+  {
     id: 'hebrew',
     label: 'Hebrew Old Testament',
     abbreviation: 'HOT',

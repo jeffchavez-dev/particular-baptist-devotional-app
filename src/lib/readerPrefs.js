@@ -11,7 +11,7 @@
 const KEY = 'pb-default-version'
 const VISIBLE_KEY = 'pb-visible-versions'
 
-export const DEFAULT_VISIBLE_VERSIONS = ['kjv', 'hebrew', 'greek', 'abab']
+export const DEFAULT_VISIBLE_VERSIONS = ['kjv', 'hebrew', 'greek', 'abab', 'original']
 
 /**
  * Available default reader options shown in Settings.
