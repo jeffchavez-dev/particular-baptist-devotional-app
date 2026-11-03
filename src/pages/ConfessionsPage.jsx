@@ -1209,9 +1209,22 @@ export default function ConfessionsPage() {
     setSearchPanelOpen(false)
     const targetTab = result.source
     if (tab !== targetTab) {
+      // For hymns, also ensure the right page is loaded before scrolling
+      if (result.hymnId) {
+        const allIds = Object.keys(HYMN_TEXTS).sort((a, b) => parseInt(a) - parseInt(b))
+        const idx = allIds.indexOf(result.hymnId)
+        const needed = Math.ceil((idx + 1) / HYMNS_PER_PAGE)
+        setHymnPage(p => Math.max(p, needed))
+      }
       pendingScrollRef.current = result.id
       setSearchParams({ t: targetTab })
     } else {
+      if (result.hymnId) {
+        const allIds = Object.keys(HYMN_TEXTS).sort((a, b) => parseInt(a) - parseInt(b))
+        const idx = allIds.indexOf(result.hymnId)
+        const needed = Math.ceil((idx + 1) / HYMNS_PER_PAGE)
+        setHymnPage(p => Math.max(p, needed))
+      }
       const el = document.getElementById(result.id)
       if (el) {
         const top = el.getBoundingClientRect().top + window.scrollY - headerH - 12
@@ -1263,6 +1276,12 @@ export default function ConfessionsPage() {
     Object.entries(ORTHODOX_CATECHISM).forEach(([num, item]) => {
       if (textMatches(item.q + ' ' + item.a, item.refs, SEARCH_IDX.orthodox[num] || '', q)) {
         hits.push({ source: 'orthodox', label: `Q&A ${num}`, text: `Q. ${item.q}`, id: `qa-${num}` })
+      }
+    })
+    Object.entries(HYMN_TEXTS).forEach(([id, h]) => {
+      const combined = (h.firstLine + ' ' + h.text).toLowerCase()
+      if (combined.includes(q)) {
+        hits.push({ source: 'hymns', label: `#${id} — ${h.firstLine}`, text: h.text, id: `hymn-${id}`, hymnId: id })
       }
     })
     return hits
@@ -1558,7 +1577,7 @@ export default function ConfessionsPage() {
           )}
 
           {!q && searchHistory.length === 0 && (
-            <div style={srp.emptyHint}>Type to search across all confessions and catechisms</div>
+            <div style={srp.emptyHint}>Type to search across all confessions, catechisms, and hymns</div>
           )}
 
           {/* Results grouped by source */}
