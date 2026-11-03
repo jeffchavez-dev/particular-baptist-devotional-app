@@ -1076,7 +1076,7 @@ function MorphTable({ detail, lang, styles: r, onMorphSearch, strongsId, wordGlo
 }
 
 /* ── Main Bible Reader (KJV, ABAB, etc.) ── */
-const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, studyLayers: studyLayersProp, onToggleLayer, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true, idleHide = false }, ref) {
+const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', allowAllBooks = false, onVersionChange, todayChapter, onNavChange, onSearchChange, onHistoryChange, onSearchResults, authorEditMode = false, studyMode = true, studyLayers: studyLayersProp, onToggleLayer, isBookmarked = false, onToggleBookmark, topInset = 0, chromeVis = true, idleHide = false }, ref) {
   const { prefs, updatePrefs } = usePrefs()
   const routerNavigate = useNavigate()
 
@@ -1553,7 +1553,8 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
       const dy = e.changedTouches[0].clientY - startY
       tracking = false
       if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.65) return
-      const allowed = version === 'greek' ? NT_BOOKS
+      const allowed = allowAllBooks ? null
+        : version === 'greek' ? NT_BOOKS
         : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
         : null
       // Use refs for current position so rapid swipes chain correctly.
@@ -2065,11 +2066,13 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           if (cancelled) return
           setMorphReady(true)
           setMorphLoading(false)
-          // Navigate to correct testament if needed
-          if (version === 'greek' && !NT_BOOKS.has(book)) {
-            setBook('Matthew'); setChapter(1)
-          } else if (version === 'hebrew' && !OT_BOOKS.has(book)) {
-            setBook('Genesis'); setChapter(1)
+          // Navigate to correct testament if needed (skip when allowAllBooks — 'original' mode handles this upstream)
+          if (!allowAllBooks) {
+            if (version === 'greek' && !NT_BOOKS.has(book)) {
+              setBook('Matthew'); setChapter(1)
+            } else if (version === 'hebrew' && !OT_BOOKS.has(book)) {
+              setBook('Genesis'); setChapter(1)
+            }
           }
         })
         .catch(e => {
@@ -3463,21 +3466,20 @@ const KjvReader = React.forwardRef(function KjvReader({ version = 'kjv', onVersi
           selectedBook={book}
           selectedChapter={chapter}
           onNavigate={(b, ch) => {
-            if (version === 'greek' && !NT_BOOKS.has(b)) { navigate('Matthew', 1); return }
-            if ((version === 'hebrew' || version === 'lxx') && !OT_BOOKS.has(b)) { navigate('Genesis', 1); return }
             navigate(b, ch)
           }}
           onClose={() => setSideOpen(false)}
           isMobile={isMobile}
-          ntOnly={version === 'greek'}
-          otOnly={version === 'hebrew' || version === 'lxx'}
+          ntOnly={!allowAllBooks && version === 'greek'}
+          otOnly={!allowAllBooks && (version === 'hebrew' || version === 'lxx')}
         />
         </div>{/* end sidebarScroll */}
       </aside>
 
       {/* ── Fixed chapter navigation arrows — hidden when chrome is hidden ── */}
       {(() => {
-        const allowed = version === 'greek' ? NT_BOOKS
+        const allowed = allowAllBooks ? null
+          : version === 'greek' ? NT_BOOKS
           : (version === 'hebrew' || version === 'lxx') ? OT_BOOKS
           : null
         const prevCh = chapter === 0 ? null : getPrevChapter(book, chapter)

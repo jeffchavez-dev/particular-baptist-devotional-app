@@ -1,1 +1,1 @@
-{"version":"1.11.4","date":"2026-11-03","changelog":"Hymns are now searchable by title and lyrics from the Confessions page search panel. Results appear grouped under Hymns alongside confessions and catechisms, and tapping a result navigates directly to that hymn."}
+{"version":"1.11.5","date":"2026-11-03","changelog":"Fixed: in Original Languages (ORIG) mode the book sidebar now shows both Old and New Testament books, allowing free navigation across all 66 books without being locked to one testament."}

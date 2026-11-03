@@ -819,6 +819,7 @@ export default function ScripturePage() {
         <KjvReader
           ref={kjvRef}
           version={effectiveVersion}
+          allowAllBooks={readVersion === 'original'}
           topInset={headerH}
           onVersionChange={v => {
             // When the user manually switches away from 'original', exit the meta-mode
