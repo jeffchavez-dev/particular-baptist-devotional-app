@@ -419,8 +419,8 @@ function StudyLayerPills({ layers, onToggle, styles: r }) {
 /* ── Desktop right-side commentary panel ── */
 function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, onToggle, onChangeId, onLinkClick, styles: r, topInset, commentaries, sizePx, onWidthChange }) {
   const lastSecRef = React.useRef(null)
+  const bodyRef    = React.useRef(null)
   const [panelWidth, setPanelWidth] = React.useState(340)
-  const dragRef = React.useRef(null)
 
   function onDragStart(e) {
     e.preventDefault()
@@ -442,7 +442,6 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
   // Find last section whose range starts at or before the visible verse
   const activeIdx = (() => {
     if (!sections.length) return -1
-    // Sections with no startVerse (intro) always qualify as index 0
     let idx = -1
     for (let i = 0; i < sections.length; i++) {
       const sv = sections[i].startVerse
@@ -453,6 +452,11 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
 
   const activeSec = activeIdx >= 0 ? sections[activeIdx] : lastSecRef.current
   if (activeIdx >= 0) lastSecRef.current = sections[activeIdx]
+
+  // Scroll panel body to top whenever the active section changes
+  React.useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [activeIdx, comId])
 
   const comKeys = Object.keys(commentaries)
 
@@ -484,7 +488,7 @@ function CommentaryRightPanel({ comId, sections, isLoading, visVerse, expanded, 
       </div>
 
       {/* Body */}
-      <div style={r.comPanelBody}>
+      <div ref={bodyRef} style={r.comPanelBody}>
         {isLoading && (
           <div style={r.comLoadingRow}>
             <div style={r.comSpinner} />
